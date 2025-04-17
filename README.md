@@ -1,7 +1,7 @@
-# Reward kit
+# Introducing the Fireworks Reward Kit: Simpler, Composable Reward Modeling for LLM RL Fine-Tuning
 Reinforcement Learning from AI Feedback (RLAIF), is a powerful technique for aligning Large Language Models (LLMs) to desired behaviors. However, implementing the reward modeling component can often be complex, tightly coupled to specific RL frameworks, and difficult to scale or iterate upon.
 
-Today, we're excited to introduce the **Fireworks RL Reward SDK**, a Python library designed to drastically simplify how you define, test, deploy, and *use* reward functions for LLM fine-tuning, including launching full RL jobs directly on the Fireworks platform.
+Today, we're excited to introduce the **Fireworks Reward Kit**, a Python library designed to drastically simplify how you define, test, deploy, and *use* reward functions for LLM fine-tuning, including launching full RL jobs directly on the Fireworks platform.
 
 **Our core philosophy:** Your reward logic should be:
 
@@ -22,7 +22,7 @@ Traditional RL setups often require reward functions to fit specific batch-orien
 The Fireworks RL Reward SDK lets you define your reward logic using a natural, context-aware, **pointwise** Python function signature that returns both a final score and its components:
 
 ```python
-# In my_rewards.py
+# In the reward_kit library
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
@@ -38,7 +38,11 @@ class MetricRewardOutput:
 class RewardOutput:
     score: float
     metrics: Dict[str, MetricRewardOutput]
+```
 
+and then for the reward function you need to define
+```python
+from reward_kit import RewardOutput
 def calculate_base_score(
     messages: List[Dict[str, str]],
     original_messages: List[Dict[str, str]],
@@ -74,8 +78,7 @@ This signature returns a `(float, Dict[str, float])` tuple, enabling fine-graine
 Combine multiple reward functions for more sophisticated evaluations.
 
 ```python
-# In my_rewards.py (continued)
-from fireworks_rl_reward_sdk import RewardFunction # Assuming RewardFunction is importable
+from reward_kit import RewardFunction
 
 def calculate_safety_score(
     messages: List[Dict[str, str]],
@@ -118,8 +121,8 @@ This approach keeps individual reward functions focused and allows combining the
 Accelerate development with pre-built functions for common tasks like evaluating LLM-generated function calls.
 
 ```python
-from fireworks_rl_reward_sdk import RewardFunction
-from fireworks_rl_reward_sdk.rewards import function_calling # Assumed path
+from reward_kit import RewardFunction
+from reward_kit.rewards import function_calling
 
 expected_call = { # Define expected structure (as before)
     "name": "get_weather",
@@ -156,7 +159,7 @@ def my_agent_reward(messages, original_messages, **kwargs) -> RewardOutput:
 Leverage powerful, pre-trained reward models hosted directly on the Fireworks platform without needing to manage them yourself. Example using a hypothetical Nemotron-340B reward model:
 
 ```python
-from fireworks_rl_reward_sdk import RewardFunction
+from reward_kit import RewardFunction
 
 # Instantiate by pointing to a Fireworks-hosted model ID
 # (Ensure your Fireworks API key is configured)
@@ -221,7 +224,7 @@ To make deploying and scaling your custom reward functions seamless, we provide 
 Simply write your reward logic as a standard Python function and apply the `@reward_function` decorator provided by our library. The decorator handles the necessary preparations for deployment without altering your core logic's signature or behavior for local execution.
 
 ```python
-from fireworks.rewards import reward_function
+from reward_kit import reward_function
 
 @reward_function
 def combined_reward(messages: Dict[str, Any], *args, **kwargs) -> float:
@@ -375,7 +378,7 @@ The RL service calls the specified endpoint to get rewards during training.
 
 The Fireworks RL Reward SDK offers a pragmatic, flexible, and powerful approach to RL reward modeling and execution, letting you choose the right level of control and convenience.
 
-- **Install the SDK:** `pip install fireworks-rl-reward-sdk` (*Use actual name*)
+- **Install the SDK:** `pip install reward_kit` (*Use actual name*)
 - **Check out the Docs:** [Link to your documentation] (Including details on deployment options, `fireworks-reward serve`, hosted models, secrets, TRL adapter)
 - **Try the Examples:** [Link to examples repository/directory]
 

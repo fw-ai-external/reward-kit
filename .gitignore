@@ -1,0 +1,7 @@
+.DS_Store
+.venv
+# all the pycache
+__pycache__
+
+# all the egg info
+*.egg-info

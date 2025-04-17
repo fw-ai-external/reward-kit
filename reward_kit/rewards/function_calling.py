@@ -111,27 +111,13 @@ def match_function_call(
             else:
                 correct_args = len(perfect_matches)
                 arg_score = correct_args / total_provided
-    elif argument_match_strictness == "flexible":
-        # Allow extra arguments and type mismatches with penalty
-        total_expected = len(expected_args)
-        if total_expected == 0:
-            # If no args were expected, we only penalize for extras
-            arg_score = 1.0 if not extra_args else 0.5
+    elif argument_match_strictness == "permissive" or argument_match_strictness == "flexible":
+        # For permissive mode, ignore extra arguments and just check that required ones are present
+        # and have the correct type
+        if missing_args or type_mismatches:
+            arg_score = 0.0
         else:
-            # Calculate percentage of perfect matches out of expected args
-            perfect_score = len(perfect_matches) / total_expected
-            
-            # Apply penalties
-            penalty = 0.0
-            if missing_args:
-                penalty += 0.3  # 30% penalty for missing args
-            if type_mismatches:
-                penalty += 0.2  # 20% penalty for type mismatches
-            if extra_args:
-                penalty += 0.1  # 10% penalty for extra args
-            
-            # Ensure the score is between 0 and 1
-            arg_score = max(0.0, perfect_score - penalty)
+            arg_score = 1.0
     else:
         raise ValueError(f"Invalid argument_match_strictness: {argument_match_strictness}")
     

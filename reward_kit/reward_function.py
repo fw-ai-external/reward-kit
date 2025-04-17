@@ -77,11 +77,32 @@ class RewardFunction:
             raise ValueError(f"Invalid mode: {mode}")
     
     def _load_function_from_path(self, func_path: str) -> Callable:
-        """Load a function from a path string (e.g., 'module.submodule:function_name')."""
-        if ":" not in func_path:
-            raise ValueError(f"Invalid func_path format: {func_path}, expected 'module.path:function_name'")
+        """
+        Load a function from a path string.
         
-        module_path, func_name = func_path.split(":", 1)
+        Handles two formats:
+        - 'module.path:function_name' - Module with colon separator 
+        - 'module.path.function_name' - Module with function as last component
+        """
+        # Check for the colon format first (preferred)
+        if ":" in func_path:
+            module_path, func_name = func_path.split(":", 1)
+            
+            try:
+                module = importlib.import_module(module_path)
+                func = getattr(module, func_name)
+                return func
+            except (ImportError, AttributeError) as e:
+                raise ImportError(f"Failed to load function from path {func_path}: {str(e)}")
+        
+        # Try dot notation format: module.path.function_name
+        # This assumes the last component is the function name
+        parts = func_path.split(".")
+        if len(parts) < 2:
+            raise ValueError(f"Invalid func_path format: {func_path}, expected 'module.path:function_name' or 'module.path.function_name'")
+        
+        module_path = ".".join(parts[:-1])
+        func_name = parts[-1]
         
         try:
             module = importlib.import_module(module_path)
@@ -178,25 +199,50 @@ class RewardFunction:
         """
         Create an adapter function for use with TRL library.
         
-        The TRL library expects a function that takes a batch of texts (list of strings)
-        and returns a batch of reward values (list of floats).
+        The TRL library expects a function that takes batch inputs and returns a batch of reward values.
+        This adapter handles:
+        1. Batch of messages (List[List[Dict]]) and original messages (List[List[Dict]])
+        2. Batch of texts (List[str]) for simpler cases
         
         Returns:
             A callable function compatible with TRL
         """
-        def adapter(texts: List[str]) -> List[float]:
+        def adapter(batch_input, batch_orig_input=None) -> List[float]:
             results = []
-            for text in texts:
-                # TRL typically provides just the completion, so we wrap it in a message
-                messages = [{"role": "assistant", "content": text}]
-                # Call the reward function and extract the score
-                try:
-                    reward_output = self(messages=messages)
-                    results.append(reward_output.score)
-                except Exception as e:
-                    logger.error(f"Error in TRL adapter: {str(e)}")
-                    # In case of error, provide a neutral reward to avoid breaking training
-                    results.append(0.0)
+            
+            # Check if this is simple text input or structured messages
+            if isinstance(batch_input, list):
+                if not batch_input:
+                    return []
+                
+                # Case 1: List of message arrays (TRL batch format)
+                if isinstance(batch_input[0], list) and all(isinstance(m, dict) for m in batch_input[0]):
+                    for i, messages in enumerate(batch_input):
+                        try:
+                            # Get original messages if provided, otherwise use messages minus last one
+                            original_msgs = batch_orig_input[i] if batch_orig_input else messages[:-1]
+                            reward_output = self(messages=messages, original_messages=original_msgs)
+                            results.append(reward_output.score)
+                        except Exception as e:
+                            logger.error(f"Error in TRL adapter: {str(e)}")
+                            results.append(0.0)
+                
+                # Case 2: List of strings (simple TRL format)
+                elif all(isinstance(text, str) for text in batch_input):
+                    for text in batch_input:
+                        try:
+                            # TRL typically provides just the completion, so wrap it in a message
+                            messages = [{"role": "assistant", "content": text}]
+                            reward_output = self(messages=messages)
+                            results.append(reward_output.score)
+                        except Exception as e:
+                            logger.error(f"Error in TRL adapter: {str(e)}")
+                            results.append(0.0)
+                else:
+                    raise ValueError(f"Unsupported input format for TRL adapter: {type(batch_input[0])}")
+            else:
+                raise ValueError(f"Unsupported input type for TRL adapter: {type(batch_input)}")
+                
             return results
         
         return adapter
@@ -238,29 +284,186 @@ def reward_function(func: T) -> T:
     
     def deploy(**config) -> str:
         """
-        Deploy the reward function to Fireworks.
+        Deploy the reward function to Fireworks as an evaluation with a Python code assertion.
         
         Args:
             **config: Configuration options for deployment
+                name (str): Name for the evaluation
+                description (str, optional): Description of the evaluation
+                account_id (str, optional): Fireworks account ID. If not provided, 
+                                           will be read from ~/.fireworks/auth.ini
+                providers (list, optional): List of provider configurations
+                                           Defaults to a single provider with current model
                 
         Returns:
-            A string deployment handle/ID
+            A string evaluation ID that can be used in RL training
         """
-        # In a real implementation, this would send the function code to Fireworks
-        # for deployment. For now, we just log the action.
+        import configparser
+        import os
+        import requests
+        from pathlib import Path
+        
+        # Get configuration parameters
         name = config.get("name", func.__name__)
-        logger.info(f"Deploying reward function '{func.__name__}' as '{name}'...")
+        description = config.get("description", f"Reward function deployed from {func.__name__}")
         
-        # Get function source code and dependencies
+        # Get function source code
         source = inspect.getsource(func)
+        
+        # Load authentication info
+        account_id = config.get("account_id")
+        auth_token = config.get("auth_token")
+        
+        # If not provided directly, try to load from config files
+        if not account_id or not auth_token:
+            try:
+                auth_path = Path.home() / ".fireworks" / "auth.ini"
+                if auth_path.exists():
+                    auth_config = configparser.ConfigParser()
+                    auth_config.read(auth_path)
+                    if "default" in auth_config:
+                        if not account_id and "account_id" in auth_config["default"]:
+                            account_id = auth_config["default"]["account_id"]
+                        if not auth_token and "id_token" in auth_config["default"]:
+                            auth_token = auth_config["default"]["id_token"]
+            except Exception as e:
+                logger.error(f"Error reading auth config: {str(e)}")
+                
+        if not account_id:
+            raise ValueError("account_id not provided and could not be loaded from ~/.fireworks/auth.ini")
+        
+        if not auth_token:
+            auth_token = os.environ.get("FIREWORKS_API_KEY")
+            if not auth_token:
+                raise ValueError("Authentication token not found. Please run 'firectl signin' or set FIREWORKS_API_KEY")
+
+        # Get or create default providers
+        providers = config.get("providers", [
+            {
+                "providerType": "fireworks",
+                "modelId": "accounts/fireworks/models/llama-v3-8b-instruct"
+            }
+        ])
+        
+        # Create wrapper code that converts the function to a proper reward evaluation
+        # This generates a Python snippet that will:
+        # 1. Parse input from the evaluation framework
+        # 2. Call our reward function
+        # 3. Format the output appropriately
+        # Check if we need to import the reward kit models
         module = inspect.getmodule(func)
-        module_path = module.__file__ if module else None
+        module_imports = inspect.getsource(module) if module else ""
         
-        # Create a mock deployment ID
-        deployment_id = f"deployment_{name}"
+        # Define needed imports for the wrapper code
+        imports_needed = (
+            "from typing import Dict, List, Optional, Any\n"
+            "from dataclasses import dataclass\n\n"
+            "@dataclass\n"
+            "class MetricRewardOutput:\n"
+            "    score: float\n"
+            "    reason: Optional[str] = None\n\n"
+            "@dataclass\n"
+            "class RewardOutput:\n"
+            "    score: float\n"
+            "    metrics: Dict[str, MetricRewardOutput] = None\n"
+            "    \n"
+            "    def to_dict(self):\n"
+            "        return {\n"
+            "            \"score\": self.score,\n"
+            "            \"metrics\": {\n"
+            "                k: {\"score\": v.score, \"reason\": v.reason}\n" 
+            "                for k, v in (self.metrics or {}).items()\n"
+            "            }\n"
+            "        }\n"
+        )
         
-        logger.info(f"Deployment submitted. Handle/ID: {deployment_id}")
-        return deployment_id
+        # Only add imports if they're not already in the module
+        if "class RewardOutput" not in module_imports:
+            extra_imports = imports_needed
+        else:
+            extra_imports = ""
+        
+        # Format the wrapper code to handle execution of the reward function
+        wrapper_code = (
+            f"# Original function: {func.__name__}\n"
+            "import json\n"
+            "import sys\n"
+            "from typing import Dict, List, Optional, Any\n\n"
+            f"{extra_imports}\n"
+            f"{source}\n\n"
+            "def evaluate(input_data):\n"
+            "    try:\n"
+            "        # Parse input data\n"
+            "        data = json.loads(input_data)\n"
+            "        messages = data.get('messages', [])\n"
+            "        original_messages = data.get('original_messages', messages[:-1] if messages else [])\n"
+            "        kwargs = data.get('kwargs', {})\n"
+            "        \n"
+            f"        # Call reward function\n"
+            f"        result = {func.__name__}(messages=messages, original_messages=original_messages, **kwargs)\n"
+            "        \n"
+            "        # Format result as expected by the evaluation system\n"
+            "        if hasattr(result, 'to_dict'):\n"
+            "            result_dict = result.to_dict()\n"
+            "        elif hasattr(result, '__dict__'):\n"
+            "            result_dict = result.__dict__\n"
+            "        else:\n"
+            "            result_dict = {'score': result}\n"
+            "            \n"
+            "        return json.dumps(result_dict)\n"
+            "    except Exception as e:\n"
+            "        return json.dumps({'error': str(e), 'score': 0.0})\n\n"
+            "# Process input from the evaluation system\n"
+            "if __name__ == '__main__':\n"
+            "    input_data = sys.stdin.read()\n"
+            "    output = evaluate(input_data)\n"
+            "    print(output)\n"
+        )
+
+        # Create evaluation payload
+        evaluation_payload = {
+            "evaluation": {
+                "evaluationType": "code_assertion",
+                "description": description,
+                "providers": providers,
+                "assertions": [
+                    {
+                        "assertionType": "CODE",
+                        "codeAssertion": {
+                            "language": "python",
+                            "code": wrapper_code
+                        },
+                        "metricName": name
+                    }
+                ]
+            }
+        }
+        
+        # Send request to create evaluation
+        url = f"https://api.fireworks.ai/v1/accounts/{account_id}/evaluations"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            logger.info(f"Deploying reward function '{func.__name__}' as evaluation '{name}'...")
+            response = requests.post(url, json=evaluation_payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            
+            evaluation_id = result.get("name", "").split("/")[-1]
+            evaluation_url = f"https://api.fireworks.ai/v1/accounts/{account_id}/evaluations/{evaluation_id}"
+            
+            logger.info(f"Deployment successful. Evaluation ID: {evaluation_id}")
+            logger.info(f"Evaluation URL: {evaluation_url}")
+            
+            return evaluation_id
+        except Exception as e:
+            logger.error(f"Error deploying evaluation: {str(e)}")
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+                logger.error(f"Response: {e.response.text}")
+            raise
     
     # Add the deploy method to the function
     wrapper.deploy = deploy  # type: ignore

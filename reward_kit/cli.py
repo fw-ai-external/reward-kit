@@ -2,10 +2,23 @@ import argparse
 import os
 import sys
 import logging
+import importlib
+import importlib.util
 from typing import Optional
+import typer
+import uvicorn
 
 from .server import serve, serve_tunnel
 from .models import RewardOutput
+
+# Set up Typer app for modern CLI interface
+app = typer.Typer(help="Fireworks Reward Kit CLI")
+
+# Import version from package
+try:
+    from . import __version__
+except ImportError:
+    __version__ = "0.1.0"  # Default version if not found
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -45,71 +58,154 @@ def parse_args():
     
     return parser.parse_args()
 
+def validate_function_path(function_path: str):
+    """
+    Validate and import a function from a module path.
+    
+    Args:
+        function_path: A string in the format "module.path:function_name" or "file.py:function_name"
+    
+    Returns:
+        The imported function
+    
+    Raises:
+        ImportError: If the function could not be imported
+    """
+    if ":" not in function_path:
+        raise ImportError(f"Invalid function path format: {function_path}, expected 'module.path:function_name' or 'file.py:function_name'")
+    
+    # Split into module/file path and function name
+    path, func_name = function_path.split(":", 1)
+    
+    # Check if it's a file path (ends with .py)
+    if path.endswith(".py"):
+        if not os.path.exists(path):
+            raise ImportError(f"File not found: {path}")
+        
+        # Load module from file path
+        module_name = os.path.basename(path).replace(".py", "")
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None:
+            raise ImportError(f"Could not create module spec from {path}")
+        
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # type: ignore
+    else:
+        # Standard module import
+        try:
+            module = importlib.import_module(path)
+        except ImportError as e:
+            raise ImportError(f"Failed to import module {path}: {str(e)}")
+    
+    # Get the function from the module
+    try:
+        func = getattr(module, func_name)
+        return func
+    except AttributeError:
+        raise ImportError(f"Function '{func_name}' not found in module {path}")
+
+
+@app.command()
+def version():
+    """Show the version of the reward kit."""
+    typer.echo(f"Fireworks Reward Kit v{__version__}")
+
+
+@app.command()
+def serve_app(
+    function_path: str = typer.Argument(..., help="Path to the reward function (e.g., 'module.path:function_name')"),
+    host: str = typer.Option("0.0.0.0", help="Host to bind the server to"),
+    port: int = typer.Option(8000, help="Port to bind the server to"),
+):
+    """Serve a reward function as an HTTP API."""
+    try:
+        # Validate the function path
+        validate_function_path(function_path)
+        
+        # Start the server
+        typer.echo(f"Starting reward server on {host}:{port} for function {function_path}")
+        # Use the serve function imported from server.py
+        serve(function_path, host, port)
+    except Exception as e:
+        typer.echo(f"Error: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def serve_tunnel_cmd(
+    function_path: str = typer.Argument(..., help="Path to the reward function"),
+    port: int = typer.Option(8000, help="Port to bind the server to"),
+):
+    """Serve a reward function with a tunnel for external access."""
+    try:
+        serve_tunnel(function_path, port)
+    except Exception as e:
+        typer.echo(f"Error: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def test(
+    function_path: str = typer.Argument(..., help="Path to the reward function to test"),
+    messages_json: str = typer.Option(..., "--messages", help="JSON string of messages to test with"),
+):
+    """Test a reward function locally."""
+    import json
+    
+    try:
+        # Parse the messages
+        messages = json.loads(messages_json)
+        
+        # Validate and load the function
+        func = validate_function_path(function_path)
+        
+        # Call the function
+        result = func(messages=messages)
+        
+        # Print the result
+        if isinstance(result, RewardOutput):
+            typer.echo(f"Score: {result.score}")
+            typer.echo("Metrics:")
+            for name, metric in result.metrics.items():
+                typer.echo(f"  {name}: {metric.score} ({metric.reason or 'No reason provided'})")
+        elif isinstance(result, tuple) and len(result) == 2:
+            score, components = result
+            typer.echo(f"Score: {score}")
+            typer.echo("Components:")
+            for name, value in components.items():
+                typer.echo(f"  {name}: {value}")
+        else:
+            typer.echo(f"Invalid result type: {type(result)}", err=True)
+            raise typer.Exit(code=1)
+    except Exception as e:
+        typer.echo(f"Error testing reward function: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def deploy(
+    function_path: str = typer.Argument(..., help="Path to the reward function to deploy"),
+    name: str = typer.Option(..., help="Name for the deployed function"),
+):
+    """Deploy a reward function to Fireworks."""
+    typer.echo(f"Deploying {function_path} as {name}...")
+    typer.echo("This is a placeholder. In a complete implementation, this would deploy the function to Fireworks.")
+
+
+@app.command()
+def deploy_cloudrun(
+    function_path: str = typer.Argument(..., help="Path to the reward function to deploy"),
+    project: str = typer.Option(..., help="Google Cloud project ID"),
+    name: str = typer.Option(..., help="Name for the Cloud Run service"),
+):
+    """Deploy a reward function to Google Cloud Run."""
+    typer.echo(f"Deploying {function_path} to Cloud Run as {name} in project {project}...")
+    typer.echo("This is a placeholder. In a complete implementation, this would deploy to Google Cloud Run.")
+
+
 def main():
     """Main entry point for the CLI."""
-    args = parse_args()
-    
-    if args.command == "serve":
-        # Serve the reward function
-        serve(func_path=args.func_path, host=args.host, port=args.port)
-    
-    elif args.command == "serve-tunnel":
-        # Serve the reward function with a tunnel
-        serve_tunnel(func_path=args.func_path, port=args.port)
-    
-    elif args.command == "test":
-        # Test the reward function
-        import json
-        import importlib
-        
-        try:
-            # Parse the messages
-            messages = json.loads(args.messages)
-            
-            # Load the function
-            if ":" not in args.func_path:
-                raise ValueError(f"Invalid func_path format: {args.func_path}, expected 'module.path:function_name'")
-            
-            module_path, func_name = args.func_path.split(":", 1)
-            module = importlib.import_module(module_path)
-            func = getattr(module, func_name)
-            
-            # Call the function
-            result = func(messages=messages)
-            
-            # Print the result
-            if isinstance(result, RewardOutput):
-                print(f"Score: {result.score}")
-                print("Metrics:")
-                for name, metric in result.metrics.items():
-                    print(f"  {name}: {metric.score} ({metric.reason or 'No reason provided'})")
-            elif isinstance(result, tuple) and len(result) == 2:
-                score, components = result
-                print(f"Score: {score}")
-                print("Components:")
-                for name, value in components.items():
-                    print(f"  {name}: {value}")
-            else:
-                print(f"Invalid result type: {type(result)}")
-                sys.exit(1)
-        
-        except Exception as e:
-            logger.error(f"Error testing reward function: {str(e)}")
-            sys.exit(1)
-    
-    elif args.command == "deploy":
-        # This would be implemented with actual API calls to deploy the function
-        logger.info(f"Deploying {args.func_path} as {args.name}...")
-        logger.info("This is a placeholder. In a complete implementation, this would deploy the function to Fireworks.")
-    
-    elif args.command == "deploy-cloudrun":
-        # This would be implemented with actual Google Cloud API calls
-        logger.info(f"Deploying {args.func_path} to Cloud Run as {args.name} in project {args.project}...")
-        logger.info("This is a placeholder. In a complete implementation, this would deploy to Google Cloud Run.")
-    
-    else:
-        logger.error("No command specified. Use --help to see available commands.")
-        sys.exit(1)
+    app()
 
 if __name__ == "__main__":
     main()

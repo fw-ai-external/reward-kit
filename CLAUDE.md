@@ -1,6 +1,7 @@
 # CLAUDE.md - Reward Kit Development Guide
 
 ## Commands
+- activate venv: `source .venv/bin/activate`
 - Install: `pip install -e .`
 - Run tests: `pytest`
 - Run single test: `pytest tests/test_file.py::test_function`

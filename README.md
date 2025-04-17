@@ -71,7 +71,7 @@ def calculate_base_score(
     return RewardOutput(score=final_score, metrics=metrics)
 ```
 
-This signature returns a `(float, Dict[str, float])` tuple, enabling fine-grained analysis against reward hacking.
+This structure returns both the final score and detailed component metrics, enabling fine-grained analysis against reward hacking.
 
 ### Building Composable Rewards
 
@@ -87,15 +87,23 @@ def calculate_safety_score(
 ) -> RewardOutput:
     """Calculates a safety score (example: penalizes forbidden words)."""
     last_response = messages[-1]['content'].lower()
-    components = {}
+    metrics = {}
+    
+    # Check for unsafe content
     penalty = 0.0
+    reason = "No unsafe content detected"
     if "unsafe_word" in last_response:
         penalty = -1.0
-    components["safety_penalty"] = penalty
-    # A safety score might range from 0 (unsafe) to 1 (safe),
-    # here we just return the penalty component directly.
-    final_score = penalty # In this simple case, final score is just the penalty
-    return final_score, components
+        reason = "Unsafe content detected"
+    
+    metrics["safety_penalty"] = MetricRewardOutput(
+        score=penalty,
+        reason=reason
+    )
+    
+    # A safety score might range from 0 (unsafe) to 1 (safe)
+    final_score = penalty  # In this simple case, final score is just the penalty
+    return RewardOutput(score=final_score, metrics=metrics)
 
 # Now, compose them:
 def combined_reward(
@@ -104,14 +112,14 @@ def combined_reward(
     **kwargs
 ) -> RewardOutput:
     """Combines base score and safety score."""
-    final_base, components_base = calculate_base_score(messages, original_messages, **kwargs)
-    final_safety, components_safety = calculate_safety_score(messages, original_messages, **kwargs)
+    base_output = calculate_base_score(messages, original_messages, **kwargs)
+    safety_output = calculate_safety_score(messages, original_messages, **kwargs)
 
-    # Combine scores and components
-    all_components = {**components_base, **components_safety}
-    final_score = final_base + final_safety # Adjust aggregation as needed
+    # Combine scores and metrics
+    all_metrics = {**base_output.metrics, **safety_output.metrics}
+    final_score = base_output.score + safety_output.score  # Adjust aggregation as needed
 
-    return final_score, all_components
+    return RewardOutput(score=final_score, metrics=all_metrics)
 ```
 
 This approach keeps individual reward functions focused and allows combining them easily. *Note: While this example uses local composition, one of the composed functions (e.g., `calculate_safety_score`) could itself be an instance of `RewardFunction(mode="remote", endpoint="...")` if you had deployed it separately.*
@@ -138,16 +146,20 @@ fn_call_reward_model = RewardFunction(
 )
 
 def my_agent_reward(messages, original_messages, **kwargs) -> RewardOutput:
-    is_function_call, parsed_call = parse_potential_function_call(messages[-1])
+    # Let's assume this function parses a potential function call from the response
+    is_function_call, parsed_call = parse_potential_function_call(messages[-1]['content'])
+    
     if is_function_call:
-        # Returns (score, components) based on match quality
+        # Return reward output based on function call match quality
         return fn_call_reward_model(
-            messages=messages, original_messages=original_messages,
-            parsed_arguments=parsed_call.get('arguments',{}),
+            messages=messages, 
+            original_messages=original_messages,
+            parsed_arguments=parsed_call.get('arguments', {}),
             function_name=parsed_call.get('name')
         )
     else:
-        return calculate_base_score(messages, original_messages) # Fallback
+        # Fallback to base scoring for non-function responses
+        return calculate_base_score(messages, original_messages)
 
 # Wrap 'my_agent_reward'
 # agent_reward_wrapper = RewardFunction(func_path="my_rewards.py::my_agent_reward", mode="local")
@@ -176,14 +188,14 @@ test_msgs = test_orig + [{"role": "assistant", "content": "..." # LLM Response
 
 try:
     # This call goes to the Fireworks API endpoint for the Nemotron reward model
-    final_score, components = nemotron_reward_model(
+    reward_output = nemotron_reward_model(
         messages=test_msgs,
         original_messages=test_orig
         # Specific models might accept/require additional args via kwargs
     )
-    print(f"Nemotron Reward Score: {final_score}")
+    print(f"Nemotron Reward Score: {reward_output.score}")
     # Components dict structure depends on the specific hosted model
-    print(f"Nemotron Components: {components}")
+    print(f"Nemotron Metrics: {reward_output.metrics}")
 
 except Exception as e:
     print(f"Error calling hosted reward model: {e}")
@@ -203,8 +215,9 @@ reward_model_local = RewardFunction(func_path="my_rewards.py::combined_reward", 
 test_orig = [{"role": "user", "content": "Explain RLHF safely."}]
 test_msgs = test_orig + [{"role": "assistant", "content": "RLHF is helpful..."}]
 
-final_score, components = reward_model_local(messages=test_msgs, original_messages=test_orig)
-print(f"Calculated local reward: {final_score}, Components: {components}")
+reward_output = reward_model_local(messages=test_msgs, original_messages=test_orig)
+print(f"Calculated local reward: {reward_output.score}")
+print(f"Reward metrics: {reward_output.metrics}")
 
 ```
 
@@ -219,29 +232,50 @@ trl_compatible_reward_fn = reward_model_local.get_trl_adapter()
 
 To make deploying and scaling your custom reward functions seamless, we provide a simple decorator-based approach, inspired by familiar patterns in frameworks like Ray Serve and Modal. This allows you to focus on your reward logic in standard Python while easily transitioning to a scalable deployment.
 
-**1. Define Your Reward Function with `@reward_function`**
+**1. Define Your Reward Function with `@reward_function`**
 
-Simply write your reward logic as a standard Python function and apply the `@reward_function` decorator provided by our library. The decorator handles the necessary preparations for deployment without altering your core logic's signature or behavior for local execution.
+Simply write your reward logic as a standard Python function and apply the `@reward_function` decorator provided by our library. The decorator handles the necessary preparations for deployment without altering your core logic's signature or behavior for local execution.
 
 ```python
 from reward_kit import reward_function
 
 @reward_function
-def combined_reward(messages: Dict[str, Any], *args, **kwargs) -> float:
+def combined_reward(messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], 
+                   metadata: Optional[Dict[str, Any]] = None, **kwargs) -> RewardOutput:
     """
     Calculates a reward based on completion length and keyword presence.
     (This is just an example, your logic can be arbitrarily complex)
     """
-    length_score = min(len(messages[-1].content) / 100.0, 1.0) # Score based on length (up to 100 chars)
-    keyword_present = "important" in completion.lower()
+    last_response = messages[-1]['content']
+    metrics = {}
     
-    final_score = 0.7 * length_score + 0.3 * (1.0 if keyword_present else 0.0)
+    # Length-based score
+    length_score = min(len(last_response) / 100.0, 1.0)  # Score based on length (up to 100 chars)
+    metrics["length_score"] = MetricRewardOutput(
+        score=length_score,
+        reason=f"Response length: {len(last_response)} chars"
+    )
     
-    # You can access anything passed in metadata if needed
-    if metadata.get("user_preference") == "concise":
-        final_score *= 0.9 # Penalize verbosity slightly if user prefers concise
+    # Keyword presence score
+    keyword_present = "important" in last_response.lower()
+    keyword_score = 1.0 if keyword_present else 0.0
+    metrics["keyword_score"] = MetricRewardOutput(
+        score=keyword_score,
+        reason="Contains important keyword" if keyword_present else "Missing important keyword"
+    )
+    
+    # Calculate weighted final score
+    final_score = 0.7 * length_score + 0.3 * keyword_score
+    
+    # Apply preference adjustments if metadata provided
+    if metadata and metadata.get("user_preference") == "concise":
+        final_score *= 0.9  # Slightly penalize verbosity for users who prefer concise responses
+        metrics["conciseness_adjustment"] = MetricRewardOutput(
+            score=-0.1 * final_score,
+            reason="Applied conciseness preference adjustment"
+        )
 
-    return final_score
+    return RewardOutput(score=final_score, metrics=metrics)
 ```
 
 **2. Local Execution and Testing**
@@ -249,20 +283,26 @@ def combined_reward(messages: Dict[str, Any], *args, **kwargs) -> float:
 Crucially, your decorated function still works exactly like a regular Python function. You can call it directly to test your logic locally before considering deployment.
 
 ```python
-
-messages = [{"user": "Explain the concept of reinforcement learning.", "assistant": "RL involves agents learning through trial and error via rewards. It's important."
+# Test data
+messages = [
+    {"role": "user", "content": "Explain the concept of reinforcement learning."},
+    {"role": "assistant", "content": "RL involves agents learning through trial and error via rewards. It's important."}
+]
+original_messages = [messages[0]]  # Just the user message
 metadata_example = {"user_preference": "concise"}
 
-local_score = combined_reward(messages, metadata_example)
-print(f"Calculated local reward score: {local_score}")
+# Call the reward function directly
+reward_output = combined_reward(messages, original_messages, metadata_example)
+print(f"Calculated local reward score: {reward_output.score}")
+print(f"Score components: {reward_output.metrics}")
 # Output: Calculated local reward score: 0.568... (example value)
 ```
 
 **3. Deploying for Scalability**
 
-When you're ready to scale, the `@reward_function` decorator automatically adds a `.deploy()` method to your function object. Calling this method initiates the deployment process on the Fireworks platform.
+When you're ready to scale, the `@reward_function` decorator automatically adds a `.deploy()` method to your function object. Calling this method initiates the deployment process on the Fireworks platform.
 
-You can pass configuration options directly to `.deploy()` to control resources, scaling behaviour, environment variables, secrets, and more.
+You can pass configuration options directly to `.deploy()` to control resources, scaling behaviour, environment variables, secrets, and more.
 
 ```python
 # --- Deployment Example ---
@@ -275,7 +315,7 @@ print(f"Deployment submitted. Handle/ID: {deployment_handle}")
 
 ```
 
-The `.deploy()` method takes care of:
+The `.deploy()` method takes care of:
 
 - Packaging your function code and its dependencies.
 - Provisioning the specified cloud resources.
@@ -290,19 +330,21 @@ Interact with remote functions (either Fireworks-deployed, self-hosted, or Firew
 
 ```python
 # Example: Using the function deployed to Fireworks
-remote_reward_model = RewardFunction(name=evaluation_name, mode="remote")
-final_score, components = remote_reward_model(messages=test_msgs, original_messages=test_orig)
-print(f"Calculated remote reward: {final_score}, Components: {components}")
+remote_reward_model = RewardFunction(name="combined-reward-prod", mode="remote")
+reward_output = remote_reward_model(messages=test_msgs, original_messages=test_orig)
+print(f"Calculated remote reward: {reward_output.score}")
+print(f"Reward metrics: {reward_output.metrics}")
 
 # Example: Using the self-hosted function (replace with your actual URL)
-self_hosted_reward_model = RewardFunction(endpoint="<http://127.0.0.1:8000/reward>", mode="remote")
+self_hosted_reward_model = RewardFunction(endpoint="http://127.0.0.1:8000/reward", mode="remote")
 # Note: Authentication might be needed depending on your self-hosted setup
-final_score_sh, components_sh = self_hosted_reward_model(messages=test_msgs, original_messages=test_orig)
-print(f"Calculated self-hosted reward: {final_score_sh}, Components: {components_sh}")
+reward_output_sh = self_hosted_reward_model(messages=test_msgs, original_messages=test_orig)
+print(f"Calculated self-hosted reward: {reward_output_sh.score}")
+print(f"Reward metrics: {reward_output_sh.metrics}")
 
 # Example: Using the Fireworks-hosted Nemotron model (from earlier)
 # nemotron_reward_model = RewardFunction(model_id="fireworks/nemotron-340b-reward", mode="fireworks_hosted")
-# score_nem, comps_nem = nemotron_reward_model(...)
+# reward_output_nem = nemotron_reward_model(messages=test_msgs, original_messages=test_orig)
 
 # Get TRL adapter for any remote/hosted model
 remote_trl_adapter = remote_reward_model.get_trl_adapter()
@@ -316,13 +358,13 @@ Use *any* accessible reward endpoint (Fireworks-deployed, publicly accessible se
 
 ```bash
 # Example using firectl with a Fireworks-deployed endpoint
-firectl create rl-job \\
-    --model <your_base_model_name_or_id> \\
-    --training-file <path_or_uri_to_your_training_data> \\
+firectl create rl-job \
+    --model <your_base_model_name_or_id> \
+    --training-file <path_or_uri_to_your_training_data> \
     # Use the URL from .deploy() or your known endpoint
-    --reward-endpoint "<paste_your_endpoint_url_here>" \\
-    --ppo-config <path_to_ppo_config.yaml> \\
-    --output-model-name <your_finetuned_model_name> \\
+    --reward-endpoint "<paste_your_endpoint_url_here>" \
+    --ppo-config <path_to_ppo_config.yaml> \
+    --output-model-name <your_finetuned_model_name> \
     # ... other RL parameters ...
 
 ```
@@ -331,31 +373,21 @@ The RL service calls the specified endpoint to get rewards during training.
 
 ### End-to-End RL Tuning Workflow
 
-1. **Define:** Write Python logic `(messages, original_messages) -> (float, Dict[str, float])`.
+1. **Define:** Write Python logic that implements the `RewardOutput` interface.
 2. **Compose (Optional):** Combine modular reward functions.
 3. **Leverage (Optional):** Instantiate `RewardFunction` with `mode="fireworks_hosted"` to use powerful models like Nemotron.
-4. **Test Locally:** Use `mode="local"` for rapid iteration. Check score and components.
+4. **Test Locally:** Use `mode="local"` for rapid iteration. Check score and its component metrics.
 5. **Adapt (Optional):** Use `.get_trl_adapter()` for TRL/batch library compatibility.
 6. **Deploy/Serve:**
     - **Fireworks Managed:** Use `.deploy()` for a scalable endpoint. Note the URL.
-    - **Self-Host:** Use `fireworks-reward serve ...` command. Note the URL and manage the server.
-    - <offline discussion>
-        - this needs more detail
-        - reverse tunnel or cloud run
-            - for reverse tunnel
-                - Fireworks do the reverse tunnel
-                    - Open a connection with a intermediary
-                - ngrok do the reverse tunnel
-                    - we authenticate with API Key
-                    - when you spin up the fastapi server, create an FIREWORKS API key you can share with FW
-                        - we can do the create secret in the background and send it to FW
-                    - For now let’s do ngrok
+    - **Self-Host:** Use `fireworks-reward serve` command to run locally. Note the URL and manage the server.
+    - **Self-Host with Tunnel:** For local development that's accessible by Fireworks RL jobs, use `fireworks-reward serve-tunnel` to create a secure tunnel.
+    - **Self-Host on Cloud Run:** Deploy to your own cloud infrastructure using `fireworks-reward deploy-cloudrun` for complete control.
     - **Use Fireworks Hosted:** Use the `RewardFunction(mode="fireworks_hosted", ...)` directly.
 7. **Launch RL Job:** Use the appropriate reward endpoint URL with Fireworks RL
-    1. `firectl create evaluation --reward-endpoint`
-        1. get evaluation id
-    2.  (`firectl create rl-job --evaluation-id ...`).
-8. **Monitor & Iterate:** Track RL job progress. Use **Evaluator Logs** (for Fireworks-deployed functions) or your own logging (for self-hosted) to debug. Analyze components to refine logic.
+    - `firectl create rl-job --reward-endpoint "<your_endpoint_url>"` for direct job creation
+    - Or first create an evaluation then reference it: `firectl create evaluation --reward-endpoint "<url>"` followed by `firectl create rl-job --evaluation-id <eval_id>`
+8. **Monitor & Iterate:** Track RL job progress. Use **Evaluator Logs** (for Fireworks-deployed functions) or your own logging (for self-hosted) to debug. Analyze metrics to refine logic.
 
 ### Why This Matters for MLEs
 
@@ -378,8 +410,8 @@ The RL service calls the specified endpoint to get rewards during training.
 
 The Fireworks RL Reward SDK offers a pragmatic, flexible, and powerful approach to RL reward modeling and execution, letting you choose the right level of control and convenience.
 
-- **Install the SDK:** `pip install reward_kit` (*Use actual name*)
-- **Check out the Docs:** [Link to your documentation] (Including details on deployment options, `fireworks-reward serve`, hosted models, secrets, TRL adapter)
-- **Try the Examples:** [Link to examples repository/directory]
+- **Install the SDK:** `pip install reward-kit`
+- **Check out the Docs:** [https://docs.fireworks.ai/rewards](https://docs.fireworks.ai/rewards)
+- **Try the Examples:** [https://github.com/fireworks-ai/reward-kit/examples](https://github.com/fireworks-ai/reward-kit/examples)
 
 We're excited to see how you use it to align your models! Share your feedback and happy tuning!

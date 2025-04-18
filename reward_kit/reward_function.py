@@ -446,6 +446,11 @@ def reward_function(func: T) -> T:
             "Content-Type": "application/json"
         }
         
+        # Log request details for debugging
+        logger.info(f"Making request to: {url}")
+        logger.info(f"Using account_id: {account_id}")
+        logger.info(f"Auth token present: {bool(auth_token)}")
+        
         try:
             logger.info(f"Deploying reward function '{func.__name__}' as evaluation '{name}'...")
             response = requests.post(url, json=evaluation_payload, headers=headers)

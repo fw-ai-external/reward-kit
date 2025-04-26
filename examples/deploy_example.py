@@ -120,7 +120,7 @@ def deploy_to_fireworks():
             # For auth.ini, we'll manually parse it since we know the format
             with open(auth_path, 'r') as f:
                 for line in f:
-                    if "id_token" in line and "=" in line:
+                    if "api_key" in line and "=" in line:
                         auth_token = line.split("=")[1].strip()
                         break
             

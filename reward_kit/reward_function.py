@@ -466,9 +466,47 @@ def reward_function(func: T) -> T:
         logger.info(f"Using account_id: {account_id}")
         logger.info(f"Auth token present: {bool(auth_token)}")
         
+        # Check if we should force update an existing evaluation
+        force = config.get("force", False)
+        
         try:
             logger.info(f"Deploying reward function '{func.__name__}' as evaluation '{name}'...")
-            response = requests.post(url, json=evaluation_payload, headers=headers)
+            
+            if force:
+                # First try to check if evaluator already exists
+                evaluator_id = name
+                check_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluator_id}"
+                
+                try:
+                    # Check if the evaluator exists
+                    check_response = requests.get(check_url, headers=headers)
+                    if check_response.status_code == 200:
+                        # Evaluator exists, delete it first then recreate
+                        logger.info(f"Evaluator '{evaluator_id}' already exists, deleting and recreating...")
+                        delete_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluator_id}"
+                        try:
+                            # Try to delete the evaluator
+                            delete_response = requests.delete(delete_url, headers=headers)
+                            # Don't raise for status here, we'll try to create it anyway
+                            if delete_response.status_code < 400:
+                                logger.info(f"Successfully deleted evaluator '{evaluator_id}'")
+                            else:
+                                logger.warning(f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}")
+                        except Exception as e:
+                            logger.warning(f"Error deleting evaluator: {str(e)}")
+                        
+                        # Now create it
+                        response = requests.post(url, json=evaluation_payload, headers=headers)
+                    else:
+                        # Evaluator doesn't exist, create it
+                        response = requests.post(url, json=evaluation_payload, headers=headers)
+                except requests.exceptions.RequestException:
+                    # If checking fails, try to create it
+                    response = requests.post(url, json=evaluation_payload, headers=headers)
+            else:
+                # Just try to create it
+                response = requests.post(url, json=evaluation_payload, headers=headers)
+            
             response.raise_for_status()
             result = response.json()
             

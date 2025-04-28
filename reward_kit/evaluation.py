@@ -260,7 +260,7 @@ class Evaluator:
 
         return preview_result
 
-    def create(self, evaluator_id, display_name=None, description=None):
+    def create(self, evaluator_id, display_name=None, description=None, force=False):
         """
         Create the evaluation on the Fireworks platform
 
@@ -268,6 +268,7 @@ class Evaluator:
             evaluator_id: ID for the evaluator
             display_name: Display name for the evaluator
             description: Description of the evaluator
+            force: If True, update the evaluator if it already exists
 
         Returns:
             The created evaluator object
@@ -295,23 +296,40 @@ class Evaluator:
         self.description = description or f"Evaluator created from {evaluator_id}"
 
         # Construct the evaluation payload
-        payload = {
-            "evaluationId": evaluator_id,
-            "evaluation": {
-                "evaluationType": "code_assertion",
-                "description": self.description,
-                "assertions": self._construct_criteria(),
-            },
-        }
-
-        # Add multiMetrics if using API that supports it
-        if os.environ.get("FIREWORKS_API_BASE", "").startswith(
-            "https://dev.api.fireworks.ai"
-        ):
-            payload["evaluation"]["multiMetrics"] = self.multi_metrics
+        # Check if we're using the new API format
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        using_new_api = "dev.api.fireworks.ai" in api_base
+        
+        if using_new_api:
+            # New API format (similar to deploy_example.py)
+            payload = {
+                "evaluator": {
+                    "displayName": self.display_name,
+                    "description": self.description,
+                    "multiMetrics": self.multi_metrics,
+                    "criteria": self._construct_criteria(),
+                    "requirements": "",
+                    "rollupSettings": None
+                },
+                "evaluatorId": evaluator_id
+            }
+        else:
+            # Legacy API format
+            payload = {
+                "evaluationId": evaluator_id,
+                "evaluation": {
+                    "evaluationType": "code_assertion",
+                    "description": self.description,
+                    "assertions": self._construct_criteria(),
+                },
+            }
+            
+            # Add multiMetrics if using API that supports it
+            if api_base.startswith("https://dev.api.fireworks.ai"):
+                payload["evaluation"]["multiMetrics"] = self.multi_metrics
 
         # Make API request to create evaluator
-        url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
+        base_url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
@@ -321,7 +339,42 @@ class Evaluator:
 
         # Make real API call
         try:
-            response = requests.post(url, json=payload, headers=headers)
+            if force:
+                # First check if the evaluator exists
+                check_url = f"{base_url}/{evaluator_id}"
+                
+                try:
+                    # Check if the evaluator exists
+                    check_response = requests.get(check_url, headers=headers)
+                    
+                    if check_response.status_code == 200:
+                        # Evaluator exists, delete it first then recreate
+                        logger.info(f"Evaluator '{evaluator_id}' already exists, deleting and recreating...")
+                        delete_url = f"{base_url}/{evaluator_id}"
+                        
+                        try:
+                            # Try to delete the evaluator
+                            delete_response = requests.delete(delete_url, headers=headers)
+                            # Don't raise for status here, we'll try to create it anyway
+                            if delete_response.status_code < 400:
+                                logger.info(f"Successfully deleted evaluator '{evaluator_id}'")
+                            else:
+                                logger.warning(f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}")
+                        except Exception as e:
+                            logger.warning(f"Error deleting evaluator: {str(e)}")
+                        
+                        # Now create it
+                        response = requests.post(base_url, json=payload, headers=headers)
+                    else:
+                        # Evaluator doesn't exist, create it
+                        response = requests.post(base_url, json=payload, headers=headers)
+                except requests.exceptions.RequestException:
+                    # If checking fails, try to create it
+                    response = requests.post(base_url, json=payload, headers=headers)
+            else:
+                # Just try to create it
+                response = requests.post(base_url, json=payload, headers=headers)
+            
             response.raise_for_status()
             result = response.json()
 
@@ -708,6 +761,7 @@ def create_evaluation(
     folder=None,
     display_name=None,
     description=None,
+    force=False,
 ):
     """
     Create an evaluation on the Fireworks platform
@@ -719,6 +773,7 @@ def create_evaluation(
         folder: Path to folder with multiple metrics (for multi_metrics mode)
         display_name: Display name for the evaluator
         description: Description of the evaluator
+        force: If True, update the evaluator if it already exists
 
     Returns:
         Created evaluator object
@@ -744,4 +799,4 @@ def create_evaluation(
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
 
-    return evaluator.create(evaluator_id, display_name, description)
+    return evaluator.create(evaluator_id, display_name, description, force)

@@ -154,12 +154,13 @@ def deploy_to_fireworks():
             account_id = "pyroworks-dev"  # Default value
         # Don't set a default for auth_token
         
-    # Deploy the reward function
+    # Deploy the reward function with force=True to overwrite if it exists
     evaluation_id = informativeness_reward.deploy(
         name="informativeness-v1",
         description="Evaluates response informativeness based on specificity and content density",
         account_id=account_id,
-        auth_token=auth_token
+        auth_token=auth_token,
+        force=True  # Overwrite if already exists
     )
     print(f"Deployed evaluation with ID: {evaluation_id}")
     
@@ -169,6 +170,7 @@ def deploy_to_fireworks():
         description="Informativeness evaluation using Claude model",
         account_id=account_id,
         auth_token=auth_token,
+        force=True,  # Overwrite if already exists
         providers=[
             {
                 "providerType": "anthropic",

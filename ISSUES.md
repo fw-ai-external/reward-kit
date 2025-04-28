@@ -3,7 +3,8 @@ Replica the evaluation preview and deploy logic in firectl in the SDK
 
 ## Current issue
 
-I am not using the new API properly, here is the latest error running things end to end
+### Add new SDK feature to make deploy example run well
+The deploy actually works end to end, but when I run it, I get error because I already deployed an example and it wasn't teared down from previous run
 
 ```
 (.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/deploy_example.py
@@ -15,7 +16,6 @@ Metrics:
   specificity: 0.3 - Found 2 specificity markers
   content_density: 0.5 - Content density: 4 content words in 64 total words
 
-
 Deploying to Fireworks...
 Using auth token from environment
 Token starts with: fw_3Zeaces...
@@ -24,27 +24,73 @@ INFO:reward_kit.reward_function:Making request to: https://dev.api.fireworks.ai/
 INFO:reward_kit.reward_function:Using account_id: pyroworks-dev
 INFO:reward_kit.reward_function:Auth token present: True
 INFO:reward_kit.reward_function:Deploying reward function 'informativeness_reward' as evaluation 'informativeness-v1'...
-ERROR:reward_kit.reward_function:Error deploying evaluation: 400 Client Error: Bad Request for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
+ERROR:reward_kit.reward_function:Error deploying evaluation: 409 Client Error: Conflict for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
 ERROR:reward_kit.reward_function:Response: {
-  "code": 3,
+  "code": 6,
   "details": [],
-  "message": "proto: (line 1:2): unknown field \"evaluationId\""
+  "message": "evaluator ID already exists"
 }
 Traceback (most recent call last):
-  File "/home/bchen/home/reward-kit/examples/deploy_example.py", line 194, in <module>
+  File "/home/bchen/home/reward-kit/examples/deploy_example.py", line 196, in <module>
     deploy_to_fireworks()
   File "/home/bchen/home/reward-kit/examples/deploy_example.py", line 158, in deploy_to_fireworks
     evaluation_id = informativeness_reward.deploy(
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/bchen/home/reward-kit/reward_kit/reward_function.py", line 486, in deploy
+  File "/home/bchen/home/reward-kit/reward_kit/reward_function.py", line 472, in deploy
     response.raise_for_status()
   File "/home/bchen/home/reward-kit/.venv/lib/python3.12/site-packages/requests/models.py", line 1024, in raise_for_status
     raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
+requests.exceptions.HTTPError: 409 Client Error: Conflict for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
 ```
 
+Please help me
+- make the test run end to end
+- if we need to add new RPC wrappers to make the call run, please add it to the SDK
+
+### Preview not working yet
+
+preview is just still running into errors
+
+```
+(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/evaluation_preview_example.py 
+Previewing evaluation...
+INFO:reward_kit.evaluation:Loaded 1 Python files for metric 'word_count' from /home/bchen/home/reward-kit/tmp_metric
+INFO:reward_kit.evaluation:Loaded 2 samples from ./samples.jsonl
+Evaluation Preview Results
+------------------------
+Total Samples: 2
+Total Runtime: 1 ms
+
+Individual Results:
+------------------
+Sample 1:
+  Success: True
+  Score: 0.75
+  word_count: 0.75
+
+Sample 2:
+  Success: True
+  Score: 0.75
+  word_count: 0.75
+
+Creating evaluation...
+INFO:reward_kit.evaluation:Loaded 1 Python files for metric 'word_count' from /home/bchen/home/reward-kit/tmp_metric
+INFO:reward_kit.evaluation:Creating evaluator 'word-count-eval'...
+ERROR:reward_kit.evaluation:Error creating evaluator: 400 Client Error: Bad Request for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
+ERROR:reward_kit.evaluation:Response: {
+  "code": 3,
+  "details": [],
+  "message": "proto: (line 1:2): unknown field \"evaluationId\""
+}
+Error creating evaluator: 400 Client Error: Bad Request for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
+Make sure you have proper Fireworks API credentials set up.
+```
+
+please
+- move everything to the latest API, similar to deploy_example.py
+
 ## REST-ful api reference
-- check the super large fireworks.swagger.yaml, you can start with   /v1/accounts/{account_id}/evaluators:
+- check the super large fireworks.swagger.yaml, you can start with   /v1/accounts/{account_id}/evaluators. The file is very large so don't try to read it directly.
 
 ## Evaluation preview
 

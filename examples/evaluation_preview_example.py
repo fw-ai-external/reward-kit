@@ -25,7 +25,18 @@ def main():
     # Using single quotes for outer string to avoid conflict with inner triple quotes
     evaluate_code = '''
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
-    """Evaluate a sample entry."""
+    """
+    Evaluate a sample entry.
+    
+    Args:
+        messages: List of conversation messages
+        original_messages: Original messages (usually without the response being evaluated)
+        tools: Available tools for the conversation
+        **kwargs: Additional parameters
+        
+    Returns:
+        Dict with score and metrics information
+    """
     # If this is the first message, there's nothing to evaluate
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
@@ -42,8 +53,10 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         'score': score,
         'reason': f'Word count: {word_count}',
         'metrics': {
-            'word_count': word_count,
-            'score': score
+            'word_count': {
+                'score': score,
+                'reason': f'Response has {word_count} words'
+            }
         }
     }
 '''
@@ -101,7 +114,8 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
             evaluator_id="word-count-eval",
             metric_folders=["word_count=./tmp_metric"],
             display_name="Word Count Evaluator",
-            description="Evaluates responses based on word count"
+            description="Evaluates responses based on word count",
+            force=True  # Update the evaluator if it already exists
         )
         print(f"Created evaluator: {evaluator['name']}")
     except Exception as e:

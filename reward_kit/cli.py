@@ -4,12 +4,13 @@ import sys
 import logging
 import importlib
 import importlib.util
-from typing import Optional
+from typing import Optional, List
 import typer
 import uvicorn
 
 from .server import serve, serve_tunnel
 from .models import RewardOutput
+from .evaluation import preview_evaluation, create_evaluation
 
 # Set up Typer app for modern CLI interface
 app = typer.Typer(help="Fireworks Reward Kit CLI")
@@ -201,6 +202,75 @@ def deploy_cloudrun(
     """Deploy a reward function to Google Cloud Run."""
     typer.echo(f"Deploying {function_path} to Cloud Run as {name} in project {project}...")
     typer.echo("This is a placeholder. In a complete implementation, this would deploy to Google Cloud Run.")
+
+
+@app.command("preview")
+def preview_cmd(
+    metric_folder: List[str] = typer.Option(None, "--metric-folder", help="Format as METRIC_NAME=folder_path"),
+    sample_file: str = typer.Option(..., "--sample-file", help="Path to sample JSONL file"),
+    multi_metrics: bool = typer.Option(False, "--multi-metrics", help="If set, enables multiple metrics from one folder"),
+    folder: str = typer.Option(None, "--folder", help="Path to folder with multiple metrics"),
+    max_samples: int = typer.Option(5, "--max-samples", help="Maximum number of samples to process"),
+):
+    """Preview an evaluation with sample data."""
+    try:
+        if not metric_folder and not folder:
+            typer.echo("Either --metric-folder or --folder with --multi-metrics must be specified")
+            raise typer.Exit(code=1)
+            
+        if multi_metrics and not folder:
+            typer.echo("--folder must be specified when using --multi-metrics")
+            raise typer.Exit(code=1)
+            
+        preview_result = preview_evaluation(
+            metric_folders=metric_folder,
+            multi_metrics=multi_metrics,
+            folder=folder,
+            sample_file=sample_file,
+            max_samples=max_samples
+        )
+        
+        # Display the results
+        preview_result.display()
+        
+    except Exception as e:
+        typer.echo(f"Error previewing evaluation: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("create")
+def create_cmd(
+    eval_id: str = typer.Argument(..., help="ID for the evaluation to create"),
+    metric_folder: List[str] = typer.Option(None, "--metric-folder", help="Format as METRIC_NAME=folder_path"),
+    multi_metrics: bool = typer.Option(False, "--multi-metrics", help="If set, enables multiple metrics from one folder"),
+    folder: str = typer.Option(None, "--folder", help="Path to folder with multiple metrics"),
+    display_name: str = typer.Option(None, "--display-name", help="Display name for the evaluation"),
+    description: str = typer.Option(None, "--description", help="Description of the evaluation"),
+):
+    """Create an evaluation."""
+    try:
+        if not metric_folder and not folder:
+            typer.echo("Either --metric-folder or --folder with --multi-metrics must be specified")
+            raise typer.Exit(code=1)
+            
+        if multi_metrics and not folder:
+            typer.echo("--folder must be specified when using --multi-metrics")
+            raise typer.Exit(code=1)
+            
+        evaluator = create_evaluation(
+            evaluator_id=eval_id,
+            metric_folders=metric_folder,
+            multi_metrics=multi_metrics,
+            folder=folder,
+            display_name=display_name,
+            description=description
+        )
+        
+        typer.echo(f"Successfully created evaluator: {evaluator['name']}")
+        
+    except Exception as e:
+        typer.echo(f"Error creating evaluation: {str(e)}", err=True)
+        raise typer.Exit(code=1)
 
 
 def main():

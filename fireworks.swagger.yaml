@@ -1386,8 +1386,68 @@ paths:
       tags:
       - Gateway
   /v1/accounts/{account_id}/deployedModels:
+    get:
+      summary: List LoRAs
+      operationId: Gateway_ListDeployedModels
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayListDeployedModelsResponse'
+      parameters:
+      - name: pageSize
+        description: 'The maximum number of deployed models to return. The maximum
+          page_size is 200,
+
+          values above 200 will be coerced to 200.
+
+          If unspecified, the default is 50.'
+        in: query
+        required: false
+        type: integer
+        format: int32
+      - name: pageToken
+        description: 'A page token, received from a previous ListDeployedModels call.
+          Provide this
+
+          to retrieve the subsequent page. When paginating, all other parameters
+
+          provided to ListDeployedModels must match the call that provided the page
+
+          token.'
+        in: query
+        required: false
+        type: string
+      - name: filter
+        description: 'Only depoyed models satisfying the provided filter (if specified)
+          will be
+
+          returned. See https://google.aip.dev/160 for the filter grammar.'
+        in: query
+        required: false
+        type: string
+      - name: orderBy
+        description: 'A comma-separated list of fields to order by. e.g. "foo,bar"
+
+          The default sort order is ascending. To specify a descending order for a
+
+          field, append a " desc" suffix. e.g. "foo desc,bar"
+
+          Subfields are specified with a "." character. e.g. "foo.bar"
+
+          If not specified, the default order is by "name".'
+        in: query
+        required: false
+        type: string
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      tags:
+      - Gateway
     post:
-      summary: CRUD APIs for deployed models.
+      summary: Load LoRA
       operationId: Gateway_CreateDeployedModel
       responses:
         '200':
@@ -1408,7 +1468,116 @@ paths:
       tags:
       - Gateway
   /v1/accounts/{account_id}/deployedModels/{deployed_model_id}:
+    get:
+      summary: Get LoRA
+      operationId: Gateway_GetDeployedModel
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayDeployedModel'
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      - name: deployed_model_id
+        in: path
+        required: true
+        type: string
+        description: The Deployed Model Id
+      tags:
+      - Gateway
+    patch:
+      summary: Update LoRA
+      operationId: Gateway_UpdateDeployedModel
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayDeployedModel'
+      parameters:
+      - name: deployedModel
+        description: 'The properties of the deployed model being updated. `deployed_model.name`
+          must
+
+          be populated with the updated resource''s name.'
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            displayName:
+              type: string
+            description:
+              type: string
+              description: Description of the resource.
+            createTime:
+              type: string
+              format: date-time
+              description: The creation time of the resource.
+              readOnly: true
+            createdBy:
+              type: string
+              description: The email address of the user who created this deployed
+                model.
+              readOnly: true
+            model:
+              type: string
+              title: 'The resource name of the model to be deployed.
+
+                e.g. accounts/my-account/models/my-model'
+            deployment:
+              type: string
+              description: The resource name of the base deployment the model is deployed
+                to.
+            default:
+              type: boolean
+              description: 'If true, this is the default target when querying this
+                model without
+
+                the `#<deployment>` suffix.
+
+                The first deployment a model is deployed to will have this field set
+                to true.'
+            state:
+              $ref: '#/definitions/gatewayDeployedModelState'
+              description: The state of the deployed model.
+              readOnly: true
+            serverless:
+              type: boolean
+              title: True if the underlying deployment is managed by Fireworks
+            status:
+              $ref: '#/definitions/gatewayStatus'
+              description: Contains model deploy/undeploy details.
+              readOnly: true
+            public:
+              type: boolean
+              description: If true, the deployed model will be publicly reachable.
+            updateTime:
+              type: string
+              format: date-time
+              description: The update time for the deployed model.
+              readOnly: true
+          title: 'The properties of the deployed model being updated. `deployed_model.name`
+            must
+
+            be populated with the updated resource''s name.'
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      - name: deployed_model_id
+        in: path
+        required: true
+        type: string
+        description: The Deployed Model Id
+      tags:
+      - Gateway
     delete:
+      summary: Unload LoRA
       operationId: Gateway_DeleteDeployedModel
       responses:
         '200':
@@ -1623,6 +1792,13 @@ paths:
               $ref: '#/definitions/gatewayStatus'
               description: Detailed status information regarding the most recent operation.
               readOnly: true
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+              description: 'Annotations to identify deployment properties.
+
+                Key/value pairs may be used by external tools or other services.'
             minReplicaCount:
               type: integer
               format: int32
@@ -2387,6 +2563,122 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/GatewayValidateAssertionsBody'
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      tags:
+      - Gateway
+  /v1/accounts/{account_id}/evaluators:
+    get:
+      operationId: Gateway_ListEvaluators
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayListEvaluatorsResponse'
+      parameters:
+      - name: pageSize
+        in: query
+        required: false
+        type: integer
+        format: int32
+      - name: pageToken
+        in: query
+        required: false
+        type: string
+      - name: filter
+        in: query
+        required: false
+        type: string
+      - name: orderBy
+        in: query
+        required: false
+        type: string
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      tags:
+      - Gateway
+    post:
+      operationId: Gateway_CreateEvaluator
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayEvaluator'
+      parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/GatewayCreateEvaluatorBody'
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      tags:
+      - Gateway
+  /v1/accounts/{account_id}/evaluators/{evaluator_id}:
+    get:
+      operationId: Gateway_GetEvaluator
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayEvaluator'
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      - name: evaluator_id
+        in: path
+        required: true
+        type: string
+        description: The Evaluator Id
+      tags:
+      - Gateway
+    delete:
+      operationId: Gateway_DeleteEvaluator
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties: {}
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        type: string
+        description: The Account Id
+      - name: evaluator_id
+        in: path
+        required: true
+        type: string
+        description: The Evaluator Id
+      tags:
+      - Gateway
+  /v1/accounts/{account_id}/evaluators:previewEvaluator:
+    post:
+      operationId: Gateway_PreviewEvaluator
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/gatewayPreviewEvaluatorResponse'
+      parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/GatewayPreviewEvaluatorBody'
       - name: account_id
         in: path
         required: true
@@ -4483,6 +4775,15 @@ definitions:
         type: string
     required:
     - evaluationJob
+  GatewayCreateEvaluatorBody:
+    type: object
+    properties:
+      evaluator:
+        $ref: '#/definitions/gatewayEvaluator'
+      evaluatorId:
+        type: string
+    required:
+    - evaluator
   GatewayCreateModelBody:
     type: object
     properties:
@@ -4585,6 +4886,24 @@ definitions:
           small number like 5)
     title: Request to preview an evaluation with sample data
     required:
+    - sampleData
+  GatewayPreviewEvaluatorBody:
+    type: object
+    properties:
+      evaluator:
+        $ref: '#/definitions/gatewayEvaluator'
+        title: The evaluator object to run preview on
+      sampleData:
+        type: array
+        items:
+          type: string
+        title: Sample data in JSON format (array of json formated samples)
+      maxSamples:
+        type: integer
+        format: int32
+        title: Maximum number of samples to evaluate, default is 10
+    required:
+    - evaluator
     - sampleData
   GatewayScaleDeploymentBody:
     type: object
@@ -4767,7 +5086,7 @@ definitions:
         format: date-time
         description: The update time for the account.
         readOnly: true
-    title: 'Next ID: 19'
+    title: 'Next ID: 21'
     required:
     - email
   gatewayAccountState:
@@ -4809,6 +5128,10 @@ definitions:
           Fireworks does
 
           know the plaintext value.'
+        readOnly: true
+      email:
+        type: string
+        description: Email of the user who owns this API key.
         readOnly: true
   gatewayAppendToMessages:
     type: object
@@ -5053,11 +5376,16 @@ definitions:
         type: integer
         format: int32
         description: The number of epochs to train for.
+      batchSize:
+        type: integer
+        format: int32
+        description: The maximum packed number of tokens per batch for training in
+          sequence packing.
     title: 'BaseTrainingConfig contains common configuration fields shared across
 
       different training job types.
 
-      Next ID: 13'
+      Next ID: 14'
   gatewayBatchInferenceJob:
     type: object
     properties:
@@ -5113,6 +5441,30 @@ definitions:
 
           If unspecified (null or empty string), the dataset rows should not end with
           any assistant messages.'
+      region:
+        $ref: '#/definitions/gatewayRegion'
+      maxReplicaCount:
+        type: integer
+        format: int32
+        title: 'Maximum number of replicas to use for the deployment.
+
+          Default is 1'
+      acceleratorType:
+        $ref: '#/definitions/gatewayAcceleratorType'
+        description: 'The type of accelerator to use.
+
+          If not specified, a default will be chosen based on the model.'
+      acceleratorCount:
+        type: integer
+        format: int32
+        description: 'The number of accelerators to use per replica.
+
+          If not specified, a default will be chosen based on the model.'
+      precision:
+        $ref: '#/definitions/DeploymentPrecision'
+        description: 'The precision with which the model should be served.
+
+          If PRECISION_UNSPECIFIED, a default will be chosen based on the model.'
     title: 'Next ID: 15'
     required:
     - model
@@ -5418,6 +5770,16 @@ definitions:
     required:
     - language
     - code
+  gatewayCodeSnippets:
+    type: object
+    properties:
+      language:
+        type: string
+      fileContents:
+        type: object
+        additionalProperties:
+          type: string
+        title: File name to code snippet, default is main.py
   gatewayConversationConfig:
     type: object
     properties:
@@ -5432,6 +5794,25 @@ definitions:
         description: The Jinja template (if style is "jinja").
     required:
     - style
+  gatewayCriterion:
+    type: object
+    properties:
+      type:
+        $ref: '#/definitions/gatewayCriterionType'
+      name:
+        type: string
+      description:
+        type: string
+      codeSnippets:
+        $ref: '#/definitions/gatewayCodeSnippets'
+        title: Criteria for code snippet
+  gatewayCriterionType:
+    type: string
+    enum:
+    - TYPE_UNSPECIFIED
+    - CODE_SNIPPETS
+    default: TYPE_UNSPECIFIED
+    title: '- CODE_SNIPPETS: Code snippets for Sandbox based evaluation'
   gatewayDataset:
     type: object
     properties:
@@ -5719,6 +6100,13 @@ definitions:
         $ref: '#/definitions/gatewayStatus'
         description: Detailed status information regarding the most recent operation.
         readOnly: true
+      annotations:
+        type: object
+        additionalProperties:
+          type: string
+        description: 'Annotations to identify deployment properties.
+
+          Key/value pairs may be used by external tools or other services.'
       minReplicaCount:
         type: integer
         format: int32
@@ -5950,12 +6338,23 @@ definitions:
         $ref: '#/definitions/gatewayDirectRouteType'
       precision:
         $ref: '#/definitions/DeploymentPrecision'
+      extraArgs:
+        type: array
+        items:
+          type: string
+        description: A list of extra arguments that should be passed to the server.
+      extraValues:
+        type: object
+        additionalProperties:
+          type: string
+        description: A JSON object of extra values that should be passed to the helm
+          chart when installed.
       updateTime:
         type: string
         format: date-time
         description: The update time for the deployment template.
         readOnly: true
-    title: 'Next ID: 36'
+    title: 'Next ID: 38'
   gatewayDirectRouteType:
     type: string
     enum:
@@ -6396,13 +6795,13 @@ definitions:
       status:
         $ref: '#/definitions/gatewayStatus'
         readOnly: true
-      evaluation:
+      evaluator:
         type: string
         description: 'The fully-qualified resource name of the Evaluation used by
           this job.
 
 
-          Format: accounts/{account_id}/evaluations/{evaluation_id}'
+          Format: accounts/{account_id}/evaluators/{evaluator_id}'
       inputDataset:
         type: string
         description: 'The fully-qualified resource name of the input Dataset used
@@ -6423,14 +6822,17 @@ definitions:
           type: number
           format: double
         readOnly: true
+      outputStats:
+        type: string
+        description: The output dataset's aggregated stats for the evaluation job.
       updateTime:
         type: string
         format: date-time
         description: The update time for the evaluation job.
         readOnly: true
-    title: 'Next ID: 12'
+    title: 'Next ID: 13'
     required:
-    - evaluation
+    - evaluator
     - inputDataset
     - outputDataset
   gatewayEvaluationResult:
@@ -6440,6 +6842,63 @@ definitions:
         type: string
     required:
     - evaluationJobId
+  gatewayEvaluator:
+    type: object
+    properties:
+      name:
+        type: string
+        readOnly: true
+      displayName:
+        type: string
+      description:
+        type: string
+      createTime:
+        type: string
+        format: date-time
+        readOnly: true
+      createdBy:
+        type: string
+        readOnly: true
+      updateTime:
+        type: string
+        format: date-time
+        readOnly: true
+      state:
+        $ref: '#/definitions/gatewayEvaluatorState'
+        readOnly: true
+      multiMetrics:
+        type: boolean
+        description: 'If true, the criteria will report multiple metric-score pairs
+
+          Otherwise, each criteria will report the score assigned to the criteria
+          name as metric.'
+      criteria:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/gatewayCriterion'
+        title: Criteria for the evaluator, it should produce a score for the metric
+          (name of criteria)
+      requirements:
+        type: string
+        title: Content for the requirements.txt for package installation
+      rollupSettings:
+        $ref: '#/definitions/gatewayRollupSettings'
+        title: 'Strategy for metrics reports summary/rollup.
+
+          e.g. {metric1: 1, metric2: 0.3}, rollup_settings could be criteria_weights:
+          {metric1: 0.5, metric2: 0.5}, then final score will be 0.5 * 1 + 0.5 * 0.3
+          = 0.65'
+    title: 'Next ID: 12'
+  gatewayEvaluatorState:
+    type: string
+    enum:
+    - STATE_UNSPECIFIED
+    - ACTIVE
+    default: STATE_UNSPECIFIED
+    description: "The evaluator is not ready to use for evaluation, could be deploying,\
+      \ updating, or manually marked as inactive.\n INACTIVE = 2;"
+    title: '- ACTIVE: The evaluator is ready to use for evaluation'
   gatewayExample:
     type: object
     properties:
@@ -7164,6 +7623,19 @@ definitions:
       totalSize:
         type: integer
         format: int32
+  gatewayListEvaluatorsResponse:
+    type: object
+    properties:
+      evaluators:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/gatewayEvaluator'
+      nextPageToken:
+        type: string
+      totalSize:
+        type: integer
+        format: int32
   gatewayListFineTuningJobsResponse:
     type: object
     properties:
@@ -7313,6 +7785,24 @@ definitions:
         type: integer
         format: int32
         title: The total number of quotas
+  gatewayListReinforcementFineTuningEpochsResponse:
+    type: object
+    properties:
+      reinforcementFineTuningEpochs:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/gatewayReinforcementFineTuningEpoch'
+      nextPageToken:
+        type: string
+        description: 'A token, which can be sent as `page_token` to retrieve the next
+          page.
+
+          If this field is omitted, there are no subsequent pages.'
+      totalSize:
+        type: integer
+        format: int32
+        title: The total number of fine-tuning epochs
   gatewayListReinforcementFineTuningJobsResponse:
     type: object
     properties:
@@ -7926,13 +8416,50 @@ definitions:
       score:
         type: number
         format: double
-        title: Score (if applicable)
+        description: 'Score (if applicable)
+
+          Deprecated: Use metrics field instead.'
       messages:
         type: array
         items:
           type: object
         title: messages, which can be any kind of object
+      metrics:
+        type: object
+        additionalProperties:
+          type: number
+          format: double
+        title: Metrics from the evaluation run
     title: A single evaluation result from a preview
+  gatewayPreviewEvaluatorResponse:
+    type: object
+    properties:
+      results:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/gatewayPreviewEvaluatorSampleResult'
+      totalSamples:
+        type: integer
+        format: int32
+      totalRuntimeMs:
+        type: string
+        format: int64
+  gatewayPreviewEvaluatorSampleResult:
+    type: object
+    properties:
+      success:
+        type: boolean
+        title: Overall success or failure
+      score:
+        type: number
+        format: double
+        title: Score (rollup score if applicable)
+      perMetricEvals:
+        type: object
+        additionalProperties:
+          type: object
+        title: Per metric eval results
   gatewayProvider:
     type: object
     properties:
@@ -7989,7 +8516,7 @@ definitions:
         format: date-time
         description: The update time for the quota.
         readOnly: true
-    title: 'Next ID: 5'
+    title: 'Next ID: 6'
   gatewayRegion:
     type: string
     enum:
@@ -8019,6 +8546,58 @@ definitions:
       \ US_TEXAS_2: Lambda us-south-2 (N. Texas)\n - EU_PARIS_1: Nebius eu-west1\n\
       \ - EU_HELSINKI_1: Nebius eu-north1\n - US_NEVADA_1: GCP us-west4\n - EU_ICELAND_1:\
       \ Crusoe eu-iceland1\n - EU_ICELAND_2: Crusoe eu-iceland1 (network1)"
+  gatewayReinforcementFineTuningEpoch:
+    type: object
+    properties:
+      name:
+        type: string
+        readOnly: true
+      createTime:
+        type: string
+        format: date-time
+        readOnly: true
+      completedTime:
+        type: string
+        format: date-time
+        readOnly: true
+      dataset:
+        type: string
+        description: The name of the dataset used for training.
+      evaluationDataset:
+        type: string
+        description: The name of a separate dataset to use for evaluation.
+      evalAutoCarveout:
+        type: boolean
+        description: Whether to auto-carve the dataset for eval.
+      state:
+        $ref: '#/definitions/gatewayJobState'
+        readOnly: true
+      status:
+        $ref: '#/definitions/gatewayStatus'
+        readOnly: true
+      createdBy:
+        type: string
+        description: The email address of the user who initiated this fine-tuning
+          job.
+        readOnly: true
+      updateTime:
+        type: string
+        format: date-time
+        description: The update time for the reinforcement fine-tuning epoch.
+        readOnly: true
+      trainingConfig:
+        $ref: '#/definitions/gatewayBaseTrainingConfig'
+        description: Common training configurations.
+      evaluator:
+        type: string
+        description: The evaluator resource name to use for RLOR epoch.
+      wandbConfig:
+        $ref: '#/definitions/gatewayWandbConfig'
+        description: The Weights & Biases team/user account for logging training progress.
+    title: 'Next ID: 14'
+    required:
+    - dataset
+    - evaluator
   gatewayReinforcementFineTuningJob:
     type: object
     properties:
@@ -8059,9 +8638,9 @@ definitions:
       trainingConfig:
         $ref: '#/definitions/gatewayBaseTrainingConfig'
         description: Common training configurations.
-      evaluation:
+      evaluator:
         type: string
-        description: The evaluation resource name to use for RLOR fine-tuning job.
+        description: The evaluator resource name to use for RLOR fine-tuning job.
       episodes:
         type: integer
         format: int32
@@ -8072,7 +8651,7 @@ definitions:
     title: 'Next ID: 15'
     required:
     - dataset
-    - evaluation
+    - evaluator
   gatewayReservation:
     type: object
     properties:
@@ -8180,6 +8759,23 @@ definitions:
     required:
     - dataset
     - rewardWeights
+  gatewayRollupSettings:
+    type: object
+    properties:
+      criteriaWeights:
+        type: object
+        additionalProperties:
+          type: number
+          format: float
+        title: from criteria name to weights in rollup score
+      pythonCode:
+        type: string
+        title: Python code for rollup score calculation, if this is provided, the
+          criteria_weights will be ignored
+      successThreshold:
+        type: number
+        format: float
+        title: rollup score's threshold for success/failure
   gatewaySecret:
     type: object
     properties:
@@ -8348,7 +8944,11 @@ definitions:
         type: integer
         format: int32
         description: The number of nodes to use for the fine-tuning job.
-    title: 'Next ID: 28'
+      batchSize:
+        type: integer
+        format: int32
+        title: The batch size for sequence packing in training
+    title: 'Next ID: 29'
     required:
     - dataset
   gatewayTEFTDetails:
@@ -8415,7 +9015,7 @@ definitions:
         format: date-time
         description: The update time for the user.
         readOnly: true
-    title: 'Next ID: 9'
+    title: 'Next ID: 12'
     required:
     - role
     - email

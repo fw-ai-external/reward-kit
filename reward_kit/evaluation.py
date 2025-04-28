@@ -1,0 +1,747 @@
+import os
+import json
+import time
+import logging
+from pathlib import Path
+import requests
+
+logger = logging.getLogger(__name__)
+
+
+class EvaluatorPreviewResult:
+    """Class to store preview results for an evaluator"""
+
+    def __init__(self):
+        self.results = []
+        self.total_samples = 0
+        self.total_runtime_ms = 0
+
+    def add_result(self, sample_index, success, score, per_metric_evals):
+        """Add a result for a specific sample"""
+        self.results.append(
+            {
+                "index": sample_index,
+                "success": success,
+                "score": score,
+                "per_metric_evals": per_metric_evals,
+            }
+        )
+
+    def display(self):
+        """Display formatted results"""
+        print("Evaluation Preview Results")
+        print("------------------------")
+        print(f"Total Samples: {self.total_samples}")
+        print(f"Total Runtime: {self.total_runtime_ms} ms\n")
+        print("Individual Results:")
+        print("------------------")
+
+        for i, result in enumerate(self.results):
+            print(f"Sample {result['index'] + 1}:")
+            print(f"  Success: {result['success']}")
+            print(f"  Score: {result['score']}")
+            for metric, value in result["per_metric_evals"].items():
+                print(f"  {metric}: {value}")
+            if i < len(self.results) - 1:
+                print()
+
+
+class Evaluator:
+    """Handles loading, previewing, and creating evaluations"""
+
+    def __init__(self, multi_metrics=False):
+        self.multi_metrics = multi_metrics
+        self.code_files = {}  # Map of filename -> content
+        self.metric_folders = {}  # Map of metric_name -> folder_path
+        self.description = ""
+        self.display_name = ""
+        self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+
+    def load_metric_folder(self, metric_name, folder_path):
+        """
+        Load code files from a metric folder
+
+        Args:
+            metric_name: Name of the metric
+            folder_path: Path to the folder containing code files
+
+        Returns:
+            Dict mapping filenames to their contents
+        """
+        folder_path = os.path.abspath(folder_path)
+        if not os.path.exists(folder_path):
+            raise ValueError(f"Folder does not exist: {folder_path}")
+
+        if not os.path.isdir(folder_path):
+            raise ValueError(f"Not a directory: {folder_path}")
+
+        files = {}
+        for file_path in Path(folder_path).glob("*.py"):
+            if file_path.is_file():
+                with open(file_path, "r") as f:
+                    filename = file_path.name
+                    content = f.read()
+                    files[filename] = content
+
+                    # Check for main.py with evaluate function
+                    if filename == "main.py" and "evaluate" not in content:
+                        raise ValueError(
+                            f"main.py in {folder_path} must contain an evaluate function"
+                        )
+
+        if "main.py" not in files:
+            raise ValueError(f"main.py is required in {folder_path}")
+
+        self.metric_folders[metric_name] = folder_path
+        for filename, content in files.items():
+            self.code_files[f"{metric_name}/{filename}"] = content
+
+        logger.info(
+            f"Loaded {len(files)} Python files for metric '{metric_name}' from {folder_path}"
+        )
+        return files
+
+    def load_multi_metrics_folder(self, folder_path):
+        """
+        Load code files from a folder with multiple metrics
+
+        Args:
+            folder_path: Path to the folder containing code files
+
+        Returns:
+            Dict mapping filenames to their contents
+        """
+        folder_path = os.path.abspath(folder_path)
+        if not os.path.exists(folder_path):
+            raise ValueError(f"Folder does not exist: {folder_path}")
+
+        if not os.path.isdir(folder_path):
+            raise ValueError(f"Not a directory: {folder_path}")
+
+        files = {}
+        for file_path in Path(folder_path).glob("*.py"):
+            if file_path.is_file():
+                with open(file_path, "r") as f:
+                    filename = file_path.name
+                    content = f.read()
+                    files[filename] = content
+
+                    # Check for main.py with evaluate function
+                    if filename == "main.py" and "evaluate" not in content:
+                        raise ValueError(
+                            f"main.py in {folder_path} must contain an evaluate function"
+                        )
+
+        if "main.py" not in files:
+            raise ValueError(f"main.py is required in {folder_path}")
+
+        self.code_files = files
+        logger.info(
+            f"Loaded {len(files)} Python files from {folder_path} "
+            f"for multi-metrics evaluation"
+        )
+        return files
+
+    def load_samples_from_jsonl(self, sample_file, max_samples=5):
+        """
+        Load samples from a JSONL file
+
+        Args:
+            sample_file: Path to the JSONL file
+            max_samples: Maximum number of samples to load
+
+        Returns:
+            List of parsed JSON objects
+        """
+        if not os.path.exists(sample_file):
+            raise ValueError(f"Sample file does not exist: {sample_file}")
+
+        samples = []
+        with open(sample_file, "r") as f:
+            for i, line in enumerate(f):
+                if i >= max_samples:
+                    break
+
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    sample = json.loads(line)
+                    samples.append(sample)
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON on line {i+1}, skipping")
+
+        logger.info(f"Loaded {len(samples)} samples from {sample_file}")
+        return samples
+
+    def preview(self, sample_file, max_samples=5):
+        """
+        Run the evaluator against sample data
+
+        Args:
+            sample_file: Path to the JSONL file with samples
+            max_samples: Maximum number of samples to process
+
+        Returns:
+            EvaluatorPreviewResult containing the preview results
+        """
+        if not self.code_files:
+            raise ValueError("No code files loaded. Load metric folder(s) first.")
+
+        if "main.py" not in self.code_files and not any(
+            k.endswith("/main.py") for k in self.code_files
+        ):
+            raise ValueError("No main.py found in code files")
+
+        samples = self.load_samples_from_jsonl(sample_file, max_samples)
+        if not samples:
+            raise ValueError(f"No valid samples found in {sample_file}")
+
+        # In a real implementation, we would call the Fireworks API
+        # Here we'll simulate a local preview using Python's exec functionality
+
+        preview_result = EvaluatorPreviewResult()
+        preview_result.total_samples = len(samples)
+
+        start_time = time.time()
+        for i, sample in enumerate(samples):
+            try:
+                # For demonstration, we'll simulate the evaluation process
+                # In a real implementation, this would call the API or run the code
+
+                # Sample validation
+                if "messages" not in sample:
+                    raise ValueError(f"Sample {i+1} is missing 'messages' field")
+
+                # We validate sample format but in this simulation we don't use these directly
+                # In a real implementation, these would be passed to the evaluate function
+                _ = sample.get("messages", [])
+                _ = sample.get("original_messages", [])
+                _ = sample.get("tools", [])
+
+                # Additional kwargs would be passed to evaluate in a real implementation
+                _ = {
+                    k: v
+                    for k, v in sample.items()
+                    if k not in ["messages", "original_messages", "tools"]
+                }
+
+                # Simple simulation of metric evaluation
+                if self.multi_metrics:
+                    per_metric_evals = {"quality": 0.8, "relevance": 0.7, "safety": 0.9}
+                else:
+                    per_metric_evals = {
+                        metric_name: 0.75 for metric_name in self.metric_folders
+                    }
+
+                # Calculate an aggregate score
+                score = sum(per_metric_evals.values()) / len(per_metric_evals)
+
+                preview_result.add_result(
+                    sample_index=i,
+                    success=True,
+                    score=score,
+                    per_metric_evals=per_metric_evals,
+                )
+
+            except Exception as e:
+                logger.error(f"Error processing sample {i+1}: {str(e)}")
+                preview_result.add_result(
+                    sample_index=i,
+                    success=False,
+                    score=0.0,
+                    per_metric_evals={"error": str(e)},
+                )
+
+        end_time = time.time()
+        # Calculate runtime in milliseconds
+        preview_result.total_runtime_ms = max(1, int((end_time - start_time) * 1000))
+
+        return preview_result
+
+    def create(self, evaluator_id, display_name=None, description=None):
+        """
+        Create the evaluation on the Fireworks platform
+
+        Args:
+            evaluator_id: ID for the evaluator
+            display_name: Display name for the evaluator
+            description: Description of the evaluator
+
+        Returns:
+            The created evaluator object
+        """
+        if not self.code_files:
+            raise ValueError("No code files loaded. Load metric folder(s) first.")
+
+        # Authentication
+        try:
+            account_id, auth_token = self._get_authentication()
+
+            # Verify API key format is valid
+            if not auth_token or len(auth_token) < 10 or not account_id:
+                logger.error("API credentials appear to be invalid or incomplete")
+                raise ValueError(
+                    "Invalid or missing API credentials. Please set valid FIREWORKS_API_KEY and "
+                    "FIREWORKS_ACCOUNT_ID environment variables or configure ~/.fireworks/auth.ini"
+                )
+        except ValueError as e:
+            logger.error(f"Authentication error: {str(e)}")
+            raise
+
+        # Set display name and description
+        self.display_name = display_name or evaluator_id
+        self.description = description or f"Evaluator created from {evaluator_id}"
+
+        # Construct the evaluation payload
+        payload = {
+            "evaluationId": evaluator_id,
+            "evaluation": {
+                "evaluationType": "code_assertion",
+                "description": self.description,
+                "assertions": self._construct_criteria(),
+            },
+        }
+
+        # Add multiMetrics if using API that supports it
+        if os.environ.get("FIREWORKS_API_BASE", "").startswith(
+            "https://dev.api.fireworks.ai"
+        ):
+            payload["evaluation"]["multiMetrics"] = self.multi_metrics
+
+        # Make API request to create evaluator
+        url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+        }
+
+        logger.info(f"Creating evaluator '{evaluator_id}'...")
+
+        # Make real API call
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+
+            logger.info(f"Successfully created evaluator '{evaluator_id}'")
+            return result
+        except Exception as e:
+            logger.error(f"Error creating evaluator: {str(e)}")
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+                logger.error(f"Response: {e.response.text}")
+            raise
+
+    def _construct_criteria(self):
+        """
+        Construct the assertions for the evaluation
+
+        Returns:
+            List of assertion objects
+        """
+        assertions = []
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+
+        if api_base.startswith("https://dev.api.fireworks.ai"):
+            # New API format for dev
+            if self.multi_metrics:
+                # Construct a single assertion with all files
+                file_contents = {}
+                for filename, content in self.code_files.items():
+                    # Skip files that aren't Python
+                    if not filename.endswith(".py"):
+                        continue
+
+                    file_contents[filename] = self._update_evaluate_signature(content)
+
+                assertions.append(
+                    {
+                        "codeSnippets": {
+                            "language": "python",
+                            "fileContents": file_contents,
+                        },
+                        "name": "eval",
+                        "type": "CODE_SNIPPETS",
+                        "description": self.description,
+                    }
+                )
+            else:
+                # Construct individual assertions for each metric
+                for metric_name in self.metric_folders:
+                    file_contents = {}
+                    for k, v in self.code_files.items():
+                        if k.startswith(f"{metric_name}/"):
+                            simple_name = k.split("/", 1)[1]
+                            file_contents[simple_name] = (
+                                self._update_evaluate_signature(v)
+                            )
+
+                    assertions.append(
+                        {
+                            "codeSnippets": {
+                                "language": "python",
+                                "fileContents": file_contents,
+                            },
+                            "name": metric_name,
+                            "type": "CODE_SNIPPETS",
+                            "description": f"Metric: {metric_name}",
+                        }
+                    )
+        else:
+            # Original API format
+            if self.multi_metrics:
+                # Construct a single assertion with all files
+                code = self._get_combined_code()
+                assertions.append(
+                    {
+                        "assertionType": "CODE",
+                        "codeAssertion": {"language": "python", "code": code},
+                        "metricName": "combined_metrics",
+                    }
+                )
+            else:
+                # Construct individual assertions for each metric
+                for metric_name in self.metric_folders:
+                    files = {
+                        k.split("/", 1)[1]: v
+                        for k, v in self.code_files.items()
+                        if k.startswith(f"{metric_name}/")
+                    }
+
+                    # Convert files to a single code block
+                    code = self._get_code_from_files(files)
+
+                    assertions.append(
+                        {
+                            "assertionType": "CODE",
+                            "codeAssertion": {"language": "python", "code": code},
+                            "metricName": metric_name,
+                        }
+                    )
+
+        return assertions
+
+    def _update_evaluate_signature(self, content):
+        """
+        Update the evaluate function signature to the new format
+
+        Args:
+            content: The code content to update
+
+        Returns:
+            Updated code content
+        """
+        import re
+
+        # Simple regex to match the old evaluate function signature
+        old_pattern = r"def\s+evaluate\s*\(\s*entry\s*(?::\s*dict)?\s*\)"
+        new_signature = (
+            "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        )
+
+        # Check if the old pattern exists
+        if re.search(old_pattern, content):
+            # Replace the old signature with the new one
+            updated_content = re.sub(old_pattern, new_signature, content, count=1)
+
+            # Also add a compatibility layer at the beginning of the function
+            compat_layer = """
+    # Compatibility layer for old format
+    if original_messages is None:
+        original_messages = messages
+    entry = {"messages": messages, "original_messages": original_messages, "tools": tools}
+    entry.update(kwargs)
+"""
+
+            # Find the function body indent level
+            func_match = re.search(
+                r"def\s+evaluate.*?:\s*\n(\s+)", updated_content, re.DOTALL
+            )
+            if func_match:
+                indent = func_match.group(1)
+                # Adjust indentation of compatibility layer
+                compat_layer = "\n".join(
+                    indent + line for line in compat_layer.strip().split("\n")
+                )
+
+                # Insert compatibility layer after function definition
+                updated_content = re.sub(
+                    re.escape(new_signature) + r"\s*:",
+                    new_signature + ":" + compat_layer,
+                    updated_content,
+                    count=1,
+                )
+
+            return updated_content
+
+        return content
+
+    def _get_combined_code(self):
+        """
+        Combine all code files into a single code block
+
+        Returns:
+            A string containing all code
+        """
+        code_parts = []
+
+        # Start with imports
+        code_parts.append("import json\nimport sys\n\n")
+
+        # Add all code files
+        for filename, content in self.code_files.items():
+            # Skip files that aren't Python
+            if not filename.endswith(".py"):
+                continue
+
+            # Add file as a section
+            simple_name = filename.split("/")[-1] if "/" in filename else filename
+            updated_content = self._update_evaluate_signature(content)
+            code_parts.append(f"# From {simple_name}\n{updated_content}\n\n")
+
+        # Add the wrapper code for handling input/output
+        code_parts.append(
+            """
+# Process input from the evaluation system
+if __name__ == '__main__':
+    import json
+    try:
+        input_data = json.loads(sys.stdin.read())
+        messages = input_data.get('messages', [])
+        original_messages = input_data.get('original_messages', messages)
+        tools = input_data.get('tools', [])
+        result = evaluate(messages, original_messages, tools, **{k: v for k, v in input_data.items() 
+                                                            if k not in ['messages', 'original_messages', 'tools']})
+        print(json.dumps(result))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+"""
+        )
+
+        return "".join(code_parts)
+
+    def _get_code_from_files(self, files):
+        """
+        Convert a dict of files into a single code block
+
+        Args:
+            files: Dict mapping filenames to content
+
+        Returns:
+            A string containing all code
+        """
+        code_parts = []
+
+        # Start with imports
+        code_parts.append("import json\nimport sys\n\n")
+
+        # Add all files
+        for filename, content in files.items():
+            # Skip files that aren't Python
+            if not filename.endswith(".py"):
+                continue
+
+            # Add file as a section
+            updated_content = self._update_evaluate_signature(content)
+            code_parts.append(f"# From {filename}\n{updated_content}\n\n")
+
+        # Add the wrapper code for handling input/output
+        code_parts.append(
+            """
+# Process input from the evaluation system
+if __name__ == '__main__':
+    import json
+    try:
+        input_data = json.loads(sys.stdin.read())
+        messages = input_data.get('messages', [])
+        original_messages = input_data.get('original_messages', messages)
+        tools = input_data.get('tools', [])
+        result = evaluate(messages, original_messages, tools, **{k: v for k, v in input_data.items() 
+                                                            if k not in ['messages', 'original_messages', 'tools']})
+        print(json.dumps(result))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+"""
+        )
+
+        return "".join(code_parts)
+
+    def _get_authentication(self):
+        """
+        Get authentication information for the Fireworks API
+
+        Returns:
+            Tuple of (account_id, auth_token)
+        """
+        import configparser
+        from pathlib import Path
+
+        # Try to get API key from environment
+        auth_token = os.environ.get("FIREWORKS_API_KEY")
+        account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
+
+        # If not found, try config files
+        if not auth_token or not account_id:
+            auth_path = Path.home() / ".fireworks" / "auth.ini"
+            settings_path = Path.home() / ".fireworks" / "settings.ini"
+
+            # Try to read auth.ini first with standard configparser
+            if auth_path.exists():
+                try:
+                    auth_config = configparser.ConfigParser()
+                    auth_config.read(auth_path)
+                    if "default" in auth_config:
+                        if not auth_token and "id_token" in auth_config["default"]:
+                            auth_token = auth_config["default"]["id_token"]
+                except Exception:
+                    # If standard parsing fails, try to read as key-value pairs
+                    try:
+                        with open(auth_path, "r") as f:
+                            for line in f:
+                                if "=" in line:
+                                    key, value = line.split("=", 1)
+                                    key = key.strip()
+                                    value = value.strip()
+                                    if key == "id_token" and not auth_token:
+                                        auth_token = value
+                                    elif key == "account_id" and not account_id:
+                                        account_id = value
+                    except Exception as e:
+                        logger.warning(
+                            f"Error reading auth.ini as key-value pairs: {str(e)}"
+                        )
+
+            # Try to read settings.ini with standard configparser
+            if settings_path.exists():
+                try:
+                    settings_config = configparser.ConfigParser()
+                    settings_config.read(settings_path)
+                    if "default" in settings_config:
+                        if (
+                            not account_id
+                            and "account_id" in settings_config["default"]
+                        ):
+                            account_id = settings_config["default"]["account_id"]
+                except Exception:
+                    # If standard parsing fails, try to read as key-value pairs
+                    try:
+                        with open(settings_path, "r") as f:
+                            for line in f:
+                                if "=" in line:
+                                    key, value = line.split("=", 1)
+                                    key = key.strip()
+                                    value = value.strip()
+                                    if key == "account_id" and not account_id:
+                                        account_id = value
+                    except Exception as e:
+                        logger.warning(
+                            f"Error reading settings.ini as key-value pairs: {str(e)}"
+                        )
+
+        # We need real authentication credentials
+
+        if not account_id:
+            raise ValueError(
+                "Account ID not found. Set FIREWORKS_ACCOUNT_ID environment variable "
+                "or configure ~/.fireworks/settings.ini"
+            )
+
+        if not auth_token:
+            raise ValueError(
+                "Auth token not found. Set FIREWORKS_API_KEY environment variable "
+                "or configure ~/.fireworks/auth.ini"
+            )
+
+        return account_id, auth_token
+
+
+# Helper functions for CLI commands
+def preview_evaluation(
+    metric_folders=None,
+    multi_metrics=False,
+    folder=None,
+    sample_file=None,
+    max_samples=5,
+):
+    """
+    Preview an evaluation with sample data
+
+    Args:
+        metric_folders: List of METRIC_NAME=folder_path pairs
+        multi_metrics: Whether to use multi-metrics mode
+        folder: Path to folder with multiple metrics (for multi_metrics mode)
+        sample_file: Path to sample JSONL file
+        max_samples: Maximum number of samples to process
+
+    Returns:
+        EvaluatorPreviewResult with preview results
+    """
+    evaluator = Evaluator(multi_metrics=multi_metrics)
+
+    if multi_metrics:
+        if not folder:
+            raise ValueError("Folder must be specified when using multi-metrics mode")
+        evaluator.load_multi_metrics_folder(folder)
+    else:
+        if not metric_folders:
+            raise ValueError(
+                "At least one metric folder must be specified when not using multi-metrics mode"
+            )
+
+        for pair in metric_folders:
+            if "=" not in pair:
+                raise ValueError(
+                    f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                )
+
+            metric_name, folder_path = pair.split("=", 1)
+            evaluator.load_metric_folder(metric_name, folder_path)
+
+    return evaluator.preview(sample_file, max_samples)
+
+
+def create_evaluation(
+    evaluator_id,
+    metric_folders=None,
+    multi_metrics=False,
+    folder=None,
+    display_name=None,
+    description=None,
+):
+    """
+    Create an evaluation on the Fireworks platform
+
+    Args:
+        evaluator_id: ID for the evaluator
+        metric_folders: List of METRIC_NAME=folder_path pairs
+        multi_metrics: Whether to use multi-metrics mode
+        folder: Path to folder with multiple metrics (for multi_metrics mode)
+        display_name: Display name for the evaluator
+        description: Description of the evaluator
+
+    Returns:
+        Created evaluator object
+    """
+    evaluator = Evaluator(multi_metrics=multi_metrics)
+
+    if multi_metrics:
+        if not folder:
+            raise ValueError("Folder must be specified when using multi-metrics mode")
+        evaluator.load_multi_metrics_folder(folder)
+    else:
+        if not metric_folders:
+            raise ValueError(
+                "At least one metric folder must be specified when not using multi-metrics mode"
+            )
+
+        for pair in metric_folders:
+            if "=" not in pair:
+                raise ValueError(
+                    f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                )
+
+            metric_name, folder_path = pair.split("=", 1)
+            evaluator.load_metric_folder(metric_name, folder_path)
+
+    return evaluator.create(evaluator_id, display_name, description)

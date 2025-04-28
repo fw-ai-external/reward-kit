@@ -421,33 +421,48 @@ def reward_function(func: T) -> T:
         )
 
         # Create evaluation payload
-        evaluation_payload = {
-            "evaluation": {
-                "evaluationType": "code_assertion",
-                "description": description,
-                "providers": providers,
-                "assertions": [
-                    {
-                        "assertionType": "CODE",
-                        "codeAssertion": {
-                            "language": "python",
-                            "code": wrapper_code
-                        },
-                        "metricName": name
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        
+        # Create an evaluator object payload as expected by the API
+        evaluator = {
+            "displayName": name,
+            "description": description,
+            "multiMetrics": False,
+            "criteria": [
+                {
+                    "type": "CODE_SNIPPETS",
+                    "name": name,
+                    "description": description,
+                    "codeSnippets": {
+                        "language": "python",
+                        "fileContents": {
+                            "main.py": wrapper_code
+                        }
                     }
-                ]
-            }
+                }
+            ],
+            "requirements": "",
+            "rollupSettings": None
         }
         
+        # The POST body requires the evaluator nested under "evaluator" and an optional "evaluatorId"
+        evaluation_payload = {
+            "evaluator": evaluator,
+            "evaluatorId": name
+        }
+        
+        # Get API base URL from environment or use default
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        
         # Send request to create evaluation
-        url = f"https://api.fireworks.ai/v1/accounts/{account_id}/evaluations"
+        url = f"{api_base}/v1/accounts/{account_id}/evaluators"
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json"
         }
         
         # Log request details for debugging
-        logger.info(f"Making request to: {url}")
+        logger.info(f"Making request to: {url} (using API base: {api_base})")
         logger.info(f"Using account_id: {account_id}")
         logger.info(f"Auth token present: {bool(auth_token)}")
         
@@ -458,7 +473,7 @@ def reward_function(func: T) -> T:
             result = response.json()
             
             evaluation_id = result.get("name", "").split("/")[-1]
-            evaluation_url = f"https://api.fireworks.ai/v1/accounts/{account_id}/evaluations/{evaluation_id}"
+            evaluation_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluation_id}"
             
             logger.info(f"Deployment successful. Evaluation ID: {evaluation_id}")
             logger.info(f"Evaluation URL: {evaluation_url}")

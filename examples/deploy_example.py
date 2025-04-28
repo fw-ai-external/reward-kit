@@ -5,6 +5,7 @@ This example demonstrates how to create and deploy a reward function
 that evaluates the informativeness of an assistant's response.
 """
 
+import os
 from typing import List, Dict, Optional
 from reward_kit import reward_function, RewardOutput, MetricRewardOutput
 
@@ -93,47 +94,65 @@ def deploy_to_fireworks():
     import configparser
     from pathlib import Path
     
+    # First check environment variables
+    api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+    is_dev = "dev.api.fireworks.ai" in api_base
+    
+    account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
+    auth_token = os.environ.get("FIREWORKS_API_KEY")
+    
+    if account_id:
+        print(f"Using account ID from environment: {account_id}")
+    
+    if auth_token:
+        print(f"Using auth token from environment")
+        print(f"Token starts with: {auth_token[:10]}...")
+    
+    # If not in environment, try config files
     try:
-        settings_path = Path.home() / ".fireworks" / "settings.ini"
-        if settings_path.exists():
-            # For settings.ini, we'll manually parse it since we know the format
-            account_id = None
-            with open(settings_path, 'r') as f:
-                for line in f:
-                    if "account_id" in line and "=" in line:
-                        account_id = line.split("=")[1].strip()
-                        break
-                        
-            if account_id:
-                print(f"Using account ID from settings: {account_id}")
+        # Only get account_id from settings if not already set
+        if not account_id:
+            settings_path = Path.home() / ".fireworks" / "settings.ini"
+            if settings_path.exists():
+                # For settings.ini, we'll manually parse it since we know the format
+                with open(settings_path, 'r') as f:
+                    for line in f:
+                        if "account_id" in line and "=" in line:
+                            account_id = line.split("=")[1].strip()
+                            break
+                            
+                if account_id:
+                    print(f"Using account ID from settings: {account_id}")
+                else:
+                    account_id = "pyroworks-dev"  # Default value
+                    print(f"No account_id found in settings.ini, using default: {account_id}")
             else:
+                print("No settings.ini file found")
                 account_id = "pyroworks-dev"  # Default value
-                print(f"No account_id found in settings.ini, using default: {account_id}")
-        else:
-            print("No settings.ini file found")
-            account_id = "pyroworks-dev"  # Default value
-            
-        # Get auth token from auth.ini
-        auth_path = Path.home() / ".fireworks" / "auth.ini"
-        auth_token = None
-        if auth_path.exists():
-            # For auth.ini, we'll manually parse it since we know the format
-            with open(auth_path, 'r') as f:
-                for line in f:
-                    if "api_key" in line and "=" in line:
-                        auth_token = line.split("=")[1].strip()
-                        break
-            
-            if auth_token:
-                print("Found auth token in auth.ini")
-                # Print the first few characters for verification
-                print(f"Token starts with: {auth_token[:10]}...")
-            else:
-                print("No id_token found in auth.ini")
+        
+        # Only get auth token if not already set
+        if not auth_token:
+            auth_path = Path.home() / ".fireworks" / "auth.ini"
+            if auth_path.exists():
+                # For auth.ini, we'll manually parse it since we know the format
+                with open(auth_path, 'r') as f:
+                    for line in f:
+                        # Look for the appropriate token based on environment
+                        key_name = "api_key"
+                        if key_name in line and "=" in line:
+                            auth_token = line.split("=")[1].strip()
+                            break
+                
+                if auth_token:
+                    print(f"Found auth token for {'dev' if is_dev else 'prod'} in auth.ini")
+                    print(f"Token starts with: {auth_token[:10]}...")
+                else:
+                    print(f"No {key_name} found in auth.ini")
     except Exception as e:
         print(f"Error reading config: {str(e)}")
-        account_id = "pyroworks-dev"  # Default value
-        auth_token = None
+        if not account_id:
+            account_id = "pyroworks-dev"  # Default value
+        # Don't set a default for auth_token
         
     # Deploy the reward function
     evaluation_id = informativeness_reward.deploy(

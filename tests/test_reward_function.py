@@ -184,7 +184,7 @@ class TestRewardFunctionDecorator:
             # Configure the response
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {"name": "accounts/test-account/evaluations/test-123"}
+            mock_response.json.return_value = {"name": "accounts/test-account/evaluators/test-123"}
             mock_post.return_value = mock_response
             
             # Test deploy method by providing account_id directly in the config
@@ -200,5 +200,5 @@ class TestRewardFunctionDecorator:
             # Verify the API was called
             mock_post.assert_called_once()
             args, kwargs = mock_post.call_args
-            assert "accounts/test-account/evaluations" in args[0]
+            assert "accounts/test-account/evaluators" in args[0]
             assert kwargs["headers"]["Authorization"] == "Bearer fake-token"

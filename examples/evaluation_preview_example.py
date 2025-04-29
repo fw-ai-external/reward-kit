@@ -107,7 +107,24 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     
     preview_result.display()
     
-    # Create the evaluation
+    # Modified approach - add a flag to reward_kit.evaluation that we'll check
+    # to determine if the preview API was successfully used
+    import reward_kit.evaluation as evaluation_module
+    
+    # Check if 'used_preview_api' attribute exists and is True
+    # This attribute would be set to True when the preview API is used
+    # and False when fallback mode is used
+    if hasattr(evaluation_module, 'used_preview_api') and not evaluation_module.used_preview_api:
+        print("Note: The preview used fallback mode due to server issues.")
+        proceed = input("The server might be having connectivity issues. Do you want to try creating the evaluator anyway? (y/n): ")
+        if proceed.lower() != 'y':
+            print("Skipping evaluator creation.")
+            # Clean up and exit
+            main_py.unlink()
+            tmp_folder.rmdir()
+            sample_file.unlink()
+            sys.exit(0)
+    
     print("\nCreating evaluation...")
     try:
         evaluator = create_evaluation(

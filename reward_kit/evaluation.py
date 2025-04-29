@@ -7,6 +7,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# Flag to track if the preview API was successfully used
+used_preview_api = False
+
 
 class EvaluatorPreviewResult:
     """Class to store preview results for an evaluator"""
@@ -177,7 +180,7 @@ class Evaluator:
 
     def preview(self, sample_file, max_samples=5):
         """
-        Run the evaluator against sample data
+        Run the evaluator against sample data using the Fireworks preview API
 
         Args:
             sample_file: Path to the JSONL file with samples
@@ -198,18 +201,104 @@ class Evaluator:
         if not samples:
             raise ValueError(f"No valid samples found in {sample_file}")
 
-        # In a real implementation, we would call the Fireworks API
-        # Here we'll simulate a local preview using Python's exec functionality
+        # Get authentication information
+        try:
+            account_id, auth_token = self._get_authentication()
+        except ValueError as e:
+            logger.error(f"Authentication error: {str(e)}")
+            raise
+            
+        # Construct the evaluator payload
+        # Construct the preview evaluation payload
+        evaluator = {
+            "displayName": self.display_name or "Preview Evaluator",
+            "description": self.description or "Preview Evaluator",
+            "multiMetrics": self.multi_metrics,
+            "criteria": self._construct_criteria(),
+            "requirements": "",
+            "rollupSettings": None
+        }
+        
+        # The samples need to be passed as JSON strings in an array
+        sample_strings = [json.dumps(sample) for sample in samples]
+        
+        payload = {
+            "evaluator": evaluator,
+            "sampleData": sample_strings,
+            "maxSamples": max_samples
+        }
+        
+        # Make API request to preview evaluator
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
+        # For dev environment, special handling for account_id
+        if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
+            account_id = "pyroworks-dev"  # Default dev account
+        
+        url = f"{api_base}/v1/accounts/{account_id}/evaluators:previewEvaluator"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+        }
+        
+        logger.info(f"Previewing evaluator using API endpoint: {url} with account: {account_id}")
+        
+        global used_preview_api
+        try:
+            # Make the API call to preview the evaluator
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            
+            # API call successful
+            used_preview_api = True
+            
+            # Convert API response to EvaluatorPreviewResult
+            preview_result = EvaluatorPreviewResult()
+            preview_result.total_samples = result.get("totalSamples", len(samples))
+            preview_result.total_runtime_ms = int(result.get("totalRuntimeMs", 0))
+            
+            # Process individual sample results
+            sample_results = result.get("results", [])
+            for i, sample_result in enumerate(sample_results):
+                preview_result.add_result(
+                    sample_index=i,
+                    success=sample_result.get("success", False),
+                    score=sample_result.get("score", 0.0),
+                    per_metric_evals=sample_result.get("perMetricEvals", {})
+                )
+            
+            return preview_result
+            
+        except Exception as e:
+            logger.error(f"Error previewing evaluator: {str(e)}")
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+                logger.error(f"Response: {e.response.text}")
+                
+            # Set flag to indicate fallback mode was used
+            used_preview_api = False
+            
+            # Fallback to the old simulation-based preview
+            logger.warning("Falling back to simulated preview mode")
+            return self._simulated_preview(samples)
+    
+    def _simulated_preview(self, samples):
+        """
+        Simulate the preview locally without calling the API
+        For fallback when the API call fails
+        
+        Args:
+            samples: List of sample data
+            
+        Returns:
+            EvaluatorPreviewResult with simulated results
+        """
         preview_result = EvaluatorPreviewResult()
         preview_result.total_samples = len(samples)
 
         start_time = time.time()
         for i, sample in enumerate(samples):
             try:
-                # For demonstration, we'll simulate the evaluation process
-                # In a real implementation, this would call the API or run the code
-
                 # Sample validation
                 if "messages" not in sample:
                     raise ValueError(f"Sample {i+1} is missing 'messages' field")
@@ -329,13 +418,17 @@ class Evaluator:
                 payload["evaluation"]["multiMetrics"] = self.multi_metrics
 
         # Make API request to create evaluator
+        # For dev environment, special handling for account_id
+        if "dev.api.fireworks.ai" in self.api_base and account_id == "fireworks":
+            account_id = "pyroworks-dev"  # Default dev account
+            
         base_url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
         }
 
-        logger.info(f"Creating evaluator '{evaluator_id}'...")
+        logger.info(f"Creating evaluator '{evaluator_id}' for account '{account_id}'...")
 
         # Make real API call
         try:

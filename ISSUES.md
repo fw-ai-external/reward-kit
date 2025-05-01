@@ -1,65 +1,39 @@
 # Goal
-- clean up the code
 - makes the type more correct
 
 and make sure we use local venv to do this in case you need to install any dependencies
 
+## Input is untyped, reward function can be both typed and untyped
 
-## Clean up the code
-right now to author an evaluator, we need to make two rows of import
-
-```
-from reward_kit.models import Message, EvaluateResult, MetricResult
-from reward_kit.typed_interface import reward_function
-```
-
-which is really ugly, please help me refactor the code so everything is just one row
-o
-## Make types more correct
-
-Right now for messages we have
+I am looking at examples/typed_reward_function_example.py and I think this example is wrong and doesn't even run right now
 
 ```
-# Pydantic models for typed interface
-class Message(BaseModel):
-    """A message in a conversation."""
-    role: Literal["system", "user", "assistant"]
-    content: str
+(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ source .venv/bin/activate && python examples/typed_reward_function_example.py
+Traceback (most recent call last):
+  File "/home/bchen/home/reward-kit/examples/typed_reward_function_example.py", line 141, in <module>
+    test_reward_function()
+  File "/home/bchen/home/reward-kit/examples/typed_reward_function_example.py", line 125, in test_reward_function
+    result = typed_informativeness_reward(messages=sample_messages)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bchen/home/reward-kit/reward_kit/typed_interface.py", line 86, in wrapper
+    result = func(typed_messages, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bchen/home/reward-kit/examples/typed_reward_function_example.py", line 46, in typed_informativeness_reward
+    Message(role=msg["role"], content=msg["content"])
+  File "/home/bchen/miniconda3/lib/python3.12/typing.py", line 1140, in __call__
+    result = self.__origin__(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bchen/miniconda3/lib/python3.12/typing.py", line 480, in __call__
+    raise TypeError(f"Cannot instantiate {self!r}")
+TypeError: Cannot instantiate typing.Union
 ```
 
-But I think we just accept the OpenAI message type, can you help me import from OpenAI instead as well as the OpenAI types?
+and in general for reward kit, I want to make sure the input is typed for the reward function, can you help me with that across my codebase? This will give the reward author more confidence that their code is correct.
 
-Checking the OpenAI code, I think the base type is here
+In our typed_evaluator_example.py, things are correct
 
 ```
-class CompletionCreateParamsBase(TypedDict, total=False):
-    messages: Required[Iterable[ChatCompletionMessageParam]]
-    """A list of messages comprising the conversation so far.
 
-    Depending on the [model](https://platform.openai.com/docs/models) you use,
-    different message types (modalities) are supported, like
-    [text](https://platform.openai.com/docs/guides/text-generation),
-    [images](https://platform.openai.com/docs/guides/vision), and
-    [audio](https://platform.openai.com/docs/guides/audio).
-    """
-
-    model: Required[Union[str, ChatModel]]
-    """Model ID used to generate the response, like `gpt-4o` or `o3`.
-
-    OpenAI offers a wide range of models with different capabilities, performance
-    characteristics, and price points. Refer to the
-    [model guide](https://platform.openai.com/docs/models) to browse and compare
-    available models.
-    """
-
-    audio: Optional[ChatCompletionAudioParam]
-    """Parameters for audio output.
-
-    Required when audio output is requested with `modalities: ["audio"]`.
-    [Learn more](https://platform.openai.com/docs/guides/audio).
-    """
+@reward_function
+def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
 ```
-
-under src/openai/types/chat/completion_create_params.py, but that is source code, we need to find the right type to import from OpenAI library
-
-Also add unittest to make sure we are properly covered for all these different types

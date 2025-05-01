@@ -20,8 +20,12 @@ class OpenAICompatibilityTest(unittest.TestCase):
 
     def test_message_type_compatibility(self):
         """Test that our Message type is compatible with OpenAI's."""
-        # Check that Message is an alias for ChatCompletionMessageParam
-        self.assertEqual(Message, ChatCompletionMessageParam)
+        # We no longer directly alias ChatCompletionMessageParam
+        # Instead verify we can use the same fields and create our Message
+        openai_msg = {"role": "assistant", "content": "Hello"}
+        our_msg = Message(**openai_msg)
+        self.assertEqual(our_msg.role, "assistant")
+        self.assertEqual(our_msg.content, "Hello")
 
     def test_openai_message_in_decorator(self):
         """Test that the reward_function decorator can handle OpenAI message types."""
@@ -33,8 +37,8 @@ class OpenAICompatibilityTest(unittest.TestCase):
             last_message = messages[-1]
             
             # Simple evaluation - check if the response is not empty and from the assistant
-            success = (last_message.get("role") == "assistant" and 
-                      last_message.get("content", "") != "")
+            success = (last_message.role == "assistant" and 
+                      last_message.content != "")
             
             return EvaluateResult(root={
                 "not_empty": MetricResult(

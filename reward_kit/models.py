@@ -7,8 +7,15 @@ from pydantic import BaseModel, Field, RootModel
 # Import OpenAI message types
 from openai.types.chat import ChatCompletionMessageParam
 
-# Message type alias - for backward compatibility
-Message = ChatCompletionMessageParam
+# Create a proper Message class
+class Message(BaseModel):
+    """Chat message model compatible with OpenAI's interface."""
+    role: str
+    content: str
+    name: Optional[str] = None
+    tool_call_id: Optional[str] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    function_call: Optional[Dict[str, Any]] = None
 
 
 class MetricResult(BaseModel):

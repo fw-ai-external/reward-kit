@@ -37,11 +37,9 @@ def test_typed_interface_basic():
 
 def test_typed_interface_input_validation():
     """
-    Test that invalid input messages are properly handled.
+    Test that input messages are properly validated.
     
-    Note: With our OpenAI compatibility update, we're now more permissive with message formats
-    to match OpenAI's flexibility. This test now checks that even unusual formats are processed
-    without errors.
+    Our Message model now properly validates messages, requiring at least 'role' and 'content'.
     """
     
     @reward_function
@@ -53,15 +51,25 @@ def test_typed_interface_input_validation():
             "test": MetricResult(success=True, score=0.5, reason="Test")
         })
     
-    # Test with unusual but now acceptable messages
-    unusual_messages = [
-        {"content": "Hello"},  # Missing 'role' but we handle this gracefully now
+    # Valid messages with required fields
+    valid_messages = [
+        {"role": "user", "content": "Hello"},
         {"role": "assistant", "content": "Hi there!"}
     ]
     
-    # This should now work without raising an error
-    result = sample_evaluator(messages=unusual_messages)
+    # This should work without error
+    result = sample_evaluator(messages=valid_messages)
     assert result["test"]["score"] == 0.5
+    
+    # Test with invalid messages should raise an error
+    invalid_messages = [{"content": "Hello without role"}]
+    
+    try:
+        sample_evaluator(messages=invalid_messages)
+        assert False, "Should have raised a validation error"
+    except ValueError:
+        # Expected validation error
+        pass
     
     # Test with other unusual formats
     unusual_role_messages = [

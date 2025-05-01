@@ -47,38 +47,43 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
 
     @wraps(func)
     def wrapper(
-        messages: List[Dict[str, Any]], **kwargs: Any
+        messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
     ) -> Dict[str, Dict[str, Any]]:
-        # 1. Validate / coerce the incoming list[dict] → list[Message]
+        # 1. Validate / coerce the incoming messages to list[Message]
         try:
-            # Convert dict messages to OpenAI message types
+            # Convert messages to Message objects if they're not already
             typed_messages = []
 
             for msg in messages:
-                role = msg.get("role", "")
-                content = msg.get("content", "")
-
-                if role == "system":
-                    typed_messages.append({"role": role, "content": content})
-                elif role == "user":
-                    typed_messages.append({"role": role, "content": content})
-                elif role == "assistant":
-                    typed_messages.append({"role": role, "content": content})
-                elif role == "tool":
-                    typed_messages.append(
-                        {
-                            "role": role,
-                            "content": content,
-                            "tool_call_id": msg.get("tool_call_id", ""),
-                        }
-                    )
-                elif role == "function":
-                    typed_messages.append(
-                        {"role": role, "content": content, "name": msg.get("name", "")}
-                    )
-                else:
-                    # Unknown role type, pass as is
+                if isinstance(msg, Message):
+                    # Already a Message object, use it directly
                     typed_messages.append(msg)
+                else:
+                    # It's a dictionary, convert to Message
+                    role = msg.get("role", "")
+                    content = msg.get("content", "")
+
+                    if role == "system":
+                        typed_messages.append(Message(role=role, content=content))
+                    elif role == "user":
+                        typed_messages.append(Message(role=role, content=content))
+                    elif role == "assistant":
+                        typed_messages.append(Message(role=role, content=content))
+                    elif role == "tool":
+                        typed_messages.append(
+                            Message(
+                                role=role,
+                                content=content,
+                                tool_call_id=msg.get("tool_call_id", ""),
+                            )
+                        )
+                    elif role == "function":
+                        typed_messages.append(
+                            Message(role=role, content=content, name=msg.get("name", ""))
+                        )
+                    else:
+                        # Unknown role type, convert as best we can
+                        typed_messages.append(Message(**msg))
         except Exception as err:
             raise ValueError(f"Input messages failed validation:\n{err}") from None
 

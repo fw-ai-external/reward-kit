@@ -287,7 +287,7 @@ class RewardFunction:
         return adapter
 
 
-def reward_function(func: T) -> T:
+def legacy_reward_function(func: T) -> T:
     """
     Decorator for reward functions that adds deployment capabilities.
 
@@ -591,3 +591,7 @@ def reward_function(func: T) -> T:
     wrapper.deploy = deploy  # type: ignore
 
     return cast(T, wrapper)
+
+
+# Alias for backward compatibility - to be removed in future version
+reward_function = legacy_reward_function  # type: ignore # noqa: F811

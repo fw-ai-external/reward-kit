@@ -9,7 +9,8 @@ from pathlib import Path
 from functools import wraps
 import logging
 
-from .models import RewardOutput, MetricRewardOutput
+from .models import RewardOutput, MetricRewardOutput, Message, EvaluateResult, MetricResult
+from .typed_interface import reward_function
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

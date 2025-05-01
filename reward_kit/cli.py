@@ -10,7 +10,7 @@ import uvicorn
 
 from .server import serve, serve_tunnel
 from .models import RewardOutput
-from .evaluation import preview_evaluation, create_evaluation
+from .evaluation import preview_evaluation, create_evaluation, preview_folder_evaluation, deploy_folder_evaluation
 
 # Set up Typer app for modern CLI interface
 app = typer.Typer(help="Fireworks Reward Kit CLI")
@@ -212,7 +212,7 @@ def preview_cmd(
     folder: str = typer.Option(None, "--folder", help="Path to folder with multiple metrics"),
     max_samples: int = typer.Option(5, "--max-samples", help="Maximum number of samples to process"),
 ):
-    """Preview an evaluation with sample data."""
+    """Preview an evaluation with sample data (legacy method)."""
     try:
         if not metric_folder and not folder:
             typer.echo("Either --metric-folder or --folder with --multi-metrics must be specified")
@@ -238,6 +238,32 @@ def preview_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("preview-folder")
+def preview_folder_cmd(
+    evaluator_folder: str = typer.Argument(..., help="Path to the folder containing the evaluator code"),
+    sample_file: str = typer.Option(..., "--sample-file", help="Path to sample JSONL file"),
+    max_samples: int = typer.Option(5, "--max-samples", help="Maximum number of samples to process"),
+    multi_metrics: bool = typer.Option(None, "--multi-metrics", help="If set, forces multi-metrics mode"),
+):
+    """Preview an evaluation directly from a folder with sample data."""
+    try:
+        typer.echo(f"Previewing evaluation from folder: {evaluator_folder}")
+        
+        preview_result = preview_folder_evaluation(
+            evaluator_folder=evaluator_folder,
+            sample_file=sample_file,
+            max_samples=max_samples,
+            multi_metrics=multi_metrics
+        )
+        
+        # Display the results
+        preview_result.display()
+        
+    except Exception as e:
+        typer.echo(f"Error previewing folder evaluation: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("create")
 def create_cmd(
     eval_id: str = typer.Argument(..., help="ID for the evaluation to create"),
@@ -247,7 +273,7 @@ def create_cmd(
     display_name: str = typer.Option(None, "--display-name", help="Display name for the evaluation"),
     description: str = typer.Option(None, "--description", help="Description of the evaluation"),
 ):
-    """Create an evaluation."""
+    """Create an evaluation (legacy method)."""
     try:
         if not metric_folder and not folder:
             typer.echo("Either --metric-folder or --folder with --multi-metrics must be specified")
@@ -270,6 +296,35 @@ def create_cmd(
         
     except Exception as e:
         typer.echo(f"Error creating evaluation: {str(e)}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("deploy-folder")
+def deploy_folder_cmd(
+    eval_id: str = typer.Argument(..., help="ID for the evaluation to create"),
+    evaluator_folder: str = typer.Argument(..., help="Path to the folder containing the evaluator code"),
+    display_name: str = typer.Option(None, "--display-name", help="Display name for the evaluation"),
+    description: str = typer.Option(None, "--description", help="Description of the evaluation"),
+    force: bool = typer.Option(False, "--force", help="If set, will overwrite an existing evaluator with the same ID"),
+    multi_metrics: bool = typer.Option(None, "--multi-metrics", help="If set, forces multi-metrics mode"),
+):
+    """Deploy an evaluation directly from a folder."""
+    try:
+        typer.echo(f"Deploying evaluation from folder: {evaluator_folder}")
+        
+        evaluator = deploy_folder_evaluation(
+            evaluator_id=eval_id,
+            evaluator_folder=evaluator_folder,
+            display_name=display_name,
+            description=description,
+            force=force,
+            multi_metrics=multi_metrics
+        )
+        
+        typer.echo(f"Successfully deployed evaluator: {evaluator['name']}")
+        
+    except Exception as e:
+        typer.echo(f"Error deploying folder evaluation: {str(e)}", err=True)
         raise typer.Exit(code=1)
 
 

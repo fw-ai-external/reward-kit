@@ -1,8 +1,27 @@
-from typing import Dict, List, Optional, Any, Union, Callable
+from typing import Dict, List, Optional, Any, Union, Callable, Literal
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json
 import json
+from pydantic import BaseModel, Field, RootModel
 
+# Pydantic models for typed interface
+class Message(BaseModel):
+    """A message in a conversation."""
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+class MetricResult(BaseModel):
+    """Result of a single metric evaluation."""
+    success: bool
+    score: float = Field(..., ge=0.0, le=1.0)
+    reason: str
+
+# Use RootModel for pydantic v2 compatibility
+class EvaluateResult(RootModel):
+    """The complete result of an evaluator with multiple metrics."""
+    root: Dict[str, MetricResult]
+
+# Original dataclass-based models for backwards compatibility
 @dataclass_json
 @dataclass
 class MetricRewardOutput:

@@ -847,6 +847,83 @@ def preview_evaluation(
     return evaluator.preview(sample_file, max_samples)
 
 
+def preview_folder_evaluation(
+    evaluator_folder,
+    sample_file,
+    max_samples=5,
+    multi_metrics=False,
+):
+    """
+    Preview an evaluation from a folder with sample data.
+    This is a more convenient interface that automatically detects the 
+    folder structure and handles both single and multi-metrics evaluations.
+
+    Args:
+        evaluator_folder: Path to the folder containing the evaluator code
+        sample_file: Path to the sample JSONL file
+        max_samples: Maximum number of samples to process
+        multi_metrics: Whether this is a multi-metrics evaluation
+        
+    Returns:
+        EvaluatorPreviewResult with preview results
+    """
+    import os
+    from pathlib import Path
+    
+    evaluator_folder = os.path.abspath(evaluator_folder)
+    
+    # Check if folder exists
+    if not os.path.exists(evaluator_folder):
+        raise ValueError(f"Evaluator folder does not exist: {evaluator_folder}")
+        
+    if not os.path.isdir(evaluator_folder):
+        raise ValueError(f"Not a directory: {evaluator_folder}")
+    
+    # Determine if this is a multi-metric evaluator or single-metric
+    # Multi-metric evaluator has main.py directly in the folder
+    # Single-metric has subdirectories for each metric
+    has_main_py = os.path.exists(os.path.join(evaluator_folder, "main.py"))
+    
+    # Auto-detect multi_metrics if not specified
+    if has_main_py and not multi_metrics:
+        # Look for a structure that suggests multi-metrics
+        py_files = list(Path(evaluator_folder).glob("*.py"))
+        if len(py_files) > 1:
+            logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
+            multi_metrics = True
+    
+    # Create and load evaluator
+    evaluator = Evaluator(multi_metrics=multi_metrics)
+    
+    if multi_metrics:
+        # Load the folder directly as a multi-metric evaluation
+        evaluator.load_multi_metrics_folder(evaluator_folder)
+    else:
+        # Treat each subdirectory with a main.py as a separate metric
+        metric_folders = []
+        
+        # Check if the folder itself has a main.py (single metric case)
+        if has_main_py:
+            metric_name = os.path.basename(evaluator_folder)
+            evaluator.load_metric_folder(metric_name, evaluator_folder)
+        else:
+            # Look for subdirectories with main.py
+            for item in os.listdir(evaluator_folder):
+                item_path = os.path.join(evaluator_folder, item)
+                if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "main.py")):
+                    metric_name = item
+                    evaluator.load_metric_folder(metric_name, item_path)
+                    metric_folders.append(f"{metric_name}={item_path}")
+        
+        if not evaluator.metric_folders:
+            raise ValueError(
+                f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
+            )
+    
+    # Run the preview
+    return evaluator.preview(sample_file, max_samples)
+
+
 def create_evaluation(
     evaluator_id,
     metric_folders=None,
@@ -892,4 +969,93 @@ def create_evaluation(
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
 
+    return evaluator.create(evaluator_id, display_name, description, force)
+
+
+def deploy_folder_evaluation(
+    evaluator_id,
+    evaluator_folder,
+    display_name=None,
+    description=None,
+    force=False,
+    multi_metrics=False,
+):
+    """
+    Deploy an evaluation from a folder to the Fireworks platform.
+    This is a more convenient interface that automatically detects the 
+    folder structure and handles both single and multi-metrics evaluations.
+
+    Args:
+        evaluator_id: ID for the evaluator
+        evaluator_folder: Path to the folder containing the evaluator code
+        display_name: Display name for the evaluator
+        description: Description of the evaluator
+        force: If True, update the evaluator if it already exists
+        multi_metrics: Whether this is a multi-metrics evaluation (auto-detected if not specified)
+        
+    Returns:
+        Created evaluator object
+    """
+    import os
+    from pathlib import Path
+    
+    evaluator_folder = os.path.abspath(evaluator_folder)
+    
+    # Check if folder exists
+    if not os.path.exists(evaluator_folder):
+        raise ValueError(f"Evaluator folder does not exist: {evaluator_folder}")
+        
+    if not os.path.isdir(evaluator_folder):
+        raise ValueError(f"Not a directory: {evaluator_folder}")
+    
+    # Determine if this is a multi-metric evaluator or single-metric
+    # Multi-metric evaluator has main.py directly in the folder
+    # Single-metric has subdirectories for each metric
+    has_main_py = os.path.exists(os.path.join(evaluator_folder, "main.py"))
+    
+    # Auto-detect multi_metrics if not specified
+    if has_main_py and not multi_metrics:
+        # Look for a structure that suggests multi-metrics
+        py_files = list(Path(evaluator_folder).glob("*.py"))
+        if len(py_files) > 1:
+            logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
+            multi_metrics = True
+    
+    # Default display name if not provided
+    if not display_name:
+        display_name = evaluator_id
+    
+    # Default description if not provided
+    if not description:
+        description = f"Evaluator '{evaluator_id}' deployed from folder {os.path.basename(evaluator_folder)}"
+    
+    # Create and load evaluator
+    evaluator = Evaluator(multi_metrics=multi_metrics)
+    
+    if multi_metrics:
+        # Load the folder directly as a multi-metric evaluation
+        evaluator.load_multi_metrics_folder(evaluator_folder)
+    else:
+        # Treat each subdirectory with a main.py as a separate metric
+        metric_folders = []
+        
+        # Check if the folder itself has a main.py (single metric case)
+        if has_main_py:
+            metric_name = os.path.basename(evaluator_folder)
+            evaluator.load_metric_folder(metric_name, evaluator_folder)
+        else:
+            # Look for subdirectories with main.py
+            for item in os.listdir(evaluator_folder):
+                item_path = os.path.join(evaluator_folder, item)
+                if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "main.py")):
+                    metric_name = item
+                    evaluator.load_metric_folder(metric_name, item_path)
+                    metric_folders.append(f"{metric_name}={item_path}")
+        
+        if not evaluator.metric_folders:
+            raise ValueError(
+                f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
+            )
+    
+    # Deploy the evaluation
     return evaluator.create(evaluator_id, display_name, description, force)

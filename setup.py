@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -28,8 +28,7 @@ setup(
     author="Fireworks AI",
     author_email="info@fireworks.ai",
     description="A Python library for defining, testing, deploying, and using reward functions for LLM fine-tuning",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
+    long_description="A Python library for defining, testing, deploying, and using reward functions for LLM fine-tuning",
     url="https://github.com/fireworks-ai/reward-kit",
     classifiers=[
         "Programming Language :: Python :: 3",

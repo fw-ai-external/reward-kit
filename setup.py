@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.2.0",
+    version="0.2.1",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",

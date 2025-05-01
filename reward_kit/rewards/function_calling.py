@@ -4,6 +4,7 @@ import re
 
 from ..models import RewardOutput, MetricRewardOutput
 
+
 def match_function_call(
     messages: List[Dict[str, str]],
     original_messages: List[Dict[str, str]],
@@ -11,11 +12,11 @@ def match_function_call(
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
     argument_match_strictness: str = "exact",
-    **kwargs
+    **kwargs,
 ) -> RewardOutput:
     """
     Evaluate how well a function call matches an expected schema.
-    
+
     Args:
         messages: The conversation messages
         original_messages: Original conversation context
@@ -26,34 +27,36 @@ def match_function_call(
             - "exact": All arguments must match exactly
             - "partial": Only check provided arguments, ignore missing ones
             - "flexible": Allow extra arguments and type mismatches with penalty
-            
+
     Returns:
         RewardOutput with score and metrics
     """
     metrics = {}
-    
+
     # 1. Function name match
     expected_name = expected_call_schema.get("name", "")
     name_match = function_name == expected_name
     name_score = 1.0 if name_match else 0.0
     name_reason = f"Function name {'matches' if name_match else 'does not match'}: expected '{expected_name}', got '{function_name}'"
-    metrics["function_name_match"] = MetricRewardOutput(score=name_score, reason=name_reason)
-    
+    metrics["function_name_match"] = MetricRewardOutput(
+        score=name_score, reason=name_reason
+    )
+
     # 2. Arguments match
     expected_args = expected_call_schema.get("arguments", {})
     arg_score = 0.0
     arg_details = []
-    
+
     # We'll track different aspects of argument matching
     missing_args = []
     extra_args = []
     type_mismatches = []
     perfect_matches = []
-    
+
     # Check for expected arguments
     for arg_name, arg_schema in expected_args.items():
         expected_type = arg_schema.get("type", "any")
-        
+
         if arg_name not in parsed_arguments:
             missing_args.append(arg_name)
             arg_details.append(f"Missing argument: {arg_name}")
@@ -63,35 +66,47 @@ def match_function_call(
             type_matched = True
             if expected_type == "string" and not isinstance(arg_value, str):
                 type_mismatches.append(arg_name)
-                arg_details.append(f"Type mismatch for {arg_name}: expected string, got {type(arg_value).__name__}")
+                arg_details.append(
+                    f"Type mismatch for {arg_name}: expected string, got {type(arg_value).__name__}"
+                )
                 type_matched = False
             elif expected_type == "number" and not isinstance(arg_value, (int, float)):
                 type_mismatches.append(arg_name)
-                arg_details.append(f"Type mismatch for {arg_name}: expected number, got {type(arg_value).__name__}")
+                arg_details.append(
+                    f"Type mismatch for {arg_name}: expected number, got {type(arg_value).__name__}"
+                )
                 type_matched = False
             elif expected_type == "boolean" and not isinstance(arg_value, bool):
                 type_mismatches.append(arg_name)
-                arg_details.append(f"Type mismatch for {arg_name}: expected boolean, got {type(arg_value).__name__}")
+                arg_details.append(
+                    f"Type mismatch for {arg_name}: expected boolean, got {type(arg_value).__name__}"
+                )
                 type_matched = False
             elif expected_type == "array" and not isinstance(arg_value, list):
                 type_mismatches.append(arg_name)
-                arg_details.append(f"Type mismatch for {arg_name}: expected array, got {type(arg_value).__name__}")
+                arg_details.append(
+                    f"Type mismatch for {arg_name}: expected array, got {type(arg_value).__name__}"
+                )
                 type_matched = False
             elif expected_type == "object" and not isinstance(arg_value, dict):
                 type_mismatches.append(arg_name)
-                arg_details.append(f"Type mismatch for {arg_name}: expected object, got {type(arg_value).__name__}")
+                arg_details.append(
+                    f"Type mismatch for {arg_name}: expected object, got {type(arg_value).__name__}"
+                )
                 type_matched = False
-            
+
             if type_matched:
                 perfect_matches.append(arg_name)
-                arg_details.append(f"Argument {arg_name} matches expected type {expected_type}")
-    
+                arg_details.append(
+                    f"Argument {arg_name} matches expected type {expected_type}"
+                )
+
     # Check for extra arguments
     for arg_name in parsed_arguments:
         if arg_name not in expected_args:
             extra_args.append(arg_name)
             arg_details.append(f"Unexpected argument: {arg_name}")
-    
+
     # Calculate argument score based on strictness
     if argument_match_strictness == "exact":
         # All arguments must match exactly
@@ -111,7 +126,10 @@ def match_function_call(
             else:
                 correct_args = len(perfect_matches)
                 arg_score = correct_args / total_provided
-    elif argument_match_strictness == "permissive" or argument_match_strictness == "flexible":
+    elif (
+        argument_match_strictness == "permissive"
+        or argument_match_strictness == "flexible"
+    ):
         # For permissive mode, ignore extra arguments and just check that required ones are present
         # and have the correct type
         if missing_args or type_mismatches:
@@ -119,12 +137,14 @@ def match_function_call(
         else:
             arg_score = 1.0
     else:
-        raise ValueError(f"Invalid argument_match_strictness: {argument_match_strictness}")
-    
+        raise ValueError(
+            f"Invalid argument_match_strictness: {argument_match_strictness}"
+        )
+
     arg_reason = "\n".join(arg_details)
     metrics["arguments_match"] = MetricRewardOutput(score=arg_score, reason=arg_reason)
-    
+
     # 3. Calculate final score (equally weighted between name and args)
     final_score = (name_score + arg_score) / 2.0
-    
+
     return RewardOutput(score=final_score, metrics=metrics)

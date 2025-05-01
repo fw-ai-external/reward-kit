@@ -1,48 +1,85 @@
 from functools import wraps
-from typing import Any, Callable, Dict, List, TypeVar, cast, Protocol, Optional
+from typing import Any, Callable, Dict, List, TypeVar, cast, Protocol, Optional, Union
 
 from pydantic import TypeAdapter, ValidationError
 
 from .models import Message, EvaluateResult
 
+# Create a type adapter that can handle OpenAI message types
 _msg_adapter = TypeAdapter(List[Message])
 _res_adapter = TypeAdapter(EvaluateResult)
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 # Define protocol for more precise typing
 class EvaluateFunction(Protocol):
     """Protocol for evaluate functions that take typed messages."""
-    def __call__(self, messages: List[Message], **kwargs: Any) -> EvaluateResult: ...
+
+    def __call__(
+        self, messages: Union[List[Message], List[Dict[str, Any]]], **kwargs: Any
+    ) -> EvaluateResult: ...
+
 
 # Define return type protocol
 class DictEvaluateFunction(Protocol):
     """Protocol for functions that take dict messages and return dict results."""
-    def __call__(self, messages: List[Dict[str, Any]], **kwargs: Any) -> Dict[str, Dict[str, Any]]: ...
+
+    def __call__(
+        self, messages: List[Dict[str, Any]], **kwargs: Any
+    ) -> Dict[str, Dict[str, Any]]: ...
 
 
-def reward_function(
-    func: EvaluateFunction
-) -> DictEvaluateFunction:
+def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
     """
     Wrap an `evaluate`-style function so callers still use raw JSON-ish types.
-    
+
     This decorator allows you to write evaluator functions with typed Pydantic models
     while maintaining backward compatibility with the existing API that uses lists
     of dictionaries.
-    
+
     Args:
         func: Function that takes List[Message] and returns EvaluateResult
-        
+
     Returns:
         Wrapped function that takes List[dict] and returns Dict[str, Dict[str, Any]]
     """
+
     @wraps(func)
-    def wrapper(messages: List[Dict[str, Any]], **kwargs: Any) -> Dict[str, Dict[str, Any]]:
+    def wrapper(
+        messages: List[Dict[str, Any]], **kwargs: Any
+    ) -> Dict[str, Dict[str, Any]]:
         # 1. Validate / coerce the incoming list[dict] → list[Message]
         try:
-            typed_messages = _msg_adapter.validate_python(messages)
-        except ValidationError as err:
+            # Convert dict messages to OpenAI message types
+            typed_messages = []
+
+            for msg in messages:
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+
+                if role == "system":
+                    typed_messages.append({"role": role, "content": content})
+                elif role == "user":
+                    typed_messages.append({"role": role, "content": content})
+                elif role == "assistant":
+                    typed_messages.append({"role": role, "content": content})
+                elif role == "tool":
+                    typed_messages.append(
+                        {
+                            "role": role,
+                            "content": content,
+                            "tool_call_id": msg.get("tool_call_id", ""),
+                        }
+                    )
+                elif role == "function":
+                    typed_messages.append(
+                        {"role": role, "content": content, "name": msg.get("name", "")}
+                    )
+                else:
+                    # Unknown role type, pass as is
+                    typed_messages.append(msg)
+        except Exception as err:
             raise ValueError(f"Input messages failed validation:\n{err}") from None
 
         # 2. Call the author's function
@@ -67,7 +104,7 @@ def reward_function(
                 key: {
                     "success": metric.success,
                     "score": metric.score,
-                    "reason": metric.reason
+                    "reason": metric.reason,
                 }
                 for key, metric in result_model.root.items()
             }

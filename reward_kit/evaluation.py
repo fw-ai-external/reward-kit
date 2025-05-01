@@ -207,7 +207,7 @@ class Evaluator:
         except ValueError as e:
             logger.error(f"Authentication error: {str(e)}")
             raise
-            
+
         # Construct the evaluator payload
         # Construct the preview evaluation payload
         evaluator = {
@@ -216,48 +216,50 @@ class Evaluator:
             "multiMetrics": self.multi_metrics,
             "criteria": self._construct_criteria(),
             "requirements": "",
-            "rollupSettings": None
+            "rollupSettings": None,
         }
-        
+
         # The samples need to be passed as JSON strings in an array
         sample_strings = [json.dumps(sample) for sample in samples]
-        
+
         payload = {
             "evaluator": evaluator,
             "sampleData": sample_strings,
-            "maxSamples": max_samples
+            "maxSamples": max_samples,
         }
-        
+
         # Make API request to preview evaluator
         api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
         # For dev environment, special handling for account_id
         if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
             account_id = "pyroworks-dev"  # Default dev account
-        
+
         url = f"{api_base}/v1/accounts/{account_id}/evaluators:previewEvaluator"
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
         }
-        
-        logger.info(f"Previewing evaluator using API endpoint: {url} with account: {account_id}")
-        
+
+        logger.info(
+            f"Previewing evaluator using API endpoint: {url} with account: {account_id}"
+        )
+
         global used_preview_api
         try:
             # Make the API call to preview the evaluator
             response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
-            
+
             # API call successful
             used_preview_api = True
-            
+
             # Convert API response to EvaluatorPreviewResult
             preview_result = EvaluatorPreviewResult()
             preview_result.total_samples = result.get("totalSamples", len(samples))
             preview_result.total_runtime_ms = int(result.get("totalRuntimeMs", 0))
-            
+
             # Process individual sample results
             sample_results = result.get("results", [])
             for i, sample_result in enumerate(sample_results):
@@ -265,31 +267,31 @@ class Evaluator:
                     sample_index=i,
                     success=sample_result.get("success", False),
                     score=sample_result.get("score", 0.0),
-                    per_metric_evals=sample_result.get("perMetricEvals", {})
+                    per_metric_evals=sample_result.get("perMetricEvals", {}),
                 )
-            
+
             return preview_result
-            
+
         except Exception as e:
             logger.error(f"Error previewing evaluator: {str(e)}")
             if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
                 logger.error(f"Response: {e.response.text}")
-                
+
             # Set flag to indicate fallback mode was used
             used_preview_api = False
-            
+
             # Fallback to the old simulation-based preview
             logger.warning("Falling back to simulated preview mode")
             return self._simulated_preview(samples)
-    
+
     def _simulated_preview(self, samples):
         """
         Simulate the preview locally without calling the API
         For fallback when the API call fails
-        
+
         Args:
             samples: List of sample data
-            
+
         Returns:
             EvaluatorPreviewResult with simulated results
         """
@@ -388,7 +390,7 @@ class Evaluator:
         # Check if we're using the new API format
         api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
         using_new_api = "dev.api.fireworks.ai" in api_base
-        
+
         if using_new_api:
             # New API format (similar to deploy_example.py)
             payload = {
@@ -398,9 +400,9 @@ class Evaluator:
                     "multiMetrics": self.multi_metrics,
                     "criteria": self._construct_criteria(),
                     "requirements": "",
-                    "rollupSettings": None
+                    "rollupSettings": None,
                 },
-                "evaluatorId": evaluator_id
+                "evaluatorId": evaluator_id,
             }
         else:
             # Legacy API format
@@ -412,7 +414,7 @@ class Evaluator:
                     "assertions": self._construct_criteria(),
                 },
             }
-            
+
             # Add multiMetrics if using API that supports it
             if api_base.startswith("https://dev.api.fireworks.ai"):
                 payload["evaluation"]["multiMetrics"] = self.multi_metrics
@@ -421,53 +423,67 @@ class Evaluator:
         # For dev environment, special handling for account_id
         if "dev.api.fireworks.ai" in self.api_base and account_id == "fireworks":
             account_id = "pyroworks-dev"  # Default dev account
-            
+
         base_url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
         headers = {
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
         }
 
-        logger.info(f"Creating evaluator '{evaluator_id}' for account '{account_id}'...")
+        logger.info(
+            f"Creating evaluator '{evaluator_id}' for account '{account_id}'..."
+        )
 
         # Make real API call
         try:
             if force:
                 # First check if the evaluator exists
                 check_url = f"{base_url}/{evaluator_id}"
-                
+
                 try:
                     # Check if the evaluator exists
                     check_response = requests.get(check_url, headers=headers)
-                    
+
                     if check_response.status_code == 200:
                         # Evaluator exists, delete it first then recreate
-                        logger.info(f"Evaluator '{evaluator_id}' already exists, deleting and recreating...")
+                        logger.info(
+                            f"Evaluator '{evaluator_id}' already exists, deleting and recreating..."
+                        )
                         delete_url = f"{base_url}/{evaluator_id}"
-                        
+
                         try:
                             # Try to delete the evaluator
-                            delete_response = requests.delete(delete_url, headers=headers)
+                            delete_response = requests.delete(
+                                delete_url, headers=headers
+                            )
                             # Don't raise for status here, we'll try to create it anyway
                             if delete_response.status_code < 400:
-                                logger.info(f"Successfully deleted evaluator '{evaluator_id}'")
+                                logger.info(
+                                    f"Successfully deleted evaluator '{evaluator_id}'"
+                                )
                             else:
-                                logger.warning(f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}")
+                                logger.warning(
+                                    f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}"
+                                )
                         except Exception as e:
                             logger.warning(f"Error deleting evaluator: {str(e)}")
-                        
+
                         # Now create it
-                        response = requests.post(base_url, json=payload, headers=headers)
+                        response = requests.post(
+                            base_url, json=payload, headers=headers
+                        )
                     else:
                         # Evaluator doesn't exist, create it
-                        response = requests.post(base_url, json=payload, headers=headers)
+                        response = requests.post(
+                            base_url, json=payload, headers=headers
+                        )
                 except requests.exceptions.RequestException:
                     # If checking fails, try to create it
                     response = requests.post(base_url, json=payload, headers=headers)
             else:
                 # Just try to create it
                 response = requests.post(base_url, json=payload, headers=headers)
-            
+
             response.raise_for_status()
             result = response.json()
 
@@ -855,7 +871,7 @@ def preview_folder_evaluation(
 ):
     """
     Preview an evaluation from a folder with sample data.
-    This is a more convenient interface that automatically detects the 
+    This is a more convenient interface that automatically detects the
     folder structure and handles both single and multi-metrics evaluations.
 
     Args:
@@ -863,27 +879,27 @@ def preview_folder_evaluation(
         sample_file: Path to the sample JSONL file
         max_samples: Maximum number of samples to process
         multi_metrics: Whether this is a multi-metrics evaluation
-        
+
     Returns:
         EvaluatorPreviewResult with preview results
     """
     import os
     from pathlib import Path
-    
+
     evaluator_folder = os.path.abspath(evaluator_folder)
-    
+
     # Check if folder exists
     if not os.path.exists(evaluator_folder):
         raise ValueError(f"Evaluator folder does not exist: {evaluator_folder}")
-        
+
     if not os.path.isdir(evaluator_folder):
         raise ValueError(f"Not a directory: {evaluator_folder}")
-    
+
     # Determine if this is a multi-metric evaluator or single-metric
     # Multi-metric evaluator has main.py directly in the folder
     # Single-metric has subdirectories for each metric
     has_main_py = os.path.exists(os.path.join(evaluator_folder, "main.py"))
-    
+
     # Auto-detect multi_metrics if not specified
     if has_main_py and not multi_metrics:
         # Look for a structure that suggests multi-metrics
@@ -891,17 +907,17 @@ def preview_folder_evaluation(
         if len(py_files) > 1:
             logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
             multi_metrics = True
-    
+
     # Create and load evaluator
     evaluator = Evaluator(multi_metrics=multi_metrics)
-    
+
     if multi_metrics:
         # Load the folder directly as a multi-metric evaluation
         evaluator.load_multi_metrics_folder(evaluator_folder)
     else:
         # Treat each subdirectory with a main.py as a separate metric
         metric_folders = []
-        
+
         # Check if the folder itself has a main.py (single metric case)
         if has_main_py:
             metric_name = os.path.basename(evaluator_folder)
@@ -910,16 +926,18 @@ def preview_folder_evaluation(
             # Look for subdirectories with main.py
             for item in os.listdir(evaluator_folder):
                 item_path = os.path.join(evaluator_folder, item)
-                if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "main.py")):
+                if os.path.isdir(item_path) and os.path.exists(
+                    os.path.join(item_path, "main.py")
+                ):
                     metric_name = item
                     evaluator.load_metric_folder(metric_name, item_path)
                     metric_folders.append(f"{metric_name}={item_path}")
-        
+
         if not evaluator.metric_folders:
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
-    
+
     # Run the preview
     return evaluator.preview(sample_file, max_samples)
 
@@ -982,7 +1000,7 @@ def deploy_folder_evaluation(
 ):
     """
     Deploy an evaluation from a folder to the Fireworks platform.
-    This is a more convenient interface that automatically detects the 
+    This is a more convenient interface that automatically detects the
     folder structure and handles both single and multi-metrics evaluations.
 
     Args:
@@ -992,27 +1010,27 @@ def deploy_folder_evaluation(
         description: Description of the evaluator
         force: If True, update the evaluator if it already exists
         multi_metrics: Whether this is a multi-metrics evaluation (auto-detected if not specified)
-        
+
     Returns:
         Created evaluator object
     """
     import os
     from pathlib import Path
-    
+
     evaluator_folder = os.path.abspath(evaluator_folder)
-    
+
     # Check if folder exists
     if not os.path.exists(evaluator_folder):
         raise ValueError(f"Evaluator folder does not exist: {evaluator_folder}")
-        
+
     if not os.path.isdir(evaluator_folder):
         raise ValueError(f"Not a directory: {evaluator_folder}")
-    
+
     # Determine if this is a multi-metric evaluator or single-metric
     # Multi-metric evaluator has main.py directly in the folder
     # Single-metric has subdirectories for each metric
     has_main_py = os.path.exists(os.path.join(evaluator_folder, "main.py"))
-    
+
     # Auto-detect multi_metrics if not specified
     if has_main_py and not multi_metrics:
         # Look for a structure that suggests multi-metrics
@@ -1020,25 +1038,25 @@ def deploy_folder_evaluation(
         if len(py_files) > 1:
             logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
             multi_metrics = True
-    
+
     # Default display name if not provided
     if not display_name:
         display_name = evaluator_id
-    
+
     # Default description if not provided
     if not description:
         description = f"Evaluator '{evaluator_id}' deployed from folder {os.path.basename(evaluator_folder)}"
-    
+
     # Create and load evaluator
     evaluator = Evaluator(multi_metrics=multi_metrics)
-    
+
     if multi_metrics:
         # Load the folder directly as a multi-metric evaluation
         evaluator.load_multi_metrics_folder(evaluator_folder)
     else:
         # Treat each subdirectory with a main.py as a separate metric
         metric_folders = []
-        
+
         # Check if the folder itself has a main.py (single metric case)
         if has_main_py:
             metric_name = os.path.basename(evaluator_folder)
@@ -1047,15 +1065,17 @@ def deploy_folder_evaluation(
             # Look for subdirectories with main.py
             for item in os.listdir(evaluator_folder):
                 item_path = os.path.join(evaluator_folder, item)
-                if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, "main.py")):
+                if os.path.isdir(item_path) and os.path.exists(
+                    os.path.join(item_path, "main.py")
+                ):
                     metric_name = item
                     evaluator.load_metric_folder(metric_name, item_path)
                     metric_folders.append(f"{metric_name}={item_path}")
-        
+
         if not evaluator.metric_folders:
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
-    
+
     # Deploy the evaluation
     return evaluator.create(evaluator_id, display_name, description, force)

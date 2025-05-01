@@ -36,35 +36,42 @@ def test_typed_interface_basic():
 
 
 def test_typed_interface_input_validation():
-    """Test that the typed_interface validates input correctly."""
+    """
+    Test that invalid input messages are properly handled.
+    
+    Note: With our OpenAI compatibility update, we're now more permissive with message formats
+    to match OpenAI's flexibility. This test now checks that even unusual formats are processed
+    without errors.
+    """
     
     @reward_function
     def sample_evaluator(messages: List[Message], **kwargs) -> EvaluateResult:
-        return EvaluateResult({
+        # Check that we can access the messages
+        assert len(messages) > 0
+        
+        return EvaluateResult(root={
             "test": MetricResult(success=True, score=0.5, reason="Test")
         })
     
-    # Test with invalid messages (missing role)
-    invalid_messages = [
-        {"content": "Hello"},  # Missing 'role'
+    # Test with unusual but now acceptable messages
+    unusual_messages = [
+        {"content": "Hello"},  # Missing 'role' but we handle this gracefully now
         {"role": "assistant", "content": "Hi there!"}
     ]
     
-    with pytest.raises(ValueError) as excinfo:
-        sample_evaluator(messages=invalid_messages)
+    # This should now work without raising an error
+    result = sample_evaluator(messages=unusual_messages)
+    assert result["test"]["score"] == 0.5
     
-    assert "Input messages failed validation" in str(excinfo.value)
-    
-    # Test with invalid role
-    invalid_role_messages = [
-        {"role": "invalid_role", "content": "Hello"},  # Invalid role
+    # Test with other unusual formats
+    unusual_role_messages = [
+        {"role": "custom_role", "content": "Hello"},  # Non-standard role
         {"role": "assistant", "content": "Hi there!"}
     ]
     
-    with pytest.raises(ValueError) as excinfo:
-        sample_evaluator(messages=invalid_role_messages)
-    
-    assert "Input messages failed validation" in str(excinfo.value)
+    # This should also work without raising an error
+    result = sample_evaluator(messages=unusual_role_messages)
+    assert result["test"]["score"] == 0.5
 
 
 def test_typed_interface_output_validation():

@@ -1,0 +1,275 @@
+# Data Models Reference
+
+This document describes the core data models used in the Reward Kit for representing messages, evaluation results, and metrics.
+
+## Message Models
+
+### Message
+
+The `Message` class represents a single message in a conversation.
+
+```python
+from reward_kit import Message
+
+message = Message(
+    role="assistant",
+    content="This is the response content",
+    name=None,  # Optional
+    tool_call_id=None,  # Optional
+    tool_calls=None,  # Optional
+    function_call=None  # Optional
+)
+```
+
+#### Attributes
+
+- **`role`** (`str`): The role of the message sender. Typically one of:
+  - `"user"`: Message from the user
+  - `"assistant"`: Message from the assistant
+  - `"system"`: System message providing context/instructions
+  
+- **`content`** (`str`): The text content of the message.
+  
+- **`name`** (`Optional[str]`): Optional name of the sender (for named system messages).
+  
+- **`tool_call_id`** (`Optional[str]`): Optional ID for a tool call (used in tool calling).
+  
+- **`tool_calls`** (`Optional[List[Dict[str, Any]]]`): Optional list of tool calls in the message.
+  
+- **`function_call`** (`Optional[Dict[str, Any]]`): Optional function call information (legacy format).
+
+#### Compatibility
+
+The `Message` class is compatible with OpenAI's `ChatCompletionMessageParam` interface, allowing for easy integration with OpenAI-compatible APIs.
+
+## Reward Output Models
+
+### RewardOutput
+
+The `RewardOutput` class represents the complete result of a reward function evaluation.
+
+```python
+from reward_kit import RewardOutput, MetricRewardOutput
+
+result = RewardOutput(
+    score=0.75,
+    metrics={
+        "clarity": MetricRewardOutput(score=0.8, reason="The response clearly explains the concept"),
+        "accuracy": MetricRewardOutput(score=0.7, reason="Contains one minor factual error")
+    }
+)
+```
+
+#### Attributes
+
+- **`score`** (`float`): The overall reward score, typically between 0.0 and 1.0.
+  
+- **`metrics`** (`Dict[str, MetricRewardOutput]`): Dictionary of component metrics, with metric names as keys and `MetricRewardOutput` objects as values.
+
+#### Methods
+
+- **`to_dict()`** → `Dict[str, Any]`: Converts the `RewardOutput` to a dictionary representation.
+  
+- **`from_dict(data: Dict[str, Any])`** → `RewardOutput`: Class method that creates a `RewardOutput` from a dictionary representation.
+  
+- **`__str__()`** → `str`: Returns a JSON string representation of the `RewardOutput`.
+
+### MetricRewardOutput
+
+The `MetricRewardOutput` class represents a single component metric in a reward evaluation.
+
+```python
+from reward_kit import MetricRewardOutput
+
+metric = MetricRewardOutput(
+    score=0.8,
+    reason="The response provides a clear explanation with appropriate examples"
+)
+```
+
+#### Attributes
+
+- **`score`** (`float`): The score for this specific metric, typically between 0.0 and 1.0.
+  
+- **`reason`** (`Optional[str]`): Optional explanation for why this score was assigned.
+
+## Evaluation Models
+
+### EvaluateResult
+
+The `EvaluateResult` class represents the complete result of an evaluator with multiple metrics.
+
+```python
+from reward_kit import EvaluateResult, MetricResult
+
+result = EvaluateResult(
+    score=0.75,
+    reason="Overall good response with minor issues",
+    metrics={
+        "clarity": MetricResult(score=0.8, reason="Clear and concise"),
+        "accuracy": MetricResult(score=0.7, reason="Contains a minor factual error")
+    },
+    error=None  # Optional error message
+)
+```
+
+#### Attributes
+
+- **`score`** (`float`): The overall evaluation score, typically between 0.0 and 1.0.
+  
+- **`reason`** (`Optional[str]`): Optional explanation for the overall score.
+  
+- **`metrics`** (`Dict[str, MetricResult]`): Dictionary of component metrics.
+  
+- **`error`** (`Optional[str]`): Optional error message if the evaluation encountered a problem.
+
+### MetricResult
+
+The `MetricResult` class represents a single metric in an evaluation.
+
+```python
+from reward_kit import MetricResult
+
+metric = MetricResult(
+    score=0.8,
+    reason="The response is clear and well-structured",
+    success=True  # Optional success indicator
+)
+```
+
+#### Attributes
+
+- **`score`** (`float`): The score for this specific metric, typically between 0.0 and 1.0.
+  
+- **`reason`** (`str`): Explanation for why this score was assigned.
+  
+- **`success`** (`Optional[bool]`): Optional flag indicating whether this metric evaluation was successful.
+
+## Example Usages
+
+### Working with Messages
+
+```python
+from reward_kit import Message
+
+# Create a user message
+user_message = Message(
+    role="user",
+    content="Can you explain how machine learning works?"
+)
+
+# Create an assistant message
+assistant_message = Message(
+    role="assistant",
+    content="Machine learning is a method where computers learn from data without being explicitly programmed."
+)
+
+# Create a system message
+system_message = Message(
+    role="system",
+    content="You are a helpful assistant that provides clear and accurate explanations."
+)
+
+# Create a message with tool calls
+tool_call_message = Message(
+    role="assistant",
+    content=None,
+    tool_calls=[{
+        "id": "call_123",
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "arguments": '{"location": "San Francisco", "unit": "celsius"}'
+        }
+    }]
+)
+```
+
+### Working with RewardOutput
+
+```python
+from reward_kit import RewardOutput, MetricRewardOutput
+
+# Create a RewardOutput with multiple metrics
+result = RewardOutput(
+    score=0.75,
+    metrics={
+        "clarity": MetricRewardOutput(score=0.8, reason="Response is clear and well-structured"),
+        "accuracy": MetricRewardOutput(score=0.7, reason="Contains minor factual errors"),
+        "completeness": MetricRewardOutput(score=0.75, reason="Covers most aspects of the topic")
+    }
+)
+
+# Convert to dictionary
+result_dict = result.to_dict()
+print(result_dict)
+
+# Create from dictionary
+new_result = RewardOutput.from_dict(result_dict)
+print(new_result.score)  # 0.75
+
+# String representation
+result_str = str(result)
+print(result_str)  # JSON string
+```
+
+### Working with EvaluateResult
+
+```python
+from reward_kit import EvaluateResult, MetricResult
+
+# Create an EvaluateResult
+eval_result = EvaluateResult(
+    score=0.75,
+    reason="Overall good response with some minor issues",
+    metrics={
+        "clarity": MetricResult(score=0.8, reason="Clear and concise explanation"),
+        "accuracy": MetricResult(score=0.7, reason="Contains one minor factual error"),
+        "relevance": MetricResult(score=0.75, reason="Mostly relevant to the query")
+    }
+)
+
+# Access metrics
+clarity_score = eval_result.metrics["clarity"].score
+print(f"Clarity score: {clarity_score}")  # Clarity score: 0.8
+
+# Check for errors
+if eval_result.error:
+    print(f"Evaluation error: {eval_result.error}")
+else:
+    print(f"Evaluation successful with score: {eval_result.score}")
+```
+
+## Conversion Between Types
+
+Reward Kit provides functions for converting between `RewardOutput` and `EvaluateResult` formats:
+
+```python
+from reward_kit.utils import convert_to_reward_output, convert_to_evaluate_result
+
+# Convert EvaluateResult to RewardOutput
+evaluate_result = EvaluateResult(score=0.8, metrics={"quality": MetricResult(score=0.8, reason="Good quality")})
+reward_output = convert_to_reward_output(evaluate_result)
+
+# Convert RewardOutput to EvaluateResult
+reward_output = RewardOutput(score=0.9, metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")})
+evaluate_result = convert_to_evaluate_result(reward_output)
+```
+
+This conversion functionality is useful when interacting with different parts of the API that might expect different formats.
+
+## Type Compatibility
+
+While the classes provide strong typing for development, the Reward Kit also accepts dictionary representations for flexibility:
+
+```python
+# Using dictionaries instead of Message objects
+messages = [
+    {"role": "user", "content": "What is machine learning?"},
+    {"role": "assistant", "content": "Machine learning is a method..."}
+]
+
+# These are automatically converted to the appropriate types internally
+```
+
+This flexibility makes it easier to integrate with different APIs and data formats.

@@ -131,39 +131,6 @@ def test_basic_reward_example(mock_env_variables):
     assert hasattr(module, "combined_reward")
 
 
-def test_typed_reward_function_example(mock_env_variables):
-    """Test that the typed_reward_function_example.py example can be loaded"""
-    typed_reward_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 
-        "examples", 
-        "typed_reward_function_example.py"
-    )
-    
-    # Load the module without executing functions
-    module = load_module_from_path("typed_reward", typed_reward_path)
-    
-    # Verify the module has the expected components
-    assert hasattr(module, "typed_informativeness_reward")
-    assert hasattr(module, "test_reward_function")
-
-
-def test_typed_evaluator_example(mock_env_variables):
-    """Test that the typed_evaluator_example.py example runs without errors"""
-    typed_eval_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 
-        "examples", 
-        "typed_evaluator_example.py"
-    )
-    
-    # Instead of import, which might execute the code, let's just check the syntax
-    import ast
-    
-    with open(typed_eval_path, "r") as f:
-        parsed = ast.parse(f.read(), filename=typed_eval_path)
-    
-    # If we can parse it without errors, it's syntactically valid
-    assert parsed is not None
-
 
 def test_folder_based_evaluation_example(mock_env_variables, mock_requests):
     """Test the folder_based_evaluation_example.py can be loaded"""

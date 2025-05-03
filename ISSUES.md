@@ -1,233 +1,116 @@
 # Issues and Tasks
 
-## Resolved Issues
+## Crafting more custom reward functions
+### Code execution and math rewards
 
-### Deploy is now working - FIXED
-
-The deploy functionality is now working correctly. The issue was that the `legacy_reward_function.deploy()` method in `reward_function.py` had a different implementation from the working `create_evaluation()` function in `evaluation.py`. 
-
-We fixed it by:
-1. Creating a temporary directory with the reward function as a main.py file
-2. Using the `create_evaluation()` function from `evaluation.py` to deploy it
-3. Ensuring proper authentication with the improved auth mechanism
-
-Both approaches (`deploy()` in reward functions and `create_evaluation()` for evaluations) now work through the same underlying mechanism.
-
-```
-(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/deploy_example.py 
-Testing reward function locally...
-Informativeness Reward Result:
-Score: 0.8892
-Metrics:
-  length: 0.0892 - Response length: 446 chars
-  specificity: 0.3 - Found 2 specificity markers
-  content_density: 0.5 - Content density: 4 content words in 64 total words
+I have the reward functions from `verl` under the folder `/home/bchen/home/verl/verl/utils/reward_score`. I want to borrow their code to setup math and coding reward functions.
 
 
-Deploying to Fireworks...
-INFO:reward_kit.auth:Using development API base, defaulting to pyroworks-dev account
-Using account ID: pyroworks-dev
-Using auth token (first 10 chars): eyJraWQiOi...
-INFO:reward_kit.reward_function:Making request to: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators (using API base: https://dev.api.fireworks.ai)
-INFO:reward_kit.reward_function:Using account_id: pyroworks-dev
-INFO:reward_kit.reward_function:Auth token present: True
-INFO:reward_kit.reward_function:Deploying reward function 'informativeness_reward' as evaluation 'informativeness-v1'...
-ERROR:reward_kit.reward_function:Error deploying evaluation: 403 Client Error: Forbidden for url: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators
-ERROR:reward_kit.reward_function:Response: {"error":"unauthorized"}
+Basically original message should have the question and the assistant message that would contain the answer, so there is no separate concept of ground truth. And then for math, we should use regex to pull answers from both the original message's final assistant message and the messages's final assistant message which is generated, and then compare the answer
 
-Permission Error: Your API key doesn't have deployment permissions.
-Possible solutions:
-1. Use a production API key: export FIREWORKS_API_KEY=your_production_key
-2. Request deployment permissions for your API key
-3. Check if your account has evaluator deployment enabled
-Error details: {"error":"unauthorized"}
-(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/evaluation_preview_example.py 
-Previewing evaluation...
-INFO:reward_kit.evaluation:Loaded 1 Python files for metric 'word_count' from /home/bchen/home/reward-kit/examples/metrics/word_count
-INFO:reward_kit.evaluation:Loaded 2 samples from ./examples/samples/samples.jsonl
-INFO:reward_kit.evaluation:Previewing evaluator using API endpoint: https://dev.api.fireworks.ai/v1/accounts/pyroworks-dev/evaluators:previewEvaluator with account: pyroworks-dev
-Evaluation Preview Results
-------------------------
-Total Samples: 2
-Total Runtime: 7483 ms
+For coding I want to use E2B as the sandbox for execution as well as local execution, and there are some examples for how to run this in very. For E2B, I have the docs under `/home/bchen/home/E2B/apps/web/src/app/(docs)/docs`.
 
-Individual Results:
-------------------
-Sample 1:
-  Success: 
-  Score: 0.26
-  word_count: {'reason': 'Word count: 26', 'score': 0.26, 'success': None}
+For both of these we need to write very comprehensive tests, and then we need to go through a bunch of steps to make it happen, so please first dump the plan into ISSUES.md for me to review, and then we will try to do it one at a time.
 
-Sample 2:
-  Success: 
-  Score: 0.22
-  word_count: {'reason': 'Word count: 22', 'score': 0.22, 'success': None}
+## Implementation Plan for Math and Code Execution Reward Functions
 
-Creating evaluation...
-INFO:reward_kit.evaluation:Loaded 1 Python files for metric 'word_count' from /home/bchen/home/reward-kit/examples/metrics/word_count
-INFO:reward_kit.evaluation:Creating evaluator 'word-count-eval' for account 'pyroworks-dev'...
-INFO:reward_kit.evaluation:Evaluator 'word-count-eval' already exists, deleting and recreating...
-INFO:reward_kit.evaluation:Successfully deleted evaluator 'word-count-eval'
-INFO:reward_kit.evaluation:Successfully created evaluator 'word-count-eval'
-Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
-```
+### 1. Math Reward Function ✅
 
-## Custom Reward Functions Documentation Plan
+#### Structure: ✅
+1. Create a new file `math.py` in the `reward_kit/rewards/` directory ✅
+2. Implement a `math_reward` function that: ✅
+   - Extracts numerical answers from both original and generated messages using regex ✅
+   - Compares the answers and provides a score based on match ✅
+   - Provides detailed metrics including extracted values and comparison details ✅
 
-### 1. Core Documentation
+#### Key Steps: ✅
+1. Implement regex patterns for common math answer formats (numbers, fractions, scientific notation) ✅
+2. Create answer extraction function that can handle multiple formats ✅
+3. Implement tolerance-based comparison for floating point numbers ✅
+4. Add support for units when comparing answers ✅
+5. Provide comprehensive metrics explaining the scoring process ✅
 
-#### 1.1 Developer Guide - COMPLETED
-- **Getting Started with Reward Functions**: Basic concepts, installation, setup ✅
-- **Reward Function Anatomy**: Detailed explanation of the `@reward_function` decorator ✅
-- **Core Data Types**: Explanation of `RewardOutput`, `MetricRewardOutput`, `Message`, etc. ✅
-- **Evaluation Workflows**: Local testing, preview, deployment ✅
+#### Tests: ✅
+1. Create test cases with various math problem types: ✅
+   - Simple arithmetic ✅
+   - Fractions and decimals ✅
+   - Scientific notation ✅
+   - Multiple steps with intermediate results ✅
+   - Problems with/without units ✅
 
-#### 1.2 API Reference - COMPLETED
-- **Core Classes and Methods**: Full reference for `RewardFunction`, `reward_function`, etc. ✅
-- **Data Models**: Reference for all data models (`RewardOutput`, `Message`, etc.) ✅
-- **Deployment Methods**: Reference for deployment-related functions ✅
+#### LaTeX Support: ✅
+1. Added support for LaTeX-formatted answers: ✅
+   - Boxed expressions: `\boxed{42}` ✅
+   - Fractions: `\frac{3}{4}` ✅
+   - Scientific notation: `\times 10^8` ✅
+   - Units in text: `\text{kg}` ✅
 
-#### 1.3 Code Examples - COMPLETED
-- **Basic Reward Function**: Simple examples like word count ✅
-- **Advanced Reward Functions**: Multiple metrics, combining metrics ✅
-- **Function Calling Evaluation**: Specialized reward functions for evaluating tool use ✅
+### 2. Code Execution Reward Function
 
-### 2. Tutorials and Guides
+#### Structure:
+1. Create a new file `code_execution.py` in the `reward_kit/rewards/` directory
+2. Implement two main functions:
+   - `local_code_execution_reward` for running code in a local environment
+   - `e2b_code_execution_reward` for running code in the E2B sandbox
 
-#### 2.1 Step-by-Step Tutorials - COMPLETED
-- **Creating Your First Reward Function**: From scratch to deployment ✅
-- **Evaluating Model Responses**: Using reward functions for evaluation ✅
-- **Integrating with Training Workflows**: How to use reward functions in RLHF
+#### Key Steps for Local Execution:
+1. Safely extract code blocks from messages
+2. Implement a secure code execution environment with proper isolation
+3. Set up output capture and timeout mechanisms
+4. Implement comparison between expected and actual outputs
+5. Handle various languages (Python, JavaScript, etc.)
 
-#### 2.2 Best Practices - COMPLETED
-- **Designing Effective Reward Functions**: Guidelines and principles ✅
-- **Handling Edge Cases**: Ensuring robust evaluation ✅
-- **Performance Optimization**: Making reward functions efficient ✅
+#### Key Steps for E2B Execution:
+1. Set up E2B client integration
+2. Create a standardized interface to E2B sandbox
+3. Implement secure code execution and timeout handling
+4. Set up proper error handling and reporting
 
-#### 2.3 Advanced Topics
-- **Custom Providers**: Using different models for evaluation
-- **Multi-Component Scoring**: Combining multiple metrics
-- **Metadata Handling**: Using context in reward functions
-- **Integration with Training**: Using reward functions in RLHF pipelines
+#### Tests:
+1. Create test cases for different languages and scenarios:
+   - Simple code execution tests
+   - Tests with inputs/outputs
+   - Tests with long-running code (timeout tests)
+   - Error handling tests
+   - Tests for different languages
 
-### 3. Reference Implementation Templates
+### 3. Common Implementation Tasks
 
-#### 3.1 Common Use Case Templates
-- **Content Quality Evaluation**: Informativeness, relevance, etc.
-- **Safety Evaluation**: Detecting unsafe content
-- **Tool Use Evaluation**: Function calling accuracy
-- **Instruction Following**: Adherence to user instructions
+#### Project Structure Updates:
+1. Update `reward_kit/rewards/__init__.py` to import the new modules
+2. Add proper documentation in the code and in the docs directory
+3. Update example files to show usage of the new reward functions
 
-#### 3.2 Starter Kits
-- **Basic Metrics Pack**: Common metrics ready to use
-- **Custom Evaluator Framework**: Template for building complex evaluators
-- **Evaluation Dashboard**: Tools for visualizing evaluation results
+#### Dependencies:
+1. For local execution: Evaluate and add any required packages for secure code execution
+2. For E2B: Add E2B client as an optional dependency
 
-### 4. Infrastructure Documentation
+#### Security Considerations:
+1. Implement strict security measures for code execution
+2. Provide clear documentation about security implications
+3. Set up proper sandboxing and resource limitations
 
-#### 4.1 CLI Documentation - COMPLETED
-- **Command Reference**: All CLI commands with examples ✅
-- **Workflow Integration**: Using CLI in development workflows ✅
+### 4. Implementation Schedule
 
-#### 4.2 Deployment Guide
-- **Authentication Setup**: Configuring API credentials
-- **Deployment Options**: Different ways to deploy reward functions
-- **Versioning and Updates**: Managing deployed evaluators
-- **Troubleshooting Deployment**: Common issues and solutions
+#### Phase 1: Math Reward Function
+1. Implement core regex-based answer extraction
+2. Implement comparison logic with tolerance
+3. Write tests for basic functionality
+4. Add advanced features (units, scientific notation, etc.)
+5. Complete comprehensive tests
 
-### 5. Practical Examples and Cookbooks
+#### Phase 2: Local Code Execution Reward
+1. Implement secure code extraction
+2. Set up basic local execution environment
+3. Implement output comparison
+4. Add language-specific handlers
+5. Write tests for various scenarios
 
-#### 5.1 Real-World Examples
-- **Helpfulness Evaluator**: Complete implementation with explanations
-- **Factual Accuracy Evaluator**: Detecting factual errors
-- **Reasoning Evaluator**: Assessing logical reasoning
+#### Phase 3: E2B Code Execution Reward
+1. Set up E2B client integration
+2. Implement sandbox execution
+3. Add comprehensive error handling
+4. Write tests for E2B execution
+5. Create documentation for E2B integration
 
-#### 5.2 Cookbooks for Specific Domains
-- **Customer Support Evaluation**: Metrics for support scenarios
-- **Creative Writing Evaluation**: Metrics for creative content
-- **Technical Documentation Evaluation**: Metrics for technical accuracy
-
-## Function Calling Reward Implementation Plan
-
-### Goal
-Create a comprehensive function calling evaluation system that combines schema validation and LLM evaluation to assess the quality of function calls made by AI models.
-
-### Components
-
-#### 1. Schema Jaccard Distance Reward
-- Implement a JSON schema validation reward function that:
-  - Takes a function call output and expected schema as input
-  - Validates function name matches
-  - Calculates Jaccard similarity between expected and actual schema
-  - Returns a score between 0.0-1.0 based on schema similarity
-  - Provides detailed explanations for mismatches
-
-#### 2. LLM Judge Reward
-- Implement an LLM-based judge reward function that:
-  - Takes a function call output and expected behavior
-  - Sends to GPT-4o-mini for evaluation
-  - Returns a score based on LLM's judgment of correctness
-  - Provides qualitative feedback on function call quality
-
-#### 3. Composite Function Calling Reward
-- Implement a composite reward that:
-  - Combines schema validation and LLM judgment
-  - Allows configurable weights for each component
-  - Returns detailed metrics for debugging and analysis
-
-### Implementation Steps
-
-1. Schema Jaccard Reward:
-   - Create schema validation utilities
-   - Implement Jaccard similarity calculation
-   - Add proper error handling and edge cases
-   - Create unit tests
-
-2. LLM Judge Reward:
-   - Set up GPT-4o-mini API integration
-   - Design effective prompt templates
-   - Handle API responses and error cases
-   - Create unit tests
-
-3. Composite Reward:
-   - Implement combined reward function
-   - Add configurable weighting
-   - Create comprehensive documentation
-   - Create integration tests
-
-4. Documentation and Examples:
-   - Add function calling examples
-   - Create tutorial for function call evaluation
-   - Update API reference
-
-### Testing Approach
-- Unit tests for each individual component
-- Integration tests for composite reward
-- Example notebooks with real-world scenarios
-- Benchmarking against human judgments
-
-## Documentation Status
-
-The core developer guide and basic examples are now complete. These provide a solid foundation for developers to understand the basics of creating, testing, and deploying reward functions.
-
-### Completed Items
-
-1. ✅ Implement Schema Jaccard Distance Reward for function calling
-2. ✅ Implement LLM Judge Reward using GPT-4o-mini
-3. ✅ Create Composite Function Calling Reward
-4. ✅ Add documentation and examples for function calling rewards
-
-### Next Priority Items
-
-1. Add advanced topics documentation
-2. Create deployment guide documentation
-3. Develop reference implementation templates
-4. Create practical examples and cookbooks
-
-The documentation can be found in the `docs/` directory with the following structure:
-- `docs/developer_guide/`: Core concepts and usage guides
-- `docs/examples/`: Code examples
-- `docs/tutorials/`: Step-by-step guides
-- `docs/api_reference/`: API documentation
-- `docs/cli_reference/`: CLI documentation
-- `docs/DOCUMENTATION_STATUS.md`: Detailed status and recommendations
+Each phase will include thorough testing and documentation.

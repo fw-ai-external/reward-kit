@@ -2,6 +2,14 @@ from typing import Dict, List, Any, Optional, Set, Tuple, Union
 import json
 import re
 from collections import defaultdict
+import os
+
+# Import OpenAI at module level for mocking in tests
+try:
+    import openai
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None  # Type to mock in tests
 
 from ..models import RewardOutput, MetricRewardOutput
 
@@ -290,14 +298,20 @@ def schema_jaccard_reward(
         
         # Try to extract function call from the message
         if "function_call" in last_message:
-            function_call = last_message["function_call"]
+            function_call_obj = last_message.get("function_call")
+            if isinstance(function_call_obj, dict):
+                function_call = function_call_obj
         elif "tool_calls" in last_message:
             # Extract first tool call of function type
-            tool_calls = last_message.get("tool_calls", [])
-            for tool_call in tool_calls:
-                if tool_call.get("type") == "function":
-                    function_call = tool_call.get("function", {})
-                    break
+            tool_calls_obj = last_message.get("tool_calls")
+            if isinstance(tool_calls_obj, list):
+                tool_calls: List[Dict[str, Any]] = tool_calls_obj
+                for tool_call in tool_calls:
+                    if isinstance(tool_call, dict) and tool_call.get("type") == "function":
+                        function_obj = tool_call.get("function")
+                        if isinstance(function_obj, dict):
+                            function_call = function_obj
+                            break
         
         if not function_call:
             return RewardOutput(
@@ -359,7 +373,7 @@ def schema_jaccard_reward(
     expected_args_schema = expected_schema.get("arguments", {})
     
     # Create a schema representation of the actual arguments
-    actual_args_schema = {}
+    actual_args_schema: Dict[str, Any] = {}
     for arg_name, arg_value in parsed_arguments.items():
         # Infer type from value
         if isinstance(arg_value, str):
@@ -381,7 +395,9 @@ def schema_jaccard_reward(
         
         # For nested objects, create subschema
         if arg_type == "object" and isinstance(arg_value, dict):
-            actual_args_schema[arg_name]["properties"] = {}
+            properties_dict: Dict[str, Any] = {}
+            actual_args_schema[arg_name]["properties"] = properties_dict
+            
             for sub_name, sub_value in arg_value.items():
                 if isinstance(sub_value, str):
                     sub_type = "string"
@@ -398,7 +414,7 @@ def schema_jaccard_reward(
                 else:
                     sub_type = "any"
                     
-                actual_args_schema[arg_name]["properties"][sub_name] = {"type": sub_type}
+                properties_dict[sub_name] = {"type": sub_type}
     
     # 3. Extract schema properties
     expected_properties = extract_schema_properties({"properties": expected_args_schema})
@@ -475,12 +491,8 @@ def llm_judge_reward(
     Returns:
         RewardOutput with score and metrics
     """
-    import os
-    
-    try:
-        import openai
-        from openai import OpenAI
-    except ImportError:
+    # Check if OpenAI is available
+    if OpenAI is None:
         return RewardOutput(
             score=0.0,
             metrics={"error": MetricRewardOutput(
@@ -506,14 +518,20 @@ def llm_judge_reward(
         
         # Try to extract function call from the message
         if "function_call" in last_message:
-            function_call = last_message["function_call"]
+            function_call_obj = last_message.get("function_call")
+            if isinstance(function_call_obj, dict):
+                function_call = function_call_obj
         elif "tool_calls" in last_message:
             # Extract first tool call of function type
-            tool_calls = last_message.get("tool_calls", [])
-            for tool_call in tool_calls:
-                if tool_call.get("type") == "function":
-                    function_call = tool_call.get("function", {})
-                    break
+            tool_calls_obj = last_message.get("tool_calls")
+            if isinstance(tool_calls_obj, list):
+                tool_calls: List[Dict[str, Any]] = tool_calls_obj
+                for tool_call in tool_calls:
+                    if isinstance(tool_call, dict) and tool_call.get("type") == "function":
+                        function_obj = tool_call.get("function")
+                        if isinstance(function_obj, dict):
+                            function_call = function_obj
+                            break
         
         if not function_call:
             return RewardOutput(
@@ -614,7 +632,7 @@ EXPLANATION: [your detailed explanation]
         )
         
         # Extract the response
-        llm_response = response.choices[0].message.content
+        llm_response = response.choices[0].message.content or ""
         
         # Parse the score and explanation
         score_match = re.search(r"SCORE:\s*([\d.]+)", llm_response)
@@ -752,3 +770,167 @@ def composite_function_call_reward(
     )
     
     return RewardOutput(score=final_score, metrics=combined_metrics)
+
+
+def json_schema_reward(
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
+    json_content: Optional[Union[Dict[str, Any], str]] = None,
+    expected_schema: Optional[Union[Dict[str, Any], str]] = None,
+    **kwargs
+) -> RewardOutput:
+    """
+    Evaluate JSON content against an expected schema using Jaccard similarity.
+
+    This reward function compares the structure of JSON content against an expected schema
+    and calculates a similarity score using Jaccard similarity. It repurposes the same
+    approach used for function calling validation but for general JSON schema validation.
+
+    Args:
+        messages: The conversation messages
+        original_messages: Original conversation context (optional)
+        json_content: The JSON content to evaluate (if not provided, extracts from message)
+        expected_schema: The expected schema for the JSON content
+        **kwargs: Additional keyword arguments
+
+    Returns:
+        RewardOutput with score and metrics
+    """
+    metrics = {}
+
+    # Extract JSON content from messages if not provided directly
+    if json_content is None:
+        if not messages:
+            return RewardOutput(
+                score=0.0,
+                metrics={"error": MetricRewardOutput(
+                    score=0.0,
+                    reason="No messages provided"
+                )}
+            )
+
+        last_message = messages[-1]
+        content = last_message.get("content", "")
+
+        # Try to extract JSON from the message content
+        if content:
+            try:
+                # Find JSON-like content in the message
+                json_matches = re.findall(r"\{.*\}", content, re.DOTALL)
+                if json_matches:
+                    json_content = json_matches[0]
+                else:
+                    # Try to extract code blocks that might contain JSON
+                    pattern = r"```(?:json)?\s*([\s\S]*?)```"
+                    code_blocks = re.findall(pattern, content)
+                    if code_blocks:
+                        json_content = code_blocks[0]
+            except Exception:
+                pass
+
+        if not json_content:
+            return RewardOutput(
+                score=0.0,
+                metrics={"error": MetricRewardOutput(
+                    score=0.0,
+                    reason="No JSON content found in messages"
+                )}
+            )
+
+    # Normalize expected schema
+    if expected_schema is None:
+        return RewardOutput(
+            score=0.0,
+            metrics={"error": MetricRewardOutput(
+                score=0.0,
+                reason="No expected schema provided"
+            )}
+        )
+
+    expected_schema = normalize_schema(expected_schema)
+    
+    # Parse JSON content
+    try:
+        if isinstance(json_content, str):
+            parsed_content = json.loads(json_content)
+        else:
+            parsed_content = json_content
+    except json.JSONDecodeError:
+        return RewardOutput(
+            score=0.0,
+            metrics={"error": MetricRewardOutput(
+                score=0.0,
+                reason=f"Invalid JSON content: {json_content}"
+            )}
+        )
+    
+    # Function to recursively build a schema from content
+    def build_schema_from_content(content: Any) -> Dict[str, Any]:
+        if isinstance(content, dict):
+            schema: Dict[str, Any] = {"type": "object", "properties": {}}
+            for key, value in content.items():
+                if isinstance(schema["properties"], dict):
+                    schema["properties"][key] = build_schema_from_content(value)
+            return schema
+        elif isinstance(content, list):
+            if content:
+                # Use the first item as reference for array items
+                return {"type": "array",
+                        "items": build_schema_from_content(content[0])}
+            return {"type": "array"}
+        elif isinstance(content, str):
+            return {"type": "string"}
+        elif isinstance(content, bool):
+            return {"type": "boolean"}
+        elif isinstance(content, (int, float)):
+            return {"type": "number"}
+        elif content is None:
+            return {"type": "null"}
+        else:
+            return {"type": "any"}
+    
+    # Build schema for the actual content
+    content_schema = build_schema_from_content(parsed_content)
+    
+    # 2. Extract schema properties
+    expected_properties = extract_schema_properties(expected_schema)
+    actual_properties = extract_schema_properties(content_schema)
+
+    # 3. Calculate Jaccard similarity
+    schema_similarity = calculate_jaccard_similarity(
+        expected_properties, actual_properties
+    )
+
+    # 4. Create detailed comparison report
+    missing_props = expected_properties - actual_properties
+    extra_props = actual_properties - expected_properties
+    matching_props = expected_properties.intersection(actual_properties)
+
+    comparison_details = []
+
+    if matching_props:
+        comparison_details.append(f"Matching properties ({len(matching_props)}):")
+        for prop, prop_type in sorted(matching_props):
+            comparison_details.append(f"  - {prop}: {prop_type}")
+
+    if missing_props:
+        comparison_details.append(f"Missing properties ({len(missing_props)}):")
+        for prop, prop_type in sorted(missing_props):
+            comparison_details.append(f"  - {prop}: {prop_type}")
+
+    if extra_props:
+        comparison_details.append(f"Extra properties ({len(extra_props)}):")
+        for prop, prop_type in sorted(extra_props):
+            comparison_details.append(f"  - {prop}: {prop_type}")
+
+    schema_comparison_reason = "\n".join(comparison_details)
+
+    metrics["schema_similarity"] = MetricRewardOutput(
+        score=schema_similarity,
+        reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}"
+    )
+
+    # 5. Calculate final score based on schema similarity
+    final_score = schema_similarity
+
+    return RewardOutput(score=final_score, metrics=metrics)

@@ -102,17 +102,24 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
             raise ValueError(f"Return value failed validation:\n{err}") from None
 
         # 3. Dump back to a plain dict for the outside world
-        # For RootModel, we need to access the .root attribute before dumping
+        # Handle the updated EvaluateResult model structure
         if isinstance(result_model, EvaluateResult):
-            # Convert MetricResult objects to dicts
-            return {
-                key: {
+            # Build a response including all the metrics
+            result_dict = {}
+            
+            # Add each metric to the result dictionary
+            for key, metric in result_model.metrics.items():
+                result_dict[key] = {
                     "success": metric.success,
                     "score": metric.score,
                     "reason": metric.reason,
                 }
-                for key, metric in result_model.root.items()
-            }
+            
+            # If there's an error, add it to the result
+            if result_model.error:
+                result_dict["error"] = {"error": result_model.error}
+            
+            return result_dict
         else:
             return _res_adapter.dump_python(result_model, mode="json")
 

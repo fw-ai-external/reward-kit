@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.2.1",
+    version="0.2.2",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -11,6 +11,7 @@ setup(
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",
         "python-dotenv>=0.19.0",
+        "openai==1.9.0",
     ],
     extras_require={
         "dev": [

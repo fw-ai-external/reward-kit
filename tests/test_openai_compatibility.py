@@ -40,13 +40,17 @@ class OpenAICompatibilityTest(unittest.TestCase):
             success = (last_message.role == "assistant" and 
                       last_message.content != "")
             
-            return EvaluateResult(root={
-                "not_empty": MetricResult(
-                    success=success,
-                    score=1.0 if success else 0.0,
-                    reason="Response is not empty" if success else "Response is empty or not from assistant"
-                )
-            })
+            return EvaluateResult(
+                score=1.0 if success else 0.0,
+                reason="Response evaluation",
+                metrics={
+                    "not_empty": MetricResult(
+                        success=success,
+                        score=1.0 if success else 0.0,
+                        reason="Response is not empty" if success else "Response is empty or not from assistant"
+                    )
+                }
+            )
         
         # Test with OpenAI message types
         system_message = ChatCompletionSystemMessageParam(role="system", content="You are a helpful assistant.")

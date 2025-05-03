@@ -15,9 +15,13 @@ def test_typed_interface_basic():
     @reward_function
     def sample_evaluator(messages: List[Message], **kwargs) -> EvaluateResult:
         """Sample evaluator that returns a hardcoded result."""
-        return EvaluateResult({
-            "test": MetricResult(success=True, score=0.8, reason="Test reason")
-        })
+        return EvaluateResult(
+            score=0.8,
+            reason="Overall test reason",
+            metrics={
+                "test": MetricResult(success=True, score=0.8, reason="Test reason")
+            }
+        )
     
     # Test with valid messages
     valid_messages = [
@@ -47,9 +51,13 @@ def test_typed_interface_input_validation():
         # Check that we can access the messages
         assert len(messages) > 0
         
-        return EvaluateResult(root={
-            "test": MetricResult(success=True, score=0.5, reason="Test")
-        })
+        return EvaluateResult(
+            score=0.5,
+            reason="Overall test",
+            metrics={
+                "test": MetricResult(success=True, score=0.5, reason="Test")
+            }
+        )
     
     # Valid messages with required fields
     valid_messages = [
@@ -89,9 +97,13 @@ def test_typed_interface_output_validation():
     def invalid_evaluator(messages: List[Message], **kwargs) -> EvaluateResult:
         # Return an incomplete metric (missing required fields)
         # This should be caught by the output validation
-        return EvaluateResult({
-            "test": {"score": 0.5}  # Missing 'success' and 'reason'
-        })  # type: ignore
+        return EvaluateResult(
+            score=0.5,
+            reason=None,
+            metrics={
+                "test": {"score": 0.5}  # Missing 'success' and 'reason'
+            }
+        )  # type: ignore
     
     messages = [
         {"role": "user", "content": "Hello"},
@@ -111,13 +123,17 @@ def test_typed_interface_kwargs():
     @reward_function
     def kwargs_evaluator(messages: List[Message], **kwargs) -> EvaluateResult:
         # Return the kwargs in the reason field
-        return EvaluateResult({
-            "test": MetricResult(
-                success=True, 
-                score=0.5, 
-                reason=f"Got kwargs: {sorted([k for k in kwargs.keys()])}"
-            )
-        })
+        return EvaluateResult(
+            score=0.5,
+            reason="Overall test with kwargs",
+            metrics={
+                "test": MetricResult(
+                    success=True, 
+                    score=0.5, 
+                    reason=f"Got kwargs: {sorted([k for k in kwargs.keys()])}"
+                )
+            }
+        )
     
     messages = [
         {"role": "user", "content": "Hello"},

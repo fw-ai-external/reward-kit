@@ -176,7 +176,7 @@ def serve_tunnel(func_path: str, port: int = 8000):
         port: Port to bind the server to
     """
     try:
-        import pyngrok.ngrok as ngrok
+        import pyngrok.ngrok as ngrok  # type: ignore
     except ImportError:
         raise ImportError(
             "The 'pyngrok' package is required to use serve_tunnel. "

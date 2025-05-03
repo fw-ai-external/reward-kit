@@ -90,7 +90,7 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 #### 1.3 Code Examples - COMPLETED
 - **Basic Reward Function**: Simple examples like word count ✅
 - **Advanced Reward Functions**: Multiple metrics, combining metrics ✅
-- **Specialized Reward Functions**: Function calling evaluation, etc.
+- **Function Calling Evaluation**: Specialized reward functions for evaluating tool use
 
 ### 2. Tutorials and Guides
 
@@ -108,6 +108,7 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 - **Custom Providers**: Using different models for evaluation
 - **Multi-Component Scoring**: Combining multiple metrics
 - **Metadata Handling**: Using context in reward functions
+- **Integration with Training**: Using reward functions in RLHF pipelines
 
 ### 3. Reference Implementation Templates
 
@@ -132,6 +133,7 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 - **Authentication Setup**: Configuring API credentials
 - **Deployment Options**: Different ways to deploy reward functions
 - **Versioning and Updates**: Managing deployed evaluators
+- **Troubleshooting Deployment**: Common issues and solutions
 
 ### 5. Practical Examples and Cookbooks
 
@@ -144,3 +146,21 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 - **Customer Support Evaluation**: Metrics for support scenarios
 - **Creative Writing Evaluation**: Metrics for creative content
 - **Technical Documentation Evaluation**: Metrics for technical accuracy
+
+## Current Documentation Status
+
+The core developer guide and basic examples are now complete. These provide a solid foundation for developers to understand the basics of creating, testing, and deploying reward functions.
+
+### Next Priority Items
+
+1. Complete the function calling evaluation example
+2. Create API reference documentation
+3. Add more step-by-step tutorials, particularly for evaluation
+4. Develop best practices guidelines
+5. Add CLI documentation
+
+The documentation can be found in the `docs/` directory with the following structure:
+- `docs/developer_guide/`: Core concepts and usage guides
+- `docs/examples/`: Code examples
+- `docs/tutorials/`: Step-by-step guides
+- `docs/DOCUMENTATION_STATUS.md`: Detailed status and recommendations

@@ -1,7 +1,8 @@
-# Goals
-- deploy is not working even though it has all the right permissions - FIXED
+# Issues and Tasks
 
-## Deploy is now working - FIXED
+## Resolved Issues
+
+### Deploy is now working - FIXED
 
 The deploy functionality is now working correctly. The issue was that the `legacy_reward_function.deploy()` method in `reward_function.py` had a different implementation from the working `create_evaluation()` function in `evaluation.py`. 
 
@@ -70,3 +71,76 @@ INFO:reward_kit.evaluation:Successfully deleted evaluator 'word-count-eval'
 INFO:reward_kit.evaluation:Successfully created evaluator 'word-count-eval'
 Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 ```
+
+## Custom Reward Functions Documentation Plan
+
+### 1. Core Documentation
+
+#### 1.1 Developer Guide - COMPLETED
+- **Getting Started with Reward Functions**: Basic concepts, installation, setup ✅
+- **Reward Function Anatomy**: Detailed explanation of the `@reward_function` decorator ✅
+- **Core Data Types**: Explanation of `RewardOutput`, `MetricRewardOutput`, `Message`, etc. ✅
+- **Evaluation Workflows**: Local testing, preview, deployment ✅
+
+#### 1.2 API Reference
+- **Core Classes and Methods**: Full reference for `RewardFunction`, `reward_function`, etc.
+- **Data Models**: Reference for all data models (`RewardOutput`, `Message`, etc.)
+- **Deployment Methods**: Reference for deployment-related functions
+
+#### 1.3 Code Examples - COMPLETED
+- **Basic Reward Function**: Simple examples like word count ✅
+- **Advanced Reward Functions**: Multiple metrics, combining metrics ✅
+- **Specialized Reward Functions**: Function calling evaluation, etc.
+
+### 2. Tutorials and Guides
+
+#### 2.1 Step-by-Step Tutorials - IN PROGRESS
+- **Creating Your First Reward Function**: From scratch to deployment ✅
+- **Evaluating Model Responses**: Using reward functions for evaluation
+- **Integrating with Training Workflows**: How to use reward functions in RLHF
+
+#### 2.2 Best Practices
+- **Designing Effective Reward Functions**: Guidelines and principles
+- **Handling Edge Cases**: Ensuring robust evaluation
+- **Performance Optimization**: Making reward functions efficient
+
+#### 2.3 Advanced Topics
+- **Custom Providers**: Using different models for evaluation
+- **Multi-Component Scoring**: Combining multiple metrics
+- **Metadata Handling**: Using context in reward functions
+
+### 3. Reference Implementation Templates
+
+#### 3.1 Common Use Case Templates
+- **Content Quality Evaluation**: Informativeness, relevance, etc.
+- **Safety Evaluation**: Detecting unsafe content
+- **Tool Use Evaluation**: Function calling accuracy
+- **Instruction Following**: Adherence to user instructions
+
+#### 3.2 Starter Kits
+- **Basic Metrics Pack**: Common metrics ready to use
+- **Custom Evaluator Framework**: Template for building complex evaluators
+- **Evaluation Dashboard**: Tools for visualizing evaluation results
+
+### 4. Infrastructure Documentation
+
+#### 4.1 CLI Documentation
+- **Command Reference**: All CLI commands with examples
+- **Workflow Integration**: Using CLI in development workflows
+
+#### 4.2 Deployment Guide
+- **Authentication Setup**: Configuring API credentials
+- **Deployment Options**: Different ways to deploy reward functions
+- **Versioning and Updates**: Managing deployed evaluators
+
+### 5. Practical Examples and Cookbooks
+
+#### 5.1 Real-World Examples
+- **Helpfulness Evaluator**: Complete implementation with explanations
+- **Factual Accuracy Evaluator**: Detecting factual errors
+- **Reasoning Evaluator**: Assessing logical reasoning
+
+#### 5.2 Cookbooks for Specific Domains
+- **Customer Support Evaluation**: Metrics for support scenarios
+- **Creative Writing Evaluation**: Metrics for creative content
+- **Technical Documentation Evaluation**: Metrics for technical accuracy

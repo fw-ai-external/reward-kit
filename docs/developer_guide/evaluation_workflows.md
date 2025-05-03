@@ -1,0 +1,274 @@
+# Evaluation Workflows
+
+This guide explains the complete lifecycle of a reward function, from local development and testing to deployment on the Fireworks platform.
+
+## Development Workflow Overview
+
+The typical workflow for developing and deploying reward functions involves:
+
+1. **Local Development**: Writing and testing reward functions locally
+2. **Preview Evaluation**: Testing with sample data to validate performance
+3. **Deployment**: Making the reward function available for training workflows
+4. **Integration**: Using the deployed evaluator in RLHF training
+
+## 1. Local Development
+
+### Creating a Reward Function
+
+Start by creating a reward function with the `@reward_function` decorator:
+
+```python
+from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from typing import List, Dict, Optional
+
+@reward_function
+def helpfulness_reward(
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
+    **kwargs
+) -> RewardOutput:
+    """Evaluate the helpfulness of a response."""
+    # Get the assistant's response
+    response = messages[-1].get("content", "").lower()
+    
+    # Define helpful keywords
+    helpful_keywords = ["help", "assist", "solve", "solution", "answer", "explain"]
+    
+    # Count helpful keywords
+    keyword_count = sum(1 for keyword in helpful_keywords if keyword in response)
+    
+    # Calculate score based on keyword presence (simple example)
+    score = min(keyword_count / 3, 1.0)  # Cap at 1.0
+    
+    return RewardOutput(
+        score=score,
+        metrics={
+            "helpfulness": MetricRewardOutput(
+                score=score,
+                reason=f"Found {keyword_count} helpful keywords"
+            )
+        }
+    )
+```
+
+### Local Testing
+
+Test your reward function with sample messages:
+
+```python
+# Sample test messages
+test_messages = [
+    {"role": "user", "content": "How do I reset my password?"},
+    {"role": "assistant", "content": "I can help you reset your password. First, go to the login page and click on 'Forgot Password'. Then follow the instructions sent to your email."}
+]
+
+# Test the reward function
+result = helpfulness_reward(messages=test_messages)
+
+# Print the results
+print(f"Overall Score: {result.score}")
+print("Metrics:")
+for name, metric in result.metrics.items():
+    print(f"  {name}: {metric.score} - {metric.reason}")
+```
+
+### Creating a Test File
+
+For more comprehensive testing, create a separate test script:
+
+```python
+# test_helpfulness.py
+import json
+from reward_kit import RewardOutput
+from my_rewards import helpfulness_reward
+
+def load_test_cases(file_path):
+    """Load test cases from a JSONL file."""
+    with open(file_path, 'r') as f:
+        return [json.loads(line) for line in f]
+
+def main():
+    # Load test cases
+    test_cases = load_test_cases("samples/test_conversations.jsonl")
+    
+    print(f"Testing helpfulness reward on {len(test_cases)} cases...")
+    
+    # Test each case
+    for i, case in enumerate(test_cases):
+        messages = case.get("messages", [])
+        result = helpfulness_reward(messages=messages)
+        
+        print(f"\nCase {i+1}:")
+        print(f"User: {messages[0].get('content', '')[:50]}...")
+        print(f"Assistant: {messages[-1].get('content', '')[:50]}...")
+        print(f"Score: {result.score}")
+        print(f"Reason: {result.metrics.get('helpfulness', {}).get('reason', 'No reason provided')}")
+
+if __name__ == "__main__":
+    main()
+```
+
+## 2. Preview Evaluation
+
+### Creating Sample Data
+
+Create a JSONL file with sample conversations for evaluation:
+
+```json
+{"messages": [{"role": "user", "content": "How do I reset my password?"}, {"role": "assistant", "content": "I can help you reset your password. First, go to the login page and click on 'Forgot Password'. Then follow the instructions sent to your email."}]}
+{"messages": [{"role": "user", "content": "What's the weather today?"}, {"role": "assistant", "content": "I don't have access to real-time information like weather."}]}
+```
+
+### Using the CLI for Preview
+
+Use the Reward Kit CLI to preview your evaluation:
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Preview with the CLI
+reward-kit preview \
+  --metrics-folders "helpfulness=./path/to/helpfulness_metric" \
+  --samples ./path/to/samples.jsonl
+```
+
+### Programmatic Preview
+
+Alternatively, use the API for programmatic preview:
+
+```python
+from reward_kit.evaluation import preview_evaluation
+
+# Preview the evaluation
+preview_result = preview_evaluation(
+    metric_folders=["helpfulness=./path/to/helpfulness_metric"],
+    sample_file="./path/to/samples.jsonl",
+    max_samples=5  # Optional: limit number of samples
+)
+
+# Display the results
+preview_result.display()
+```
+
+## 3. Deployment
+
+### Direct Deployment from Function
+
+You can deploy the reward function directly:
+
+```python
+# Deploy the function
+evaluation_id = helpfulness_reward.deploy(
+    name="helpfulness-evaluator",
+    description="Evaluates the helpfulness of responses",
+    force=True  # Overwrite if it already exists
+)
+
+print(f"Deployed helpfulness evaluator with ID: {evaluation_id}")
+```
+
+### Using the CLI for Deployment
+
+Or use the CLI to deploy the function:
+
+```bash
+# Deploy with the CLI
+reward-kit deploy \
+  --id helpfulness-evaluator \
+  --metrics-folders "helpfulness=./path/to/helpfulness_metric" \
+  --display-name "Helpfulness Evaluator" \
+  --description "Evaluates the helpfulness of responses" \
+  --force
+```
+
+### Custom Provider Deployment
+
+Deploy with a specific model provider:
+
+```python
+# Deploy with a custom provider
+custom_evaluation_id = helpfulness_reward.deploy(
+    name="helpfulness-evaluator-anthropic",
+    description="Helpfulness evaluation using Claude model",
+    force=True,
+    providers=[
+        {
+            "providerType": "anthropic",
+            "modelId": "claude-3-sonnet-20240229"
+        }
+    ]
+)
+
+print(f"Deployed custom provider evaluator: {custom_evaluation_id}")
+```
+
+### Using create_evaluation Function
+
+You can also use the `create_evaluation` function directly:
+
+```python
+from reward_kit.evaluation import create_evaluation
+
+# Create an evaluation
+evaluator = create_evaluation(
+    evaluator_id="helpfulness-evaluator",
+    metric_folders=["helpfulness=./path/to/helpfulness_metric"],
+    display_name="Helpfulness Evaluator",
+    description="Evaluates the helpfulness of responses",
+    force=True
+)
+
+print(f"Created evaluator: {evaluator['name']}")
+```
+
+## 4. Integration with Training
+
+### Using in an RL Training Job
+
+Once deployed, use the evaluator in an RL training job:
+
+```bash
+# Example of using the evaluator in a Fireworks RL job
+firectl create rl-job \
+  --reward-endpoint "https://api.fireworks.ai/v1/evaluations/helpfulness-evaluator" \
+  --model-id "accounts/fireworks/models/llama-v3-8b-instruct" \
+  --dataset-id "my-training-dataset"
+```
+
+### Programmatic Integration with TRL
+
+For programmatic integration with the Transformer Reinforcement Learning (TRL) library:
+
+```python
+from reward_kit import RewardFunction
+
+# Create a reward function instance
+reward_fn = RewardFunction(
+    name="helpfulness-evaluator",
+    mode="remote"  # Use the deployed evaluator
+)
+
+# Get a TRL-compatible adapter
+trl_reward_fn = reward_fn.get_trl_adapter()
+
+# Use in your TRL training pipeline
+# ...
+```
+
+## Best Practices
+
+1. **Iterative Development**: Start simple, test thoroughly, and refine your reward function
+2. **Version Control**: Use version control for your reward functions and track changes
+3. **Sample Diversity**: Test with a diverse set of samples to ensure robustness
+4. **Documentation**: Document the behavior and assumptions of your reward function
+5. **Error Handling**: Include robust error handling to prevent evaluation failures
+6. **Logging**: Add detailed logging for debugging and monitoring
+
+## Next Steps
+
+Now that you understand the complete workflow:
+
+1. Try creating a [Basic Reward Function](../examples/basic_reward_function.md)
+2. Explore [Advanced Reward Functions](../examples/advanced_reward_functions.md) with multiple metrics
+3. Learn about [Best Practices](../tutorials/best_practices.md) for designing effective reward functions

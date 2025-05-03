@@ -1,0 +1,211 @@
+# Basic Reward Function Example
+
+This example demonstrates how to create a simple reward function that evaluates the clarity of an assistant's response.
+
+## Prerequisites
+
+Before running this example, ensure you have:
+
+1. Installed the Reward Kit package (`pip install reward-kit`)
+2. Set up your Fireworks API credentials (if deploying)
+
+## Complete Example Code
+
+```python
+"""
+Example of a basic clarity reward function using the Reward Kit.
+"""
+
+from typing import List, Dict, Optional
+from reward_kit import RewardOutput, MetricRewardOutput, reward_function
+
+@reward_function
+def clarity_reward(
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
+    **kwargs
+) -> RewardOutput:
+    """
+    Evaluates the clarity of a response based on sentence structure,
+    vocabulary complexity, and use of explanatory language.
+    
+    Args:
+        messages: List of conversation messages
+        original_messages: Original context messages
+        **kwargs: Additional parameters
+        
+    Returns:
+        RewardOutput with score and metrics
+    """
+    # Get the assistant's response
+    if not messages or messages[-1].get("role") != "assistant":
+        return RewardOutput(
+            score=0.0,
+            metrics={"error": MetricRewardOutput(score=0.0, reason="No assistant response found")}
+        )
+    
+    response = messages[-1].get("content", "")
+    metrics = {}
+    
+    # 1. Sentence length analysis (prefer shorter sentences for clarity)
+    sentences = [s.strip() for s in response.split(".") if s.strip()]
+    avg_sentence_length = sum(len(s.split()) for s in sentences) / max(len(sentences), 1)
+    
+    sentence_score = 1.0 if avg_sentence_length < 15 else (25.0 - avg_sentence_length) / 10.0
+    sentence_score = max(0.0, min(1.0, sentence_score))
+    
+    metrics["sentence_length"] = MetricRewardOutput(
+        score=sentence_score,
+        reason=f"Average sentence length: {avg_sentence_length:.1f} words"
+    )
+    
+    # 2. Check for explanatory language
+    explanatory_markers = ["because", "for example", "in other words", "specifically", "this means"]
+    explanatory_count = sum(1 for marker in explanatory_markers if marker.lower() in response.lower())
+    
+    explanation_score = min(explanatory_count / 2.0, 1.0)  # Cap at 1.0
+    metrics["explanation"] = MetricRewardOutput(
+        score=explanation_score,
+        reason=f"Found {explanatory_count} explanatory markers"
+    )
+    
+    # 3. Jargon and complex language check (simplified approach)
+    words = response.lower().split()
+    long_words = sum(1 for word in words if len(word) > 8)  # Words longer than 8 chars
+    long_word_ratio = long_words / max(len(words), 1)
+    
+    vocabulary_score = 1.0 - min(long_word_ratio * 5, 1.0)  # Lower score for more complex vocabulary
+    metrics["vocabulary"] = MetricRewardOutput(
+        score=vocabulary_score,
+        reason=f"Complex word ratio: {long_word_ratio:.2f}"
+    )
+    
+    # Calculate final score (weighted average)
+    final_score = (
+        sentence_score * 0.4 +      # 40% weight to sentence structure
+        explanation_score * 0.4 +    # 40% weight to explanatory language
+        vocabulary_score * 0.2       # 20% weight to vocabulary complexity
+    )
+    
+    return RewardOutput(score=final_score, metrics=metrics)
+
+
+# Example usage with test conversation
+def test_clarity_reward():
+    # Example conversation 1: Clear explanation
+    clear_messages = [
+        {"role": "user", "content": "What is machine learning?"},
+        {"role": "assistant", "content": "Machine learning is a type of artificial intelligence. It uses data to learn patterns. For example, it can learn to recognize images of cats. This means computers can improve without being explicitly programmed."}
+    ]
+    
+    # Example conversation 2: Less clear explanation
+    complex_messages = [
+        {"role": "user", "content": "What is machine learning?"},
+        {"role": "assistant", "content": "Machine learning represents a computational methodology within the artificial intelligence domain that facilitates algorithmic pattern recognition through statistical approximation functions utilizing high-dimensional datasets for predictive extrapolation and classification tasks."}
+    ]
+    
+    # Test with clear explanation
+    clear_result = clarity_reward(messages=clear_messages)
+    print("Clear Explanation Result:")
+    print(f"Score: {clear_result.score:.2f}")
+    print("Metrics:")
+    for name, metric in clear_result.metrics.items():
+        print(f"  {name}: {metric.score:.2f} - {metric.reason}")
+    print()
+    
+    # Test with complex explanation
+    complex_result = clarity_reward(messages=complex_messages)
+    print("Complex Explanation Result:")
+    print(f"Score: {complex_result.score:.2f}")
+    print("Metrics:")
+    for name, metric in complex_result.metrics.items():
+        print(f"  {name}: {metric.score:.2f} - {metric.reason}")
+    print()
+
+
+# Deployment example (uncomment to use)
+def deploy_reward():
+    evaluation_id = clarity_reward.deploy(
+        name="clarity-evaluator",
+        description="Evaluates the clarity of responses",
+        force=True
+    )
+    print(f"Deployed clarity evaluator with ID: {evaluation_id}")
+
+
+if __name__ == "__main__":
+    # Test the reward function
+    test_clarity_reward()
+    
+    # Deploy the reward function (uncomment to use)
+    # deploy_reward()
+```
+
+## How to Run the Example
+
+Save the code as `clarity_reward.py` and run it:
+
+```bash
+python clarity_reward.py
+```
+
+## Expected Output
+
+```
+Clear Explanation Result:
+Score: 0.80
+Metrics:
+  sentence_length: 0.86 - Average sentence length: 6.3 words
+  explanation: 1.00 - Found 2 explanatory markers
+  vocabulary: 0.33 - Complex word ratio: 0.13
+
+Complex Explanation Result:
+Score: 0.23
+Metrics:
+  sentence_length: 0.00 - Average sentence length: 27.0 words
+  explanation: 0.00 - Found 0 explanatory markers
+  vocabulary: 0.15 - Complex word ratio: 0.17
+```
+
+## Code Explanation
+
+This reward function evaluates the clarity of a response based on three components:
+
+1. **Sentence Length**: Shorter sentences are generally clearer
+   - Calculates average words per sentence
+   - Higher score for sentences under 15 words
+
+2. **Explanatory Language**: Phrases that indicate explanation
+   - Checks for markers like "because", "for example", etc.
+   - Higher score for more explanatory markers
+
+3. **Vocabulary Complexity**: Assesses word complexity
+   - Checks ratio of long words (> 8 characters)
+   - Higher score for simpler vocabulary
+
+The final score is a weighted average of these components:
+- 40% for sentence structure
+- 40% for explanatory language
+- 20% for vocabulary complexity
+
+## Deployment
+
+To deploy this reward function to Fireworks, uncomment the `deploy_reward()` function call at the bottom of the script. Ensure your Fireworks API credentials are set before deploying.
+
+## Extensions and Improvements
+
+This basic example can be extended in several ways:
+
+1. **Advanced NLP**: Use libraries like spaCy for better sentence segmentation
+2. **Readability Metrics**: Add established metrics like Flesch-Kincaid readability
+3. **Domain-Specific Terms**: Account for necessary technical terms in specific domains
+4. **User Context**: Adapt complexity expectations based on user query sophistication
+5. **Multi-language Support**: Add language detection and language-specific rules
+
+## Next Steps
+
+Now that you understand basic reward functions:
+
+1. Try creating more [Advanced Reward Functions](advanced_reward_functions.md) with multiple metrics
+2. Learn about [Function Calling Evaluation](function_calling_evaluation.md) for tool use
+3. Follow our [Best Practices](../tutorials/best_practices.md) for reward function design

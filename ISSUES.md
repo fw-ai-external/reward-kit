@@ -90,7 +90,7 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 #### 1.3 Code Examples - COMPLETED
 - **Basic Reward Function**: Simple examples like word count ✅
 - **Advanced Reward Functions**: Multiple metrics, combining metrics ✅
-- **Function Calling Evaluation**: Specialized reward functions for evaluating tool use
+- **Function Calling Evaluation**: Specialized reward functions for evaluating tool use ✅
 
 ### 2. Tutorials and Guides
 
@@ -210,13 +210,19 @@ Create a comprehensive function calling evaluation system that combines schema v
 
 The core developer guide and basic examples are now complete. These provide a solid foundation for developers to understand the basics of creating, testing, and deploying reward functions.
 
+### Completed Items
+
+1. ✅ Implement Schema Jaccard Distance Reward for function calling
+2. ✅ Implement LLM Judge Reward using GPT-4o-mini
+3. ✅ Create Composite Function Calling Reward
+4. ✅ Add documentation and examples for function calling rewards
+
 ### Next Priority Items
 
-1. Implement Schema Jaccard Distance Reward for function calling
-2. Implement LLM Judge Reward using GPT-4o-mini
-3. Create Composite Function Calling Reward
-4. Add documentation and examples for function calling rewards
-5. Add advanced topics documentation
+1. Add advanced topics documentation
+2. Create deployment guide documentation
+3. Develop reference implementation templates
+4. Create practical examples and cookbooks
 
 The documentation can be found in the `docs/` directory with the following structure:
 - `docs/developer_guide/`: Core concepts and usage guides

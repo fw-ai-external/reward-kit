@@ -341,6 +341,7 @@ def legacy_reward_function(func: T) -> T:
         import configparser
         import os
         import requests
+        import json
         from pathlib import Path
 
         # Get configuration parameters
@@ -352,36 +353,72 @@ def legacy_reward_function(func: T) -> T:
         # Get function source code
         source = inspect.getsource(func)
 
-        # Load authentication info
-        account_id = config.get("account_id")
-        auth_token = config.get("auth_token")
+        # Load authentication info using auth.py
+        try:
+            # Import from the package
+            from reward_kit.auth import get_authentication
+            account_id, auth_token = get_authentication()
+            
+            # Override with config values if provided
+            if config.get("account_id"):
+                account_id = config.get("account_id")
+            if config.get("auth_token"):
+                auth_token = config.get("auth_token")
+        except ImportError:
+            # Fallback to direct authentication if relative import fails
+            from reward_kit.auth import get_authentication
+            account_id, auth_token = get_authentication()
+            
+            # Override with config values if provided
+            if config.get("account_id"):
+                account_id = config.get("account_id")
+            if config.get("auth_token"):
+                auth_token = config.get("auth_token")
+        except Exception as e:
+            logger.error(f"Error getting authentication: {str(e)}")
+            # Fallback to the old approach
+            account_id = config.get("account_id")
+            auth_token = config.get("auth_token")
 
-        # If not provided directly, try to load from config files
-        if not account_id or not auth_token:
-            try:
-                auth_path = Path.home() / ".fireworks" / "auth.ini"
-                if auth_path.exists():
-                    auth_config = configparser.ConfigParser()
-                    auth_config.read(auth_path)
-                    if "default" in auth_config:
-                        if not account_id and "account_id" in auth_config["default"]:
-                            account_id = auth_config["default"]["account_id"]
-                        if not auth_token and "id_token" in auth_config["default"]:
-                            auth_token = auth_config["default"]["id_token"]
-            except Exception as e:
-                logger.error(f"Error reading auth config: {str(e)}")
+            # If not provided directly, try to load from config files
+            if not account_id or not auth_token:
+                try:
+                    auth_path = Path.home() / ".fireworks" / "auth.ini"
+                    if auth_path.exists():
+                        auth_config = configparser.ConfigParser()
+                        auth_config.read(auth_path)
+                        if "default" in auth_config:
+                            if not account_id and "account_id" in auth_config["default"]:
+                                account_id = auth_config["default"]["account_id"]
+                            if not auth_token and "id_token" in auth_config["default"]:
+                                auth_token = auth_config["default"]["id_token"]
+                except Exception as e:
+                    logger.error(f"Error reading auth config: {str(e)}")
 
-        if not account_id:
-            raise ValueError(
-                "account_id not provided and could not be loaded from ~/.fireworks/auth.ini"
-            )
+            # Check if FIREWORKS_ACCOUNT_ID is set in environment
+            if not account_id:
+                env_account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
+                if env_account_id:
+                    account_id = env_account_id
 
-        if not auth_token:
-            auth_token = os.environ.get("FIREWORKS_API_KEY")
-            if not auth_token:
+            if not account_id:
                 raise ValueError(
-                    "Authentication token not found. Please run 'firectl signin' or set FIREWORKS_API_KEY"
+                    "account_id not provided and could not be loaded from FIREWORKS_ACCOUNT_ID environment variable "
+                    "or ~/.fireworks/auth.ini"
                 )
+
+            if not auth_token:
+                auth_token = os.environ.get("FIREWORKS_API_KEY")
+                if not auth_token:
+                    raise ValueError(
+                        "Authentication token not found. Please run 'firectl signin' or set FIREWORKS_API_KEY"
+                    )
+                
+        # Special handling for dev environment
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
+            logger.info("Using development API base, defaulting to pyroworks-dev account")
+            account_id = "pyroworks-dev"  # Default dev account
 
         # Get or create default providers
         providers = config.get(
@@ -440,13 +477,11 @@ def legacy_reward_function(func: T) -> T:
             "from typing import Dict, List, Optional, Any\n\n"
             f"{extra_imports}\n"
             f"{source}\n\n"
-            "def evaluate(input_data):\n"
+            "def evaluate(messages, original_messages=None, tools=None, **kwargs):\n"
             "    try:\n"
-            "        # Parse input data\n"
-            "        data = json.loads(input_data)\n"
-            "        messages = data.get('messages', [])\n"
-            "        original_messages = data.get('original_messages', messages[:-1] if messages else [])\n"
-            "        kwargs = data.get('kwargs', {})\n"
+            "        # Set default for original_messages if not provided\n"
+            "        if original_messages is None:\n"
+            "            original_messages = messages[:-1] if messages else []\n"
             "        \n"
             f"        # Call reward function\n"
             f"        result = {func.__name__}(messages=messages, original_messages=original_messages, **kwargs)\n"
@@ -459,133 +494,90 @@ def legacy_reward_function(func: T) -> T:
             "        else:\n"
             "            result_dict = {'score': result}\n"
             "            \n"
-            "        return json.dumps(result_dict)\n"
+            "        return result_dict\n"
             "    except Exception as e:\n"
-            "        return json.dumps({'error': str(e), 'score': 0.0})\n\n"
-            "# Process input from the evaluation system\n"
-            "if __name__ == '__main__':\n"
-            "    input_data = sys.stdin.read()\n"
-            "    output = evaluate(input_data)\n"
-            "    print(output)\n"
+            "        return {'error': str(e), 'score': 0.0}\n\n"
+            "# The evaluate function will be called by the Fireworks evaluation system\n"
+            "# This is compatible with the new evaluation format\n"
         )
 
-        # Create evaluation payload
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
-
-        # Create an evaluator object payload as expected by the API
-        evaluator = {
-            "displayName": name,
-            "description": description,
-            "multiMetrics": False,
-            "criteria": [
-                {
-                    "type": "CODE_SNIPPETS",
-                    "name": name,
-                    "description": description,
-                    "codeSnippets": {
-                        "language": "python",
-                        "fileContents": {"main.py": wrapper_code},
-                    },
-                }
-            ],
-            "requirements": "",
-            "rollupSettings": None,
-        }
-
-        # The POST body requires the evaluator nested under "evaluator" and an optional "evaluatorId"
-        evaluation_payload = {"evaluator": evaluator, "evaluatorId": name}
-
-        # Get API base URL from environment or use default
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
-
-        # Send request to create evaluation
-        url = f"{api_base}/v1/accounts/{account_id}/evaluators"
-        headers = {
-            "Authorization": f"Bearer {auth_token}",
-            "Content-Type": "application/json",
-        }
-
-        # Log request details for debugging
-        logger.info(f"Making request to: {url} (using API base: {api_base})")
-        logger.info(f"Using account_id: {account_id}")
-        logger.info(f"Auth token present: {bool(auth_token)}")
-
-        # Check if we should force update an existing evaluation
-        force = config.get("force", False)
-
+        # Create a temporary folder for the function
+        import tempfile
+        import os
+        
+        temp_dir = tempfile.mkdtemp()
         try:
-            logger.info(
-                f"Deploying reward function '{func.__name__}' as evaluation '{name}'..."
-            )
-
-            if force:
-                # First try to check if evaluator already exists
-                evaluator_id = name
-                check_url = (
-                    f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluator_id}"
-                )
-
+            # Create a main.py file with the wrapper code
+            with open(os.path.join(temp_dir, "main.py"), "w") as f:
+                f.write(wrapper_code)
+            
+            # Use the create_evaluation function from evaluation.py
+            force = config.get("force", False)
+            display_name = name
+            
+            logger.info(f"Deploying reward function '{func.__name__}' as evaluation '{name}'...")
+            
+            try:
+                # Use the working create_evaluation function to create the evaluator
                 try:
-                    # Check if the evaluator exists
-                    check_response = requests.get(check_url, headers=headers)
-                    if check_response.status_code == 200:
-                        # Evaluator exists, delete it first then recreate
-                        logger.info(
-                            f"Evaluator '{evaluator_id}' already exists, deleting and recreating..."
-                        )
-                        delete_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluator_id}"
-                        try:
-                            # Try to delete the evaluator
-                            delete_response = requests.delete(
-                                delete_url, headers=headers
-                            )
-                            # Don't raise for status here, we'll try to create it anyway
-                            if delete_response.status_code < 400:
-                                logger.info(
-                                    f"Successfully deleted evaluator '{evaluator_id}'"
-                                )
-                            else:
-                                logger.warning(
-                                    f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}"
-                                )
-                        except Exception as e:
-                            logger.warning(f"Error deleting evaluator: {str(e)}")
-
-                        # Now create it
-                        response = requests.post(
-                            url, json=evaluation_payload, headers=headers
-                        )
+                    from reward_kit.evaluation import create_evaluation
+                except ImportError:
+                    # If we're being called from within reward_kit, we need to import differently
+                    import sys
+                    if hasattr(sys.modules.get("reward_kit.evaluation"), "create_evaluation"):
+                        create_evaluation = sys.modules["reward_kit.evaluation"].create_evaluation
                     else:
-                        # Evaluator doesn't exist, create it
-                        response = requests.post(
-                            url, json=evaluation_payload, headers=headers
-                        )
-                except requests.exceptions.RequestException:
-                    # If checking fails, try to create it
-                    response = requests.post(
-                        url, json=evaluation_payload, headers=headers
-                    )
-            else:
-                # Just try to create it
-                response = requests.post(url, json=evaluation_payload, headers=headers)
-
-            response.raise_for_status()
-            result = response.json()
-
-            evaluation_id = result.get("name", "").split("/")[-1]
-            evaluation_url = (
-                f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluation_id}"
-            )
-
-            logger.info(f"Deployment successful. Evaluation ID: {evaluation_id}")
-            logger.info(f"Evaluation URL: {evaluation_url}")
-
-            return evaluation_id
-        except Exception as e:
-            logger.error(f"Error deploying evaluation: {str(e)}")
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
-                logger.error(f"Response: {e.response.text}")
-            raise
+                        raise ImportError("Cannot import create_evaluation from reward_kit.evaluation")
+                result = create_evaluation(
+                    evaluator_id=name,
+                    metric_folders=[f"{name}={temp_dir}"],
+                    display_name=display_name,
+                    description=description,
+                    force=force
+                )
+                
+                # Extract the evaluator ID from the result
+                evaluation_id = result.get("name", "").split("/")[-1]
+                
+                # Log the result
+                api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+                evaluation_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluation_id}"
+                
+                logger.info(f"Deployment successful. Evaluation ID: {evaluation_id}")
+                logger.info(f"Evaluation URL: {evaluation_url}")
+                
+                return evaluation_id
+            except Exception as e:
+                logger.error(f"Error deploying evaluation: {str(e)}")
+                if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+                    logger.error(f"Response: {e.response.text}")
+                    
+                    # Check for 403 error
+                    if e.response.status_code == 403:
+                        error_msg = "Permission Error: Your API key doesn't have deployment permissions."
+                        suggestions = [
+                            "1. Use a production API key: export FIREWORKS_API_KEY=your_production_key",
+                            "2. Request deployment permissions for your API key",
+                            "3. Check if your account has evaluator deployment enabled"
+                        ]
+                        
+                        error_details = e.response.text
+                        try:
+                            error_json = e.response.json()
+                            if isinstance(error_json, dict):
+                                error_details = json.dumps(error_json)
+                        except:
+                            pass
+                        
+                        raise ValueError(f"{error_msg}\nPossible solutions:\n" + "\n".join(suggestions) + f"\nError details: {error_details}")
+                raise
+        finally:
+            # Clean up the temporary directory
+            import shutil
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                logger.warning(f"Error cleaning up temporary directory: {str(e)}")
 
     # Add the deploy method to the function
     wrapper.deploy = deploy  # type: ignore

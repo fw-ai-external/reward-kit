@@ -147,20 +147,81 @@ Created evaluator: accounts/pyroworks-dev/evaluators/word-count-eval
 - **Creative Writing Evaluation**: Metrics for creative content
 - **Technical Documentation Evaluation**: Metrics for technical accuracy
 
-## Current Documentation Status
+## Function Calling Reward Implementation Plan
+
+### Goal
+Create a comprehensive function calling evaluation system that combines schema validation and LLM evaluation to assess the quality of function calls made by AI models.
+
+### Components
+
+#### 1. Schema Jaccard Distance Reward
+- Implement a JSON schema validation reward function that:
+  - Takes a function call output and expected schema as input
+  - Validates function name matches
+  - Calculates Jaccard similarity between expected and actual schema
+  - Returns a score between 0.0-1.0 based on schema similarity
+  - Provides detailed explanations for mismatches
+
+#### 2. LLM Judge Reward
+- Implement an LLM-based judge reward function that:
+  - Takes a function call output and expected behavior
+  - Sends to GPT-4o-mini for evaluation
+  - Returns a score based on LLM's judgment of correctness
+  - Provides qualitative feedback on function call quality
+
+#### 3. Composite Function Calling Reward
+- Implement a composite reward that:
+  - Combines schema validation and LLM judgment
+  - Allows configurable weights for each component
+  - Returns detailed metrics for debugging and analysis
+
+### Implementation Steps
+
+1. Schema Jaccard Reward:
+   - Create schema validation utilities
+   - Implement Jaccard similarity calculation
+   - Add proper error handling and edge cases
+   - Create unit tests
+
+2. LLM Judge Reward:
+   - Set up GPT-4o-mini API integration
+   - Design effective prompt templates
+   - Handle API responses and error cases
+   - Create unit tests
+
+3. Composite Reward:
+   - Implement combined reward function
+   - Add configurable weighting
+   - Create comprehensive documentation
+   - Create integration tests
+
+4. Documentation and Examples:
+   - Add function calling examples
+   - Create tutorial for function call evaluation
+   - Update API reference
+
+### Testing Approach
+- Unit tests for each individual component
+- Integration tests for composite reward
+- Example notebooks with real-world scenarios
+- Benchmarking against human judgments
+
+## Documentation Status
 
 The core developer guide and basic examples are now complete. These provide a solid foundation for developers to understand the basics of creating, testing, and deploying reward functions.
 
 ### Next Priority Items
 
-1. Complete the function calling evaluation example
-2. Add advanced topics documentation (Custom Providers, Multi-Component Scoring, etc.)
-3. Create deployment guide documentation
-4. Develop reference implementation templates
-5. Create practical examples and cookbooks
+1. Implement Schema Jaccard Distance Reward for function calling
+2. Implement LLM Judge Reward using GPT-4o-mini
+3. Create Composite Function Calling Reward
+4. Add documentation and examples for function calling rewards
+5. Add advanced topics documentation
 
 The documentation can be found in the `docs/` directory with the following structure:
 - `docs/developer_guide/`: Core concepts and usage guides
 - `docs/examples/`: Code examples
 - `docs/tutorials/`: Step-by-step guides
+- `docs/api_reference/`: API documentation
+- `docs/cli_reference/`: CLI documentation
 - `docs/DOCUMENTATION_STATUS.md`: Detailed status and recommendations

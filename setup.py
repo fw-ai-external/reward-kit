@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "fireworks-reward=reward_kit.cli:main",
+            "reward-kit=reward_kit.cli:main",
         ],
     },
     author="Fireworks AI",

@@ -3,7 +3,7 @@ import json
 import tempfile
 from pathlib import Path
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from reward_kit.evaluation import Evaluator, preview_evaluation, create_evaluation
 
@@ -290,14 +290,12 @@ def test_integration_multi_metrics(mock_env_variables, mock_requests_post):
         os.unlink(sample_file)
 
 
-@patch('typer.Exit')
+@patch('sys.exit')
 def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_post):
     """Test CLI integration by directly calling the CLI command functions"""
-    from reward_kit.cli import preview_cmd, create_cmd
-    import typer
-    from typing import List
+    from reward_kit.cli import preview_command, deploy_command
     
-    # Make typer.Exit a pass-through instead of raising an exception
+    # Make sys.exit a pass-through instead of raising an exception
     mock_exit.return_value = None
     mock_exit.side_effect = lambda code=0: None
     
@@ -305,50 +303,62 @@ def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_p
     sample_file = create_sample_file()
     
     try:
-        # Mock typer.echo to capture output
-        with patch('typer.echo') as mock_echo:
-            # Test preview command
-            preview_cmd(
-                metric_folder=[f"test_metric={tmp_dir}"],
-                sample_file=sample_file,
-                multi_metrics=False,
-                folder=None,
-                max_samples=2
-            )
+        # Test preview command
+        with patch('reward_kit.cli.preview_evaluation') as mock_preview:
+            # Create mock preview result
+            mock_preview_result = MagicMock()
+            mock_preview_result.display = MagicMock()
+            mock_preview.return_value = mock_preview_result
             
-            # Create a new mock for create_evaluation to avoid real calls
-            with patch('reward_kit.cli.create_evaluation') as mock_create:
-                # Configure the mock
-                mock_create.return_value = {
-                    "name": "accounts/test_account/evaluators/test-eval",
-                    "displayName": "Test Evaluator",
-                    "description": "Test description",
-                    "multiMetrics": False
-                }
+            # Create args
+            args = MagicMock()
+            args.metrics_folders = [f"test_metric={tmp_dir}"]
+            args.samples = sample_file
+            args.max_samples = 2
+            
+            # Run preview command
+            with patch('reward_kit.cli.Path.exists', return_value=True):
+                result = preview_command(args)
                 
-                # Test create command
-                create_cmd(
-                    eval_id="test-eval",
-                    metric_folder=[f"test_metric={tmp_dir}"],
-                    multi_metrics=False,
-                    folder=None,
-                    display_name="Test Evaluator",
-                    description="Test description"
-                )
-                
-                # Verify the mock was called correctly
-                mock_create.assert_called_once_with(
-                    evaluator_id="test-eval",
+                # Verify the result
+                assert result == 0
+                mock_preview.assert_called_once_with(
                     metric_folders=[f"test_metric={tmp_dir}"],
-                    multi_metrics=False,
-                    folder=None,
-                    display_name="Test Evaluator",
-                    description="Test description"
+                    sample_file=sample_file,
+                    max_samples=2
                 )
-                
-                # Verify echo was called with success message
-                success_message = f"Successfully created evaluator: accounts/test_account/evaluators/test-eval"
-                mock_echo.assert_any_call(success_message)
+                mock_preview_result.display.assert_called_once()
+        
+        # Test deploy command
+        with patch('reward_kit.cli.create_evaluation') as mock_create:
+            # Configure the mock
+            mock_create.return_value = {
+                "name": "accounts/test_account/evaluators/test-eval",
+                "displayName": "Test Evaluator",
+                "description": "Test description",
+                "multiMetrics": False
+            }
+            
+            # Create args
+            args = MagicMock()
+            args.metrics_folders = [f"test_metric={tmp_dir}"]
+            args.id = "test-eval"
+            args.display_name = "Test Evaluator"
+            args.description = "Test description"
+            args.force = False
+            
+            # Run deploy command
+            result = deploy_command(args)
+            
+            # Verify the result
+            assert result == 0
+            mock_create.assert_called_once_with(
+                evaluator_id="test-eval",
+                metric_folders=[f"test_metric={tmp_dir}"],
+                display_name="Test Evaluator",
+                description="Test description",
+                force=False
+            )
             
     finally:
         # Clean up

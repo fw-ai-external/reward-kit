@@ -6,10 +6,22 @@ that evaluates the informativeness of an assistant's response.
 """
 
 import os
+import sys
 from typing import List, Dict, Optional
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
 
-@reward_function
+# Ensure reward-kit is in the path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Check for required environment variables
+if not os.environ.get("FIREWORKS_API_KEY"):
+    print("Warning: FIREWORKS_API_KEY environment variable is not set.")
+    print("Either set this variable or provide an auth_token when calling deploy().")
+    print("Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/deploy_example.py")
+
+from reward_kit import legacy_reward_function, RewardOutput, MetricRewardOutput
+from reward_kit.auth import get_authentication
+
+@legacy_reward_function
 def informativeness_reward(
     messages: List[Dict[str, str]],
     original_messages: List[Dict[str, str]],
@@ -90,101 +102,50 @@ def test_reward_function():
 
 # Deploy the reward function to Fireworks
 def deploy_to_fireworks():
-    # Read settings file to get account_id
-    import configparser
-    from pathlib import Path
-    
-    # First check environment variables
-    api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
-    is_dev = "dev.api.fireworks.ai" in api_base
-    
-    account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
-    auth_token = os.environ.get("FIREWORKS_API_KEY")
-    
-    if account_id:
-        print(f"Using account ID from environment: {account_id}")
-    
-    if auth_token:
-        print(f"Using auth token from environment")
-        print(f"Token starts with: {auth_token[:10]}...")
-    
-    # If not in environment, try config files
     try:
-        # Only get account_id from settings if not already set
-        if not account_id:
-            settings_path = Path.home() / ".fireworks" / "settings.ini"
-            if settings_path.exists():
-                # For settings.ini, we'll manually parse it since we know the format
-                with open(settings_path, 'r') as f:
-                    for line in f:
-                        if "account_id" in line and "=" in line:
-                            account_id = line.split("=")[1].strip()
-                            break
-                            
-                if account_id:
-                    print(f"Using account ID from settings: {account_id}")
-                else:
-                    account_id = "pyroworks-dev"  # Default value
-                    print(f"No account_id found in settings.ini, using default: {account_id}")
-            else:
-                print("No settings.ini file found")
-                account_id = "pyroworks-dev"  # Default value
+        # Get authentication from the auth module
+        account_id, auth_token = get_authentication()
         
-        # Only get auth token if not already set
-        if not auth_token:
-            auth_path = Path.home() / ".fireworks" / "auth.ini"
-            if auth_path.exists():
-                # For auth.ini, we'll manually parse it since we know the format
-                with open(auth_path, 'r') as f:
-                    for line in f:
-                        # Look for the appropriate token based on environment
-                        key_name = "api_key"
-                        if key_name in line and "=" in line:
-                            auth_token = line.split("=")[1].strip()
-                            break
-                
-                if auth_token:
-                    print(f"Found auth token for {'dev' if is_dev else 'prod'} in auth.ini")
-                    print(f"Token starts with: {auth_token[:10]}...")
-                else:
-                    print(f"No {key_name} found in auth.ini")
-    except Exception as e:
-        print(f"Error reading config: {str(e)}")
-        if not account_id:
-            account_id = "pyroworks-dev"  # Default value
-        # Don't set a default for auth_token
+        # Display info about what we're using
+        print(f"Using account ID: {account_id}")
+        print(f"Using auth token (first 10 chars): {auth_token[:10]}...")
         
-    # Deploy the reward function with force=True to overwrite if it exists
-    evaluation_id = informativeness_reward.deploy(
-        name="informativeness-v1",
-        description="Evaluates response informativeness based on specificity and content density",
-        account_id=account_id,
-        auth_token=auth_token,
-        force=True  # Overwrite if already exists
-    )
-    print(f"Deployed evaluation with ID: {evaluation_id}")
-    
-    # Example of deploying with a custom provider
-    custom_evaluation_id = informativeness_reward.deploy(
-        name="informativeness-v1-anthropic",
-        description="Informativeness evaluation using Claude model",
-        account_id=account_id,
-        auth_token=auth_token,
-        force=True,  # Overwrite if already exists
-        providers=[
-            {
-                "providerType": "anthropic",
-                "modelId": "claude-3-sonnet-20240229"
-            }
-        ]
-    )
-    print(f"Deployed evaluation with custom provider: {custom_evaluation_id}")
-    
-    # Show how to use the evaluation ID in a training job
-    print("Use this in your RL training job:")
-    print(f"firectl create rl-job --reward-endpoint \"https://api.fireworks.ai/v1/evaluations/{evaluation_id}\"")
-    
-    return evaluation_id
+        # Deploy the reward function with force=True to overwrite if it exists
+        evaluation_id = informativeness_reward.deploy(
+            name="informativeness-v1",
+            description="Evaluates response informativeness based on specificity and content density",
+            account_id=account_id,
+            auth_token=auth_token,
+            force=True  # Overwrite if already exists
+        )
+        print(f"Deployed evaluation with ID: {evaluation_id}")
+        
+        # Example of deploying with a custom provider
+        custom_evaluation_id = informativeness_reward.deploy(
+            name="informativeness-v1-anthropic",
+            description="Informativeness evaluation using Claude model",
+            account_id=account_id,
+            auth_token=auth_token,
+            force=True,  # Overwrite if already exists
+            providers=[
+                {
+                    "providerType": "anthropic",
+                    "modelId": "claude-3-sonnet-20240229"
+                }
+            ]
+        )
+        print(f"Deployed evaluation with custom provider: {custom_evaluation_id}")
+        
+        # Show how to use the evaluation ID in a training job
+        print("Use this in your RL training job:")
+        print(f"firectl create rl-job --reward-endpoint \"https://api.fireworks.ai/v1/evaluations/{evaluation_id}\"")
+        
+        return evaluation_id
+        
+    except ValueError as e:
+        print(f"Authentication error: {str(e)}")
+        print("Make sure you have proper Fireworks API credentials set up.")
+        return None
 
 if __name__ == "__main__":
     # First test the reward function locally

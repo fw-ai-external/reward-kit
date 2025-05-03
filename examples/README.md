@@ -1,62 +1,200 @@
-# Fireworks Reward Kit Examples
+# Reward Kit Examples
 
-This directory contains examples demonstrating how to use the Fireworks Reward Kit.
+This directory contains examples demonstrating how to use the Reward Kit library for evaluating and deploying reward functions for LLM fine-tuning.
 
-## Examples
+## Prerequisites
 
-### Basic Rewards
+Before running the examples, make sure you have:
 
-- [`basic_reward.py`](./basic_reward.py) - Demonstrates how to create simple reward functions and compose them together.
+1. A Fireworks AI account and API key
+2. The Reward Kit package installed
 
-### Function Calling Rewards
+## Setup
 
-- [`function_calling_reward.py`](./function_calling_reward.py) - Shows how to use the built-in function calling reward to evaluate LLM function calls.
-
-### Serving Reward Functions
-
-- [`server_example.py`](./server_example.py) - Demonstrates how to serve a reward function as an HTTP API.
-
-## Running the Examples
-
-Make sure you have installed the reward-kit package in development mode:
+### 1. Create a Virtual Environment
 
 ```bash
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+source .venv/bin/activate
+```
+
+### 2. Install Reward Kit
+
+```bash
+# Install the package in development mode
 pip install -e .
 ```
 
-Then run any example with:
+### 3. Configure API Access
+
+For development, use these environment variables:
 
 ```bash
-python examples/basic_reward.py
+# Set environment variables for development
+export FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY
+export FIREWORKS_API_BASE=https://dev.api.fireworks.ai
 ```
 
-### Testing the Server Example
-
-After starting the server with:
+For production, use:
 
 ```bash
-python examples/server_example.py
+# Set environment variables for production
+export FIREWORKS_API_KEY=your_api_key
+export FIREWORKS_API_BASE=https://api.fireworks.ai
 ```
 
-You can test it with a curl command:
+## Example Walkthroughs
+
+### Basic Evaluation Example
+
+The `evaluation_preview_example.py` demonstrates how to preview and create an evaluation using the Reward Kit.
+
+#### Step 1: Understand the Metric
+
+Examine the example metric in the `metrics/word_count` directory. This metric evaluates responses based on their word count:
+
+```python
+@reward_function
+def evaluate(messages, original_messages=None, **kwargs):
+    # Get the last message (assistant's response)
+    last_message = messages[-1]
+    content = last_message.content or ''
+    
+    # Count words and calculate score
+    word_count = len(content.split())
+    score = min(word_count / 100, 1.0)  # Cap at 1.0
+    
+    return EvaluateResult(
+        score=score,
+        reason=f'Word count: {word_count}',
+        metrics={
+            'word_count': MetricResult(
+                score=score,
+                reason=f'Word count: {word_count}'
+            )
+        }
+    )
+```
+
+#### Step 2: Prepare Sample Data
+
+Review the sample conversations in `samples/samples.jsonl`. Each line contains a JSON object representing a conversation:
+
+```json
+{"messages": [{"role": "user", "content": "Tell me about AI"}, {"role": "assistant", "content": "AI refers to systems designed to mimic human intelligence."}]}
+```
+
+#### Step 3: Run the Preview
+
+Execute the evaluation preview example:
 
 ```bash
-curl -X POST http://localhost:8000/reward \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "Tell me about RLHF"},
-      {"role": "assistant", "content": "RLHF (Reinforcement Learning from Human Feedback) is a technique to align language models with human preferences. It involves training a reward model using human feedback and then fine-tuning an LLM using reinforcement learning to maximize this learned reward function."}
-    ]
-  }'
+source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/evaluation_preview_example.py
+```
+
+This will:
+1. Load the word count metric from `examples/metrics/word_count`
+2. Load sample conversations from `examples/samples/samples.jsonl`
+3. Preview the evaluator using the Fireworks API
+4. Display the evaluation results for each sample
+5. Create an evaluator named "word-count-eval"
+
+### Deployment Example
+
+The `deploy_example.py` demonstrates how to deploy a reward function to the Fireworks platform.
+
+#### Step 1: Examine the Reward Function
+
+Review the informativeness reward function in the deploy example, which evaluates responses based on:
+- Length
+- Specificity markers
+- Content density
+
+#### Step 2: Run the Deployment
+
+Execute the deployment example:
+
+```bash
+source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai python examples/deploy_example.py
+```
+
+This will:
+1. Test the reward function locally with sample data
+2. Deploy the function to the Fireworks platform
+3. Display the deployed evaluator ID
+
+### Using the CLI
+
+The Reward Kit also provides a command-line interface for common operations.
+
+#### Preview an Evaluator Using CLI
+
+```bash
+# Activate the virtual environment and set environment variables
+source .venv/bin/activate
+
+# Preview an evaluator
+FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai reward-kit preview \
+  --metrics-folders "word_count=./examples/metrics/word_count" \
+  --samples ./examples/samples/samples.jsonl
+```
+
+#### Deploy an Evaluator Using CLI
+
+```bash
+# Activate the virtual environment and set environment variables
+source .venv/bin/activate
+
+# Deploy an evaluator
+FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY FIREWORKS_API_BASE=https://dev.api.fireworks.ai reward-kit deploy \
+  --id my-evaluator \
+  --metrics-folders "word_count=./examples/metrics/word_count" \
+  --display-name "My Word Count Evaluator" \
+  --description "Evaluates responses based on word count" \
+  --force
+```
+
+## Creating Your Own Evaluators
+
+Follow these steps to create your own custom evaluator:
+
+1. Create a directory for your metric (e.g., `my_metrics/coherence`)
+2. Create a `main.py` file with an `evaluate` function
+3. Test your evaluator using the preview functionality
+4. Deploy your evaluator when ready
+
+### Example Custom Metric
+
+```python
+from reward_kit import EvaluateResult, MetricResult, reward_function, Message
+from typing import List
+
+@reward_function
+def evaluate(messages: List[Message], original_messages: List[Message] = list(), **kwargs):
+    """Custom evaluation metric."""
+    # Your evaluation logic here
+    # ...
+    
+    return EvaluateResult(
+        score=your_score,
+        reason="Explanation of score",
+        metrics={
+            'your_metric': MetricResult(
+                score=your_score,
+                reason="Detailed explanation"
+            )
+        }
+    )
 ```
 
 ## Next Steps
 
 After exploring these examples, you can:
 
-1. Create your own reward functions tailored to your specific use case
-2. Deploy them using the Fireworks platform
-3. Use them in RL fine-tuning jobs
-
-Check the main README file for more detailed information on the API and deployment options.
+1. Create your own custom metrics
+2. Integrate reward functions into model training workflows
+3. Use deployed evaluators to score model outputs
+4. Combine multiple metrics for comprehensive evaluation

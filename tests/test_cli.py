@@ -2,69 +2,95 @@ import pytest
 from unittest.mock import MagicMock, patch
 import sys
 import os
-from typer.testing import CliRunner
+import argparse
 
-from reward_kit.cli import app, validate_function_path
-
-
-@pytest.fixture
-def cli_runner():
-    """Fixture for CLI runner."""
-    return CliRunner()
+from reward_kit.cli import parse_args, preview_command, deploy_command, main
 
 
 class TestCLI:
     """Tests for the CLI functionality."""
     
-    def test_version_command(self, cli_runner):
-        """Test the version command."""
-        with patch("reward_kit.cli.__version__", "0.1.0"):
-            result = cli_runner.invoke(app, ["version"])
-            assert result.exit_code == 0
-            assert "0.1.0" in result.stdout
-    
-    def test_serve_command(self, cli_runner):
-        """Test the serve command exists and has the expected help text."""
-        # Just check that the command is registered and has the expected help text
-        result = cli_runner.invoke(app, ["serve-app", "--help"])
+    def test_parse_args(self):
+        """Test the argument parser."""
+        # Test preview command
+        args = parse_args(["preview", "--samples", "test.jsonl"])
+        assert args.command == "preview"
+        assert args.samples == "test.jsonl"
+        assert args.max_samples == 5  # default value
         
-        # Command should return help text successfully
-        assert result.exit_code == 0
-        assert "Serve a reward function as an HTTP API" in result.stdout
-        assert "FUNCTION_PATH" in result.stdout
-        assert "--host" in result.stdout
-        assert "--port" in result.stdout
+        # Test deploy command
+        args = parse_args(["deploy", "--id", "test-eval", "--metrics-folders", "test=./test"])
+        assert args.command == "deploy"
+        assert args.id == "test-eval"
+        assert args.metrics_folders == ["test=./test"]
+        assert not args.force  # default value
     
-    def test_validate_function_path(self):
-        """Test the validation of function paths."""
-        # We'll mock imports separately to test just the validate_function_path function
-        with patch("reward_kit.cli.importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.test_func = MagicMock()
-            mock_import.return_value = mock_module
+    @patch("reward_kit.cli.preview_evaluation")
+    def test_preview_command(self, mock_preview):
+        """Test the preview command."""
+        # Setup mock
+        mock_preview_result = MagicMock()
+        mock_preview_result.display = MagicMock()
+        mock_preview.return_value = mock_preview_result
+        
+        # Create args
+        args = argparse.Namespace()
+        args.metrics_folders = ["test=./test"]
+        args.samples = "test.jsonl"
+        args.max_samples = 5
+        
+        # Mock Path.exists to return True
+        with patch("reward_kit.cli.Path.exists", return_value=True):
+            # Run the command
+            result = preview_command(args)
             
-            # Test the function directly with a module:function format
-            result = validate_function_path("test_module:test_func")
-            
-            # Module import should be called with correct name
-            mock_import.assert_called_once_with("test_module")
-            
-            # Verify the result is the function object
-            assert result is mock_module.test_func
+            # Check result
+            assert result == 0
+            mock_preview.assert_called_once_with(
+                metric_folders=["test=./test"],
+                sample_file="test.jsonl",
+                max_samples=5
+            )
+            mock_preview_result.display.assert_called_once()
     
-    @patch("reward_kit.cli.validate_function_path")
-    @patch("reward_kit.cli.uvicorn.run")
-    def test_serve_error_handling(self, mock_run, mock_validate, cli_runner):
-        """Test error handling in the serve command."""
-        # Mock the validation function to raise an error
-        mock_validate.side_effect = ImportError("Function not found")
+    @patch("reward_kit.cli.create_evaluation")
+    def test_deploy_command(self, mock_create):
+        """Test the deploy command."""
+        # Setup mock
+        mock_create.return_value = {"name": "test-evaluator"}
         
-        result = cli_runner.invoke(app, [
-            "serve-app", 
-            "invalid.path"
-        ])
+        # Create args
+        args = argparse.Namespace()
+        args.metrics_folders = ["test=./test"]
+        args.id = "test-eval"
+        args.display_name = "Test Evaluator"
+        args.description = "Test description"
+        args.force = True
         
-        # Should exit with error
-        assert result.exit_code != 0
-        # Error message should be displayed
-        assert "Function not found" in result.stdout
+        # Run the command
+        result = deploy_command(args)
+        
+        # Check result
+        assert result == 0
+        mock_create.assert_called_once_with(
+            evaluator_id="test-eval",
+            metric_folders=["test=./test"],
+            display_name="Test Evaluator",
+            description="Test description",
+            force=True
+        )
+    
+    @patch("reward_kit.cli.check_environment", return_value=False)
+    def test_command_environment_check(self, mock_check):
+        """Test that commands check the environment."""
+        # Create args
+        preview_args = argparse.Namespace()
+        deploy_args = argparse.Namespace()
+        
+        # Run the commands
+        preview_result = preview_command(preview_args)
+        deploy_result = deploy_command(deploy_args)
+        
+        # Both should fail if environment check fails
+        assert preview_result == 1
+        assert deploy_result == 1

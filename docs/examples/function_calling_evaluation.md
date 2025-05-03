@@ -1,0 +1,361 @@
+# Function Calling Evaluation
+
+This guide demonstrates how to evaluate function calls made by AI models using a combination of schema validation and LLM judgment.
+
+## Prerequisites
+
+Before using the function calling evaluation rewards, ensure you have:
+
+1. **Python 3.8+** installed on your system
+2. **Reward Kit** installed: `pip install reward-kit`
+3. **OpenAI Python Client** installed (for LLM judge): `pip install openai`
+4. **OpenAI API Key** (for LLM judge evaluation)
+
+## Function Calling Reward Components
+
+The Reward Kit provides three approaches to evaluating function calls:
+
+1. **Schema Jaccard Reward**: Compares function call structure to expected schema using Jaccard similarity
+2. **LLM Judge Reward**: Uses GPT-4o-mini to evaluate function call quality based on expected behavior
+3. **Composite Reward**: Combines schema validation and LLM judgment for comprehensive evaluation
+
+## Schema Jaccard Reward
+
+The Schema Jaccard Reward evaluates how well a function call matches the expected schema by calculating the Jaccard similarity between property sets.
+
+### Example Usage
+
+```python
+from reward_kit.rewards.function_calling import schema_jaccard_reward
+import json
+
+# Define expected schema
+expected_schema = {
+    "name": "get_weather",
+    "arguments": {
+        "location": {"type": "string"},
+        "unit": {"type": "string"}
+    }
+}
+
+# Messages with function call
+messages = [
+    {"role": "user", "content": "What's the weather in New York?"},
+    {
+        "role": "assistant", 
+        "content": "I'll check the weather for you.",
+        "function_call": {
+            "name": "get_weather",
+            "arguments": json.dumps({
+                "location": "New York",
+                "unit": "celsius"
+            })
+        }
+    }
+]
+
+# Evaluate the function call
+result = schema_jaccard_reward(
+    messages=messages,
+    expected_schema=expected_schema
+)
+
+# Print the results
+print(f"Overall Score: {result.score}")
+print("Component Metrics:")
+for name, metric in result.metrics.items():
+    print(f"  {name}: {metric.score}")
+    print(f"    Reason: {metric.reason}")
+```
+
+### How It Works
+
+1. Extracts function call information from the messages or directly from provided function_call parameter
+2. Compares the function name against the expected name (exact match required)
+3. Compares argument schema structure using Jaccard similarity, which measures:
+   - The intersection of properties divided by the union of properties
+4. Generates a comprehensive report of matching, missing, and unexpected properties
+5. Calculates final score as weighted combination of name match and schema similarity
+
+## LLM Judge Reward
+
+The LLM Judge Reward uses GPT-4o-mini to evaluate the quality and correctness of function calls based on expected behavior.
+
+### Example Usage
+
+```python
+from reward_kit.rewards.function_calling import llm_judge_reward
+import json
+import os
+
+# Set OpenAI API key
+os.environ["OPENAI_API_KEY"] = "your_openai_api_key"
+
+# Define expected schema and behavior
+expected_schema = {
+    "name": "get_weather",
+    "arguments": {
+        "location": {"type": "string"},
+        "unit": {"type": "string"}
+    }
+}
+
+expected_behavior = """
+This function should retrieve weather information for the specified location.
+- The location should be a valid city or place name
+- The unit parameter should be either 'celsius' or 'fahrenheit'
+- The function should be called when the user explicitly asks about weather
+"""
+
+# Messages with function call
+messages = [
+    {"role": "user", "content": "What's the weather in New York?"},
+    {
+        "role": "assistant", 
+        "content": "I'll check the weather for you.",
+        "function_call": {
+            "name": "get_weather",
+            "arguments": json.dumps({
+                "location": "New York",
+                "unit": "celsius"
+            })
+        }
+    }
+]
+
+# Evaluate the function call
+result = llm_judge_reward(
+    messages=messages,
+    expected_schema=expected_schema,
+    expected_behavior=expected_behavior
+)
+
+# Print the results
+print(f"Overall Score: {result.score}")
+print("Component Metrics:")
+for name, metric in result.metrics.items():
+    print(f"  {name}: {metric.score}")
+    print(f"    Reason: {metric.reason}")
+```
+
+### How It Works
+
+1. Extracts function call information from the messages
+2. Formats a prompt with:
+   - Conversation context
+   - Function call details
+   - Expected schema
+   - Expected behavior description
+3. Sends the prompt to GPT-4o-mini (or another specified model)
+4. Parses the response to extract:
+   - Numeric score between 0.0 and 1.0
+   - Detailed explanation of strengths and weaknesses
+5. Returns the LLM's evaluation as a reward score with explanation
+
+## Composite Function Call Reward
+
+The Composite Function Call Reward combines both schema validation and LLM judgment for a comprehensive evaluation.
+
+### Example Usage
+
+```python
+from reward_kit.rewards.function_calling import composite_function_call_reward
+import json
+import os
+
+# Set OpenAI API key
+os.environ["OPENAI_API_KEY"] = "your_openai_api_key"
+
+# Define expected schema and behavior
+expected_schema = {
+    "name": "get_weather",
+    "arguments": {
+        "location": {"type": "string"},
+        "unit": {"type": "string"}
+    }
+}
+
+expected_behavior = """
+This function should retrieve weather information for the specified location.
+- The location should be a valid city or place name
+- The unit parameter should be either 'celsius' or 'fahrenheit'
+- The function should be called when the user explicitly asks about weather
+"""
+
+# Messages with function call
+messages = [
+    {"role": "user", "content": "What's the weather in New York?"},
+    {
+        "role": "assistant", 
+        "content": "I'll check the weather for you.",
+        "function_call": {
+            "name": "get_weather",
+            "arguments": json.dumps({
+                "location": "New York",
+                "unit": "celsius"
+            })
+        }
+    }
+]
+
+# Evaluate the function call with custom weights
+result = composite_function_call_reward(
+    messages=messages,
+    expected_schema=expected_schema,
+    expected_behavior=expected_behavior,
+    weights={"schema": 0.6, "llm": 0.4}  # Emphasize schema validation
+)
+
+# Print the results
+print(f"Overall Score: {result.score}")
+print("Component Metrics:")
+for name, metric in result.metrics.items():
+    print(f"  {name}: {metric.score}")
+    print(f"    Reason: {metric.reason}")
+```
+
+### How It Works
+
+1. Runs both schema_jaccard_reward and llm_judge_reward separately
+2. Combines the metrics from both evaluations with prefixes:
+   - `schema_` for schema validation metrics
+   - `llm_` for LLM judgment metrics
+3. Calculates a weighted average of both scores based on provided weights
+4. Returns a comprehensive set of metrics with the weighted final score
+
+## Advanced Usage
+
+### Custom Weights
+
+You can customize the weights for different components:
+
+```python
+# Emphasize LLM judgment over schema validation
+result = composite_function_call_reward(
+    messages=messages,
+    expected_schema=expected_schema,
+    expected_behavior=expected_behavior,
+    weights={"schema": 0.3, "llm": 0.7}  # Higher weight for LLM judgment
+)
+```
+
+### Custom LLM Model
+
+You can specify a different model for LLM evaluation:
+
+```python
+# Use a different model
+result = llm_judge_reward(
+    messages=messages,
+    expected_schema=expected_schema,
+    expected_behavior=expected_behavior,
+    model="gpt-4-turbo",  # Use a more powerful model
+    temperature=0.2       # Add some randomness
+)
+```
+
+### Direct Function Call Evaluation
+
+You can also evaluate a function call directly without extracting from messages:
+
+```python
+function_call = {
+    "name": "get_weather",
+    "arguments": json.dumps({
+        "location": "New York",
+        "unit": "celsius"
+    })
+}
+
+result = schema_jaccard_reward(
+    messages=[],  # Can be empty as function_call is provided directly
+    function_call=function_call,
+    expected_schema=expected_schema
+)
+```
+
+## Use Case: Evaluating Tool Use in Models
+
+One common application is evaluating how well different models use tools:
+
+```python
+import json
+from reward_kit.rewards.function_calling import composite_function_call_reward
+
+# Define expected schema for search function
+search_schema = {
+    "name": "search",
+    "arguments": {
+        "query": {"type": "string"}
+    }
+}
+
+expected_behavior = """
+The search function should be called:
+1. When the user is asking for factual information
+2. With a clear, specific query that captures what the user is looking for
+3. Without including instructions, formatting requests, or explanations in the query
+"""
+
+# Test different model responses to the same query
+models = ["llama-3-8b", "claude-3-sonnet", "gpt-4o"]
+model_responses = {
+    "llama-3-8b": {
+        "name": "search",
+        "arguments": json.dumps({
+            "query": "latest developments in quantum computing"
+        })
+    },
+    "claude-3-sonnet": {
+        "name": "search",
+        "arguments": json.dumps({
+            "query": "quantum computing recent advances 2023-2024"
+        })
+    },
+    "gpt-4o": {
+        "name": "search",
+        "arguments": json.dumps({
+            "query": "recent breakthroughs in quantum computing please search for detailed technical information"
+        })
+    }
+}
+
+# User query
+user_query = "What are the latest developments in quantum computing?"
+
+# Evaluate each model's function call
+results = {}
+for model in models:
+    messages = [
+        {"role": "user", "content": user_query},
+        {"role": "assistant", "function_call": model_responses[model]}
+    ]
+    
+    result = composite_function_call_reward(
+        messages=messages,
+        expected_schema=search_schema,
+        expected_behavior=expected_behavior
+    )
+    
+    results[model] = result.score
+
+# Print the results
+print("Model Function Call Evaluation Scores:")
+for model, score in results.items():
+    print(f"{model}: {score:.2f}")
+```
+
+## Best Practices
+
+1. **Clear Expected Schemas**: Define schemas with precise types and required properties
+2. **Detailed Expected Behavior**: Provide specific guidance for what constitutes correct behavior
+3. **Combined Evaluation**: Use the composite reward for the most comprehensive evaluation
+4. **Custom Weights**: Adjust weights based on whether structure or behavior is more important
+5. **Testing**: Test reward functions with a variety of function calls, including edge cases
+6. **Fallback Options**: Always handle API errors gracefully in the LLM judge evaluation
+
+## Next Steps
+
+- Learn about [Creating Custom Reward Functions](../tutorials/creating_your_first_reward_function.md)
+- Explore [Advanced Reward Functions](advanced_reward_functions.md) for more complex evaluations
+- See [Best Practices](../tutorials/best_practices.md) for reward function design

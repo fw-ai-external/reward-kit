@@ -24,14 +24,17 @@ def main():
     
     # Using single quotes for outer string to avoid conflict with inner triple quotes
     evaluate_code = '''
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+from reward_kit import EvaluateResult, MetricResult, reward_function, Message
+from typing import List
+
+@reward_function
+def evaluate(messages: List[Message], original_messages: List[Message] = list(), **kwargs) -> EvaluateResult:
     """
     Evaluate a sample entry.
     
     Args:
         messages: List of conversation messages
         original_messages: Original messages (usually without the response being evaluated)
-        tools: Available tools for the conversation
         **kwargs: Additional parameters
         
     Returns:
@@ -39,26 +42,29 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     """
     # If this is the first message, there's nothing to evaluate
     if not messages:
-        return {'score': 0.0, 'reason': 'No messages found'}
+        return EvaluateResult(score=0.0, reason='No messages found')
     
     # Get the last message (assistant's response)
     last_message = messages[-1]
-    content = last_message.get('content', '')
+    if last_message is not None and last_message.content is not None:
+        content = last_message.content
+    else:
+        content = ''
     
     # Simple evaluation: count the number of words
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)  # Cap at 1.0
     
-    return {
-        'score': score,
-        'reason': f'Word count: {word_count}',
-        'metrics': {
-            'word_count': {
-                'score': score,
-                'reason': f'Response has {word_count} words'
-            }
+    return EvaluateResult(
+        score=score,
+        reason=f'Word count: {word_count}',
+        metrics={
+            'word_count': MetricResult(
+                score=score,
+                reason=f'Response has {word_count} words'
+            )
         }
-    }
+    )
 '''
     
     main_py.write_text(evaluate_code)

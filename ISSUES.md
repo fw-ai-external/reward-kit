@@ -3,46 +3,42 @@
 
 I made the following type changes
 
-
 ```
-(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ git diff reward_kit/models.py
-diff --git a/reward_kit/models.py b/reward_kit/models.py
-index 46aa9e2..b838d5c 100644
---- a/reward_kit/models.py
-+++ b/reward_kit/models.py
-@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Any, Union, Callable, Literal
- from dataclasses import dataclass, field
- from dataclasses_json import dataclass_json
- import json
--from pydantic import BaseModel, Field, RootModel
-+from pydantic import BaseModel, Field
+(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ git diff
+diff --git a/reward_kit/typed_interface.py b/reward_kit/typed_interface.py
+index c9f781d..d24e06b 100644
+--- a/reward_kit/typed_interface.py
++++ b/reward_kit/typed_interface.py
+@@ -105,21 +105,7 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
+         # Handle the updated EvaluateResult model structure
+         if isinstance(result_model, EvaluateResult):
+             # Build a response including all the metrics
+-            result_dict = {}
+-            
+-            # Add each metric to the result dictionary
+-            for key, metric in result_model.metrics.items():
+-                result_dict[key] = {
+-                    "success": metric.success,
+-                    "score": metric.score,
+-                    "reason": metric.reason,
+-                }
+-            
+-            # If there's an error, add it to the result
+-            if result_model.error:
+-                result_dict["error"] = {"error": result_model.error}
+-            
+-            return result_dict
++            return result_model.model_dump()
+         else:
+             return _res_adapter.dump_python(result_model, mode="json")
  
- # Import OpenAI message types
- from openai.types.chat import ChatCompletionMessageParam
-@@ -21,16 +21,18 @@ class Message(BaseModel):
- class MetricResult(BaseModel):
-     """Result of a single metric evaluation."""
+diff --git a/setup.py b/setup.py
+index 68283db..cf4dba9 100644
+--- a/setup.py
++++ b/setup.py
+@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
  
--    success: bool
-+    success: Optional[bool] = None
-     score: float = Field(..., ge=0.0, le=1.0)
-     reason: str
- 
- 
--# Use RootModel for pydantic v2 compatibility
--class EvaluateResult(RootModel):
-+class EvaluateResult(BaseModel):
-     """The complete result of an evaluator with multiple metrics."""
--
--    root: Dict[str, MetricResult]
-+    
-+    error: Optional[str] = None
-+    score: float = Field(..., ge=0.0, le=1.0)
-+    reason: Optional[str] = None
-+    metrics: Dict[str, MetricResult]
- 
- 
- # Original dataclass-based models for backwards compatibility
- ```
+ setup(
+```
 
- please help me fix all the downstream typing issues
+please help me fix all the downstream typing issues, and check if my test covers this, if not please help me add a test

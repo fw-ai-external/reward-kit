@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, Dict, List, TypeVar, cast, Protocol, Optional, Union
+from typing import Any, Dict, List, TypeVar, cast, Protocol, Union
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -27,7 +27,7 @@ class DictEvaluateFunction(Protocol):
 
     def __call__(
         self, messages: List[Dict[str, Any]], **kwargs: Any
-    ) -> Dict[str, Dict[str, Any]]: ...
+    ) -> Dict[str, Any]: ...
 
 
 def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
@@ -42,13 +42,13 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
         func: Function that takes List[Message] and returns EvaluateResult
 
     Returns:
-        Wrapped function that takes List[dict] and returns Dict[str, Dict[str, Any]]
+        Wrapped function that takes List[dict] and returns Dict[str, Any]
     """
 
     @wraps(func)
     def wrapper(
         messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         # 1. Validate / coerce the incoming messages to list[Message]
         try:
             # Convert messages to Message objects if they're not already
@@ -105,21 +105,7 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
         # Handle the updated EvaluateResult model structure
         if isinstance(result_model, EvaluateResult):
             # Build a response including all the metrics
-            result_dict = {}
-            
-            # Add each metric to the result dictionary
-            for key, metric in result_model.metrics.items():
-                result_dict[key] = {
-                    "success": metric.success,
-                    "score": metric.score,
-                    "reason": metric.reason,
-                }
-            
-            # If there's an error, add it to the result
-            if result_model.error:
-                result_dict["error"] = {"error": result_model.error}
-            
-            return result_dict
+            return result_model.model_dump()
         else:
             return _res_adapter.dump_python(result_model, mode="json")
 

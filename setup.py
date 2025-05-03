@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.2.2",
+    version="0.2.4",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
-        "pydantic>=1.8.0",
+        "pydantic>=2.0.0",
         "dataclasses-json>=0.5.7",
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",

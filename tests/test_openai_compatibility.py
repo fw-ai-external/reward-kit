@@ -68,9 +68,10 @@ class OpenAICompatibilityTest(unittest.TestCase):
         result = sample_evaluator(messages=messages_dict)
         
         # Verify the result
-        self.assertIn("not_empty", result)
-        self.assertEqual(result["not_empty"]["score"], 1.0)
-        self.assertEqual(result["not_empty"]["reason"], "Response is not empty")
+        self.assertIn("metrics", result)
+        self.assertIn("not_empty", result["metrics"])
+        self.assertEqual(result["metrics"]["not_empty"]["score"], 1.0)
+        self.assertEqual(result["metrics"]["not_empty"]["reason"], "Response is not empty")
 
 
 if __name__ == "__main__":

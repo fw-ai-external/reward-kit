@@ -9,9 +9,83 @@ from reward_kit.rewards.code_execution import (
     execute_python_code,
     execute_javascript_code,
     compare_outputs,
-    string_similarity
+    string_similarity,
+    e2b_code_execution_reward,
+    execute_code_with_e2b,
+    _HAS_E2B
 )
 from reward_kit.models import RewardOutput
+
+
+@pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
+class TestE2BCodeExecution:
+    def test_e2b_reward_function_missing_e2b(self, monkeypatch):
+        # Patch _HAS_E2B to False to simulate missing E2B package
+        monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", False)
+        
+        messages = [
+            {"role": "user", "content": "Write a function to add two numbers"},
+            {"role": "assistant", "content": """Here's a function to add two numbers:
+
+```python
+def add(a, b):
+    return a + b
+
+print(add(2, 3))
+```
+
+This will output `5`.
+"""}
+        ]
+        
+        result = e2b_code_execution_reward(
+            messages=messages,
+            expected_output="5",
+            language="python"
+        )
+        
+        assert isinstance(result, RewardOutput)
+        assert result.score == 0.0
+        assert "E2B package not installed" in result.metrics["error"].reason
+        
+        # Restore _HAS_E2B to its original value
+        monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", _HAS_E2B)
+    
+    @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
+    def test_execute_code_with_e2b_authentication(self):
+        """Test that authentication error is properly handled."""
+        code = "print('Hello, world!')"
+        result = execute_code_with_e2b(code, language="python", api_key=None)
+        
+        assert result["success"] is False
+        assert "API key is required" in result["error"]
+        
+    @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
+    def test_e2b_reward_function_no_api_key(self, monkeypatch):
+        """Test that missing API key is properly handled in the reward function."""
+        # Ensure E2B_API_KEY is not set in environment
+        monkeypatch.delenv("E2B_API_KEY", raising=False)
+        
+        messages = [
+            {"role": "user", "content": "Write a function to add two numbers"},
+            {"role": "assistant", "content": """```python
+def add(a, b):
+    return a + b
+
+print(add(2, 3))
+```"""}
+        ]
+        
+        result = e2b_code_execution_reward(
+            messages=messages,
+            expected_output="5",
+            language="python",
+            api_key=None
+        )
+        
+        assert isinstance(result, RewardOutput)
+        assert result.score == 0.0
+        assert "API key is required" in result.metrics["error"].reason
 
 
 class TestExtractCodeBlocks:

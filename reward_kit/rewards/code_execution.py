@@ -3,7 +3,7 @@ Code execution reward functions for evaluating code correctness.
 
 This module provides functions to evaluate the correctness of code by:
 1. Extracting code blocks from messages
-2. Executing the code in a secure environment
+2. Executing the code in a secure environment (local or E2B sandbox)
 3. Comparing the output with expected results
 """
 
@@ -21,6 +21,22 @@ import multiprocessing
 import traceback
 from io import StringIO
 from typing import Dict, List, Any, Optional, Tuple, Callable
+
+# Try to import from e2b_code_interpreter first (preferred)
+try:
+    from e2b_code_interpreter import Sandbox  # type: ignore
+    _HAS_E2B = True
+    _E2B_SOURCE = "e2b_code_interpreter"
+except ImportError:
+    # Fallback to e2b
+    try:
+        from e2b import Sandbox  # type: ignore
+        _HAS_E2B = True
+        _E2B_SOURCE = "e2b"
+    except ImportError:
+        _HAS_E2B = False
+        _E2B_SOURCE = None
+
 from ..models import RewardOutput, MetricRewardOutput
 
 
@@ -67,7 +83,7 @@ def local_code_execution_reward(
 ) -> RewardOutput:
     """
     Evaluate code correctness by executing it locally and comparing the output.
-    
+
     This function executes code in a secure sandbox with memory limits, CPU limits,
     and timeouts to prevent malicious code from harming the system.
 
@@ -85,7 +101,7 @@ def local_code_execution_reward(
     """
     # Initialize metrics dictionary for tracking various aspects of the execution
     metrics = {}
-    
+
     # Note: We don't set the reliability guard in the main process
     # as it would interfere with the test runner and other system processes.
     # Instead, the guard is applied in each subprocess during code execution.
@@ -100,15 +116,14 @@ def local_code_execution_reward(
         )
 
     last_message = messages[-1]
-    
+
     # Check role of the last message
     if last_message.get("role") != "assistant":
         return RewardOutput(
             score=0.0,
             metrics={
                 "error": MetricRewardOutput(
-                    score=0.0, 
-                    reason="Last message is not from assistant"
+                    score=0.0, reason="Last message is not from assistant"
                 )
             },
         )
@@ -121,8 +136,7 @@ def local_code_execution_reward(
             score=0.0,
             metrics={
                 "error": MetricRewardOutput(
-                    score=0.0, 
-                    reason=f"No {language} code blocks found in message"
+                    score=0.0, reason=f"No {language} code blocks found in message"
                 )
             },
         )
@@ -145,7 +159,11 @@ def local_code_execution_reward(
                     match = re.search(pattern, content)
                     if match:
                         # Use group 1 or 2 depending on the pattern
-                        expected_output = match.group(2) if len(match.groups()) > 1 and match.group(2) else match.group(1)
+                        expected_output = (
+                            match.group(2)
+                            if len(match.groups()) > 1 and match.group(2)
+                            else match.group(1)
+                        )
                         expected_output = expected_output.strip()
                         break
 
@@ -160,7 +178,7 @@ def local_code_execution_reward(
         score=0.0,  # Not a real score
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
-    
+
     # Add expected output to metrics if available
     if expected_output:
         metrics["expected_output"] = MetricRewardOutput(
@@ -216,23 +234,24 @@ def local_code_execution_reward(
         return RewardOutput(score=0.0, metrics=metrics)
 
 
-
-def _execute_code_in_process(execute_func: Callable, args: Tuple, timeout: int = 5) -> Dict[str, Any]:
+def _execute_code_in_process(
+    execute_func: Callable, args: Tuple, timeout: int = 5
+) -> Dict[str, Any]:
     """
     Execute code in a separate process with timeout and resource limits.
-    
+
     Args:
         execute_func: Function to execute the code
         args: Arguments to pass to the execute function
         timeout: Maximum execution time in seconds
-        
+
     Returns:
         Dictionary with execution results
     """
     # Use multiprocessing to isolate the execution
     manager = multiprocessing.Manager()
     result_dict = manager.dict()
-    
+
     def target_func(result_container):
         try:
             # Execute the code with the provided function
@@ -240,17 +259,19 @@ def _execute_code_in_process(execute_func: Callable, args: Tuple, timeout: int =
             result_container.update(result)
         except Exception as e:
             error_traceback = traceback.format_exc()
-            result_container.update({
-                "success": False,
-                "output": None,
-                "error": f"Execution error: {str(e)}\n{error_traceback}"
-            })
-    
+            result_container.update(
+                {
+                    "success": False,
+                    "output": None,
+                    "error": f"Execution error: {str(e)}\n{error_traceback}",
+                }
+            )
+
     # Create and start the process
     process = multiprocessing.Process(target=target_func, args=(result_dict,))
     process.start()
     process.join(timeout=timeout + 0.5)  # Add a small buffer to the timeout
-    
+
     # If the process is still running, terminate it
     if process.is_alive():
         process.terminate()
@@ -260,28 +281,28 @@ def _execute_code_in_process(execute_func: Callable, args: Tuple, timeout: int =
         return {
             "success": False,
             "output": None,
-            "error": f"Timeout: execution timed out after {timeout} seconds"
+            "error": f"Timeout: execution timed out after {timeout} seconds",
         }
-    
+
     # If process died without updating result_dict
     if not result_dict:
         return {
             "success": False,
             "output": None,
-            "error": "Execution failed without producing any output"
+            "error": "Execution failed without producing any output",
         }
-    
+
     return dict(result_dict)
 
 
 def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     Inner function to execute Python code in a subprocess.
-    
+
     Args:
         code: Python code to execute
         timeout: Maximum execution time in seconds
-        
+
     Returns:
         Dictionary with execution results
     """
@@ -289,7 +310,7 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
         # Create temporary file for the code
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp_file:
             temp_file_path = temp_file.name
-            
+
             # Add imports and reliability guard
             safe_code = (
                 "import sys\n"
@@ -327,16 +348,16 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
                 # User's code
                 + code
             )
-            
+
             temp_file.write(safe_code.encode("utf-8"))
-        
+
         # Set up signal handler for timeout
         def timeout_handler(signum, frame):
             raise TimeoutError(f"Execution timed out after {timeout} seconds")
-            
+
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(timeout)
-        
+
         try:
             # Execute in a separate process
             process = subprocess.Popen(
@@ -345,14 +366,16 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
                 stderr=subprocess.PIPE,
                 text=True,
                 # Limit resource usage
-                preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout + 1))
+                preexec_fn=lambda: resource.setrlimit(
+                    resource.RLIMIT_CPU, (timeout, timeout + 1)
+                ),
             )
-            
+
             stdout, stderr = process.communicate()
-            
+
             # Cancel the alarm
             signal.alarm(0)
-            
+
             if process.returncode == 0:
                 return {"success": True, "output": stdout.strip(), "error": None}
             else:
@@ -368,9 +391,9 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     except Exception as e:
         error_traceback = traceback.format_exc()
         return {
-            "success": False, 
-            "output": None, 
-            "error": f"Setup error: {str(e)}\n{error_traceback}"
+            "success": False,
+            "output": None,
+            "error": f"Setup error: {str(e)}\n{error_traceback}",
         }
 
 
@@ -387,20 +410,18 @@ def execute_python_code(code: str, timeout: int = 5) -> Dict[str, Any]:
     """
     # Execute the code in a separate process with timeouts and resource limits
     return _execute_code_in_process(
-        _execute_python_in_subprocess, 
-        args=(code, timeout), 
-        timeout=timeout
+        _execute_python_in_subprocess, args=(code, timeout), timeout=timeout
     )
 
 
 def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     Inner function to execute JavaScript code in a subprocess.
-    
+
     Args:
         code: JavaScript code to execute
         timeout: Maximum execution time in seconds
-        
+
     Returns:
         Dictionary with execution results
     """
@@ -418,7 +439,7 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
         # Create temporary file for the code
         with tempfile.NamedTemporaryFile(suffix=".js", delete=False) as temp_file:
             temp_file_path = temp_file.name
-            
+
             # Add safety wrapper around the code to prevent dangerous operations
             safe_code = (
                 "// Safety wrapper to prevent dangerous operations\n"
@@ -454,16 +475,16 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 "  process.exitCode = 1; // Set non-zero exit code to indicate failure\n"
                 "}\n"
             )
-            
+
             temp_file.write(safe_code.encode("utf-8"))
-        
+
         # Set up signal handler for timeout
         def timeout_handler(signum, frame):
             raise TimeoutError(f"Execution timed out after {timeout} seconds")
-        
+
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(timeout)
-        
+
         try:
             # Execute in a separate process
             process = subprocess.Popen(
@@ -472,12 +493,12 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            
+
             stdout, stderr = process.communicate()
-            
+
             # Cancel the alarm
             signal.alarm(0)
-            
+
             if process.returncode == 0:
                 return {"success": True, "output": stdout.strip(), "error": None}
             else:
@@ -490,13 +511,13 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
             signal.alarm(0)
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
-    
+
     except Exception as e:
         error_traceback = traceback.format_exc()
         return {
-            "success": False, 
-            "output": None, 
-            "error": f"Setup error: {str(e)}\n{error_traceback}"
+            "success": False,
+            "output": None,
+            "error": f"Setup error: {str(e)}\n{error_traceback}",
         }
 
 
@@ -513,9 +534,7 @@ def execute_javascript_code(code: str, timeout: int = 5) -> Dict[str, Any]:
     """
     # Execute the code in a separate process with timeouts and resource limits
     return _execute_code_in_process(
-        _execute_javascript_in_subprocess, 
-        args=(code, timeout), 
-        timeout=timeout
+        _execute_javascript_in_subprocess, args=(code, timeout), timeout=timeout
     )
 
 
@@ -729,42 +748,348 @@ def noop(*args: Any, **kwargs: Any) -> Any:
     return None
 
 
+def execute_code_with_e2b(
+    code: str,
+    language: str = "python",
+    timeout: int = 30,
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Execute code within an E2B sandbox.
+
+    Args:
+        code: Code to execute
+        language: Programming language of the code ("python", "javascript", etc.)
+        timeout: Maximum execution time in seconds
+        api_key: Optional E2B API key (if not provided, will use E2B_API_KEY env var)
+
+    Returns:
+        Dictionary with execution results
+    """
+    if not _HAS_E2B:
+        return {
+            "success": False,
+            "output": None,
+            "error": "E2B package not installed. Install with: pip install e2b",
+        }
+
+    try:
+        # Initialize sandbox with the provided API key or use environment variable
+        sandbox = Sandbox(api_key=api_key)
+
+        # Capture stdout and stderr
+        stdout = []
+        stderr = []
+
+        def capture_stdout(output):
+            if hasattr(output, 'line'):
+                stdout.append(output.line)
+            else:
+                stdout.append(str(output))
+
+        def capture_stderr(output):
+            if hasattr(output, 'line'):
+                stderr.append(output.line)
+            else:
+                stderr.append(str(output))
+
+        # Create file based on language
+        if language.lower() in ["python", "py"]:
+            file_path = "/code/script.py"
+            cmd = "python3 /code/script.py"
+        elif language.lower() in ["javascript", "js"]:
+            file_path = "/code/script.js"
+            cmd = "node /code/script.js"
+        else:
+            return {
+                "success": False,
+                "output": None,
+                "error": f"Unsupported language for E2B: {language}",
+            }
+
+        # Write code to file in sandbox
+        try:
+            # Create directory if it doesn't exist
+            try:
+                sandbox.files.mkdir("/code")
+            except Exception:
+                # Directory might already exist, ignore error
+                pass
+            
+            # Write code to file
+            sandbox.files.write(file_path, code)
+        except Exception as e:
+            return {
+                "success": False,
+                "output": None,
+                "error": f"Failed to write code to sandbox: {str(e)}",
+            }
+
+        # Execute code
+        try:
+            # Use the commands interface to run the code
+            result = sandbox.commands.run(
+                cmd,
+                on_stdout=capture_stdout,
+                on_stderr=capture_stderr,
+                timeout=timeout
+            )
+
+            # Combine captured output
+            output = "\n".join(stdout)
+            error_output = "\n".join(stderr)
+
+            # Clean up sandbox
+            try:
+                sandbox.close()
+            except Exception:
+                pass
+
+            if result.exit_code == 0:
+                return {"success": True, "output": output, "error": None}
+            else:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Process exited with code {result.exit_code}: {error_output}",
+                }
+
+        except Exception as e:
+            # Ensure sandbox is closed even if execution fails
+            try:
+                sandbox.close()
+            except Exception:
+                pass
+
+            return {
+                "success": False,
+                "output": None,
+                "error": f"Execution error: {str(e)}",
+            }
+
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        return {
+            "success": False,
+            "output": None,
+            "error": f"E2B setup error: {str(e)}\n{error_traceback}",
+        }
+
+
+def e2b_code_execution_reward(
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
+    expected_output: Optional[str] = None,
+    language: str = "python",
+    timeout: int = 30,
+    api_key: Optional[str] = None,
+    **kwargs,
+) -> RewardOutput:
+    """
+    Evaluate code correctness by executing it in E2B sandbox and comparing the output.
+
+    E2B provides a secure, cloud-based sandbox for executing code safely.
+
+    Args:
+        messages: Generated conversation messages
+        original_messages: Original conversation context (optional)
+        expected_output: Expected output from code execution
+        language: Programming language of the code ("python", "javascript", etc.)
+        timeout: Maximum execution time in seconds
+        api_key: Optional E2B API key (if not provided, will use E2B_API_KEY env var)
+        **kwargs: Additional keyword arguments
+
+    Returns:
+        RewardOutput with score and metrics
+    """
+    if not _HAS_E2B:
+        return RewardOutput(
+            score=0.0,
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0,
+                    reason="E2B package not installed. Install with: pip install e2b",
+                )
+            },
+        )
+
+    # Check for E2B API key in environment variables if not provided
+    if api_key is None and os.environ.get("E2B_API_KEY") is None:
+        return RewardOutput(
+            score=0.0,
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0,
+                    reason="E2B API key is required. Set the E2B_API_KEY environment variable or provide api_key parameter.",
+                )
+            },
+        )
+
+    # Initialize metrics dictionary for tracking various aspects of the execution
+    metrics = {}
+
+    # Extract the last assistant message
+    if not messages:
+        return RewardOutput(
+            score=0.0,
+            metrics={
+                "error": MetricRewardOutput(score=0.0, reason="No messages provided")
+            },
+        )
+
+    last_message = messages[-1]
+
+    # Check role of the last message
+    if last_message.get("role") != "assistant":
+        return RewardOutput(
+            score=0.0,
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0, reason="Last message is not from assistant"
+                )
+            },
+        )
+
+    # Extract code blocks from the message
+    code_blocks = extract_code_blocks(last_message.get("content", ""), language)
+
+    if not code_blocks:
+        return RewardOutput(
+            score=0.0,
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0, reason=f"No {language} code blocks found in message"
+                )
+            },
+        )
+
+    # Extract expected output if not provided directly
+    if expected_output is None and original_messages:
+        # Try to find expected output in the original messages
+        for msg in original_messages:
+            if msg.get("role") == "user":
+                # Look for expected output patterns like "Expected output:" or "Output:"
+                content = msg.get("content", "")
+                output_patterns = [
+                    r"Expected output:?\s*([\s\S]+)",
+                    r"Output:?\s*([\s\S]+)",
+                    r"Result:?\s*([\s\S]+)",
+                    r"Should (output|return|print):?\s*([\s\S]+)",
+                ]
+
+                for pattern in output_patterns:
+                    match = re.search(pattern, content)
+                    if match:
+                        # Use group 1 or 2 depending on the pattern
+                        expected_output = (
+                            match.group(2)
+                            if len(match.groups()) > 1 and match.group(2)
+                            else match.group(1)
+                        )
+                        expected_output = expected_output.strip()
+                        break
+
+                if expected_output:
+                    break
+
+    # Use the first code block for execution
+    code = code_blocks[0]["code"]
+
+    # Log the extracted code
+    metrics["extracted_code"] = MetricRewardOutput(
+        score=0.0,  # Not a real score
+        reason=f"Extracted code:\n```{language}\n{code}\n```",
+    )
+
+    # Add expected output to metrics if available
+    if expected_output:
+        metrics["expected_output"] = MetricRewardOutput(
+            score=0.0,  # Not a real score
+            reason=f"Expected output:\n{expected_output}",
+        )
+
+    # Execute the code in E2B sandbox
+    execution_result = execute_code_with_e2b(
+        code=code, language=language, timeout=timeout, api_key=api_key
+    )
+
+    # Check execution result
+    if execution_result["success"]:
+        output = execution_result["output"]
+
+        metrics["execution_result"] = MetricRewardOutput(
+            score=1.0,
+            reason=f"Code executed successfully in E2B sandbox with output:\n{output}",
+        )
+
+        # Compare with expected output if provided
+        if expected_output:
+            similarity = compare_outputs(output, expected_output)
+            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
+
+            metrics["output_match"] = MetricRewardOutput(
+                score=similarity, reason=match_reason
+            )
+
+            return RewardOutput(score=similarity, metrics=metrics)
+
+        # No expected output provided, score based on successful execution
+        return RewardOutput(score=1.0, metrics=metrics)
+    else:
+        # Execution failed
+        error = execution_result["error"]
+
+        metrics["execution_result"] = MetricRewardOutput(
+            score=0.0,
+            reason=f"Code execution failed in E2B sandbox with error:\n{error}",
+        )
+
+        return RewardOutput(score=0.0, metrics=metrics)
+
+
 def reliability_guard(maximum_memory_bytes: Optional[int] = None) -> None:
     """
     Disable various destructive functions and prevent the generated code
     from interfering with the test system.
-    
+
     This sets resource limits and disables various system calls that could
     be used to interfere with the testing environment.
 
     Args:
         maximum_memory_bytes: Maximum memory allocation allowed in bytes (optional)
-    
+
     Warning:
-        This function is NOT a security sandbox. Untrusted code should not be 
+        This function is NOT a security sandbox. Untrusted code should not be
         blindly executed outside of a proper sandbox environment.
     """
     # Set memory limits if specified
     if maximum_memory_bytes is not None:
         if platform.uname().system != "Darwin":  # not MacOS
-            resource.setrlimit(resource.RLIMIT_AS, (maximum_memory_bytes, maximum_memory_bytes))
-            resource.setrlimit(resource.RLIMIT_DATA, (maximum_memory_bytes, maximum_memory_bytes))
-            resource.setrlimit(resource.RLIMIT_STACK, (maximum_memory_bytes, maximum_memory_bytes))
-    
+            resource.setrlimit(
+                resource.RLIMIT_AS, (maximum_memory_bytes, maximum_memory_bytes)
+            )
+            resource.setrlimit(
+                resource.RLIMIT_DATA, (maximum_memory_bytes, maximum_memory_bytes)
+            )
+            resource.setrlimit(
+                resource.RLIMIT_STACK, (maximum_memory_bytes, maximum_memory_bytes)
+            )
+
     # Disable faulthandler to avoid unwanted crash dumps
     faulthandler.disable()
-    
+
     # Type ignores are needed because we're deliberately breaking type safety
     # to prevent dangerous operations in child processes
-    
+
     # Disable destructive functions in builtins
     import builtins
+
     builtins.exit = noop  # type: ignore
     builtins.quit = noop  # type: ignore
-    
+
     # Disable threading/parallelism for resource control
     os.environ["OMP_NUM_THREADS"] = "1"
-    
+
     # Instead of completely nullifying functions, we'll replace them with noop
     # This preserves the callable interface while making them do nothing
     os.kill = noop  # type: ignore
@@ -788,33 +1113,34 @@ def reliability_guard(maximum_memory_bytes: Optional[int] = None) -> None:
     os.chmod = noop  # type: ignore
     os.chown = noop  # type: ignore
     os.chroot = noop  # type: ignore
-    
+
     # Only disable these if they exist
-    if hasattr(os, 'lchflags'):
+    if hasattr(os, "lchflags"):
         os.lchflags = noop  # type: ignore
-    if hasattr(os, 'lchmod'):
+    if hasattr(os, "lchmod"):
         os.lchmod = noop  # type: ignore
-    if hasattr(os, 'lchown'):
+    if hasattr(os, "lchown"):
         os.lchown = noop  # type: ignore
-        
+
     # These are read-only functions that we'll keep as is
     # os.getcwd = noop  # type: ignore
     # os.chdir = noop  # type: ignore
-    
+
     # Disable shutil functions
     import shutil
+
     shutil.rmtree = noop  # type: ignore
     shutil.move = noop  # type: ignore
     shutil.chown = noop  # type: ignore
-    
+
     # We don't disable subprocess completely because we need it for our own code
     # but we could disable it in the sandboxed environment
-    
+
     # Create empty modules for potentially dangerous imports
     class EmptyModule:
         def __getattr__(self, name: str) -> Any:
             return noop
-            
+
     # Disable dangerous modules
     for mod_name in ["ipdb", "joblib", "psutil", "tkinter"]:
         if mod_name not in sys.modules:
@@ -824,17 +1150,18 @@ def reliability_guard(maximum_memory_bytes: Optional[int] = None) -> None:
 class Capturing(list):
     """
     Context manager for capturing stdout output.
-    
-    This class captures all output to stdout and stores it in a list, 
+
+    This class captures all output to stdout and stores it in a list,
     allowing for the examination of output from executed code.
     """
+
     def __enter__(self):
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
         # Make closing the StringIO a no-op
         self._stringio.close = lambda x: None
         return self
-    
+
     def __exit__(self, *args):
         self.append(self._stringio.getvalue())
         del self._stringio  # free up some memory

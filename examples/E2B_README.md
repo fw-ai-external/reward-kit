@@ -1,0 +1,101 @@
+# E2B Code Execution Examples
+
+This directory contains examples demonstrating how to use the E2B code execution reward function to evaluate code by running it in the E2B cloud sandbox.
+
+## Setup
+
+To run these examples, you need:
+
+1. An E2B API key, which you can get from [E2B Dashboard](https://e2b.dev/dashboard)
+2. The `e2b_code_interpreter` Python package installed: `pip install e2b_code_interpreter`
+
+Note: While the code supports both the `e2b` and `e2b_code_interpreter` packages, we recommend using `e2b_code_interpreter` as it provides a more consistent interface specifically designed for code execution.
+
+## Examples
+
+### Basic Python Example
+
+This example demonstrates how to evaluate a Python function that calculates the factorial of a number:
+
+```bash
+python e2b_reward_example.py --api-key YOUR_E2B_API_KEY
+```
+
+### JavaScript Example
+
+This example demonstrates how to evaluate a JavaScript function that checks if a string is a palindrome:
+
+```bash
+python e2b_javascript_example.py --api-key YOUR_E2B_API_KEY
+```
+
+### Auto-Extract Example
+
+This example demonstrates how to let the reward function automatically extract the expected output from the prompt:
+
+```bash
+python e2b_auto_extract_example.py --api-key YOUR_E2B_API_KEY
+```
+
+### Fallback Example
+
+This example demonstrates how to gracefully fall back to local execution when an E2B API key is not available:
+
+```bash
+# Run with E2B if API key is provided
+python e2b_fallback_example.py --api-key YOUR_E2B_API_KEY
+
+# Or run locally if no API key is provided
+python e2b_fallback_example.py
+```
+
+## Environment Variable
+
+Instead of passing the API key as a command-line argument, you can set the `E2B_API_KEY` environment variable:
+
+```bash
+export E2B_API_KEY=your_api_key_here
+python e2b_reward_example.py
+```
+
+## Integration with Custom Applications
+
+You can integrate the E2B code execution reward function into your own applications by importing it:
+
+```python
+from reward_kit.rewards.code_execution import e2b_code_execution_reward
+
+# Evaluate code
+result = e2b_code_execution_reward(
+    messages=messages,
+    expected_output="expected result",
+    language="python",
+    api_key="your_api_key",
+    timeout=10
+)
+
+# Use the results
+print(f"Score: {result.score}")
+print(f"Execution result: {result.metrics['execution_result'].reason}")
+```
+
+## Supported Languages
+
+The E2B code execution reward function currently supports:
+
+- Python (`language="python"`)
+- JavaScript (`language="javascript"` or `language="js"`)
+
+## Outputs
+
+The reward function returns a `RewardOutput` object with:
+
+- `score`: A float between 0.0 and 1.0 indicating how well the code performed
+- `metrics`: A dictionary of metrics with details about the execution
+
+Key metrics include:
+
+- `extracted_code`: The code that was extracted and executed
+- `expected_output`: The expected output (if provided or extracted)
+- `execution_result`: Details about the execution (success or failure)
+- `output_match`: Comparison between actual and expected outputs (if both are available)

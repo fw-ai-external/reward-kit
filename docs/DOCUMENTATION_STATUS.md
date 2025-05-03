@@ -11,6 +11,12 @@
 ### Examples
 - ✅ **Basic Reward Function**: Simple example evaluating response clarity
 - ✅ **Advanced Reward Functions**: Multiple metrics, combining reward functions
+- ✅ **Reward Functions Overview**: Overview of all out-of-the-box reward functions
+- ✅ **Code Execution Evaluation**: Local code execution for Python and JavaScript
+- ✅ **Code Execution with E2B**: Cloud-based code execution using E2B sandbox
+- ✅ **Function Calling Evaluation**: Validation of function calls using schemas and LLM judges
+- ✅ **JSON Schema Validation**: Validation of JSON outputs against schemas
+- ✅ **Math Evaluation**: Evaluation of mathematical answers with various formats
 
 ### Tutorials
 - ✅ **Creating Your First Reward Function**: Step-by-step guide to building a reward function

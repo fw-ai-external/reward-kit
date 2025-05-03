@@ -1,0 +1,371 @@
+# JSON Schema Validation
+
+This guide demonstrates how to validate JSON outputs from LLM responses against a defined schema.
+
+## Overview
+
+The JSON Schema reward functions allow you to:
+
+1. Extract JSON data from LLM responses
+2. Validate it against a predefined JSON Schema
+3. Get detailed validation metrics and error reports
+4. Score models based on schema adherence
+
+## Prerequisites
+
+Before using the JSON Schema validation rewards, ensure you have:
+
+1. **Python 3.8+** installed on your system
+2. **Reward Kit** installed: `pip install reward-kit`
+3. **jsonschema** package (installed automatically with Reward Kit)
+
+## Basic Usage
+
+Here's a simple example of how to use the JSON Schema validation:
+
+```python
+from reward_kit.rewards.json_schema import json_schema_reward
+import json
+
+# Define a JSON schema for a person object
+person_schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer", "minimum": 0},
+        "email": {"type": "string", "format": "email"},
+        "interests": {"type": "array", "items": {"type": "string"}}
+    },
+    "required": ["name", "age", "email"]
+}
+
+# Example conversation with an LLM
+messages = [
+    {
+        "role": "user",
+        "content": "Create a JSON object for a person with name, age, email, and interests."
+    },
+    {
+        "role": "assistant",
+        "content": """Here's a JSON object for a person:
+
+```json
+{
+  "name": "Jane Smith",
+  "age": 32,
+  "email": "jane.smith@example.com",
+  "interests": ["hiking", "photography", "machine learning"]
+}
+```
+
+This includes all the requested fields with sample data."""
+    }
+]
+
+# Validate the JSON against the schema
+result = json_schema_reward(
+    messages=messages,
+    schema=person_schema
+)
+
+# Print the results
+print(f"Overall score: {result.score}")
+print("Metrics:")
+for name, metric in result.metrics.items():
+    print(f"  {name}: {metric.score}")
+    print(f"    {metric.reason}")
+```
+
+## How It Works
+
+The JSON Schema validation reward function:
+
+1. Extracts JSON data from the last assistant message using regex
+2. Parses the extracted JSON string into a Python object
+3. Validates the object against the provided JSON Schema
+4. Returns detailed metrics about validation success or errors
+5. Provides an overall score based on validation results
+
+## Advanced Usage
+
+### Custom JSON Extraction
+
+You can provide a custom function to extract JSON from messages:
+
+```python
+from reward_kit.rewards.json_schema import json_schema_reward
+import json
+import re
+
+# Custom extractor that looks for JSON in specific format
+def my_json_extractor(message):
+    pattern = r"USER DATA:\s*```json\s*([\s\S]*?)\s*```"
+    match = re.search(pattern, message)
+    if match:
+        return match.group(1)
+    return None
+
+# Messages with custom JSON format
+messages = [
+    {"role": "user", "content": "Format user data for Jane Smith."},
+    {"role": "assistant", "content": """Here is the formatted user data:
+
+USER DATA: ```json
+{
+  "name": "Jane Smith",
+  "age": 32,
+  "email": "jane.smith@example.com"
+}
+```
+
+The data has been formatted according to the requirements."""}
+]
+
+# Use custom extractor
+result = json_schema_reward(
+    messages=messages,
+    schema=person_schema,
+    json_extractor=my_json_extractor
+)
+```
+
+### Handling Multiple JSON Objects
+
+If multiple JSON objects are present, you can specify which one to validate:
+
+```python
+from reward_kit.rewards.json_schema import json_schema_reward
+
+# Message with multiple JSON objects
+messages = [
+    {"role": "user", "content": "Generate JSON for a person and their pet."},
+    {"role": "assistant", "content": """Here are the requested JSON objects:
+
+Person:
+```json
+{
+  "name": "John Doe",
+  "age": 35,
+  "email": "john.doe@example.com"
+}
+```
+
+Pet:
+```json
+{
+  "name": "Buddy",
+  "species": "dog",
+  "age": 5
+}
+```
+
+Both objects follow the standard format."""}
+]
+
+# Validate only the first JSON object
+result = json_schema_reward(
+    messages=messages,
+    schema=person_schema,
+    json_index=0  # 0-based index for which JSON object to validate
+)
+```
+
+### Direct JSON String Validation
+
+You can also validate a JSON string directly:
+
+```python
+from reward_kit.rewards.json_schema import validate_json_string
+
+# JSON string to validate
+json_str = """
+{
+  "name": "Alice Johnson",
+  "age": 28,
+  "email": "alice@example.com",
+  "interests": ["coding", "chess"]
+}
+"""
+
+# Validate directly
+result = validate_json_string(
+    json_str=json_str,
+    schema=person_schema
+)
+
+print(f"Valid: {result['valid']}")
+if not result['valid']:
+    print(f"Errors: {result['errors']}")
+```
+
+### Multiple Schema Requirements
+
+For more complex requirements, you can specify an array of valid schemas:
+
+```python
+from reward_kit.rewards.json_schema import json_schema_reward
+
+# Define two valid schemas
+schemas = [
+    # Schema for regular users
+    {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": 18},
+            "email": {"type": "string", "format": "email"},
+            "role": {"type": "string", "enum": ["user"]}
+        },
+        "required": ["name", "email", "role"]
+    },
+    # Schema for admin users
+    {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "email": {"type": "string", "format": "email"},
+            "role": {"type": "string", "enum": ["admin"]},
+            "permissions": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["name", "email", "role", "permissions"]
+    }
+]
+
+# Message with JSON that should conform to one of the schemas
+messages = [
+    {"role": "user", "content": "Create JSON for an admin user."},
+    {"role": "assistant", "content": """Here's the admin user JSON:
+
+```json
+{
+  "name": "Admin User",
+  "email": "admin@example.com",
+  "role": "admin",
+  "permissions": ["read", "write", "delete"]
+}
+```
+
+This follows the admin schema with the required permissions."""}
+]
+
+# Validate against multiple schemas (passes if valid against any schema)
+result = json_schema_reward(
+    messages=messages,
+    schema=schemas,
+    require_all_valid=False  # Only need to be valid against one schema
+)
+```
+
+## Use Cases
+
+### Data Formatting Validation
+
+Use JSON Schema validation to ensure LLMs generate data in the correct format for:
+
+- API request/response bodies
+- Configuration files
+- Data interchange formats
+- Application settings
+
+### Structured Output Generation
+
+Validate structured outputs for:
+
+- Database records
+- User profiles
+- Product catalogs
+- Event descriptions
+- Log entries
+
+### Response Normalization
+
+Ensure various models produce outputs in a standardized format:
+
+```python
+from reward_kit.rewards.json_schema import json_schema_reward
+import json
+
+# Define schema for product data
+product_schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "price": {"type": "number", "minimum": 0},
+        "category": {"type": "string"},
+        "available": {"type": "boolean"}
+    },
+    "required": ["name", "price", "category", "available"]
+}
+
+# Test different models with the same prompt
+models = ["model-a", "model-b", "model-c"]
+model_scores = {}
+
+for model in models:
+    # Get response from model (example responses)
+    if model == "model-a":
+        response = """```json
+{
+  "name": "Wireless Headphones",
+  "price": 79.99,
+  "category": "Electronics",
+  "available": true,
+  "description": "Noise-cancelling wireless headphones"
+}
+```"""
+    elif model == "model-b":
+        response = """```json
+{
+  "name": "Wireless Headphones",
+  "price": "79.99",  // Incorrect type - string instead of number
+  "category": "Electronics",
+  "available": true
+}
+```"""
+    else:
+        response = """```json
+{
+  "productName": "Wireless Headphones",  // Wrong field name
+  "price": 79.99,
+  "category": "Electronics"
+  // Missing required field: available
+}
+```"""
+    
+    # Create message
+    messages = [
+        {"role": "user", "content": "Generate JSON for wireless headphones product"},
+        {"role": "assistant", "content": response}
+    ]
+    
+    # Validate against schema
+    result = json_schema_reward(messages=messages, schema=product_schema)
+    model_scores[model] = result.score
+
+# Compare model performance
+print("JSON Schema Validation Scores:")
+for model, score in model_scores.items():
+    print(f"{model}: {score:.2f}")
+```
+
+## Best Practices
+
+1. **Clear Schemas**: Define schemas with precise types and constraints
+2. **Required Fields**: Explicitly specify which fields are required
+3. **Helpful Error Messages**: Include good descriptions in schema for better error messages
+4. **Nested Validation**: Use nested schemas for complex data structures
+5. **Alternative Schemas**: Consider using anyOf/oneOf for flexible validation
+6. **Test with Examples**: Validate schema against known good and bad examples
+
+## Limitations
+
+- Cannot evaluate the quality or usefulness of the content, only its structure
+- Requires properly formatted JSON to validate
+- Some aspects of data quality (like whether values are reasonable) may require custom checks
+
+## Next Steps
+
+- Learn about [Function Calling Evaluation](function_calling_evaluation.md) for validating function calls
+- Explore [Code Execution Evaluation](code_execution_with_e2b.md) for evaluating code solutions
+- See [Creating Custom Reward Functions](../tutorials/creating_your_first_reward_function.md) to build custom validation logic

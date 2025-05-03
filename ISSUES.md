@@ -80,6 +80,9 @@ For both of these we need to write very comprehensive tests, and then we need to
 1. Update `reward_kit/rewards/__init__.py` to import the new modules ✅
 2. Add proper documentation in the code ✅
 3. Update docs directory and example files ✅
+   - Created comprehensive documentation for all out-of-the-box reward functions ✅
+   - Added overview document listing all available reward functions ✅
+   - Updated main documentation index with links to all new documentation ✅
 
 #### Dependencies: ✅
 1. For local execution: Used built-in Python packages for secure code execution ✅

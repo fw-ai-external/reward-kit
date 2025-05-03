@@ -360,25 +360,31 @@ def legacy_reward_function(func: T) -> T:
             account_id, auth_token = get_authentication()
             
             # Override with config values if provided
-            if config.get("account_id"):
-                account_id = config.get("account_id")
-            if config.get("auth_token"):
-                auth_token = config.get("auth_token")
+            account_id_override = config.get("account_id")
+            if account_id_override is not None:
+                account_id = account_id_override
+            auth_token_override = config.get("auth_token")
+            if auth_token_override is not None:
+                auth_token = auth_token_override
         except ImportError:
             # Fallback to direct authentication if relative import fails
             from reward_kit.auth import get_authentication
             account_id, auth_token = get_authentication()
             
             # Override with config values if provided
-            if config.get("account_id"):
-                account_id = config.get("account_id")
-            if config.get("auth_token"):
-                auth_token = config.get("auth_token")
+            account_id_override = config.get("account_id")
+            if account_id_override is not None:
+                account_id = account_id_override
+            auth_token_override = config.get("auth_token")
+            if auth_token_override is not None:
+                auth_token = auth_token_override
         except Exception as e:
             logger.error(f"Error getting authentication: {str(e)}")
             # Fallback to the old approach
-            account_id = config.get("account_id")
-            auth_token = config.get("auth_token")
+            account_id_override = config.get("account_id")
+            auth_token_override = config.get("auth_token")
+            account_id = account_id_override if account_id_override is not None else ""
+            auth_token = auth_token_override if auth_token_override is not None else ""
 
             # If not provided directly, try to load from config files
             if not account_id or not auth_token:
@@ -408,7 +414,9 @@ def legacy_reward_function(func: T) -> T:
                 )
 
             if not auth_token:
-                auth_token = os.environ.get("FIREWORKS_API_KEY")
+                auth_token_env = os.environ.get("FIREWORKS_API_KEY")
+                if auth_token_env is not None:
+                    auth_token = auth_token_env
                 if not auth_token:
                     raise ValueError(
                         "Authentication token not found. Please run 'firectl signin' or set FIREWORKS_API_KEY"

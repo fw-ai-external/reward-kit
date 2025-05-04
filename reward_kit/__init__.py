@@ -3,6 +3,9 @@ Fireworks Reward Kit - Simplify reward modeling for LLM RL fine-tuning.
 
 A Python library for defining, testing, deploying, and using reward functions
 for LLM fine-tuning, including launching full RL jobs on the Fireworks platform.
+
+The library also provides an agent evaluation framework for testing and evaluating
+tool-augmented models using self-contained task bundles.
 """
 
 __version__ = "0.2.0"
@@ -22,6 +25,9 @@ from .reward_function import RewardFunction, reward_function as legacy_reward_fu
 # Import the decorator from typed_interface (this is the one we want to expose)
 from .typed_interface import reward_function
 
+# Import key agent evaluation components
+from .agent import ToolRegistry, AgentEvaluator, Database
+
 __all__ = [
     # Original classes
     "RewardOutput",
@@ -33,4 +39,8 @@ __all__ = [
     "MetricResult",
     "EvaluateResult",
     "reward_function",  # New decorator from typed_interface
+    # Agent evaluation
+    "ToolRegistry",
+    "AgentEvaluator",
+    "Database",
 ]

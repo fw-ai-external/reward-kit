@@ -61,29 +61,26 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
                 else:
                     # It's a dictionary, convert to Message
                     role = msg.get("role", "")
-                    content = msg.get("content", "")
-
-                    if role == "system":
-                        typed_messages.append(Message(role=role, content=content))
-                    elif role == "user":
-                        typed_messages.append(Message(role=role, content=content))
-                    elif role == "assistant":
-                        typed_messages.append(Message(role=role, content=content))
-                    elif role == "tool":
-                        typed_messages.append(
-                            Message(
-                                role=role,
-                                content=content,
-                                tool_call_id=msg.get("tool_call_id", ""),
-                            )
-                        )
+                    content = msg.get("content", "")  # Default to empty string if None
+                    
+                    # Common message parameters
+                    message_params = {"role": role}
+                    
+                    # Add content only if it exists (can be None for tool calls)
+                    if "content" in msg:
+                        message_params["content"] = content if content is not None else ""
+                    
+                    # Add role-specific parameters
+                    if role == "tool":
+                        message_params["tool_call_id"] = msg.get("tool_call_id", "")
+                        message_params["name"] = msg.get("name", "")
                     elif role == "function":
-                        typed_messages.append(
-                            Message(role=role, content=content, name=msg.get("name", ""))
-                        )
-                    else:
-                        # Unknown role type, convert as best we can
-                        typed_messages.append(Message(**msg))
+                        message_params["name"] = msg.get("name", "")
+                    elif role == "assistant" and "tool_calls" in msg:
+                        message_params["tool_calls"] = msg.get("tool_calls")
+                        
+                    # Create the message object
+                    typed_messages.append(Message(**message_params))
         except Exception as err:
             raise ValueError(f"Input messages failed validation:\n{err}") from None
 

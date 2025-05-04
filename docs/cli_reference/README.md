@@ -1,6 +1,6 @@
 # Command Line Interface Reference
 
-The Reward Kit provides a command-line interface (CLI) for common operations like previewing evaluations and deploying reward functions.
+The Reward Kit provides a command-line interface (CLI) for common operations like previewing evaluations, deploying reward functions, and running agent evaluations.
 
 ## Installation
 
@@ -34,6 +34,7 @@ The Reward Kit CLI supports the following main commands:
 
 - `preview`: Preview an evaluation with sample data
 - `deploy`: Deploy a reward function as an evaluator
+- `agent-eval`: Run agent evaluations on task bundles 
 - `list`: List existing evaluators (coming soon)
 - `delete`: Delete an evaluator (coming soon)
 
@@ -177,13 +178,86 @@ reward-kit deploy --id my-evaluator \
   --providers '[{"providerType":"anthropic","modelId":"claude-3-sonnet-20240229"}]'
 ```
 
+## Agent-Eval Command
+
+The `agent-eval` command enables you to run agent evaluations using task bundles.
+
+### Syntax
+
+```bash
+reward-kit agent-eval [options]
+```
+
+### Options
+
+#### Task Specification:
+- `--task-dir`: Path to task bundle directory containing reward.py, tools.py, etc.
+- `--dataset` or `-d`: Path to JSONL file containing task specifications.
+
+#### Output and Models:
+- `--output-dir` or `-o`: Directory to store evaluation runs (default: "./runs").
+- `--model`: Override MODEL_AGENT environment variable.
+- `--sim-model`: Override MODEL_SIM environment variable for simulated user.
+
+#### Testing and Debugging:
+- `--no-sim-user`: Disable simulated user (use static initial messages only).
+- `--test-mode`: Run in test mode without requiring API keys.
+- `--mock-response`: Use a mock agent response (works with --test-mode).
+- `--debug`: Enable detailed debug logging.
+- `--validate-only`: Validate task bundle structure without running evaluation.
+- `--export-tools`: Export tool specifications to directory for manual testing.
+
+#### Advanced Options:
+- `--task-ids`: Comma-separated list of task IDs to run.
+- `--max-tasks`: Maximum number of tasks to evaluate.
+- `--registries`: Custom tool registries in format 'name=path'.
+- `--registry-override`: Override all toolset paths with this registry path.
+- `--evaluator`: Custom evaluator module path (overrides default).
+
+### Examples
+
+```bash
+# Run agent evaluation with default settings
+export MODEL_AGENT=openai/gpt-4o-mini
+reward-kit agent-eval --task-dir examples/flight_task
+
+# Use a specific dataset file
+reward-kit agent-eval --dataset examples/flight_task/task.jsonl
+
+# Run in test mode (no API keys required)
+reward-kit agent-eval --task-dir examples/flight_task --test-mode --mock-response
+
+# Validate task bundle structure without running
+reward-kit agent-eval --task-dir examples/flight_task --validate-only
+
+# Use a custom model and limit to specific tasks
+reward-kit agent-eval --task-dir examples/flight_task \
+  --model anthropic/claude-3-opus-20240229 \
+  --task-ids flight.booking.001,flight.booking.002
+
+# Export tool specifications for manual testing
+reward-kit agent-eval --task-dir examples/flight_task --export-tools ./tool_specs
+```
+
+### Task Bundle Structure
+
+A task bundle is a directory containing the following files:
+- `reward.py`: Reward function with @reward_function decorator
+- `tools.py`: Tool registry with tool definitions
+- `task.jsonl`: Dataset rows with task specifications
+- `seed.sql` (optional): Initial database state
+
+See the [Agent Evaluation](../developer_guide/agent_evaluation.md) guide for more details.
+
 ## Environment Variables
 
 The CLI recognizes the following environment variables:
 
-- `FIREWORKS_API_KEY`: Your Fireworks API key (required)
+- `FIREWORKS_API_KEY`: Your Fireworks API key (required for deployment operations)
 - `FIREWORKS_API_BASE`: Base URL for the Fireworks API (defaults to `https://api.fireworks.ai`)
 - `FIREWORKS_ACCOUNT_ID`: Your Fireworks account ID (optional, can be configured in auth.ini)
+- `MODEL_AGENT`: Default agent model to use (e.g., "openai/gpt-4o-mini")
+- `MODEL_SIM`: Default simulation model to use (e.g., "openai/gpt-3.5-turbo")
 
 ## Troubleshooting
 
@@ -213,6 +287,24 @@ The CLI recognizes the following environment variables:
    ```
    Solution: Use a production API key with deployment permissions or request additional permissions.
 
+5. **Task Bundle Validation Errors**:
+   ```
+   Error: Missing required files in task bundle: tools.py, reward.py
+   ```
+   Solution: Ensure your task bundle has all required files.
+
+6. **Model API Key Not Set**:
+   ```
+   Warning: MODEL_AGENT environment variable is not set
+   ```
+   Solution: Set the MODEL_AGENT environment variable or use the --model parameter.
+
+7. **Import Errors with Task Bundle**:
+   ```
+   Error: Failed to import tool registry from example.task.tools
+   ```
+   Solution: Check that the Python path is correct and the module can be imported.
+
 ### Getting Help
 
 For additional help, use the `--help` flag with any command:
@@ -221,10 +313,12 @@ For additional help, use the `--help` flag with any command:
 reward-kit --help
 reward-kit preview --help
 reward-kit deploy --help
+reward-kit agent-eval --help
 ```
 
 ## Next Steps
 
 - Explore the [Developer Guide](../developer_guide/getting_started.md) for conceptual understanding
 - Try the [Creating Your First Reward Function](../tutorials/creating_your_first_reward_function.md) tutorial
+- Learn about [Agent Evaluation](../developer_guide/agent_evaluation.md) to create your own task bundles
 - See [Examples](../examples/basic_reward_function.md) for practical implementations

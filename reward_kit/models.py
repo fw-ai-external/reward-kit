@@ -11,7 +11,7 @@ from openai.types.chat import ChatCompletionMessageParam
 class Message(BaseModel):
     """Chat message model compatible with OpenAI's interface."""
     role: str
-    content: str
+    content: Optional[str] = ""  # Content can be None for tool calls in OpenAI API
     name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None

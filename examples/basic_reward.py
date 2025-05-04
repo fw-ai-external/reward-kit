@@ -4,66 +4,63 @@ Example of a basic reward function using the Reward Kit.
 
 from typing import List, Dict, Optional, Any
 from reward_kit import RewardOutput, MetricRewardOutput, reward_function
+from reward_kit.models import Message, EvaluateResult
 
 @reward_function
 def calculate_base_score(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message],
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Calculates a basic score based on length and keywords.
     
     Args:
         messages: List of conversation messages
-        original_messages: List of original messages (context)
         **kwargs: Additional arguments
         
     Returns:
         RewardOutput with score and metrics
     """
     # Get the last response (the one we're evaluating)
-    last_response = messages[-1]['content'].lower()
+    last_response = messages[-1].content.lower()
     metrics = {}
     
     # Evaluate helpfulness
     is_helpful = "helpful" in last_response
-    metrics["helpfulness"] = MetricRewardOutput(
-        score=0.5 if is_helpful else 0.0,
-        reason="Contains helpful keyword" if is_helpful else "Missing helpful keyword"
-    )
+    metrics["helpfulness"] = {
+        "score": 0.5 if is_helpful else 0.0,
+        "reason": "Contains helpful keyword" if is_helpful else "Missing helpful keyword"
+    }
     
     # Evaluate length
     is_long_enough = len(last_response) > 50
-    metrics["length_bonus"] = MetricRewardOutput(
-        score=0.5 if is_long_enough else 0.0,
-        reason="Response length sufficient" if is_long_enough else "Response too short"
-    )
+    metrics["length_bonus"] = {
+        "score": 0.5 if is_long_enough else 0.0,
+        "reason": "Response length sufficient" if is_long_enough else "Response too short"
+    }
     
     # Calculate final score (sum of component scores)
-    final_score = sum(metric.score for metric in metrics.values())
+    final_score = sum(metric["score"] for metric in metrics.values())
     
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, metrics=metrics)
 
 
 @reward_function
 def calculate_safety_score(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message],
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Calculates a safety score (penalizes forbidden words).
     
     Args:
         messages: List of conversation messages
-        original_messages: List of original messages (context)
         **kwargs: Additional arguments
         
     Returns:
         RewardOutput with score and metrics
     """
-    last_response = messages[-1]['content'].lower()
+    last_response = messages[-1].content.lower()
     metrics = {}
     
     # List of unsafe words (this would be much more comprehensive in practice)
@@ -79,30 +76,28 @@ def calculate_safety_score(
         reason = "No unsafe content detected"
         penalty = 0.0
     
-    metrics["safety_penalty"] = MetricRewardOutput(
-        score=penalty,
-        reason=reason
-    )
+    metrics["safety_penalty"] = {
+        "score": penalty,
+        "reason": reason
+    }
     
     # Safety score is just the penalty
     final_score = penalty
     
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, metrics=metrics)
 
 
 @reward_function
 def combined_reward(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message],
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Combines base score and safety score.
     
     Args:
         messages: List of conversation messages
-        original_messages: List of original messages (context)
         metadata: Optional metadata for customizing the reward
         **kwargs: Additional arguments
         
@@ -110,34 +105,39 @@ def combined_reward(
         RewardOutput with score and metrics
     """
     # Get component rewards
-    base_output = calculate_base_score(
+    base_output_dict = calculate_base_score(
         messages=messages, 
-        original_messages=original_messages,
         **kwargs
     )
     
-    safety_output = calculate_safety_score(
+    safety_output_dict = calculate_safety_score(
         messages=messages, 
-        original_messages=original_messages,
         **kwargs
     )
+    
+    # Extract scores and metrics
+    base_score = base_output_dict["score"]
+    base_metrics = base_output_dict["metrics"]
+    
+    safety_score = safety_output_dict["score"]
+    safety_metrics = safety_output_dict["metrics"]
     
     # Combine metrics
-    all_metrics = {**base_output.metrics, **safety_output.metrics}
+    all_metrics = {**base_metrics, **safety_metrics}
     
     # Calculate final score (add base score and safety penalty)
-    final_score = base_output.score + safety_output.score
+    final_score = base_score + safety_score
     
     # Apply metadata modifiers if available
     if metadata and "boost_factor" in metadata:
         boost = float(metadata["boost_factor"])
         final_score *= boost
-        all_metrics["boost_applied"] = MetricRewardOutput(
-            score=0.0,  # This doesn't affect the score, just documents the boost
-            reason=f"Applied boost factor of {boost}"
-        )
+        all_metrics["boost_applied"] = {
+            "score": 0.0,  # This doesn't affect the score, just documents the boost
+            "reason": f"Applied boost factor of {boost}"
+        }
     
-    return RewardOutput(score=final_score, metrics=all_metrics)
+    return EvaluateResult(score=final_score, metrics=all_metrics)
 
 
 if __name__ == "__main__":
@@ -148,34 +148,33 @@ if __name__ == "__main__":
     ]
     
     # Test the base reward
-    base_result = calculate_base_score(messages=test_messages, original_messages=[test_messages[0]])
+    base_result = calculate_base_score(messages=test_messages)
     print("Base Reward Result:")
-    print(f"Score: {base_result.score}")
+    print(f"Score: {base_result['score']}")
     print("Metrics:")
-    for name, metric in base_result.metrics.items():
-        print(f"  {name}: {metric.score} - {metric.reason}")
+    for name, metric in base_result["metrics"].items():
+        print(f"  {name}: {metric['score']} - {metric['reason']}")
     print()
     
     # Test the safety reward
-    safety_result = calculate_safety_score(messages=test_messages, original_messages=[test_messages[0]])
+    safety_result = calculate_safety_score(messages=test_messages)
     print("Safety Reward Result:")
-    print(f"Score: {safety_result.score}")
+    print(f"Score: {safety_result['score']}")
     print("Metrics:")
-    for name, metric in safety_result.metrics.items():
-        print(f"  {name}: {metric.score} - {metric.reason}")
+    for name, metric in safety_result["metrics"].items():
+        print(f"  {name}: {metric['score']} - {metric['reason']}")
     print()
     
     # Test the combined reward
     combined_result = combined_reward(
         messages=test_messages,
-        original_messages=[test_messages[0]],
         metadata={"boost_factor": 1.2}
     )
     print("Combined Reward Result (with boost):")
-    print(f"Score: {combined_result.score}")
+    print(f"Score: {combined_result['score']}")
     print("Metrics:")
-    for name, metric in combined_result.metrics.items():
-        print(f"  {name}: {metric.score} - {metric.reason}")
+    for name, metric in combined_result["metrics"].items():
+        print(f"  {name}: {metric['score']} - {metric['reason']}")
     print()
     
     # Deploy example (commented out in the example)

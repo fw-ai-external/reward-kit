@@ -7,6 +7,7 @@ with automatic detection of multi-metrics vs single-metrics.
 import os
 import sys
 import json
+import argparse
 from pathlib import Path
 
 # Ensure reward-kit is in the path
@@ -163,6 +164,14 @@ def clean_up(eval_folder, sample_file):
     sample_file.unlink()
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Folder-based evaluation example")
+    parser.add_argument("--auto-mode", action="store_true", 
+                        help="Run in non-interactive mode (skip deploy prompt)")
+    parser.add_argument("--deploy", action="store_true", 
+                        help="Automatically deploy the evaluator in auto-mode")
+    args = parser.parse_args()
+    
     # Set up sample evaluator folder structure
     eval_folder, sample_file = setup_sample_evaluator()
     
@@ -178,9 +187,22 @@ def main():
         # Display the preview results
         preview_result.display()
         
-        # Ask if the user wants to deploy
-        deploy_answer = input("\nDo you want to deploy this evaluator? (y/n): ")
-        if deploy_answer.lower() == 'y':
+        # Check if we should deploy
+        should_deploy = False
+        
+        if args.auto_mode:
+            # In auto mode, check the --deploy flag
+            should_deploy = args.deploy
+            if should_deploy:
+                print("\nAuto-deploying evaluator (--deploy flag set)")
+            else:
+                print("\nSkipping deployment in auto-mode (--deploy flag not set)")
+        else:
+            # In interactive mode, ask the user
+            deploy_answer = input("\nDo you want to deploy this evaluator? (y/n): ")
+            should_deploy = deploy_answer.lower() == 'y'
+        
+        if should_deploy:
             try:
                 print("\nDeploying folder-based evaluation...")
                 result = deploy_folder_evaluation(

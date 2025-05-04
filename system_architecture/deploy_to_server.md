@@ -6,48 +6,54 @@ Currently for both reviewing local and deploying to Fireworks, we need to move t
 
 ```python
 from typing import List, Dict, Optional
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function
+from reward_kit.models import Message, EvaluateResult
 
 @reward_function
 def helpfulness_reward(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message],
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluates the helpfulness of an assistant response based on 
     length and keyword presence.
     """
     # Get the assistant's response
-    if not messages or messages[-1].get("role") != "assistant":
-        return RewardOutput(score=0.0, metrics={
-            "error": MetricRewardOutput(score=0.0, reason="No assistant response found")
-        })
+    if not messages or messages[-1].role != "assistant":
+        return EvaluateResult(
+            score=0.0,
+            metrics={
+                "error": {
+                    "score": 0.0,
+                    "reason": "No assistant response found"
+                }
+            }
+        )
     
-    response = messages[-1].get("content", "")
+    response = messages[-1].content
     metrics = {}
     
     # 1. Length check - reward longer responses up to a point
     length = len(response)
     length_score = min(length / 500.0, 1.0)  # Cap at 500 chars
-    metrics["length"] = MetricRewardOutput(
-        score=length_score * 0.3,  # 30% weight
-        reason=f"Response length: {length} chars"
-    )
+    metrics["length"] = {
+        "score": length_score * 0.3,  # 30% weight
+        "reason": f"Response length: {length} chars"
+    }
     
     # 2. Keyword analysis for helpfulness indicators
     helpful_keywords = ["specifically", "example", "for instance", "steps", "how to"]
     keyword_count = sum(1 for kw in helpful_keywords if kw.lower() in response.lower())
     keyword_score = min(keyword_count / 3.0, 1.0)  # Cap at 3 keywords
-    metrics["keywords"] = MetricRewardOutput(
-        score=keyword_score * 0.7,  # 70% weight
-        reason=f"Found {keyword_count} helpful keywords"
-    )
+    metrics["keywords"] = {
+        "score": keyword_score * 0.7,  # 70% weight
+        "reason": f"Found {keyword_count} helpful keywords"
+    }
     
     # Calculate final score as weighted sum of metrics
-    final_score = sum(metric.score for metric in metrics.values())
+    final_score = sum(metric["score"] for metric in metrics.values())
     
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, metrics=metrics)
 
 # Deploy the reward function to Fireworks
 if __name__ == "__main__":

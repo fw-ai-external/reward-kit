@@ -1,0 +1,206 @@
+# Combined Metrics Rewards
+
+This guide focuses on reward functions that combine multiple evaluation aspects into a single score. These combined metrics provide a more comprehensive assessment of model responses.
+
+## Introduction to Combined Metrics
+
+In real-world evaluation scenarios, we often want to consider multiple aspects of quality simultaneously. For example:
+
+- Responses should be both accurate AND concise
+- Code solutions should be both correct AND efficient
+- Explanations should be both clear AND well-structured
+
+Combined metric rewards allow you to assess multiple dimensions in a single reward function with appropriate weightings.
+
+## Available Combined Metric Rewards
+
+### Cosine-Scaled Accuracy + Length Reward
+
+The `cosine_scaled_accuracy_length_reward` function combines accuracy evaluation with length efficiency into a unified score. Note that this function depends on the accuracy detection mechanisms, which may need customization for different types of content through the `extract_fn` and `compare_fn` parameters.
+
+```python
+from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_reward
+
+result = cosine_scaled_accuracy_length_reward(
+    messages=messages,
+    ground_truth="Paris",
+    max_length=200,
+    correctness_weight=0.7,  # Weight for accuracy component
+    length_weight=0.3        # Weight for length component
+)
+```
+
+#### Key Features
+
+- **Dual Evaluation**: Assesses both factual accuracy and response length
+- **Cosine Scaling**: Uses cosine scheduling to reward brevity in correct responses
+- **Weighted Components**: Allows customizing the importance of accuracy vs. length
+- **Asymmetric Penalties**: Handles correct and incorrect responses differently
+  - For correct answers: shorter is better (higher reward)
+  - For incorrect answers: longer explanations are penalized less (encouraging showing work)
+- **Customizable Parameters**: Flexible configuration for different use cases
+
+#### How It Works
+
+1. **Accuracy Evaluation**:
+   - Extracts an answer from the response
+   - Compares to ground truth with semantic matching
+   - Produces an accuracy score (0.0-1.0)
+
+2. **Length Evaluation**:
+   - Counts tokens in the response
+   - Applies cosine scaling based on token count vs. max_length
+   - Produces a length score (0.0-1.0)
+
+3. **Combined Scoring**:
+   - Weighted average of accuracy and length scores
+   - Clear separation between correct and incorrect answers
+   - Final score prioritizes accuracy while considering length
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `messages` | List[Dict/Message] | Required | Conversation messages to evaluate |
+| `ground_truth` | str | None | Expected correct answer |
+| `extract_fn` | Callable | None | Custom function to extract answer from text |
+| `compare_fn` | Callable | None | Custom function to compare answers |
+| `max_length` | int | 1000 | Maximum token length for scaling |
+| `min_value_wrong` | float | 0.0 | Minimum reward for wrong answers |
+| `max_value_wrong` | float | 0.3 | Maximum reward for wrong answers |
+| `min_value_correct` | float | 0.5 | Minimum reward for correct answers |
+| `max_value_correct` | float | 1.0 | Maximum reward for correct answers |
+| `token_method` | str | "whitespace" | Method to count tokens |
+| `correctness_weight` | float | 0.7 | Weight for accuracy component |
+| `length_weight` | float | 0.3 | Weight for length component |
+
+#### Return Value
+
+An `EvaluateResult` object with:
+
+- **score**: Combined weighted score (0.0-1.0)
+- **reason**: Detailed explanation of the evaluation
+- **metrics**:
+  - **combined_reward**: Overall evaluation result
+  - **accuracy**: Accuracy component evaluation
+  - **length**: Length component evaluation 
+  - **token_count**: Token count details
+
+#### Example
+
+```python
+from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_reward
+
+# Define test messages
+messages = [
+    {"role": "user", "content": "What is the capital of France?"},
+    {"role": "assistant", "content": "The capital of France is Paris."}
+]
+
+# Evaluate with cosine-scaled accuracy + length reward
+result = cosine_scaled_accuracy_length_reward(
+    messages=messages,
+    ground_truth="Paris",
+    max_length=200,
+    correctness_weight=0.7,
+    length_weight=0.3
+)
+
+# Print results
+print(f"Combined score: {result['score']}")
+print(f"Accuracy score: {result['metrics']['accuracy']['score']}")
+print(f"Length score: {result['metrics']['length']['score']}")
+print(f"Reason: {result['reason']}")
+```
+
+#### Use Cases
+
+- **Factual QA**: Reward concise, correct answers over verbose ones
+- **Mathematical problems**: Evaluate correctness while encouraging brevity
+- **Knowledge retrieval**: Balance accuracy with response length
+- **Instruction following**: Ensure responses are both correct and appropriately sized
+
+#### Advanced Configuration
+
+Fine-tune the behavior with these parameter adjustments:
+
+- **Encouraging brevity**: Increase `length_weight` and decrease `max_length`
+- **Prioritizing accuracy**: Increase `correctness_weight` and decrease `length_weight`
+- **Allowing detailed explanations**: Increase `max_length` while maintaining weighting
+- **Strict scoring**: Increase gap between `max_value_wrong` and `min_value_correct`
+
+## Creating Custom Combined Metrics
+
+You can create custom combined metrics by using the `@reward_function` decorator:
+
+```python
+from reward_kit.rewards.accuracy import accuracy_reward
+from reward_kit.rewards.reasoning_steps import reasoning_steps_reward
+from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+
+@reward_function
+def accuracy_reasoning_reward(
+    messages, 
+    ground_truth=None, 
+    accuracy_weight=0.6,
+    reasoning_weight=0.4,
+    **kwargs
+):
+    """Combine accuracy and reasoning steps evaluation."""
+    # Evaluate accuracy
+    accuracy_result = accuracy_reward(
+        messages=messages,
+        ground_truth=ground_truth
+    )
+    
+    # Evaluate reasoning steps
+    reasoning_result = reasoning_steps_reward(
+        messages=messages,
+        min_steps=3
+    )
+    
+    # Calculate combined score
+    combined_score = (
+        accuracy_weight * accuracy_result["score"] + 
+        reasoning_weight * reasoning_result["score"]
+    )
+    
+    # Combine metrics
+    metrics = {
+        "accuracy": MetricRewardOutput(
+            score=accuracy_result["score"],
+            reason=accuracy_result["reason"]
+        ),
+        "reasoning": MetricRewardOutput(
+            score=reasoning_result["score"],
+            reason=reasoning_result["reason"]
+        )
+    }
+    
+    return RewardOutput(score=combined_score, metrics=metrics)
+```
+
+### Tips for Creating Combined Metrics
+
+1. **Choose appropriate weights** based on the relative importance of each component
+2. **Ensure scale consistency** across all component metrics (typically 0.0-1.0)
+3. **Provide detailed reasons** for each component and the combined score
+4. **Handle edge cases** where one component might fail
+5. **Document parameters** clearly for users of your combined metric
+
+## Best Practices
+
+When using combined metrics rewards:
+
+1. **Start simple**: Begin with equal weights and adjust based on results
+2. **Test on diverse examples**: Ensure your metrics work across different response styles
+3. **Avoid too many components**: Two or three aspects is typically optimal
+4. **Balance importance**: Set weights to reflect true priorities
+5. **Document clearly**: Make sure users understand what each component measures
+
+## Next Steps
+
+- Explore other [out-of-the-box reward functions](reward_functions_overview.md)
+- Learn how to [create your own reward functions](../tutorials/creating_your_first_reward_function.md)
+- Study [best practices for reward functions](../tutorials/best_practices.md)
+- See how to [deploy your reward functions](../developer_guide/evaluation_workflows.md)

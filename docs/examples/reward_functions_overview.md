@@ -8,30 +8,171 @@ Reward Kit includes several pre-built reward functions for common evaluation tas
 
 ## Available Reward Functions
 
+### Format and Structure Rewards
+
+These reward functions evaluate the format and structure of responses.
+
+- **Format Reward**: Evaluate responses against a regex pattern (e.g., `<think>...</think><answer>...</answer>`)
+  ```python
+  from reward_kit.rewards.format import format_reward
+  
+  result = format_reward(
+      messages=messages,
+      pattern=r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$",
+      flags=re.DOTALL
+  )
+  ```
+
+- **Tag Count Reward**: Check for exactly one of each specified tag
+  ```python
+  from reward_kit.rewards.tag_count import tag_count_reward
+  
+  result = tag_count_reward(
+      messages=messages,
+      tags=["pros", "cons"]
+  )
+  ```
+
+### Accuracy and Correctness Rewards
+
+These reward functions evaluate the accuracy of responses against expected answers.
+
+- **Accuracy Reward**: Compare answers to ground truth
+  ```python
+  from reward_kit.rewards.accuracy import accuracy_reward
+  
+  result = accuracy_reward(
+      messages=messages,
+      ground_truth="Paris"
+  )
+  ```
+
+- **Math Reward**: Compare numerical answers with expected values
+  ```python
+  from reward_kit.rewards.math import math_reward
+  
+  result = math_reward(
+      messages=messages,
+      expected_answer="42"
+  )
+  ```
+
+### Language and Style Rewards
+
+These reward functions evaluate linguistic aspects of responses.
+
+- **Language Consistency Reward**: Ensure response is in the target language
+  ```python
+  from reward_kit.rewards.language_consistency import language_consistency_reward
+  
+  result = language_consistency_reward(
+      messages=messages,
+      target_language="spanish"
+  )
+  ```
+
+- **Reasoning Steps Reward**: Encourage step-by-step reasoning
+  ```python
+  from reward_kit.rewards.reasoning_steps import reasoning_steps_reward
+  
+  result = reasoning_steps_reward(
+      messages=messages,
+      min_steps=3
+  )
+  ```
+
+### Length and Verbosity Rewards
+
+These reward functions evaluate the length and verbosity of responses.
+
+- **Length Reward**: Evaluate response against length targets
+  ```python
+  from reward_kit.rewards.length import length_reward
+  
+  result = length_reward(
+      messages=messages,
+      target_length=200,  # Target token count
+      token_method="whitespace"
+  )
+  ```
+
+- **Cosine Length Reward**: Scale rewards based on length using cosine schedule
+  ```python
+  from reward_kit.rewards.length import cosine_length_reward
+  
+  result = cosine_length_reward(
+      messages=messages,
+      correctness=0.9,  # High correctness score
+      max_length=500,
+      min_value_correct=0.5,
+      max_value_correct=1.0
+  )
+  ```
+
+- **Repetition Penalty Reward**: Penalize repetitive content
+  ```python
+  from reward_kit.rewards.repetition import repetition_penalty_reward
+  
+  result = repetition_penalty_reward(
+      messages=messages,
+      max_penalty=0.5,
+      ngram_size=3
+  )
+  ```
+
 ### Code Execution Rewards
 
-The code execution reward functions evaluate code by running it and comparing the output to expected results.
+These reward functions evaluate code by running it and comparing the output to expected results.
 
-- **[Local Code Execution](code_execution_evaluation.md)**: Execute code securely on your local machine
+- **Binary Code Reward**: Binary pass/fail for code execution
   ```python
-  from reward_kit.rewards.code_execution import local_code_execution_reward
+  from reward_kit.rewards.code_execution import binary_code_reward
   
-  result = local_code_execution_reward(
+  result = binary_code_reward(
       messages=messages,
       expected_output="expected result",
       language="python"
   )
   ```
 
-- **[E2B Code Execution](code_execution_with_e2b.md)**: Execute code in a secure cloud sandbox
+- **Fractional Code Reward**: Return exact pass rate for code execution
   ```python
-  from reward_kit.rewards.code_execution import e2b_code_execution_reward
+  from reward_kit.rewards.code_execution import fractional_code_reward
   
-  result = e2b_code_execution_reward(
+  result = fractional_code_reward(
       messages=messages,
-      expected_output="expected result",
-      language="python",
-      api_key="your_e2b_api_key"
+      test_cases=[
+          {"input": "arg1", "expected_output": "result1"},
+          {"input": "arg2", "expected_output": "result2"}
+      ],
+      language="python"
+  )
+  ```
+
+- **IOI C/C++ Code Reward**: Evaluate C/C++ code using Piston engine
+  ```python
+  from reward_kit.rewards.cpp_code import ioi_cpp_code_reward
+  
+  result = ioi_cpp_code_reward(
+      messages=messages,
+      test_cases=[
+          {"input": "4\n5", "expected_output": "9"},
+          {"input": "10\n20", "expected_output": "30"}
+      ],
+      language="cpp"  # or "c"
+  )
+  ```
+
+- **Binary C/C++ Code Reward**: Binary pass/fail for C/C++ code
+  ```python
+  from reward_kit.rewards.cpp_code import binary_cpp_code_reward
+  
+  result = binary_cpp_code_reward(
+      messages=messages,
+      test_cases=[
+          {"input": "4\n5", "expected_output": "9"}
+      ],
+      language="cpp"
   )
   ```
 
@@ -39,7 +180,7 @@ The code execution reward functions evaluate code by running it and comparing th
 
 These reward functions evaluate function calls in LLM responses against expected schemas and behaviors.
 
-- **[Schema Jaccard Reward](function_calling_evaluation.md#schema-jaccard-reward)**: Compare function calls to expected schema
+- **Schema Jaccard Reward**: Compare function calls to expected schema
   ```python
   from reward_kit.rewards.function_calling import schema_jaccard_reward
   
@@ -49,7 +190,7 @@ These reward functions evaluate function calls in LLM responses against expected
   )
   ```
 
-- **[LLM Judge Reward](function_calling_evaluation.md#llm-judge-reward)**: Use an LLM to evaluate function call quality
+- **LLM Judge Reward**: Use an LLM to evaluate function call quality
   ```python
   from reward_kit.rewards.function_calling import llm_judge_reward
   
@@ -60,7 +201,7 @@ These reward functions evaluate function calls in LLM responses against expected
   )
   ```
 
-- **[Composite Function Call Reward](function_calling_evaluation.md#composite-function-call-reward)**: Combine schema validation and LLM judgment
+- **Composite Function Call Reward**: Combine schema validation and LLM judgment
   ```python
   from reward_kit.rewards.function_calling import composite_function_call_reward
   
@@ -73,9 +214,9 @@ These reward functions evaluate function calls in LLM responses against expected
 
 ### JSON Schema Rewards
 
-The JSON schema reward functions validate JSON outputs against predefined schemas.
+These reward functions validate JSON outputs against predefined schemas.
 
-- **[JSON Schema Reward](json_schema_validation.md)**: Validate JSON against a schema
+- **JSON Schema Reward**: Validate JSON against a schema
   ```python
   from reward_kit.rewards.json_schema import json_schema_reward
   
@@ -85,27 +226,20 @@ The JSON schema reward functions validate JSON outputs against predefined schema
   )
   ```
 
-- **[Validate JSON String](json_schema_validation.md#direct-json-string-validation)**: Direct validation of JSON strings
+### Combined Metrics Rewards
+
+These reward functions combine multiple evaluation aspects into a single score.
+
+- **Cosine-Scaled Accuracy + Length Reward**: Combine accuracy with length efficiency
   ```python
-  from reward_kit.rewards.json_schema import validate_json_string
+  from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_reward
   
-  result = validate_json_string(
-      json_str=json_string,
-      schema=json_schema
-  )
-  ```
-
-### Math Rewards
-
-The math reward functions evaluate mathematical answers in LLM responses.
-
-- **[Math Reward](math_evaluation.md)**: Compare numerical answers with expected values
-  ```python
-  from reward_kit.rewards.math import math_reward
-  
-  result = math_reward(
+  result = cosine_scaled_accuracy_length_reward(
       messages=messages,
-      expected_answer="42"
+      ground_truth="Paris",
+      max_length=200,
+      correctness_weight=0.7,
+      length_weight=0.3
   )
   ```
 
@@ -115,62 +249,99 @@ Here's a guide to help you choose the appropriate reward function for your task:
 
 | Task | Recommended Reward Function |
 |------|----------------------------|
-| Evaluating coding solutions | `local_code_execution_reward` or `e2b_code_execution_reward` |
+| Evaluating format adherence | `format_reward` |
+| Checking tag usage and structure | `tag_count_reward` |
+| Evaluating factual accuracy | `accuracy_reward` |
+| Ensuring consistent language | `language_consistency_reward` |
+| Encouraging step-by-step reasoning | `reasoning_steps_reward` |
+| Controlling response length | `length_reward` |
+| Optimizing for brevity and correctness | `cosine_scaled_accuracy_length_reward` |
+| Reducing repetition | `repetition_penalty_reward` |
+| Evaluating Python code | `fractional_code_reward` or `binary_code_reward` |
+| Evaluating C/C++ code | `ioi_cpp_code_reward` or `binary_cpp_code_reward` |
 | Validating tool use and function calls | `composite_function_call_reward` |
 | Checking structured data outputs | `json_schema_reward` |
 | Evaluating mathematical solutions | `math_reward` |
-| Simple schema validation of function calls | `schema_jaccard_reward` |
-| Qualitative evaluation of function calls | `llm_judge_reward` |
 
 ## Combining Reward Functions
 
 You can combine multiple reward functions to create comprehensive evaluations:
 
 ```python
-from reward_kit.rewards.code_execution import local_code_execution_reward
-from reward_kit.rewards.json_schema import json_schema_reward
-from reward_kit import reward_function
+from reward_kit.rewards.accuracy import accuracy_reward
+from reward_kit.rewards.length import length_reward
+from reward_kit import reward_function, RewardOutput, MetricRewardOutput
 
 @reward_function
-def combined_code_json_reward(messages, original_messages=None, **kwargs):
-    # First, check if code executes correctly
-    code_result = local_code_execution_reward(
+def combined_accuracy_length(messages, ground_truth=None, **kwargs):
+    """Combine accuracy and length evaluation."""
+    # Check accuracy
+    accuracy_result = accuracy_reward(
         messages=messages,
-        expected_output="[1, 2, 3]",
-        language="python"
+        ground_truth=ground_truth
     )
     
-    # Then, check if the output is valid JSON
-    json_schema = {
-        "type": "array",
-        "items": {"type": "integer"}
-    }
-    
-    json_result = json_schema_reward(
+    # Check length
+    length_result = length_reward(
         messages=messages,
-        schema=json_schema
+        target_length=150
     )
     
-    # Combine the metrics
+    # Combine scores with weighting
+    # 70% accuracy, 30% length
+    combined_score = 0.7 * accuracy_result["score"] + 0.3 * length_result["score"]
+    
+    # Combine metrics
     metrics = {
-        "code_execution": code_result.metrics.get("execution_result"),
-        "json_validity": json_result.metrics.get("validation")
+        "accuracy": MetricRewardOutput(
+            score=accuracy_result["score"],
+            reason=accuracy_result["reason"]
+        ),
+        "length": MetricRewardOutput(
+            score=length_result["score"],
+            reason=length_result["reason"]
+        )
     }
     
-    # Calculate overall score (50% code execution, 50% JSON validity)
-    overall_score = 0.5 * code_result.score + 0.5 * json_result.score
-    
-    return {"score": overall_score, "metrics": metrics}
+    return RewardOutput(score=combined_score, metrics=metrics)
 ```
+
+## Pre-Built Combined Metrics
+
+Reward Kit offers pre-built functions that combine multiple metrics:
+
+- **Cosine-Scaled Accuracy + Length**: Combines accuracy with length using a cosine schedule
+  ```python
+  from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_reward
+  
+  result = cosine_scaled_accuracy_length_reward(
+      messages=messages,
+      ground_truth="Paris",
+      max_length=200,
+      correctness_weight=0.7,  # Weight for accuracy component
+      length_weight=0.3        # Weight for length component
+  )
+  ```
+  
+  This function:
+  - Evaluates response accuracy against ground truth
+  - Measures response length efficiency using a cosine schedule
+  - Rewards shorter correct answers more than longer ones
+  - Maintains a clear separation between correct and incorrect answers
+  - Allows customizable weighting between accuracy and length
 
 ## Next Steps
 
 - Explore individual reward function documentation:
-  - [Code Execution Evaluation](code_execution_evaluation.md)
-  - [Code Execution with E2B](code_execution_with_e2b.md)
-  - [Function Calling Evaluation](function_calling_evaluation.md)
+  - [Format and Structure Rewards](../api_reference/reward_functions/format.md)
+  - [Accuracy and Correctness Rewards](../api_reference/reward_functions/accuracy.md)
+  - [Language and Style Rewards](../api_reference/reward_functions/language.md)
+  - [Length and Verbosity Rewards](../api_reference/reward_functions/length.md)
+  - [Code Execution Rewards](code_execution_evaluation.md)
+  - [Function Calling Rewards](function_calling_evaluation.md)
   - [JSON Schema Validation](json_schema_validation.md)
   - [Math Evaluation](math_evaluation.md)
+  - [Combined Metrics Rewards](../api_reference/reward_functions/combined.md)
 - Learn how to [create your own reward functions](../tutorials/creating_your_first_reward_function.md)
 - Read [best practices](../tutorials/best_practices.md) for effective evaluations
 - See [examples](../developer_guide/evaluation_workflows.md) of common evaluation workflows

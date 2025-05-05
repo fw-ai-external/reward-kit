@@ -12,6 +12,7 @@
 - ✅ **Basic Reward Function**: Simple example evaluating response clarity
 - ✅ **Advanced Reward Functions**: Multiple metrics, combining reward functions
 - ✅ **Reward Functions Overview**: Overview of all out-of-the-box reward functions
+- ✅ **Combined Metrics Rewards**: Combining multiple evaluation aspects into a single score
 - ✅ **Code Execution Evaluation**: Local code execution for Python and JavaScript
 - ✅ **Code Execution with E2B**: Cloud-based code execution using E2B sandbox
 - ✅ **Function Calling Evaluation**: Validation of function calls using schemas and LLM judges

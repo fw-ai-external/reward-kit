@@ -7,6 +7,7 @@ This directory contains examples and guides for using Reward Kit's built-in rewa
 Reward Kit provides several pre-built reward functions for common evaluation tasks:
 
 - [**Reward Functions Overview**](reward_functions_overview.md) - Overview of all available reward functions
+- [**Combined Metrics Rewards**](combined_metrics_rewards.md) - Evaluate responses using multiple metrics combined
 - [**Code Execution Evaluation**](code_execution_evaluation.md) - Evaluate code by running it locally
 - [**Code Execution with E2B**](code_execution_with_e2b.md) - Evaluate code using E2B cloud sandbox
 - [**Function Calling Evaluation**](function_calling_evaluation.md) - Evaluate function calls made by AI models

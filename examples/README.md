@@ -48,6 +48,22 @@ export FIREWORKS_API_BASE=https://api.fireworks.ai
 
 ## Example Walkthroughs
 
+### Combined Accuracy and Length Evaluation
+
+The `accuracy_length/cosine_scaled_example.py` demonstrates the `cosine_scaled_accuracy_length_reward` function which evaluates responses based on both accuracy and length efficiency.
+
+```bash
+# Run the example
+python examples/accuracy_length/cosine_scaled_example.py
+```
+
+This example:
+1. Demonstrates evaluation of different response types (short correct, long correct, short incorrect, long incorrect)
+2. Shows how the combined reward function prioritizes short correct answers
+3. Illustrates customizing the weights between accuracy and length components
+
+See the [Accuracy + Length README](accuracy_length/README.md) for more details.
+
 ### Basic Evaluation Example
 
 The `evaluation_preview_example.py` demonstrates how to preview and create an evaluation using the Reward Kit.

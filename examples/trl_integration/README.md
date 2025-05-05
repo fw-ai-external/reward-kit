@@ -1,0 +1,79 @@
+# TRL Integration Examples
+
+This directory contains examples showing how to use reward-kit reward functions with Hugging Face's Transformer Reinforcement Learning (TRL) library.
+
+## Overview
+
+TRL is a library designed for fine-tuning language models using reinforcement learning techniques. It includes implementations of various RL algorithms including:
+
+- GRPO (Group Relative Policy Optimization) - used in DeepSeek-R1
+- PPO (Proximal Policy Optimization)
+- DPO (Direct Preference Optimization)
+- ORPO (Optimal RLHF Policy Optimization)
+
+These examples demonstrate how to integrate reward-kit's reward functions with TRL for model fine-tuning.
+
+## Examples
+
+### 1. GRPO Example (`grpo_example.py`)
+
+This example demonstrates using reward functions with the Group Relative Policy Optimization (GRPO) trainer from TRL, which was used to train DeepSeek-R1. It shows:
+
+- Creating format and accuracy reward functions compatible with reward-kit
+- Converting these reward functions to TRL-compatible format
+- Combining multiple reward functions with weights
+- Preparing a dataset in the format expected by TRL
+- Setting up the GRPO trainer with these reward functions
+
+```bash
+# Run the GRPO example
+python examples/trl_integration/grpo_example.py
+```
+
+## Prerequisites
+
+To run these examples, you need to install TRL and related dependencies:
+
+```bash
+pip install trl peft datasets accelerate
+```
+
+For the GRPO example, you might also need:
+
+```bash
+pip install math_verify  # For math verification in the reward function
+```
+
+## Key Concepts
+
+### Reward Function Format
+
+TRL expects reward functions that:
+1. Accept batch inputs (either string lists or message arrays)
+2. Return a list of float reward values
+3. Handle both completion-only inputs and full conversation histories
+
+### Dataset Preparation
+
+The examples show how to:
+1. Load datasets from Hugging Face
+2. Format them for TRL (adding system prompts, mapping fields)
+3. Structure datasets properly for reward functions
+
+### Reward Combining
+
+For fine-tuning models like DeepSeek-R1, multiple reward functions are typically combined:
+1. Format rewards (encouraging proper tag usage)
+2. Content rewards (accuracy, helpfulness, etc.)
+
+The examples demonstrate proper weighting and normalization techniques.
+
+## Integration with reward-kit's RewardFunction Class
+
+reward-kit's RewardFunction class includes a `get_trl_adapter()` method that converts any reward function into the format expected by TRL. This makes it easy to use existing reward functions from reward-kit with TRL trainers.
+
+## References
+
+- [TRL Documentation](https://huggingface.co/docs/trl/index)
+- [DeepSeek-R1 Paper](https://arxiv.org/abs/2403.08559)
+- [GRPO Explained](https://huggingface.co/blog/trl-grpo)

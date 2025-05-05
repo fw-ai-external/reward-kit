@@ -2,6 +2,8 @@
 
 Welcome to the Reward Kit documentation. This guide will help you create, test, and deploy reward functions for evaluating and optimizing LLM responses.
 
+![image](https://github.com/user-attachments/assets/2d31aeac-0190-45f2-8bc8-4cea1eb75f33)
+
 ## Getting Started
 
 ### Developer Guide

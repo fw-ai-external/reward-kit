@@ -1,37 +1,33 @@
 # Next set of ticket items
 
-## ✅ Support DeepSeek-V2 Prover reward function
-- COMPLETED: Implemented three reward functions for Lean theorem proving:
-  1. `lean_prover_reward`: Basic evaluation of Lean proofs
-  2. `deepseek_prover_v2_reward`: Enhanced evaluation focusing on subgoal decomposition
-  3. `deepseek_huggingface_prover_benchmark`: Evaluation against HuggingFace datasets
-- Documentation and examples added in `/docs/examples/deepseek_prover_v2.md`
-- Example code available in `/examples/deepseek_prover_v2_example.py`
+## cpp test is failing right now 
 
-## Running with HuggingFace Datasets
+reward_kit/rewards/cpp_code.py:757: TypeError
+===================================================================================================================== warnings summary =====================================================================================================================
+.venv/lib/python3.12/site-packages/pydantic/_internal/_config.py:323
+.venv/lib/python3.12/site-packages/pydantic/_internal/_config.py:323
+  /home/bchen/home/reward-kit/.venv/lib/python3.12/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
 
-Currently only deepseek prover supports huggingface datasets. To evaluate proofs against the DeepSeek-ProverBench dataset:
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================================================================================================= short test summary info ==================================================================================================================
+FAILED tests/test_cpp_code.py::TestOutputComparison::test_whitespace_normalization - assert 1.0 < 1.0
+FAILED tests/test_cpp_code.py::TestPistonClient::test_get_runtimes - TypeError: TestPistonClient.test_get_runtimes.<locals>.mock_aenter() takes 0 positional arguments but 1 was given
+FAILED tests/test_cpp_code.py::TestPistonClient::test_execute_success - TypeError: TestPistonClient.test_execute_success.<locals>.mock_aenter() takes 0 positional arguments but 1 was given
+FAILED tests/test_cpp_code.py::TestPistonClient::test_execute_compile_error - TypeError: TestPistonClient.test_execute_compile_error.<locals>.mock_aenter() takes 0 positional arguments but 1 was given
+FAILED tests/test_cpp_code.py::TestPistonClient::test_execute_runtime_error - TypeError: TestPistonClient.test_execute_runtime_error.<locals>.mock_aenter() takes 0 positional arguments but 1 was given
+FAILED tests/test_cpp_code.py::TestExecuteCppCode::test_execute_cpp_success - assert False is True
+FAILED tests/test_cpp_code.py::TestExecuteCppCode::test_execute_cpp_compile_error - AssertionError: assert 'Compilation error' in 'Unknown error during execution'
+FAILED tests/test_cpp_code.py::TestExecuteCppCode::test_execute_c_code - assert False is True
+FAILED tests/test_cpp_code.py::TestIOICppCodeReward::test_success_match - TypeError: '_asyncio.Future' object is not subscriptable
+FAILED tests/test_cpp_code.py::TestIOICppCodeReward::test_success_mismatch - TypeError: '_asyncio.Future' object is not subscriptable
+FAILED tests/test_cpp_code.py::TestIOICppCodeReward::test_execution_failure - TypeError: '_asyncio.Future' object is not subscriptable
+FAILED tests/test_cpp_code.py::TestIOICppCodeReward::test_multiple_test_cases - TypeError: object of type '_asyncio.Future' has no len()
+================================================================================================== 12 failed, 242 passed, 2 skipped, 2 warnings in 7.82s ===================================================================================================
 
-```python
-from reward_kit.rewards.lean_prover import deepseek_huggingface_prover_benchmark
+## Support uploading of HuggingFace datasets to Fireworks dataset (requires Fireworks dataset API integration)
 
-# Install HuggingFace datasets dependency first:
-# pip install "reward-kit[deepseek]"
-
-# Evaluate a proof against the DeepSeek-ProverBench dataset
-result = deepseek_huggingface_prover_benchmark(
-    response="your_lean_proof_here",
-    statement="For all natural numbers n, the sum of the first n integers equals n(n+1)/2",
-    dataset_name="deepseek-ai/DeepSeek-ProverBench"
-)
-
-print(f"Score: {result.score}")
-```
-
-The function will automatically search for a matching problem in the dataset based on the statement.
-
-But this is ugly, and for running evaluation preview and evaluation job, we do not automatically handle conversion from huggingface dataset to jsonl right now, ideally we update the API to do that so then the reward functions 
-can continue to stay oblivious to huggingface dataset concepts.
+People should be able to just specify a huggingface dataset for evaluation job, and we should still make everything run
 
 ## TRL adapter for reward functions
 

@@ -76,20 +76,36 @@ def preview_command(args):
                 print(f"Error: Metric folder format should be 'name=path', got '{folder}'")
                 return 1
 
-    if not args.samples:
-        print("Error: Sample file (--samples) is required for preview")
+    # Ensure either samples or huggingface_dataset is provided
+    if not args.samples and not args.huggingface_dataset:
+        print("Error: Either sample file (--samples) or HuggingFace dataset (--huggingface-dataset) is required")
         return 1
     
-    if not Path(args.samples).exists():
+    # If using samples file, verify it exists
+    if args.samples and not Path(args.samples).exists():
         print(f"Error: Sample file '{args.samples}' not found")
         return 1
+    
+    # Process HuggingFace key mapping if provided
+    huggingface_message_key_map = None
+    if args.huggingface_key_map:
+        try:
+            huggingface_message_key_map = json.loads(args.huggingface_key_map)
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON format for --huggingface-key-map")
+            return 1
         
     # Run preview
     try:
         preview_result = preview_evaluation(
             metric_folders=args.metrics_folders,
-            sample_file=args.samples,
-            max_samples=args.max_samples
+            sample_file=args.samples if args.samples else None,
+            max_samples=args.max_samples,
+            huggingface_dataset=args.huggingface_dataset,
+            huggingface_split=args.huggingface_split,
+            huggingface_prompt_key=args.huggingface_prompt_key,
+            huggingface_response_key=args.huggingface_response_key,
+            huggingface_message_key_map=huggingface_message_key_map
         )
         
         preview_result.display()
@@ -115,6 +131,15 @@ def deploy_command(args):
     if not args.id:
         print("Error: Evaluator ID (--id) is required for deployment")
         return 1
+    
+    # Process HuggingFace key mapping if provided
+    huggingface_message_key_map = None
+    if args.huggingface_key_map:
+        try:
+            huggingface_message_key_map = json.loads(args.huggingface_key_map)
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON format for --huggingface-key-map")
+            return 1
         
     # Create the evaluator
     try:
@@ -123,7 +148,12 @@ def deploy_command(args):
             metric_folders=args.metrics_folders,
             display_name=args.display_name or args.id,
             description=args.description or f"Evaluator: {args.id}",
-            force=args.force
+            force=args.force,
+            huggingface_dataset=args.huggingface_dataset,
+            huggingface_split=args.huggingface_split,
+            huggingface_message_key_map=huggingface_message_key_map,
+            huggingface_prompt_key=args.huggingface_prompt_key,
+            huggingface_response_key=args.huggingface_response_key
         )
         
         print(f"Successfully created evaluator: {evaluator['name']}")
@@ -703,9 +733,11 @@ def parse_args(args=None):
         nargs="+",
         help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'"
     )
+    
+    # Make samples optional to allow HF dataset option
     preview_parser.add_argument(
         "--samples", "-s",
-        required=True,
+        required=False,
         help="Path to JSONL file containing sample data"
     )
     preview_parser.add_argument(
@@ -713,6 +745,32 @@ def parse_args(args=None):
         type=int,
         default=5,
         help="Maximum number of samples to process (default: 5)"
+    )
+    
+    # Add HuggingFace dataset options
+    hf_group = preview_parser.add_argument_group("HuggingFace Dataset Options")
+    hf_group.add_argument(
+        "--huggingface-dataset", "--hf",
+        help="HuggingFace dataset name (e.g., 'deepseek-ai/DeepSeek-ProverBench')"
+    )
+    hf_group.add_argument(
+        "--huggingface-split",
+        default="train",
+        help="Dataset split to use (default: 'train')"
+    )
+    hf_group.add_argument(
+        "--huggingface-prompt-key",
+        default="prompt",
+        help="Key in the dataset containing the prompt text (default: 'prompt')"
+    )
+    hf_group.add_argument(
+        "--huggingface-response-key",
+        default="response",
+        help="Key in the dataset containing the response text (default: 'response')"
+    )
+    hf_group.add_argument(
+        "--huggingface-key-map",
+        help="JSON mapping of dataset keys to reward-kit message keys"
     )
     
     # Deploy command
@@ -743,6 +801,32 @@ def parse_args(args=None):
         "--force", "-f",
         action="store_true",
         help="Force update if evaluator already exists"
+    )
+    
+    # Add HuggingFace dataset options to deploy command
+    hf_deploy_group = deploy_parser.add_argument_group("HuggingFace Dataset Options")
+    hf_deploy_group.add_argument(
+        "--huggingface-dataset", "--hf",
+        help="HuggingFace dataset name (e.g., 'deepseek-ai/DeepSeek-ProverBench')"
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-split",
+        default="train",
+        help="Dataset split to use (default: 'train')"
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-prompt-key",
+        default="prompt",
+        help="Key in the dataset containing the prompt text (default: 'prompt')"
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-response-key",
+        default="response",
+        help="Key in the dataset containing the response text (default: 'response')"
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-key-map",
+        help="JSON mapping of dataset keys to reward-kit message keys"
     )
     
     # Agent-eval command

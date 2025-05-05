@@ -3,12 +3,110 @@ import json
 import time
 import logging
 from pathlib import Path
+from typing import List, Dict, Any, Optional, Union
 import requests
 
 logger = logging.getLogger(__name__)
 
 # Flag to track if the preview API was successfully used
 used_preview_api = False
+
+
+def huggingface_dataset_to_jsonl(
+    dataset_name: str,
+    split: str = "train",
+    output_file: Optional[str] = None,
+    max_samples: int = 100,
+    message_key_map: Optional[Dict[str, str]] = None,
+    response_key: str = "response",
+    prompt_key: str = "prompt",
+) -> str:
+    """
+    Converts a HuggingFace dataset to JSONL format suitable for reward-kit evaluation.
+    
+    Args:
+        dataset_name: The name of the HuggingFace dataset (e.g., "deepseek-ai/DeepSeek-ProverBench")
+        split: The dataset split to use (default: "train")
+        output_file: Optional file path to save the JSONL output (if None, generates a temp file)
+        max_samples: Maximum number of samples to include
+        message_key_map: Optional mapping of dataset keys to reward-kit message keys
+        response_key: Key in the dataset containing the response text (default: "response")
+        prompt_key: Key in the dataset containing the prompt text (default: "prompt")
+        
+    Returns:
+        Path to the generated JSONL file
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        raise ImportError(
+            "The 'datasets' package is required to use this function. "
+            "Please install it with 'pip install \"reward-kit[deepseek]\"'"
+        )
+    
+    import tempfile
+    
+    # Load dataset from Hugging Face
+    logger.info(f"Loading dataset {dataset_name} (split: {split})")
+    dataset = load_dataset(dataset_name, split=split)
+    
+    # Generate output file if not provided
+    if not output_file:
+        temp_dir = tempfile.gettempdir()
+        dataset_basename = dataset_name.split("/")[-1]
+        output_file = os.path.join(temp_dir, f"{dataset_basename}_{split}_{int(time.time())}.jsonl")
+    
+    # Create the output directory if it doesn't exist
+    os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+    
+    # Default key mapping if not provided
+    if message_key_map is None:
+        message_key_map = {}
+    
+    # Process dataset items
+    count = 0
+    with open(output_file, "w") as f:
+        # Limit to max_samples
+        for item in dataset:
+            if count >= max_samples:
+                break
+            
+            # Skip items without required keys
+            if prompt_key not in item and "statement" not in item:
+                continue
+            
+            # Convert dataset item to reward-kit format
+            prompt_text = item.get(prompt_key, item.get("statement", ""))
+            response_text = item.get(response_key, item.get("reference_solution", item.get("expected_proof", "")))
+            
+            if not prompt_text or not response_text:
+                continue
+                
+            # Create messages array
+            messages = [
+                {"role": "user", "content": prompt_text},
+                {"role": "assistant", "content": response_text}
+            ]
+            
+            # Create the entry with messages
+            entry = {"messages": messages}
+            
+            # Add additional fields based on key mapping
+            for ds_key, rk_key in message_key_map.items():
+                if ds_key in item:
+                    entry[rk_key] = item[ds_key]
+            
+            # Add all remaining keys as kwargs
+            for key, value in item.items():
+                if key not in [prompt_key, response_key] and key not in message_key_map:
+                    entry[key] = value
+            
+            # Write the entry
+            f.write(json.dumps(entry) + "\n")
+            count += 1
+    
+    logger.info(f"Converted {count} samples to JSONL format: {output_file}")
+    return output_file
 
 
 class EvaluatorPreviewResult:
@@ -825,6 +923,11 @@ def preview_evaluation(
     folder=None,
     sample_file=None,
     max_samples=5,
+    huggingface_dataset=None,
+    huggingface_split="train",
+    huggingface_message_key_map=None,
+    huggingface_response_key="response",
+    huggingface_prompt_key="prompt",
 ):
     """
     Preview an evaluation with sample data
@@ -835,6 +938,11 @@ def preview_evaluation(
         folder: Path to folder with multiple metrics (for multi_metrics mode)
         sample_file: Path to sample JSONL file
         max_samples: Maximum number of samples to process
+        huggingface_dataset: Optional HuggingFace dataset name (e.g., "deepseek-ai/DeepSeek-ProverBench")
+        huggingface_split: Dataset split to use (default: "train")
+        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
+        huggingface_response_key: Key in the dataset containing the response (default: "response")
+        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
 
     Returns:
         EvaluatorPreviewResult with preview results
@@ -859,15 +967,42 @@ def preview_evaluation(
 
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
+    
+    # If HuggingFace dataset is specified, convert it to JSONL first
+    if huggingface_dataset:
+        if sample_file:
+            logger.warning(
+                f"Both sample_file and huggingface_dataset specified. "
+                f"Using HuggingFace dataset: {huggingface_dataset}"
+            )
+            
+        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
+        sample_file = huggingface_dataset_to_jsonl(
+            dataset_name=huggingface_dataset,
+            split=huggingface_split,
+            max_samples=max_samples,
+            message_key_map=huggingface_message_key_map,
+            response_key=huggingface_response_key,
+            prompt_key=huggingface_prompt_key,
+        )
+        logger.info(f"Converted dataset saved to: {sample_file}")
+    
+    if not sample_file:
+        raise ValueError("Either sample_file or huggingface_dataset must be specified")
 
     return evaluator.preview(sample_file, max_samples)
 
 
 def preview_folder_evaluation(
     evaluator_folder,
-    sample_file,
+    sample_file=None,
     max_samples=5,
     multi_metrics=False,
+    huggingface_dataset=None,
+    huggingface_split="train",
+    huggingface_message_key_map=None,
+    huggingface_response_key="response",
+    huggingface_prompt_key="prompt",
 ):
     """
     Preview an evaluation from a folder with sample data.
@@ -879,6 +1014,11 @@ def preview_folder_evaluation(
         sample_file: Path to the sample JSONL file
         max_samples: Maximum number of samples to process
         multi_metrics: Whether this is a multi-metrics evaluation
+        huggingface_dataset: Optional HuggingFace dataset name (e.g., "deepseek-ai/DeepSeek-ProverBench")
+        huggingface_split: Dataset split to use (default: "train")
+        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
+        huggingface_response_key: Key in the dataset containing the response (default: "response")
+        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
 
     Returns:
         EvaluatorPreviewResult with preview results
@@ -937,6 +1077,28 @@ def preview_folder_evaluation(
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
+    
+    # If HuggingFace dataset is specified, convert it to JSONL first
+    if huggingface_dataset:
+        if sample_file:
+            logger.warning(
+                f"Both sample_file and huggingface_dataset specified. "
+                f"Using HuggingFace dataset: {huggingface_dataset}"
+            )
+            
+        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
+        sample_file = huggingface_dataset_to_jsonl(
+            dataset_name=huggingface_dataset,
+            split=huggingface_split,
+            max_samples=max_samples,
+            message_key_map=huggingface_message_key_map,
+            response_key=huggingface_response_key,
+            prompt_key=huggingface_prompt_key,
+        )
+        logger.info(f"Converted dataset saved to: {sample_file}")
+    
+    if not sample_file:
+        raise ValueError("Either sample_file or huggingface_dataset must be specified")
 
     # Run the preview
     return evaluator.preview(sample_file, max_samples)
@@ -950,6 +1112,11 @@ def create_evaluation(
     display_name=None,
     description=None,
     force=False,
+    huggingface_dataset=None,
+    huggingface_split="train",
+    huggingface_message_key_map=None,
+    huggingface_response_key="response",
+    huggingface_prompt_key="prompt",
 ):
     """
     Create an evaluation on the Fireworks platform
@@ -962,6 +1129,11 @@ def create_evaluation(
         display_name: Display name for the evaluator
         description: Description of the evaluator
         force: If True, update the evaluator if it already exists
+        huggingface_dataset: Optional HuggingFace dataset name to use as evaluation data
+        huggingface_split: Dataset split to use (default: "train")
+        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
+        huggingface_response_key: Key in the dataset containing the response (default: "response")
+        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
 
     Returns:
         Created evaluator object
@@ -986,6 +1158,16 @@ def create_evaluation(
 
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
+            
+    # If using HuggingFace dataset, we need to convert it to JSONL and upload it
+    # Currently we only support preview with HF datasets
+    # Future work: Handle actual uploads of HF datasets to Fireworks
+    if huggingface_dataset:
+        logger.info(f"HuggingFace dataset specified: {huggingface_dataset}")
+        logger.info("Currently, HuggingFace datasets are supported for evaluation preview only.")
+        logger.info("To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()")
+        
+        # We could add dataset upload code here in the future
 
     return evaluator.create(evaluator_id, display_name, description, force)
 
@@ -997,6 +1179,11 @@ def deploy_folder_evaluation(
     description=None,
     force=False,
     multi_metrics=False,
+    huggingface_dataset=None,
+    huggingface_split="train",
+    huggingface_message_key_map=None,
+    huggingface_response_key="response",
+    huggingface_prompt_key="prompt",
 ):
     """
     Deploy an evaluation from a folder to the Fireworks platform.
@@ -1010,6 +1197,11 @@ def deploy_folder_evaluation(
         description: Description of the evaluator
         force: If True, update the evaluator if it already exists
         multi_metrics: Whether this is a multi-metrics evaluation (auto-detected if not specified)
+        huggingface_dataset: Optional HuggingFace dataset name to use as evaluation data
+        huggingface_split: Dataset split to use (default: "train")
+        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
+        huggingface_response_key: Key in the dataset containing the response (default: "response")
+        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
 
     Returns:
         Created evaluator object
@@ -1076,6 +1268,16 @@ def deploy_folder_evaluation(
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
+            
+    # If using HuggingFace dataset, we need to convert it to JSONL and upload it
+    # Currently we only support preview with HF datasets
+    # Future work: Handle actual uploads of HF datasets to Fireworks
+    if huggingface_dataset:
+        logger.info(f"HuggingFace dataset specified: {huggingface_dataset}")
+        logger.info("Currently, HuggingFace datasets are supported for evaluation preview only.")
+        logger.info("To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()")
+        
+        # We could add dataset upload code here in the future
 
     # Deploy the evaluation
     return evaluator.create(evaluator_id, display_name, description, force)

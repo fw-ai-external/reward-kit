@@ -38,6 +38,12 @@ class TestCLI:
         args.metrics_folders = ["test=./test"]
         args.samples = "test.jsonl"
         args.max_samples = 5
+        # Add HuggingFace attributes
+        args.huggingface_dataset = None
+        args.huggingface_split = "train"
+        args.huggingface_prompt_key = "prompt"
+        args.huggingface_response_key = "response"
+        args.huggingface_key_map = None
         
         # Mock Path.exists to return True
         with patch("reward_kit.cli.Path.exists", return_value=True):
@@ -49,7 +55,12 @@ class TestCLI:
             mock_preview.assert_called_once_with(
                 metric_folders=["test=./test"],
                 sample_file="test.jsonl",
-                max_samples=5
+                max_samples=5,
+                huggingface_dataset=None,
+                huggingface_split="train",
+                huggingface_prompt_key="prompt",
+                huggingface_response_key="response",
+                huggingface_message_key_map=None
             )
             mock_preview_result.display.assert_called_once()
     
@@ -66,6 +77,12 @@ class TestCLI:
         args.display_name = "Test Evaluator"
         args.description = "Test description"
         args.force = True
+        # Add HuggingFace attributes
+        args.huggingface_dataset = None
+        args.huggingface_split = "train"
+        args.huggingface_prompt_key = "prompt"
+        args.huggingface_response_key = "response"
+        args.huggingface_key_map = None
         
         # Run the command
         result = deploy_command(args)
@@ -77,15 +94,23 @@ class TestCLI:
             metric_folders=["test=./test"],
             display_name="Test Evaluator",
             description="Test description",
-            force=True
+            force=True,
+            huggingface_dataset=None,
+            huggingface_split="train",
+            huggingface_message_key_map=None,
+            huggingface_prompt_key="prompt",
+            huggingface_response_key="response"
         )
     
     @patch("reward_kit.cli.check_environment", return_value=False)
     def test_command_environment_check(self, mock_check):
         """Test that commands check the environment."""
-        # Create args
+        # Create args with huggingface attributes
         preview_args = argparse.Namespace()
+        preview_args.huggingface_key_map = None
+        
         deploy_args = argparse.Namespace()
+        deploy_args.huggingface_key_map = None
         
         # Run the commands
         preview_result = preview_command(preview_args)

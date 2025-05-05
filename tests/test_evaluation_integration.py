@@ -315,6 +315,12 @@ def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_p
             args.metrics_folders = [f"test_metric={tmp_dir}"]
             args.samples = sample_file
             args.max_samples = 2
+            # Add HuggingFace attributes with None values
+            args.huggingface_dataset = None
+            args.huggingface_split = "train"
+            args.huggingface_prompt_key = "prompt"
+            args.huggingface_response_key = "response"
+            args.huggingface_key_map = None
             
             # Run preview command
             with patch('reward_kit.cli.Path.exists', return_value=True):
@@ -325,7 +331,12 @@ def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_p
                 mock_preview.assert_called_once_with(
                     metric_folders=[f"test_metric={tmp_dir}"],
                     sample_file=sample_file,
-                    max_samples=2
+                    max_samples=2,
+                    huggingface_dataset=None,
+                    huggingface_split="train",
+                    huggingface_prompt_key="prompt",
+                    huggingface_response_key="response",
+                    huggingface_message_key_map=None
                 )
                 mock_preview_result.display.assert_called_once()
         
@@ -346,6 +357,12 @@ def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_p
             args.display_name = "Test Evaluator"
             args.description = "Test description"
             args.force = False
+            # Add HuggingFace attributes with None values
+            args.huggingface_dataset = None
+            args.huggingface_split = "train"
+            args.huggingface_prompt_key = "prompt"
+            args.huggingface_response_key = "response"
+            args.huggingface_key_map = None
             
             # Run deploy command
             result = deploy_command(args)
@@ -357,7 +374,12 @@ def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_p
                 metric_folders=[f"test_metric={tmp_dir}"],
                 display_name="Test Evaluator",
                 description="Test description",
-                force=False
+                force=False,
+                huggingface_dataset=None,
+                huggingface_split="train",
+                huggingface_message_key_map=None,
+                huggingface_prompt_key="prompt",
+                huggingface_response_key="response"
             )
             
     finally:

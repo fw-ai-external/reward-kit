@@ -20,6 +20,10 @@ setup(
             "mypy>=0.812",
             "flake8>=3.9.2",
         ],
+        "deepseek": [
+            "datasets>=2.12.0",
+            "difflib>=3.0.0",
+        ],
     },
     entry_points={
         "console_scripts": [

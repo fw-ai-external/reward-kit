@@ -16,11 +16,13 @@ from . import length
 from . import repetition
 from . import cpp_code
 from . import accuracy_length
+from . import lean_prover
 
 # Directly import specific reward functions for easy access
 from .code_execution import fractional_code_reward
 from .cpp_code import ioi_cpp_code_reward, binary_cpp_code_reward
 from .accuracy_length import cosine_scaled_accuracy_length_reward
+from .lean_prover import lean_prover_reward, deepseek_prover_v2_reward, deepseek_huggingface_prover_benchmark
 
 __all__ = [
     "function_calling", 
@@ -36,8 +38,12 @@ __all__ = [
     "repetition",
     "cpp_code",
     "accuracy_length",
+    "lean_prover",
     "fractional_code_reward",
     "ioi_cpp_code_reward",
     "binary_cpp_code_reward",
-    "cosine_scaled_accuracy_length_reward"
+    "cosine_scaled_accuracy_length_reward",
+    "lean_prover_reward",
+    "deepseek_prover_v2_reward",
+    "deepseek_huggingface_prover_benchmark"
 ]

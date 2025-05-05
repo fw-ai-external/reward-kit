@@ -262,6 +262,47 @@ Here's a guide to help you choose the appropriate reward function for your task:
 | Validating tool use and function calls | `composite_function_call_reward` |
 | Checking structured data outputs | `json_schema_reward` |
 | Evaluating mathematical solutions | `math_reward` |
+| Evaluating formal proofs in Lean | `lean_prover_reward`, `deepseek_prover_v2_reward` |
+
+### Lean Theorem Prover Rewards
+
+These reward functions evaluate formal proofs written in the Lean theorem prover language.
+
+- **Lean Prover Reward**: Basic evaluation of Lean proofs
+  ```python
+  from reward_kit.rewards.lean_prover import lean_prover_reward
+  
+  result = lean_prover_reward(
+      response=model_response,
+      statement="For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2.",
+      lean_version="4",
+      check_partial_progress=True
+  )
+  ```
+
+- **DeepSeek Prover V2 Reward**: Evaluate Lean proofs with focus on subgoal decomposition
+  ```python
+  from reward_kit.rewards.lean_prover import deepseek_prover_v2_reward
+  
+  result = deepseek_prover_v2_reward(
+      response=model_response,
+      statement="For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2.",
+      check_subgoals=True,
+      verbose=True
+  )
+  ```
+
+- **DeepSeek HuggingFace Prover Benchmark**: Evaluate proofs against the DeepSeek-ProverBench dataset
+  ```python
+  from reward_kit.rewards.lean_prover import deepseek_huggingface_prover_benchmark
+  
+  result = deepseek_huggingface_prover_benchmark(
+      response=model_response,
+      statement="For any positive integers a and b, gcd(a,b) divides any linear combination of a and b",
+      dataset_name="deepseek-ai/DeepSeek-ProverBench",
+      check_for_answer=True
+  )
+  ```
 
 ## Combining Reward Functions
 
@@ -341,6 +382,7 @@ Reward Kit offers pre-built functions that combine multiple metrics:
   - [Function Calling Rewards](function_calling_evaluation.md)
   - [JSON Schema Validation](json_schema_validation.md)
   - [Math Evaluation](math_evaluation.md)
+  - [DeepSeek-Prover-V2](deepseek_prover_v2.md)
   - [Combined Metrics Rewards](../api_reference/reward_functions/combined.md)
 - Learn how to [create your own reward functions](../tutorials/creating_your_first_reward_function.md)
 - Read [best practices](../tutorials/best_practices.md) for effective evaluations

@@ -1,0 +1,212 @@
+# DeepSeek-Prover-V2 Reward Functions
+
+This document describes the reward functions for evaluating Lean theorem proofs based on the [DeepSeek-Prover-V2](https://github.com/deepseek-ai/DeepSeek-Prover-V2) research paper from DeepSeek.
+
+## Overview
+
+DeepSeek-Prover-V2 is an advanced large language model specifically designed for formal theorem proving in Lean 4. It incorporates both informal mathematical reasoning and formal theorem proving capabilities, with a particular focus on subgoal decomposition for tackling complex mathematical proofs.
+
+The reward functions in this module evaluate how well model responses can formulate valid Lean proofs, with special attention to the recursive subgoal decomposition technique central to DeepSeek-Prover-V2's approach.
+
+## Reward Functions
+
+Three reward functions are provided:
+
+1. `lean_prover_reward`: A basic reward function for evaluating Lean proofs
+2. `deepseek_prover_v2_reward`: An enhanced reward function that also evaluates quality of subgoal decomposition
+3. `deepseek_huggingface_prover_benchmark`: A reward function for evaluating against the DeepSeek-ProverBench dataset from Hugging Face
+
+## Installation
+
+Basic functionality requires only the standard reward-kit installation:
+
+```bash
+pip install reward-kit
+```
+
+For using the HuggingFace dataset integration with `deepseek_huggingface_prover_benchmark`, install the dependencies:
+
+```bash
+pip install "reward-kit[deepseek]"
+```
+
+## Usage
+
+### Basic Lean Prover Reward
+
+```python
+from reward_kit.rewards.lean_prover import lean_prover_reward
+
+statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+response = """
+theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
+begin
+  induction n with d hd,
+  { simp, },
+  { sorry }
+end
+"""
+
+result = lean_prover_reward(
+    response=response,
+    statement=statement,
+    lean_version="4",
+    check_partial_progress=True,
+    verbose=True
+)
+
+print(result.score)  # Example output: 0.25
+```
+
+### DeepSeek Prover V2 Reward
+
+```python
+from reward_kit.rewards.lean_prover import deepseek_prover_v2_reward
+
+statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+response = """
+theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
+begin
+  -- We'll prove this by induction on n
+  induction n with d hd,
+  -- Base case: n = 0
+  { simp, },
+  -- Inductive step: assume true for n = d, prove for n = d + 1
+  { 
+    have step1 : ∑ i in range (d + 1), i = (∑ i in range d, i) + d,
+      by simp [sum_range_succ],
+    have step2 : (∑ i in range d, i) + d = d * (d + 1) / 2 + d,
+      by rw [hd],
+    calc
+      ∑ i in range (d + 1), i = (∑ i in range d, i) + d : by simp [sum_range_succ]
+      ... = d * (d + 1) / 2 + d : by rw [hd]
+      ... = (d * (d + 1) + 2 * d) / 2 : by ring
+      ... = (d + 1) * ((d + 1) + 1) / 2 : by ring,
+  }
+end
+"""
+
+result = deepseek_prover_v2_reward(
+    response=response,
+    statement=statement,
+    check_subgoals=True,
+    verbose=True
+)
+
+print(result.score)  # Example output: 0.85
+```
+
+### HuggingFace ProverBench Evaluation
+
+```python
+from reward_kit.rewards.lean_prover import deepseek_huggingface_prover_benchmark
+
+# This function will attempt to find a matching problem in the DeepSeek-ProverBench dataset
+# Requires installation of the Hugging Face datasets package: pip install datasets
+result = deepseek_huggingface_prover_benchmark(
+    response=response,
+    statement="For any positive integers a and b, gcd(a,b) divides any linear combination of a and b",
+    dataset_name="deepseek-ai/DeepSeek-ProverBench",
+    check_for_answer=True,
+    verbose=True
+)
+
+print(result.score)
+```
+
+## Scoring Methodology
+
+The scoring uses the following criteria:
+
+### Basic Lean Proofs (lean_prover_reward)
+
+- **0.0**: No valid Lean proof attempt
+- **0.1-0.4**: Has definition but incomplete proof (with "sorry" or "admitted")
+  - Score scales based on number of tactics used
+- **0.5-0.9**: Complete proof with varying complexity
+  - Base score of 0.5 for complete proofs
+  - Up to 0.4 additional points based on tactics complexity
+- **1.0**: Perfect match with expected answer if provided
+
+### DeepSeek-Prover-V2 Specific (deepseek_prover_v2_reward)
+
+Builds on the basic scoring and adds:
+
+- **Subgoal Quality**: Up to +0.3 based on effective use of subgoals
+- **Hierarchical Structure**: Up to +0.2 based on proof's hierarchical depth
+
+## Example Output
+
+Verbose output with `verbose=True` includes detailed breakdown of the evaluation:
+
+```python
+# Example of accessing metrics in verbose output
+if result.metrics:
+    print(f"Score: {result.score}")
+    
+    # Basic syntax metrics
+    syntax_score = result.metrics["syntax"].score
+    print(f"Syntax score: {syntax_score}")
+    
+    # Completeness metrics
+    completeness = result.metrics["completeness"].score
+    print(f"Completeness: {completeness}")
+    
+    # For DeepSeek-specific metrics
+    if "subgoal_decomposition" in result.metrics:
+        subgoal_score = result.metrics["subgoal_decomposition"].score
+        print(f"Subgoal quality: {subgoal_score}")
+        
+    if "hierarchical_structure" in result.metrics:
+        hierarchy_score = result.metrics["hierarchical_structure"].score
+        print(f"Hierarchical structure: {hierarchy_score}")
+```
+
+The metrics include:
+- `syntax`: Score for valid theorem definition
+- `completeness`: Whether the proof is complete (not using "sorry" or "admitted")
+- `tactics`: Evaluation of the tactics used
+- `subgoal_decomposition`: Quality of subgoal usage (DeepSeek-specific)
+- `hierarchical_structure`: Quality of hierarchical organization (DeepSeek-specific)
+
+### Using with the HuggingFace Dataset
+
+For more extensive evaluation with a full dataset:
+
+```python
+from datasets import load_dataset
+from reward_kit.rewards.lean_prover import deepseek_huggingface_prover_benchmark
+
+# Load the dataset
+dataset = load_dataset("deepseek-ai/DeepSeek-ProverBench")
+
+# Sample a few statements to evaluate
+statements = [item["statement"] for item in dataset["train"][:5]]
+
+# Evaluate each proof
+for statement in statements:
+    # Your model generates a proof for the statement
+    lean_proof = generate_proof_with_your_model(statement)
+    
+    # Evaluate against the dataset
+    result = deepseek_huggingface_prover_benchmark(
+        response=lean_proof,
+        statement=statement,
+        dataset_name="deepseek-ai/DeepSeek-ProverBench",
+        verbose=True
+    )
+    
+    print(f"Statement: {statement[:50]}...")
+    print(f"Score: {result.score}")
+    
+    # Check if the dataset matched successfully
+    if "dataset_match" in result.metrics:
+        match_score = result.metrics["dataset_match"].score
+        match_reason = result.metrics["dataset_match"].reason
+        print(f"Dataset match: {match_score} - {match_reason}")
+```
+
+## References
+
+- [DeepSeek-Prover-V2 GitHub Repository](https://github.com/deepseek-ai/DeepSeek-Prover-V2)
+- [DeepSeek-ProverBench Dataset](https://huggingface.co/datasets/deepseek-ai/DeepSeek-ProverBench)

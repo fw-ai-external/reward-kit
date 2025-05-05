@@ -13,6 +13,7 @@ Reward Kit provides several pre-built reward functions for common evaluation tas
 - [**Function Calling Evaluation**](function_calling_evaluation.md) - Evaluate function calls made by AI models
 - [**JSON Schema Validation**](json_schema_validation.md) - Validate JSON outputs against schemas
 - [**Math Evaluation**](math_evaluation.md) - Evaluate mathematical answers in responses
+- [**DeepSeek-Prover-V2**](deepseek_prover_v2.md) - Evaluate formal proofs in Lean theorem prover
 
 ## Creating Your Own Reward Functions
 

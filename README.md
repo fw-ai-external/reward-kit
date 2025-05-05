@@ -1,6 +1,6 @@
 # Reward Kit
 
-Reward Kit is a library for defining, evaluating, and deploying reward functions for LLM fine-tuning. It provides tools to create custom reward functions and use them in reinforcement learning from human feedback (RLHF) workflows.
+Reward Kit is a library for defining, evaluating, and deploying reward functions for LLM fine-tuning. It provides tools to create custom reward functions and use them in reinforcement learning from machine feedback (RLMF) workflows.
 
 ## Installation
 

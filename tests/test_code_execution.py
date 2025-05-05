@@ -52,8 +52,11 @@ This will output `5`.
         monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", _HAS_E2B)
     
     @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
-    def test_execute_code_with_e2b_authentication(self):
+    def test_execute_code_with_e2b_authentication(self, monkeypatch):
         """Test that authentication error is properly handled."""
+        # Force E2B_API_KEY to None for this test
+        monkeypatch.delenv("E2B_API_KEY", raising=False)
+        
         code = "print('Hello, world!')"
         result = execute_code_with_e2b(code, language="python", api_key=None)
         

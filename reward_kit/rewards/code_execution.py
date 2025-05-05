@@ -774,6 +774,14 @@ def execute_code_with_e2b(
         }
 
     try:
+        # Check for API key
+        if api_key is None and os.environ.get("E2B_API_KEY") is None:
+            return {
+                "success": False,
+                "output": None,
+                "error": "API key is required for E2B execution. Set it using the api_key parameter or E2B_API_KEY environment variable.",
+            }
+
         # Initialize sandbox with the provided API key or use environment variable
         sandbox = Sandbox(api_key=api_key)
 

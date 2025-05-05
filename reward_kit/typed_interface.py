@@ -59,7 +59,10 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
                     # Already a Message object, use it directly
                     typed_messages.append(msg)
                 else:
-                    # It's a dictionary, convert to Message
+                    # It's a dictionary, validate and convert to Message
+                    if "role" not in msg:
+                        raise ValueError("Role is required in message")
+                    
                     role = msg.get("role", "")
                     content = msg.get("content", "")  # Default to empty string if None
                     

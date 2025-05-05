@@ -6,16 +6,24 @@ from pydantic import BaseModel, Field
 
 # Import OpenAI message types
 from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_message import FunctionCall, ChatCompletionMessageToolCall
 
-# Create a proper Message class
+# Create a Message class compatible with OpenAI's interface
 class Message(BaseModel):
     """Chat message model compatible with OpenAI's interface."""
     role: str
     content: Optional[str] = ""  # Content can be None for tool calls in OpenAI API
     name: Optional[str] = None
     tool_call_id: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    function_call: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[ChatCompletionMessageToolCall]] = None
+    function_call: Optional[FunctionCall] = None
+    
+    # Model validators
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        if isinstance(obj, dict) and "role" not in obj:
+            raise ValueError("Role is required")
+        return super().model_validate(obj, *args, **kwargs)
 
 
 class MetricResult(BaseModel):

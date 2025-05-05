@@ -9,5 +9,14 @@ from . import math
 from . import code_execution
 from . import format
 from . import tag_count
+from . import accuracy
 
-__all__ = ["function_calling", "json_schema", "math", "code_execution", "format", "tag_count"]
+__all__ = [
+    "function_calling", 
+    "json_schema", 
+    "math", 
+    "code_execution", 
+    "format", 
+    "tag_count",
+    "accuracy"
+]

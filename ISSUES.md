@@ -8,7 +8,7 @@
 | ------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------- |
 | **1**         | **Format reward** (`<think>` + `<answer>` regex)  | `bool(re.match(r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$", txt, re.S))`                         | ✅ Implemented |
 | **2**         | **Tag‑count reward** (exactly one of each tag)    | Count openings/closings → `score = hits × 0.25`                                                        | ✅ Implemented |
-| **3**         | **Accuracy reward** (math / short QA)             | `verify(latex_parse(pred), latex_parse(gt)) → 1/0`                                                     |             |
+| **3**         | **Accuracy reward** (math / short QA)             | `verify(latex_parse(pred), latex_parse(gt)) → 1/0`                                                     | ✅ Implemented |
 | **4**         | **Language‑consistency reward** **(NEW)**         | `score = (# tokens in target lang) / (# tokens in CoT)` — detect language with fasttext or regex table |             |
 | **5**         | **Reasoning‑steps reward** (encourage "Step 1 …") | `len(re.findall(pattern, cot)) / 3` clipped to 1                                                       |             |
 | **6**         | **Length / cosine‑length reward**                 | Map token‑count to \[−1, +1] via linear or cosine schedule                                             |             |

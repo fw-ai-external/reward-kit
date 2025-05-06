@@ -10,6 +10,25 @@ A reward function is a mechanism for evaluating the quality of model outputs in 
 - Provide numerical scores that can be used to optimize models
 - Offer explanations for why specific scores were assigned
 
+## Getting started on www.fireworks.ai
+
+You will start your journey on our evaluators page
+
+![image](images/list_of_evaluators.png)
+
+Click on "Create Evaluator" on the upper right corner; you will be taken to the rewards page we have been working on.
+
+![image](images/create_evaluator.png)
+
+You can check out how to define an evaluator in our [tutorials](../tutorials) or in our examples for [out of the box evaluators](../examples). But before we decide on authoring any evaluators, let's actually pick a dataset creating_your_first_reward_function. Let's take a look at eval-result-job17-epoch1.
+
+![image](images/create_evaluator_data.png)
+
+It is a tool calling dataset, with messages and tools field. Let's update the evaluator to run this. We will say that if the message is longer than 3 rows, then we have engaged user for long enough and call it a success (score is 1), otherwise it is a failure (score is 0).
+
+![image](images/create_evaluator_data.png)
+
+
 ## Installation
 
 To get started with Reward Kit, install it via pip:

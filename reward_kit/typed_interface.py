@@ -18,7 +18,7 @@ class EvaluateFunction(Protocol):
 
     def __call__(
         self, messages: Union[List[Message], List[Dict[str, Any]]], **kwargs: Any
-    ) -> EvaluateResult: ...
+    ) -> Union[EvaluateResult, "RewardOutput"]: ...
 
 
 # Define return type protocol

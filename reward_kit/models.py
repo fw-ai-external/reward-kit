@@ -41,14 +41,29 @@ class EvaluateResult(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0)
     reason: Optional[str] = None
     metrics: Dict[str, MetricResult]
+    
+    def to_reward_output(self) -> "RewardOutput":
+        """Convert EvaluateResult to RewardOutput (for backwards compatibility)."""
+        metrics = {
+            k: MetricRewardOutput(
+                score=v.score,
+                reason=v.reason
+            )
+            for k, v in self.metrics.items()
+        }
+        return RewardOutput(score=self.score, metrics=metrics)
 
 
 # Original dataclass-based models for backwards compatibility
+# These are deprecated and will be removed in a future version
+# Use EvaluateResult and MetricResult instead
 @dataclass_json
 @dataclass
 class MetricRewardOutput:
     """
     Individual component metric for reward output.
+    
+    DEPRECATED: Use MetricResult instead.
 
     Args:
         score: The score value for this metric component
@@ -64,6 +79,8 @@ class MetricRewardOutput:
 class RewardOutput:
     """
     Complete output from a reward function including overall score and component metrics.
+    
+    DEPRECATED: Use EvaluateResult instead.
 
     Args:
         score: The final aggregate reward score
@@ -95,3 +112,19 @@ class RewardOutput:
     def __str__(self) -> str:
         """String representation of the reward output."""
         return json.dumps(self.to_dict(), indent=2)
+        
+    def to_evaluate_result(self) -> "EvaluateResult":
+        """Convert RewardOutput to EvaluateResult."""
+        metrics = {
+            k: MetricResult(
+                score=v.score, 
+                reason=v.reason or "", 
+                success=None
+            )
+            for k, v in self.metrics.items()
+        }
+        return EvaluateResult(
+            score=self.score,
+            reason=None,
+            metrics=metrics
+        )

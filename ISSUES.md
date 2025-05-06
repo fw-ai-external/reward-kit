@@ -1,228 +1,106 @@
-# Next set of ticket items
-## TRL adapter for reward functions
+# Reward Kit Documentation and Implementation Improvements
 
-We want to make sure the reward functions can be used with TRL as well with GRPO. I downloaded the grpo trainer code into TRL cookbooks, please check it out before implementing the TRL adapter and then make sure our reward functions can be used inside TRL as well. Our current TRL examples are not working yet since start and end of training is still exactly the same.
+## Addressing User Feedback
 
-### Implementation Plan for TRL Integration
+The following changes have been made to address feedback from users:
 
-#### Overview
-Based on the analysis of the TRL cookbook example and our reward-kit codebase, the goal is to create a seamless integration between reward-kit reward functions and TRL's GRPO trainer, as well as other TRL trainers.
-
-#### Current State Analysis
-1. The RewardFunction class already has a get_trl_adapter() method in reward_function.py lines 224-287
-2. This adapter converts our reward functions to a format compatible with TRL (handling batch inputs)
-3. TRL's GRPO trainer requires reward functions that:
-   - Process batches of completions in specific formats
-   - Support the specialized <think>/<answer> format from DeepSeek-R1
-   - Can be combined (e.g., format_reward + accuracy_reward)
-4. The existing adapter does not fully address GRPO-specific requirements
-
-#### Implementation Tasks and Testing
-
-1. **Enhance the TRL Adapter Implementation**
-   - Update adapter to support GRPO's completion format and latest TRL version
-   - Add specialized format checking for <think>/<answer> tags
-   - Improve error handling and reporting for TRL compatibility
-
-   **Testing at this stage:**
-   - Unit test: Verify adapter handles different input formats (string lists, message arrays)
-   - Unit test: Confirm adapter correctly processes GRPO-style outputs with think/answer tags
-   - Unit test: Check that batch processing works with various reward functions
-   - Edge case test: Ensure adapter gracefully handles malformed inputs, empty batches, etc.
-   - Performance test: Measure overhead of the adapter vs. direct function calls
-
-2. **Create a GRPO-Specific Format Reward**
-   - Implement a specialized reward function for GRPO format compliance
-   - Support customizable tag pairs (e.g., <think>/<answer>, <reasoning>/<solution>)
-   - Add weighting mechanism for format vs. content rewards
-
-   **Testing at this stage:**
-   - Unit test: Verify format detection for various patterns of think/answer tags
-   - Unit test: Ensure correct scoring for well-formed vs. malformed outputs
-   - Unit test: Check format scoring with different tag variations and positions
-   - Integration test: Combine format reward with accuracy reward to verify weighting
-
-3. **Implement Reward Combiners for TRL**
-   - Create utility for combining multiple reward functions with weights
-   - Support normalized and non-normalized combining methods
-   - Add GRPO-specific reward combiner that handles format+content rewards
-
-   **Testing at this stage:**
-   - Unit test: Verify weighted combinations give expected results
-   - Unit test: Test normalization methods for different reward value ranges
-   - Unit test: Check combiners work with both function-based and class-based rewards
-   - Integration test: Verify combiners work when passed to TRL trainer
-
-4. **Develop Dataset Preparation Utilities**
-   - Create converters from HuggingFace datasets to TRL training format
-   - Support custom prompt templates and formatting
-   - Add system prompt insertion for GRPO-style training
-
-   **Testing at this stage:**
-   - Unit test: Verify dataset conversion preserves sample count and content
-   - Unit test: Check system prompt is correctly inserted in converted datasets
-   - Unit test: Ensure dataset format matches what TRL trainers expect
-   - Integration test: Load converted dataset into TRL trainer to verify compatibility
-
-5. **Create End-to-End Examples**
-   - Basic example: Using a simple reward function with PPO in TRL
-   - GRPO example: Full implementation matching the cookbook pattern
-   - Advanced example: Custom reward function with specialized format
-
-   **Testing at this stage:**
-   - Smoke test: Verify examples run without errors
-   - Minimal training test: Run 5-10 steps to ensure learning happens
-   - Input/output test: Check model outputs improve according to reward function
-   - Documentation test: Ensure examples work when following documented steps
-
-6. **Add TRL Compatibility to Existing Reward Functions**
-   - Update existing rewards (accuracy, length, etc.) to work seamlessly with TRL
-   - Add TRL-specific parameters where needed
-   - Ensure rewards can be used both standalone and with TRL
-
-   **Testing at this stage:**
-   - Unit test: Verify each reward function works with TRL adapter
-   - Integration test: Test each reward with TRL in isolation
-   - Combination test: Verify multiple rewards can be used together in TRL
-
-#### Implementation Details
-
-1. **Enhanced TRL Adapter**
-```python
-def get_trl_adapter(self, format_type=None, **kwargs):
-    """
-    Create an adapter function for use with TRL library.
-    
-    Args:
-        format_type: Optional format to enforce ("grpo", "ppo", etc.)
-        **kwargs: Additional configuration parameters
-        
-    Returns:
-        A callable function compatible with TRL
-    """
-    def adapter(batch_input, batch_orig_input=None, **adapter_kwargs):
-        # Detect input format (strings vs. message arrays)
-        # Process according to format_type
-        # Handle batched inputs efficiently
-        # Return list of scores in TRL-expected format
-        pass
-    
-    return adapter
+```
+Not sure I have the full context but looks quite useful for creating complex reward functions
+A few questions:
+- What is the reward-kit CLI and how is it integrated with FW?
+- Is Reward Kit going to be the only way to create evaluators?
+- Confused b/w Evaluation Types and Reward Output Types. Examples show output of evaluator as a RewardOutput type, but evaluation types section mentions EvaluateResult as the FW compatible output type
 ```
 
-2. **GRPO Format Reward**
+## Changes Made
+
+### 1. Simplified Type System: Standardized on EvaluateResult
+
+To address the confusion between RewardOutput and EvaluateResult, we have:
+
+- Deprecated RewardOutput and standardized on EvaluateResult
+- Added conversion methods between the two types
+- Updated reward functions to return EvaluateResult
+- Added appropriate deprecation warnings
+
+This simplifies the API by having a single output type (EvaluateResult) instead of two separate types.
+
+### 2. Reward Kit CLI and Fireworks Integration
+
+The Reward Kit Command Line Interface (CLI) is a command-line tool that provides utilities for working with reward functions and evaluators. It integrates with Fireworks (FW) in the following ways:
+
+- **Authentication**: Uses Fireworks API keys for authentication through environment variables (`FIREWORKS_API_KEY`)
+- **Deployment**: Deploys reward functions to Fireworks as evaluators via the `deploy` command
+- **Preview**: Tests evaluations locally before deployment with the `preview` command
+- **Agent Evaluation**: Runs agent evaluations using the Fireworks API via the `agent-eval` command
+
+The CLI serves as a bridge between local development and the Fireworks platform, simplifying the deployment and management of evaluators.
+
+See the [CLI Reference](docs/cli_reference/cli_overview.mdx) for full details.
+
+### 3. Methods for Creating Evaluators
+
+Reward Kit is NOT the only way to create evaluators on Fireworks, but it provides a streamlined approach. Evaluators can be created through:
+
+1. **Reward Kit**: The recommended approach for Python-based evaluators, using the `@reward_function` decorator and `.deploy()` method
+2. **Direct API**: Using the Fireworks REST API to create evaluators manually
+3. **Fireworks Console**: Creating evaluators through the web-based Fireworks console (UI)
+
+Reward Kit simplifies the process by handling the deployment process, standardizing inputs/outputs, and providing local testing capabilities before deployment.
+
+## Implementation Updates
+
+### 1. Deprecation of RewardOutput
+
+The RewardOutput class has been deprecated in favor of EvaluateResult. It will be fully removed in a future version.
+
 ```python
+# Old approach (deprecated)
 @reward_function
-def grpo_format_reward(
-    messages,
-    original_messages=None,
-    think_tag="<think>",
-    answer_tag="<answer>",
-    **kwargs
-):
-    """
-    Reward function that evaluates if output follows GRPO format with think/answer tags.
-    
-    Args:
-        messages: List of conversation messages
-        original_messages: Original messages for context
-        think_tag: Tag to use for reasoning section
-        answer_tag: Tag to use for answer section
-        
-    Returns:
-        EvaluateResult with score based on format compliance
-    """
-    # Implementation that checks for proper tag usage
-    # Score based on tag presence, order, and completeness
-    pass
+def my_reward(messages, **kwargs) -> RewardOutput:
+    return RewardOutput(score=0.8, metrics={...})
+
+# New approach
+@reward_function
+def my_reward(messages, **kwargs) -> EvaluateResult:
+    return EvaluateResult(score=0.8, reason="Good response", metrics={...})
 ```
 
-3. **Reward Combiner**
+### 2. Conversion Utilities
+
+Added conversion methods between the two types:
+
 ```python
-def combine_rewards(
-    reward_functions,
-    weights=None,
-    normalize=True,
-    trl_format=True
-):
-    """
-    Combine multiple reward functions into a single reward function.
-    
-    Args:
-        reward_functions: List of RewardFunction instances
-        weights: Optional weights for each reward function
-        normalize: Whether to normalize rewards before combining
-        trl_format: Whether to return a TRL-compatible function
-        
-    Returns:
-        Combined RewardFunction instance
-    """
-    # Implementation for combining reward outputs
-    # Support for weighting and normalization
-    pass
+# Convert from RewardOutput to EvaluateResult
+evaluate_result = reward_output.to_evaluate_result()
+
+# Convert from EvaluateResult to RewardOutput (for backwards compatibility)
+reward_output = evaluate_result.to_reward_output()
 ```
 
-4. **Dataset Converter**
-```python
-def prepare_dataset_for_trl(
-    dataset_name,
-    split="train",
-    prompt_key=None,
-    response_key=None,
-    system_prompt=None,
-    format_template=None,
-    max_samples=None
-):
-    """
-    Prepare a HuggingFace dataset for use with TRL.
-    
-    Args:
-        dataset_name: Name of the HuggingFace dataset
-        split: Dataset split to use
-        prompt_key: Key for the prompt content
-        response_key: Key for the response content
-        system_prompt: Optional system prompt to prepend
-        format_template: Template for formatting prompts
-        max_samples: Maximum samples to include
-        
-    Returns:
-        Dataset in TRL-compatible format
-    """
-    # Load and convert dataset
-    # Apply formatting and templates
-    # Return in TRL format
-    pass
-```
+### 3. Backward Compatibility
 
-5. **Example of Reward-Kit with GRPO**
-```python
-def train_with_grpo():
-    """
-    Example of training with GRPO using reward-kit rewards.
-    """
-    # Load model and tokenizer
-    # Prepare dataset
-    # Define reward functions
-    # Configure GRPO trainer
-    # Run training
-    pass
-```
+We've maintained backward compatibility by:
 
-#### Testing Strategy
-- Unit tests for each component in isolation
-- Integration tests combining multiple components
-- End-to-end tests with minimal training
-- Regression tests against baseline implementations
-- Performance benchmarks for adapter overhead
+- Adding type conversion methods
+- Supporting both return types in the RewardFunction.__call__ method
+- Adding deprecation warnings
 
-#### Deliverables
-1. Enhanced TRL adapter in RewardFunction class
-2. GRPO-specific reward functions and utilities
-3. Dataset preparation utilities for TRL
-4. Example scripts demonstrating integration
-5. Comprehensive tests for all components
-6. Documentation updates explaining TRL integration
+## Documentation Updates
 
-## Support uploading of HuggingFace datasets to Fireworks dataset (requires Fireworks dataset API integration)
+The documentation has been updated to clarify these points in the following places:
 
-People should be able to just specify a huggingface dataset for evaluation job, and we should still make everything run
+- CLI Reference: Added more details about Fireworks integration
+- API Reference: Clarified that EvaluateResult is the preferred output type
+- Developer Guide: Added a section on different methods for creating evaluators
+
+## Current Status
+
+All changes have been implemented and tested. The code now:
+
+1. Uses EvaluateResult as the standard return type for reward functions
+2. Provides deprecation warnings for RewardOutput
+3. Includes conversion methods between types for backward compatibility
+4. Updates documentation to reflect these changes
+
+All tests are passing, though there are some type checking warnings that could be addressed in a follow-up update.

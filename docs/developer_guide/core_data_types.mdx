@@ -50,21 +50,22 @@ Additional fields for function/tool calling may include:
 - `tool_calls`: Tool call information
 - `function_call`: Function call information (legacy format)
 
-## Reward Output Types
+## Evaluation Output Types
 
-### `RewardOutput` Class
+### `EvaluateResult` Class
 
 ```python
-from reward_kit import RewardOutput, MetricRewardOutput
+from reward_kit import EvaluateResult, MetricResult
 
-result = RewardOutput(
+result = EvaluateResult(
     score=0.75,  # Overall score between 0.0 and 1.0
+    reason="The response meets quality requirements",  # Optional explanation
     metrics={    # Component metrics dictionary
-        "clarity": MetricRewardOutput(
+        "clarity": MetricResult(
             score=0.8,
             reason="The response is clear and concise"
         ),
-        "accuracy": MetricRewardOutput(
+        "accuracy": MetricResult(
             score=0.7,
             reason="Contains one minor factual error"
         )
@@ -72,87 +73,70 @@ result = RewardOutput(
 )
 ```
 
-The `RewardOutput` class represents the complete result of a reward function evaluation, containing:
+The `EvaluateResult` class represents the complete result of a reward function evaluation, containing:
 - An overall score (typically 0.0 to 1.0)
+- An optional reason/explanation for the overall score
 - A dictionary of component metrics
-
-### `MetricRewardOutput` Class
-
-```python
-from reward_kit import MetricRewardOutput
-
-metric = MetricRewardOutput(
-    score=0.8,  # Score for this specific metric
-    reason="Explanation for why this score was assigned"  # Optional
-)
-```
-
-The `MetricRewardOutput` class represents a single component metric in the evaluation, containing:
-- A score value (typically 0.0 to 1.0)
-- An optional reason/explanation for the score
-
-### Using Methods on RewardOutput
-
-The `RewardOutput` class provides several useful methods:
-
-```python
-# Convert to dictionary
-result_dict = result.to_dict()
-
-# Create from dictionary
-from_dict = RewardOutput.from_dict(result_dict)
-
-# String representation (JSON)
-result_json = str(result)
-```
-
-## Evaluation Types
-
-### `EvaluateResult` Class
-
-```python
-from reward_kit import EvaluateResult, MetricResult
-
-eval_result = EvaluateResult(
-    score=0.75,  # Overall score
-    reason="The response meets quality requirements",  # Optional
-    metrics={
-        "clarity": MetricResult(
-            score=0.8,
-            reason="Clear and well-structured"
-        )
-    }
-)
-```
-
-The `EvaluateResult` class is used in the evaluation preview and creation APIs. It's similar to `RewardOutput` but follows a slightly different structure for compatibility with the Fireworks evaluation system.
+- An optional error field for handling evaluation failures
 
 ### `MetricResult` Class
 
 ```python
 from reward_kit import MetricResult
 
-metric_result = MetricResult(
-    score=0.8,
-    reason="Explanation of the score",
-    success=True  # Optional, indicates success status
+metric = MetricResult(
+    score=0.8,  # Score for this specific metric
+    reason="Explanation for why this score was assigned",  # Description
+    success=True  # Optional success indicator
 )
 ```
 
-The `MetricResult` class represents a single metric in an evaluation, similar to `MetricRewardOutput` but with an additional `success` field.
+The `MetricResult` class represents a single component metric in the evaluation, containing:
+- A score value (typically 0.0 to 1.0)
+- A reason/explanation for the score
+- An optional success flag indicating if this metric evaluation was successful
+
+### Deprecated Output Types
+
+The `RewardOutput` and `MetricRewardOutput` classes are deprecated and will be removed in a future version:
+
+```python
+# Deprecated - use EvaluateResult instead
+from reward_kit import RewardOutput, MetricRewardOutput
+
+# This will show a deprecation warning
+result = RewardOutput(
+    score=0.75,
+    metrics={
+        "clarity": MetricRewardOutput(
+            score=0.8,
+            reason="The response is clear and concise"
+        )
+    }
+)
+
+# Convert to the preferred EvaluateResult format
+evaluate_result = result.to_evaluate_result()
+```
 
 ## Type Conversion
 
-The Reward Kit handles conversion between these types:
+The Reward Kit provides built-in methods for converting between types:
 
 ```python
-# Converting EvaluateResult to RewardOutput
-evaluate_result = EvaluateResult(score=0.8, metrics={"quality": MetricResult(score=0.8, reason="Good quality")})
-reward_output = convert_to_reward_output(evaluate_result)
+# Convert EvaluateResult to RewardOutput (for backwards compatibility)
+evaluate_result = EvaluateResult(
+    score=0.8, 
+    metrics={"quality": MetricResult(score=0.8, reason="Good quality")}
+)
+reward_output = evaluate_result.to_reward_output()
 
-# Converting RewardOutput to EvaluateResult
-reward_output = RewardOutput(score=0.9, metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")})
-evaluate_result = convert_to_evaluate_result(reward_output)
+# Convert RewardOutput to EvaluateResult
+reward_output = RewardOutput(
+    score=0.9, 
+    metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")}
+)
+evaluate_result = reward_output.to_evaluate_result()
 ```
 
 ## Using Types in Reward Functions
@@ -160,7 +144,7 @@ evaluate_result = convert_to_evaluate_result(reward_output)
 Here's how to use these types properly in your reward functions:
 
 ```python
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput, Message
+from reward_kit import reward_function, EvaluateResult, MetricResult, Message
 from typing import List, Optional, Dict, Any
 
 @reward_function
@@ -169,7 +153,7 @@ def my_reward_function(
     original_messages: Optional[List[Dict[str, str]]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Example reward function with proper type annotations.
     """
@@ -184,22 +168,63 @@ def my_reward_function(
     
     # Create metrics
     metrics = {
-        "clarity": MetricRewardOutput(
+        "clarity": MetricResult(
             score=clarity_score,
-            reason=f"Clarity score: {clarity_score:.2f}"
+            reason=f"Clarity score: {clarity_score:.2f}",
+            success=clarity_score >= 0.7  # Optional success indicator
         )
     }
     
-    return RewardOutput(score=clarity_score, metrics=metrics)
+    return EvaluateResult(
+        score=clarity_score, 
+        reason=f"Overall quality assessment: {clarity_score:.2f}",
+        metrics=metrics
+    )
 ```
 
 ## Best Practices for Data Types
 
-1. **Use Type Hints**: Always include proper type annotations in your functions
-2. **Default Values**: Provide defaults for optional parameters
-3. **Validation**: Validate input data before processing
-4. **Error Handling**: Handle missing or malformed data gracefully
-5. **Documentation**: Document the expected format for your inputs and outputs
+1. **Use EvaluateResult**: Always return EvaluateResult from your reward functions
+2. **Use Type Hints**: Include proper type annotations in your functions
+3. **Provide Reasons**: Include clear reason strings for both overall score and individual metrics
+4. **Use Success Flags**: Set the success flag in MetricResult to indicate pass/fail conditions
+5. **Default Values**: Provide defaults for optional parameters
+6. **Validation**: Validate input data before processing
+7. **Error Handling**: Handle missing or malformed data gracefully
+8. **Documentation**: Document the expected format for your inputs and outputs
+
+## Migration from RewardOutput to EvaluateResult
+
+If you have existing code using RewardOutput, here's how to migrate to EvaluateResult:
+
+```python
+# Old code (deprecated)
+@reward_function
+def my_reward(messages, **kwargs):
+    # ...
+    return RewardOutput(
+        score=0.75,
+        metrics={
+            "clarity": MetricRewardOutput(score=0.8, reason="Clear explanation")
+        }
+    )
+
+# New code (preferred)
+@reward_function
+def my_reward(messages, **kwargs):
+    # ...
+    return EvaluateResult(
+        score=0.75,
+        reason="Overall assessment",  # Add an overall reason
+        metrics={
+            "clarity": MetricResult(
+                score=0.8, 
+                reason="Clear explanation",
+                success=True  # Add success flag if applicable
+            )
+        }
+    )
+```
 
 ## Next Steps
 

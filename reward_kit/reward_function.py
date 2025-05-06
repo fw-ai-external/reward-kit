@@ -8,6 +8,7 @@ import requests
 from pathlib import Path
 from functools import wraps
 import logging
+import warnings
 
 from .models import (
     RewardOutput,
@@ -22,8 +23,16 @@ from .typed_interface import reward_function
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Type for reward function
-T = TypeVar("T", bound=Callable[..., RewardOutput])
+# Type for reward function (support both return types for backwards compatibility)
+T = TypeVar("T", bound=Callable[..., Union[RewardOutput, EvaluateResult]])
+
+# Show deprecation warning
+warnings.warn(
+    "RewardOutput and legacy_reward_function are deprecated and will be removed in a future version. "
+    "Use EvaluateResult and the reward_function decorator instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class RewardFunction:
@@ -136,7 +145,7 @@ class RewardFunction:
         messages: List[Dict[str, str]],
         original_messages: Optional[List[Dict[str, str]]] = None,
         **kwargs,
-    ) -> RewardOutput:
+    ) -> Union[RewardOutput, EvaluateResult]:
         """
         Call the reward function with the provided messages.
 
@@ -146,7 +155,7 @@ class RewardFunction:
             **kwargs: Additional keyword arguments to pass to the function
 
         Returns:
-            RewardOutput object with score and metrics
+            RewardOutput or EvaluateResult object with score and metrics
         """
         if original_messages is None:
             original_messages = messages[:-1] if messages else []
@@ -166,20 +175,64 @@ class RewardFunction:
                     **combined_kwargs,
                 )
 
-                # Ensure the result is a RewardOutput
+                # Handle different result types
                 if isinstance(result, RewardOutput):
+                    # Deprecated but still supported
+                    warnings.warn(
+                        "RewardOutput is deprecated. Use EvaluateResult instead.",
+                        DeprecationWarning,
+                        stacklevel=2
+                    )
+                    return result
+                elif isinstance(result, EvaluateResult):
+                    # Preferred return type
                     return result
                 elif isinstance(result, tuple) and len(result) == 2:
                     # Handle legacy (score, components) tuple format
+                    warnings.warn(
+                        "Tuple return format is deprecated. Use EvaluateResult instead.",
+                        DeprecationWarning,
+                        stacklevel=2
+                    )
                     score, components = result
+                    # Convert to EvaluateResult
                     metrics = {
-                        k: MetricRewardOutput(score=v, reason=None)
+                        k: MetricResult(score=v, reason=f"{k} score", success=None)
                         for k, v in components.items()
                     }
-                    return RewardOutput(score=score, metrics=metrics)
+                    return EvaluateResult(score=score, metrics=metrics)
+                elif isinstance(result, dict) and "score" in result:
+                    # Handle dictionary return format
+                    warnings.warn(
+                        "Dictionary return format is deprecated. Use EvaluateResult instead.",
+                        DeprecationWarning,
+                        stacklevel=2
+                    )
+                    # Convert to EvaluateResult
+                    metrics = {}
+                    if "metrics" in result:
+                        for k, v in result["metrics"].items():
+                            if isinstance(v, dict):
+                                metrics[k] = MetricResult(
+                                    score=v.get("score", 0.0),
+                                    reason=v.get("reason", f"{k} score"),
+                                    success=v.get("success", None)
+                                )
+                            else:
+                                metrics[k] = MetricResult(
+                                    score=float(v),
+                                    reason=f"{k} score",
+                                    success=None
+                                )
+                    return EvaluateResult(
+                        score=result["score"],
+                        reason=result.get("reason"),
+                        metrics=metrics
+                    )
                 else:
                     raise TypeError(
-                        f"Invalid return type from reward function: {type(result)}"
+                        f"Invalid return type from reward function: {type(result)}. "
+                        f"Expected EvaluateResult, RewardOutput, or (float, Dict[str, float]) tuple."
                     )
 
             except Exception as e:
@@ -209,9 +262,30 @@ class RewardFunction:
                 response.raise_for_status()
                 result = response.json()
 
-                # Convert the result to RewardOutput
+                # Convert the result to EvaluateResult
                 if isinstance(result, dict) and "score" in result:
-                    return RewardOutput.from_dict(result)
+                    # Create metrics dictionary
+                    metrics = {}
+                    if "metrics" in result:
+                        for k, v in result["metrics"].items():
+                            if isinstance(v, dict):
+                                metrics[k] = MetricResult(
+                                    score=v.get("score", 0.0),
+                                    reason=v.get("reason", f"{k} score"),
+                                    success=v.get("success", None)
+                                )
+                            else:
+                                metrics[k] = MetricResult(
+                                    score=float(v),
+                                    reason=f"{k} score",
+                                    success=None
+                                )
+                    
+                    return EvaluateResult(
+                        score=result["score"],
+                        reason=result.get("reason"),
+                        metrics=metrics
+                    )
                 else:
                     raise ValueError(f"Invalid response from remote endpoint: {result}")
 
@@ -254,10 +328,12 @@ class RewardFunction:
                                 if batch_orig_input
                                 else messages[:-1]
                             )
-                            reward_output = self(
+                            result = self(
                                 messages=messages, original_messages=original_msgs
                             )
-                            results.append(reward_output.score)
+                            # Handle both RewardOutput and EvaluateResult
+                            score = result.score
+                            results.append(score)
                         except Exception as e:
                             logger.error(f"Error in TRL adapter: {str(e)}")
                             results.append(0.0)
@@ -268,8 +344,10 @@ class RewardFunction:
                         try:
                             # TRL typically provides just the completion, so wrap it in a message
                             messages = [{"role": "assistant", "content": text}]
-                            reward_output = self(messages=messages)
-                            results.append(reward_output.score)
+                            result = self(messages=messages)
+                            # Handle both RewardOutput and EvaluateResult
+                            score = result.score
+                            results.append(score)
                         except Exception as e:
                             logger.error(f"Error in TRL adapter: {str(e)}")
                             results.append(0.0)
@@ -290,8 +368,10 @@ class RewardFunction:
 def legacy_reward_function(func: T) -> T:
     """
     Decorator for reward functions that adds deployment capabilities.
+    
+    DEPRECATED: Use the reward_function decorator from typed_interface instead.
 
-    This decorator wraps a function to ensure it returns a RewardOutput and adds
+    This decorator wraps a function to ensure it returns a RewardOutput or EvaluateResult and adds
     a .deploy() method that can be used to deploy the function to Fireworks.
 
     Args:
@@ -300,26 +380,75 @@ def legacy_reward_function(func: T) -> T:
     Returns:
         The decorated function with added deployment capabilities
     """
+    # Show deprecation warning
+    warnings.warn(
+        "legacy_reward_function is deprecated. Use the reward_function decorator instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
 
     @wraps(func)
-    def wrapper(*args, **kwargs) -> RewardOutput:
+    def wrapper(*args, **kwargs) -> Union[RewardOutput, EvaluateResult]:
         result = func(*args, **kwargs)
 
-        # Ensure the result is a RewardOutput
+        # Handle different return types
         if isinstance(result, RewardOutput):
+            # Deprecated but still supported
+            warnings.warn(
+                "RewardOutput is deprecated. Use EvaluateResult instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            return result
+        elif isinstance(result, EvaluateResult):
+            # Preferred return type
             return result
         elif isinstance(result, tuple) and len(result) == 2:
             # Handle legacy (score, components) tuple format
+            warnings.warn(
+                "Tuple return format is deprecated. Use EvaluateResult instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             score, components = result
+            # Convert to EvaluateResult for consistency
             metrics = {
-                k: MetricRewardOutput(score=v, reason=None)
+                k: MetricResult(score=v, reason=f"{k} score", success=None)
                 for k, v in components.items()
             }
-            return RewardOutput(score=score, metrics=metrics)
+            return EvaluateResult(score=score, metrics=metrics)
+        elif isinstance(result, dict) and "score" in result:
+            # Handle dictionary return format
+            warnings.warn(
+                "Dictionary return format is deprecated. Use EvaluateResult instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            # Convert to EvaluateResult
+            metrics = {}
+            if "metrics" in result:
+                for k, v in result["metrics"].items():
+                    if isinstance(v, dict):
+                        metrics[k] = MetricResult(
+                            score=v.get("score", 0.0),
+                            reason=v.get("reason", f"{k} score"),
+                            success=v.get("success", None)
+                        )
+                    else:
+                        metrics[k] = MetricResult(
+                            score=float(v),
+                            reason=f"{k} score",
+                            success=None
+                        )
+            return EvaluateResult(
+                score=result["score"],
+                reason=result.get("reason"),
+                metrics=metrics
+            )
         else:
             raise TypeError(
                 f"Invalid return type from reward function: {type(result)}. "
-                f"Expected RewardOutput or (float, Dict[str, float]) tuple."
+                f"Expected EvaluateResult, RewardOutput, or (float, Dict[str, float]) tuple."
             )
 
     def deploy(**config) -> str:

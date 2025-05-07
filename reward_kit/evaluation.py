@@ -3,7 +3,7 @@ import json
 import time
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union
+from typing import Dict, Optional  # List, Any, Union removed
 import requests
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def huggingface_dataset_to_jsonl(
 ) -> str:
     """
     Converts a HuggingFace dataset to JSONL format suitable for reward-kit evaluation.
-    
+
     Args:
         dataset_name: The name of the HuggingFace dataset (e.g., "deepseek-ai/DeepSeek-ProverBench")
         split: The dataset split to use (default: "train")
@@ -32,7 +32,7 @@ def huggingface_dataset_to_jsonl(
         message_key_map: Optional mapping of dataset keys to reward-kit message keys
         response_key: Key in the dataset containing the response text (default: "response")
         prompt_key: Key in the dataset containing the prompt text (default: "prompt")
-        
+
     Returns:
         Path to the generated JSONL file
     """
@@ -43,69 +43,91 @@ def huggingface_dataset_to_jsonl(
             "The 'datasets' package is required to use this function. "
             "Please install it with 'pip install \"reward-kit[deepseek]\"'"
         )
-    
+
     import tempfile
-    
+
     # Load dataset from Hugging Face
     logger.info(f"Loading dataset {dataset_name} (split: {split})")
     dataset = load_dataset(dataset_name, split=split)
-    
+
     # Generate output file if not provided
     if not output_file:
         temp_dir = tempfile.gettempdir()
         dataset_basename = dataset_name.split("/")[-1]
-        output_file = os.path.join(temp_dir, f"{dataset_basename}_{split}_{int(time.time())}.jsonl")
-    
+        output_file = os.path.join(
+            temp_dir, f"{dataset_basename}_{split}_{int(time.time())}.jsonl"
+        )
+
     # Create the output directory if it doesn't exist
     os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
-    
+
     # Default key mapping if not provided
     if message_key_map is None:
         message_key_map = {}
-    
+
     # Process dataset items
-    count = 0
+    # count = 0 # F841: Unused local variable
     with open(output_file, "w") as f:
         # Limit to max_samples
-        for item in dataset:
-            if count >= max_samples:
+        processed_samples = 0
+        for i, item in enumerate(dataset):
+            if processed_samples >= max_samples:
                 break
-            
+
             # Skip items without required keys
             if prompt_key not in item and "statement" not in item:
+                logger.debug(
+                    f"Skipping sample {i} due to missing prompt/statement key."
+                )
                 continue
-            
+
             # Convert dataset item to reward-kit format
             prompt_text = item.get(prompt_key, item.get("statement", ""))
-            response_text = item.get(response_key, item.get("reference_solution", item.get("expected_proof", "")))
-            
+            response_text = item.get(
+                response_key,
+                item.get("reference_solution", item.get("expected_proof", "")),
+            )
+
             if not prompt_text or not response_text:
+                logger.debug(
+                    f"Skipping sample {i} due to missing prompt or response text."
+                )
                 continue
-                
+
             # Create messages array
             messages = [
                 {"role": "user", "content": prompt_text},
-                {"role": "assistant", "content": response_text}
+                {"role": "assistant", "content": response_text},
             ]
-            
+
             # Create the entry with messages
             entry = {"messages": messages}
-            
+
             # Add additional fields based on key mapping
             for ds_key, rk_key in message_key_map.items():
                 if ds_key in item:
                     entry[rk_key] = item[ds_key]
-            
+
             # Add all remaining keys as kwargs
             for key, value in item.items():
-                if key not in [prompt_key, response_key] and key not in message_key_map:
+                if (
+                    key not in [prompt_key, response_key]
+                    and key not in message_key_map
+                ):
                     entry[key] = value
-            
+
             # Write the entry
             f.write(json.dumps(entry) + "\n")
-            count += 1
-    
-    logger.info(f"Converted {count} samples to JSONL format: {output_file}")
+            processed_samples += 1
+
+        # Use 'processed_samples' to report the count
+        # If loop didn't run, i might not be defined.
+        if processed_samples == 0 and i == -1:  # if dataset was empty
+            logger.info(f"No samples converted to JSONL format: {output_file}")
+        else:
+            logger.info(
+                f"Converted {processed_samples} samples to JSONL format: {output_file}"
+            )
     return output_file
 
 
@@ -156,7 +178,9 @@ class Evaluator:
         self.metric_folders = {}  # Map of metric_name -> folder_path
         self.description = ""
         self.display_name = ""
-        self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        self.api_base = os.environ.get(
+            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+        )
 
     def load_metric_folder(self, metric_name, folder_path):
         """
@@ -288,7 +312,9 @@ class Evaluator:
             EvaluatorPreviewResult containing the preview results
         """
         if not self.code_files:
-            raise ValueError("No code files loaded. Load metric folder(s) first.")
+            raise ValueError(
+                "No code files loaded. Load metric folder(s) first."
+            )
 
         if "main.py" not in self.code_files and not any(
             k.endswith("/main.py") for k in self.code_files
@@ -327,7 +353,9 @@ class Evaluator:
         }
 
         # Make API request to preview evaluator
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        api_base = os.environ.get(
+            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+        )
 
         # For dev environment, special handling for account_id
         if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
@@ -355,8 +383,12 @@ class Evaluator:
 
             # Convert API response to EvaluatorPreviewResult
             preview_result = EvaluatorPreviewResult()
-            preview_result.total_samples = result.get("totalSamples", len(samples))
-            preview_result.total_runtime_ms = int(result.get("totalRuntimeMs", 0))
+            preview_result.total_samples = result.get(
+                "totalSamples", len(samples)
+            )
+            preview_result.total_runtime_ms = int(
+                result.get("totalRuntimeMs", 0)
+            )
 
             # Process individual sample results
             sample_results = result.get("results", [])
@@ -372,7 +404,9 @@ class Evaluator:
 
         except Exception as e:
             logger.error(f"Error previewing evaluator: {str(e)}")
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(
+                e, "response"
+            ):
                 logger.error(f"Response: {e.response.text}")
 
             # Set flag to indicate fallback mode was used
@@ -401,7 +435,9 @@ class Evaluator:
             try:
                 # Sample validation
                 if "messages" not in sample:
-                    raise ValueError(f"Sample {i+1} is missing 'messages' field")
+                    raise ValueError(
+                        f"Sample {i+1} is missing 'messages' field"
+                    )
 
                 # We validate sample format but in this simulation we don't use these directly
                 # In a real implementation, these would be passed to the evaluate function
@@ -418,7 +454,11 @@ class Evaluator:
 
                 # Simple simulation of metric evaluation
                 if self.multi_metrics:
-                    per_metric_evals = {"quality": 0.8, "relevance": 0.7, "safety": 0.9}
+                    per_metric_evals = {
+                        "quality": 0.8,
+                        "relevance": 0.7,
+                        "safety": 0.9,
+                    }
                 else:
                     per_metric_evals = {
                         metric_name: 0.75 for metric_name in self.metric_folders
@@ -445,11 +485,15 @@ class Evaluator:
 
         end_time = time.time()
         # Calculate runtime in milliseconds
-        preview_result.total_runtime_ms = max(1, int((end_time - start_time) * 1000))
+        preview_result.total_runtime_ms = max(
+            1, int((end_time - start_time) * 1000)
+        )
 
         return preview_result
 
-    def create(self, evaluator_id, display_name=None, description=None, force=False):
+    def create(
+        self, evaluator_id, display_name=None, description=None, force=False
+    ):
         """
         Create the evaluation on the Fireworks platform
 
@@ -463,7 +507,9 @@ class Evaluator:
             The created evaluator object
         """
         if not self.code_files:
-            raise ValueError("No code files loaded. Load metric folder(s) first.")
+            raise ValueError(
+                "No code files loaded. Load metric folder(s) first."
+            )
 
         # Authentication
         try:
@@ -471,7 +517,9 @@ class Evaluator:
 
             # Verify API key format is valid
             if not auth_token or len(auth_token) < 10 or not account_id:
-                logger.error("API credentials appear to be invalid or incomplete")
+                logger.error(
+                    "API credentials appear to be invalid or incomplete"
+                )
                 raise ValueError(
                     "Invalid or missing API credentials. Please set valid FIREWORKS_API_KEY and "
                     "FIREWORKS_ACCOUNT_ID environment variables or configure ~/.fireworks/auth.ini"
@@ -482,11 +530,15 @@ class Evaluator:
 
         # Set display name and description
         self.display_name = display_name or evaluator_id
-        self.description = description or f"Evaluator created from {evaluator_id}"
+        self.description = (
+            description or f"Evaluator created from {evaluator_id}"
+        )
 
         # Construct the evaluation payload
         # Check if we're using the new API format
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        api_base = os.environ.get(
+            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+        )
         using_new_api = "dev.api.fireworks.ai" in api_base
 
         if using_new_api:
@@ -519,7 +571,10 @@ class Evaluator:
 
         # Make API request to create evaluator
         # For dev environment, special handling for account_id
-        if "dev.api.fireworks.ai" in self.api_base and account_id == "fireworks":
+        if (
+            "dev.api.fireworks.ai" in self.api_base
+            and account_id == "fireworks"
+        ):
             account_id = "pyroworks-dev"  # Default dev account
 
         base_url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
@@ -564,7 +619,9 @@ class Evaluator:
                                     f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}"
                                 )
                         except Exception as e:
-                            logger.warning(f"Error deleting evaluator: {str(e)}")
+                            logger.warning(
+                                f"Error deleting evaluator: {str(e)}"
+                            )
 
                         # Now create it
                         response = requests.post(
@@ -577,10 +634,14 @@ class Evaluator:
                         )
                 except requests.exceptions.RequestException:
                     # If checking fails, try to create it
-                    response = requests.post(base_url, json=payload, headers=headers)
+                    response = requests.post(
+                        base_url, json=payload, headers=headers
+                    )
             else:
                 # Just try to create it
-                response = requests.post(base_url, json=payload, headers=headers)
+                response = requests.post(
+                    base_url, json=payload, headers=headers
+                )
 
             response.raise_for_status()
             result = response.json()
@@ -589,7 +650,9 @@ class Evaluator:
             return result
         except Exception as e:
             logger.error(f"Error creating evaluator: {str(e)}")
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(
+                e, "response"
+            ):
                 logger.error(f"Response: {e.response.text}")
             raise
 
@@ -601,7 +664,9 @@ class Evaluator:
             List of assertion objects
         """
         assertions = []
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        api_base = os.environ.get(
+            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+        )
 
         if api_base.startswith("https://dev.api.fireworks.ai"):
             # New API format for dev
@@ -613,7 +678,9 @@ class Evaluator:
                     if not filename.endswith(".py"):
                         continue
 
-                    file_contents[filename] = self._update_evaluate_signature(content)
+                    file_contents[filename] = self._update_evaluate_signature(
+                        content
+                    )
 
                 assertions.append(
                     {
@@ -675,7 +742,10 @@ class Evaluator:
                     assertions.append(
                         {
                             "assertionType": "CODE",
-                            "codeAssertion": {"language": "python", "code": code},
+                            "codeAssertion": {
+                                "language": "python",
+                                "code": code,
+                            },
                             "metricName": metric_name,
                         }
                     )
@@ -696,14 +766,14 @@ class Evaluator:
 
         # Simple regex to match the old evaluate function signature
         old_pattern = r"def\s+evaluate\s*\(\s*entry\s*(?::\s*dict)?\s*\)"
-        new_signature = (
-            "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
-        )
+        new_signature = "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
 
         # Check if the old pattern exists
         if re.search(old_pattern, content):
             # Replace the old signature with the new one
-            updated_content = re.sub(old_pattern, new_signature, content, count=1)
+            updated_content = re.sub(
+                old_pattern, new_signature, content, count=1
+            )
 
             # Also add a compatibility layer at the beginning of the function
             compat_layer = """
@@ -756,7 +826,9 @@ class Evaluator:
                 continue
 
             # Add file as a section
-            simple_name = filename.split("/")[-1] if "/" in filename else filename
+            simple_name = (
+                filename.split("/")[-1] if "/" in filename else filename
+            )
             updated_content = self._update_evaluate_signature(content)
             code_parts.append(f"# From {simple_name}\n{updated_content}\n\n")
 
@@ -852,7 +924,10 @@ if __name__ == '__main__':
                     auth_config = configparser.ConfigParser()
                     auth_config.read(auth_path)
                     if "default" in auth_config:
-                        if not auth_token and "id_token" in auth_config["default"]:
+                        if (
+                            not auth_token
+                            and "id_token" in auth_config["default"]
+                        ):
                             auth_token = auth_config["default"]["id_token"]
                 except Exception:
                     # If standard parsing fails, try to read as key-value pairs
@@ -882,7 +957,9 @@ if __name__ == '__main__':
                             not account_id
                             and "account_id" in settings_config["default"]
                         ):
-                            account_id = settings_config["default"]["account_id"]
+                            account_id = settings_config["default"][
+                                "account_id"
+                            ]
                 except Exception:
                     # If standard parsing fails, try to read as key-value pairs
                     try:
@@ -951,7 +1028,9 @@ def preview_evaluation(
 
     if multi_metrics:
         if not folder:
-            raise ValueError("Folder must be specified when using multi-metrics mode")
+            raise ValueError(
+                "Folder must be specified when using multi-metrics mode"
+            )
         evaluator.load_multi_metrics_folder(folder)
     else:
         if not metric_folders:
@@ -967,7 +1046,7 @@ def preview_evaluation(
 
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
-    
+
     # If HuggingFace dataset is specified, convert it to JSONL first
     if huggingface_dataset:
         if sample_file:
@@ -975,8 +1054,10 @@ def preview_evaluation(
                 f"Both sample_file and huggingface_dataset specified. "
                 f"Using HuggingFace dataset: {huggingface_dataset}"
             )
-            
-        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
+
+        logger.info(
+            f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}"
+        )
         sample_file = huggingface_dataset_to_jsonl(
             dataset_name=huggingface_dataset,
             split=huggingface_split,
@@ -986,9 +1067,11 @@ def preview_evaluation(
             prompt_key=huggingface_prompt_key,
         )
         logger.info(f"Converted dataset saved to: {sample_file}")
-    
+
     if not sample_file:
-        raise ValueError("Either sample_file or huggingface_dataset must be specified")
+        raise ValueError(
+            "Either sample_file or huggingface_dataset must be specified"
+        )
 
     return evaluator.preview(sample_file, max_samples)
 
@@ -1045,7 +1128,9 @@ def preview_folder_evaluation(
         # Look for a structure that suggests multi-metrics
         py_files = list(Path(evaluator_folder).glob("*.py"))
         if len(py_files) > 1:
-            logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
+            logger.info(
+                f"Auto-detecting multi-metrics mode based on folder structure"
+            )
             multi_metrics = True
 
     # Create and load evaluator
@@ -1077,7 +1162,7 @@ def preview_folder_evaluation(
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
-    
+
     # If HuggingFace dataset is specified, convert it to JSONL first
     if huggingface_dataset:
         if sample_file:
@@ -1085,8 +1170,10 @@ def preview_folder_evaluation(
                 f"Both sample_file and huggingface_dataset specified. "
                 f"Using HuggingFace dataset: {huggingface_dataset}"
             )
-            
-        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
+
+        logger.info(
+            f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}"
+        )
         sample_file = huggingface_dataset_to_jsonl(
             dataset_name=huggingface_dataset,
             split=huggingface_split,
@@ -1096,9 +1183,11 @@ def preview_folder_evaluation(
             prompt_key=huggingface_prompt_key,
         )
         logger.info(f"Converted dataset saved to: {sample_file}")
-    
+
     if not sample_file:
-        raise ValueError("Either sample_file or huggingface_dataset must be specified")
+        raise ValueError(
+            "Either sample_file or huggingface_dataset must be specified"
+        )
 
     # Run the preview
     return evaluator.preview(sample_file, max_samples)
@@ -1142,7 +1231,9 @@ def create_evaluation(
 
     if multi_metrics:
         if not folder:
-            raise ValueError("Folder must be specified when using multi-metrics mode")
+            raise ValueError(
+                "Folder must be specified when using multi-metrics mode"
+            )
         evaluator.load_multi_metrics_folder(folder)
     else:
         if not metric_folders:
@@ -1158,15 +1249,19 @@ def create_evaluation(
 
             metric_name, folder_path = pair.split("=", 1)
             evaluator.load_metric_folder(metric_name, folder_path)
-            
+
     # If using HuggingFace dataset, we need to convert it to JSONL and upload it
     # Currently we only support preview with HF datasets
     # Future work: Handle actual uploads of HF datasets to Fireworks
     if huggingface_dataset:
         logger.info(f"HuggingFace dataset specified: {huggingface_dataset}")
-        logger.info("Currently, HuggingFace datasets are supported for evaluation preview only.")
-        logger.info("To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()")
-        
+        logger.info(
+            "Currently, HuggingFace datasets are supported for evaluation preview only."
+        )
+        logger.info(
+            "To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()"
+        )
+
         # We could add dataset upload code here in the future
 
     return evaluator.create(evaluator_id, display_name, description, force)
@@ -1228,7 +1323,9 @@ def deploy_folder_evaluation(
         # Look for a structure that suggests multi-metrics
         py_files = list(Path(evaluator_folder).glob("*.py"))
         if len(py_files) > 1:
-            logger.info(f"Auto-detecting multi-metrics mode based on folder structure")
+            logger.info(
+                f"Auto-detecting multi-metrics mode based on folder structure"
+            )
             multi_metrics = True
 
     # Default display name if not provided
@@ -1268,15 +1365,19 @@ def deploy_folder_evaluation(
             raise ValueError(
                 f"No valid metrics found in {evaluator_folder}. Each metric folder must contain a main.py file."
             )
-            
+
     # If using HuggingFace dataset, we need to convert it to JSONL and upload it
     # Currently we only support preview with HF datasets
     # Future work: Handle actual uploads of HF datasets to Fireworks
     if huggingface_dataset:
         logger.info(f"HuggingFace dataset specified: {huggingface_dataset}")
-        logger.info("Currently, HuggingFace datasets are supported for evaluation preview only.")
-        logger.info("To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()")
-        
+        logger.info(
+            "Currently, HuggingFace datasets are supported for evaluation preview only."
+        )
+        logger.info(
+            "To use in full evaluation, first convert to JSONL with huggingface_dataset_to_jsonl()"
+        )
+
         # We could add dataset upload code here in the future
 
     # Deploy the evaluation

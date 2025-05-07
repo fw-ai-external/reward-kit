@@ -15,24 +15,32 @@ import argparse
 import os
 from reward_kit.rewards.code_execution import e2b_code_execution_reward
 
+
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="E2B JavaScript execution reward example")
-    parser.add_argument("--api-key", help="E2B API key (or set E2B_API_KEY environment variable)")
+    parser = argparse.ArgumentParser(
+        description="E2B JavaScript execution reward example"
+    )
+    parser.add_argument(
+        "--api-key",
+        help="E2B API key (or set E2B_API_KEY environment variable)",
+    )
     args = parser.parse_args()
-    
+
     # Use API key from arguments or environment variable
     api_key = args.api_key or os.environ.get("E2B_API_KEY")
-    
+
     if not api_key:
-        print("E2B API key is required. Please provide it via --api-key or set the E2B_API_KEY environment variable.")
+        print(
+            "E2B API key is required. Please provide it via --api-key or set the E2B_API_KEY environment variable."
+        )
         return
-    
+
     # Example conversation with a JavaScript coding task
     messages = [
         {
             "role": "user",
-            "content": "Write a JavaScript function to check if a string is a palindrome."
+            "content": "Write a JavaScript function to check if a string is a palindrome.",
         },
         {
             "role": "assistant",
@@ -54,31 +62,32 @@ console.log(isPalindrome("A man, a plan, a canal: Panama"));  // Should output t
 console.log(isPalindrome("hello"));  // Should output false
 ```
 
-This function removes any non-alphanumeric characters and converts the string to lowercase before checking if it reads the same forward and backward."""
-        }
+This function removes any non-alphanumeric characters and converts the string to lowercase before checking if it reads the same forward and backward.""",
+        },
     ]
-    
+
     # Define expected output
     expected_output = "true\nfalse"
-    
+
     print("Running JavaScript code in E2B sandbox...")
-    
+
     # Evaluate the code using E2B
     result = e2b_code_execution_reward(
         messages=messages,
         expected_output=expected_output,
         language="javascript",
         api_key=api_key,
-        timeout=10
+        timeout=10,
     )
-    
+
     # Display results
     print(f"\nScore: {result.score:.2f}")
     print("\nMetrics:")
-    
+
     for metric_name, metric in result.metrics.items():
         print(f"\n--- {metric_name} ---")
         print(metric.reason)
+
 
 if __name__ == "__main__":
     main()

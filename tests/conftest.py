@@ -1,6 +1,7 @@
 """
 Pytest configuration file for reward-kit tests.
 """
+
 import pytest
 from typing import List, Dict, Any, Optional
 from reward_kit.models import RewardOutput, MetricRewardOutput
@@ -11,7 +12,10 @@ def sample_messages():
     """Sample conversation messages."""
     return [
         {"role": "user", "content": "What is the weather like today?"},
-        {"role": "assistant", "content": "I don't have real-time weather data. You should check a weather service."}
+        {
+            "role": "assistant",
+            "content": "I don't have real-time weather data. You should check a weather service.",
+        },
     ]
 
 
@@ -26,13 +30,12 @@ def sample_reward_output():
     """Sample reward output structure."""
     metrics = {
         "helpfulness": MetricRewardOutput(
-            score=0.7,
-            reason="Response acknowledges limitations"
+            score=0.7, reason="Response acknowledges limitations"
         ),
         "accuracy": MetricRewardOutput(
             score=0.8,
-            reason="Response correctly states lack of access to weather data"
-        )
+            reason="Response correctly states lack of access to weather data",
+        ),
     }
     return RewardOutput(score=0.75, metrics=metrics)
 
@@ -44,6 +47,6 @@ def sample_function_call_schema():
         "name": "get_weather",
         "arguments": {
             "location": {"type": "string"},
-            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
-        }
+            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+        },
     }

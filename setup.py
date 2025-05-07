@@ -19,6 +19,7 @@ setup(
             "black>=21.5b2",
             "mypy>=0.812",
             "flake8>=3.9.2",
+            "autopep8>=1.5.0",
         ],
         "deepseek": [
             "datasets>=2.12.0",

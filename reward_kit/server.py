@@ -27,7 +27,9 @@ class Message(BaseModel):
 class RewardRequest(BaseModel):
     """Request model for reward endpoints."""
 
-    messages: List[Message] = Field(..., description="List of conversation messages")
+    messages: List[Message] = Field(
+        ..., description="List of conversation messages"
+    )
     original_messages: Optional[List[Message]] = Field(
         None, description="Original messages for context"
     )
@@ -77,7 +79,9 @@ class RewardServer:
             module = importlib.import_module(module_path)
             func = getattr(module, func_name)
 
-            logger.info(f"Loaded reward function {func_name} from {module_path}")
+            logger.info(
+                f"Loaded reward function {func_name} from {module_path}"
+            )
             return func
         except (ImportError, AttributeError) as e:
             raise ImportError(

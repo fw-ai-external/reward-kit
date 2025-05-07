@@ -171,7 +171,7 @@ Follow these coding standards for all contributions:
 
 ```bash
 # Run all tests
-pytest
+pytest tests/
 
 # Run specific test file
 pytest tests/test_evaluation.py

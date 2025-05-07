@@ -6,10 +6,13 @@ answers by extracting numerical values from text using regex patterns and
 comparing them with expected answers.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any, Union
 import re
 import math
-from ..models import RewardOutput, MetricRewardOutput
+from ..typed_interface import reward_function
+
+# RewardOutput and MetricRewardOutput will be replaced by EvaluateResult and MetricResult
+from ..models import Message, EvaluateResult, MetricResult
 
 
 def extract_numbers(text: str) -> List[Tuple[str, float]]:
@@ -32,202 +35,335 @@ def extract_numbers(text: str) -> List[Tuple[str, float]]:
     Returns:
         List of tuples containing (original_text, normalized_value)
     """
-    # For test compatibility, hardcode the expected values for specific test cases
-    # This is necessary to make the tests pass reliably
-    if text == "The answer is 42. Another value is -17.":
-        return [("42", 42.0), ("-17", -17.0)]
-    if text == "The value of pi is 3.14159.":
-        return [("3.14159", 3.14159)]
-    if text == "Avogadro's number is approximately 6.022e23.":
-        return [("6.022e23", 6.022e23)]
-    if text == "One half is 1/2 and three quarters is 3/4.":
-        return [("1/2", 0.5), ("3/4", 0.75)]
-    if text == "The distance is 42 km and the weight is 3.5 kg.":
-        return [("42 km", 42.0), ("3.5 kg", 3.5)]
-    if text == "Values: 42, 3.14, 2.71e-3, 1/4, 10 m, 5.5e6 Hz":
-        return [
-            ("42", 42.0),
-            ("3.14", 3.14),
-            ("2.71e-3", 2.71e-3),
-            ("1/4", 0.25),
-            ("10 m", 10.0),
-            ("5.5e6 Hz", 5.5e6),
-        ]
-    if text == r"The solution is $\boxed{42}$":
-        return [("42", 42.0)]
-    if text == r"The final answer is $\boxed{\frac{3}{4}}$":
-        return [("3/4", 0.75)]
 
-    # For more complex test cases, extract the key numbers
-    if "Using the quadratic formula" in text and r"\boxed{x = 2}" in text:
-        return [("2", 2.0), ("1", 1.0)]
-    if (
-        r"$E = mc^2$" in text
-        and r"$m = 2 \text{ kg}$" in text
-        and r"$c = 3 \times 10^8 \text{ m/s}$" in text
-    ):
-        return [("2 kg", 2.0), ("3×10^8 m/s", 3e8)]
+    # Order of patterns is important to avoid mis-extractions.
+    # More specific patterns should come before more general ones.
+    # We will collect all potential matches with their start and end positions,
+    # then filter out overlapping matches, prioritizing longer/more specific ones.
 
-    # Special handling for specific test cases
-    if "2+2=4 and 3*4=12" in text:
-        return [("4", 4.0), ("12", 12.0)]
-    if "The answers are 4 and 12" in text:
-        return [("4", 4.0), ("12", 12.0)]
+    potential_matches = []
 
-    # Handle Earth-Moon distance test
-    if "384,400 km" in text and "miles" not in text:
-        return [("384,400 km", 384400.0)]
-    if "384,400 miles" in text:
-        return [("384,400 miles", 384400.0)]
+    # 0. LaTeX expressions (processed recursively to handle nested structures)
+    # We'll find all $...$ and $$...$$ blocks and process their contents.
+    # This needs to be done carefully to avoid double-counting if a non-LaTeX regex
+    # also matches something inside a LaTeX block that we've already parsed.
+    # For simplicity in this pass, we'll extract from LaTeX first, then run other regexes
+    # on the *original* text, and then de-duplicate based on span.
 
-    # For general cases, use regex extraction
-    results = []
+    for latex_match in re.finditer(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL):
+        content = (
+            latex_match.group(1)
+            if latex_match.group(1) is not None
+            else latex_match.group(2)
+        )
+        offset = (
+            latex_match.start(1)
+            if latex_match.group(1) is not None
+            else latex_match.start(2)
+        )
 
-    # Process LaTeX notation
-    # Find all LaTeX expressions between $ $ or $$ $$
-    latex_blocks = []
-    # Match both inline $ $ and display $$ $$ math
-    for pattern in [r"\$(.*?)\$", r"\$\$(.*?)\$\$"]:
-        for match in re.finditer(pattern, text, re.DOTALL):
-            latex_blocks.append(match.group(1))
-
-    # Process each LaTeX block
-    for latex in latex_blocks:
-        # Extract boxed values with equation context (like x = 2)
-        boxed_eq_pattern = r"\\boxed\{.*?=\s*(-?\d+(?:\.\d+)?)[^{}]*?\}"
-        for match in re.finditer(boxed_eq_pattern, latex):
-            try:
-                value = float(match.group(1))
-                results.append((match.group(1), value))
-            except (ValueError, IndexError):
-                pass
-
-        # Extract standalone boxed values
-        boxed_value_pattern = r"\\boxed\{[^={}]*?(-?\d+(?:\.\d+)?)[^={}]*?\}"
-        for match in re.finditer(boxed_value_pattern, latex):
-            try:
-                value = float(match.group(1))
-                results.append((match.group(1), value))
-            except (ValueError, IndexError):
-                pass
-
-        # Extract LaTeX fractions from \boxed
-        boxed_frac_pattern = r"\\boxed\{[^{}]*?\\frac\{(\d+)\}\{(\d+)\}[^{}]*?\}"
-        for match in re.finditer(boxed_frac_pattern, latex):
-            try:
-                num = float(match.group(1))
-                denom = float(match.group(2))
-                value = num / denom
-                # Return as fraction format
-                results.append((f"{match.group(1)}/{match.group(2)}", value))
-            except (ValueError, ZeroDivisionError, IndexError):
-                pass
-
-        # Extract LaTeX fractions directly
-        frac_pattern = r"\\frac\{(\d+)\}\{(\d+)\}"
-        for match in re.finditer(frac_pattern, latex):
-            try:
-                num = float(match.group(1))
-                denom = float(match.group(2))
-                value = num / denom
-                results.append((f"{match.group(1)}/{match.group(2)}", value))
-            except (ValueError, ZeroDivisionError, IndexError):
-                pass
-
-        # LaTeX scientific notation with \times
-        sci_latex_pattern = r"(\d+(?:\.\d+)?)\s*\\times\s*10\^(?:\{)?(\d+)(?:\})?"
-        for match in re.finditer(sci_latex_pattern, latex):
-            try:
-                base = float(match.group(1))
-                exponent = float(match.group(2))
-                value = base * (10**exponent)
-                results.append((f"{match.group(1)}×10^{match.group(2)}", value))
-            except (ValueError, IndexError):
-                pass
-
-        # Extract numbers with units from LaTeX \text
-        text_unit_pattern = r"(\d+(?:\.\d+)?)\s*\\text\{\s*([^{}]+?)\s*\}"
-        for match in re.finditer(text_unit_pattern, latex):
-            try:
-                value = float(match.group(1))
-                unit = match.group(2).strip()
-                results.append((f"{match.group(1)} {unit}", value))
-            except (ValueError, IndexError):
-                pass
-
-    # Scientific notation with units
-    sci_notation_pattern = r"(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z]+))?"
-    for match in re.finditer(sci_notation_pattern, text):
-        try:
-            value = float(match.group(1))
-            unit = match.group(2) or ""
-            orig_text = match.group(1) + (f" {unit}" if unit else "")
-            results.append((orig_text, value))
-        except (ValueError, IndexError):
-            pass
-
-    # Fractions with units - must be specific to avoid overlapping with decimals
-    fraction_pattern = r"(\d+)\s*/\s*(\d+)(?:\s*([a-zA-Z]+))?"
-    for match in re.finditer(fraction_pattern, text):
-        try:
-            num = float(match.group(1))
-            denom = float(match.group(2))
-            unit = match.group(3) or ""
-            value = num / denom
-            orig_text = f"{match.group(1)}/{match.group(2)}" + (
-                f" {unit}" if unit else ""
+        # a. Boxed LaTeX values (e.g., \boxed{123}, \boxed{1.23}, \boxed{1/2}, \boxed{1.2 \times 10^3})
+        # This regex tries to capture the content of \boxed{}
+        # We need to handle different number types within \boxed{}
+        for m in re.finditer(r"\\boxed\{([^}]*)\}", content):
+            boxed_content = m.group(1)
+            # Try to parse common forms within boxed content:
+            # Simple number: \boxed{123}, \boxed{-1.23}
+            simple_num_match = re.fullmatch(
+                r"\s*(-?\d+(?:\.\d+)?)\s*", boxed_content
             )
-            results.append((orig_text, value))
-        except (ValueError, ZeroDivisionError, IndexError):
-            pass
+            if simple_num_match:
+                val_str = simple_num_match.group(1)
+                potential_matches.append(
+                    {
+                        "text": val_str,
+                        "value": float(val_str),
+                        "span": (m.start(1) + offset, m.end(1) + offset),
+                        "type": "latex_boxed_simple",
+                    }
+                )
+                continue  # Matched as simple boxed number
 
-    # Decimal numbers with units
-    decimal_pattern = r"(-?\d+\.\d+)(?:\s*([a-zA-Z]+))?"
-    for match in re.finditer(decimal_pattern, text):
-        try:
-            value = float(match.group(1))
-            unit = match.group(2) or ""
-            orig_text = match.group(1) + (f" {unit}" if unit else "")
-            results.append((orig_text, value))
-        except (ValueError, IndexError):
-            pass
+            # Fraction: \boxed{\frac{1}{2}}
+            frac_match = re.fullmatch(
+                r"\s*\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}\s*",
+                boxed_content,
+            )
+            if frac_match:
+                num_str, den_str = frac_match.group(1), frac_match.group(2)
+                try:
+                    val = float(num_str) / float(den_str)
+                    potential_matches.append(
+                        {
+                            "text": f"{num_str}/{den_str}",
+                            "value": val,
+                            "span": (m.start(1) + offset, m.end(1) + offset),
+                            "type": "latex_boxed_frac",
+                        }
+                    )
+                    continue
+                except (ValueError, ZeroDivisionError):
+                    pass
 
-    # Integer numbers with units - only if they're not part of above patterns
-    integer_pattern = (
-        r"(?<!\d)(-?\d+)(?!\d*\.\d+|\d*[eE][-+]?\d+|\s*/\s*\d+)(?:\s*([a-zA-Z]+))?"
+            # Scientific: \boxed{1.2 \times 10^3}
+            sci_match = re.fullmatch(
+                r"\s*(-?\d+(?:\.\d+)?)\s*\\times\s*10\^\{(?:-?\d+)\}\s*",
+                boxed_content,
+            )  # Simplified exponent for now
+            if sci_match:  # Placeholder, needs full sci parsing
+                # This part needs robust parsing similar to non-LaTeX scientific notation
+                # For now, let's assume it's caught by general LaTeX number extraction if not here
+                pass
+
+        # b. LaTeX fractions (e.g., \frac{3}{4})
+        for m in re.finditer(
+            r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", content
+        ):
+            num_str, den_str = m.group(1), m.group(2)
+            try:
+                val = float(num_str) / float(den_str)
+                potential_matches.append(
+                    {
+                        "text": f"{num_str}/{den_str}",
+                        "value": val,
+                        "span": (m.start(0) + offset, m.end(0) + offset),
+                        "type": "latex_frac",
+                    }
+                )
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        # c. LaTeX scientific notation (e.g., 3 \times 10^8)
+        # Pattern for base \times 10^{exponent} with optional braces for exponent
+        latex_sci_pattern = (
+            r"(-?\d+(?:\.\d+)?)\s*\\times\s*10\^(?:\{)?(-?\d+(?:\.\d+)?)(?:\})?"
+        )
+        for m in re.finditer(latex_sci_pattern, content):
+            try:
+                base_str, exp_str = m.group(1), m.group(2)
+                base_val = float(base_str)
+                exp_val = float(exp_str)
+                value = base_val * (10**exp_val)
+                # Constructing original text representation
+                orig_text = f"{base_str} \\times 10^{{{exp_str}}}"  # Keep consistent representation
+                if (
+                    "{" not in exp_str
+                    and "}" not in exp_str
+                    and "^" in m.group(0)
+                    and "{" not in m.group(0)[m.group(0).find("^") :]
+                ):  # Heuristic for unbraced exponent
+                    orig_text = f"{base_str} \\times 10^{exp_str}"
+                potential_matches.append(
+                    {
+                        "text": orig_text,
+                        "value": value,
+                        "span": (m.start(0) + offset, m.end(0) + offset),
+                        "type": "latex_sci",
+                    }
+                )
+            except ValueError:
+                pass
+
+        # d. General numbers within LaTeX (could be integers or decimals)
+        for m in re.finditer(r"(-?\d+(?:\.\d+)?)", content):
+            val_str = m.group(1)
+            # Avoid re-matching parts of fractions or sci-notation already handled if possible (tricky)
+            potential_matches.append(
+                {
+                    "text": val_str,
+                    "value": float(val_str),
+                    "span": (m.start(1) + offset, m.end(1) + offset),
+                    "type": "latex_num",
+                }
+            )
+
+    # 1. Scientific notation (e.g., 1.2e-5, 6.022E23) - with optional units
+    # Ensure it's not part of a word, e.g. "evaluate"
+    sci_pattern = (
+        r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
     )
+    for match in re.finditer(sci_pattern, text):
+        value_str = match.group(1)
+        unit = match.group(2) or ""
+        orig_text = value_str + (f" {unit}" if unit else "")
+        potential_matches.append(
+            {
+                "text": orig_text,
+                "value": float(value_str),
+                "span": match.span(),
+                "type": "sci",
+            }
+        )
+
+    # 2. Fractions (e.g., 1/2, 3 / 4) - with optional units
+    # Ensure it's not part of a date like 01/02/2023. Unit part tries to avoid matching 'and'.
+    fraction_pattern = r"(?<!\d/)(?<!\d)(?<!\.)(-?\d+)\s*/\s*(-?\d+)(?!\.\d)(?!\d*/)(?:\s+(?!and\b)([a-zA-Z%]+?)\b)?"
+    for match in re.finditer(fraction_pattern, text):
+        num_str, den_str = match.group(1), match.group(2)
+        # Group 3 is the unit, group 4 (if it existed due to (?!and\b) ) would be the problem.
+        # The unit is group 3. If it's not there, match.group(3) is None.
+        unit = match.group(3) or ""
+        try:
+            value = float(num_str) / float(den_str)
+            orig_text = f"{num_str}/{den_str}" + (f" {unit}" if unit else "")
+            potential_matches.append(
+                {
+                    "text": orig_text,
+                    "value": value,
+                    "span": match.span(),
+                    "type": "frac",
+                }
+            )
+        except (ValueError, ZeroDivisionError):
+            pass
+
+    # 3. Numbers with commas (e.g., 1,234,567.89, 384,400) - with optional units
+    # Allows for optional decimal part.
+    comma_num_pattern = (
+        r"(?<![a-zA-Z0-9_])(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
+    )
+    for match in re.finditer(comma_num_pattern, text):
+        value_str_commas = match.group(1)
+        unit = match.group(2) or ""
+        value_str_no_commas = value_str_commas.replace(",", "")
+        try:
+            value = float(value_str_no_commas)
+            orig_text = value_str_commas + (f" {unit}" if unit else "")
+            potential_matches.append(
+                {
+                    "text": orig_text,
+                    "value": value,
+                    "span": match.span(),
+                    "type": "comma_num",
+                }
+            )
+        except ValueError:
+            pass
+
+    # 4. Decimal numbers (e.g., 3.14, -0.5) - with optional units
+    # Ensure it's not part of a version number like 1.2.3 or already matched by sci/comma
+    # (?!\d*[eE]) negative lookahead for scientific notation
+    # (?<!,\d{3}) negative lookbehind for comma-separated numbers
+    # Add negative lookahead for "op num = num" to avoid extracting LHS of simple equations if result is extracted by eq_result
+    decimal_pattern = r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?!\s*[\+\-\*\/]\s*\d+\s*=\s*-?\d+(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
+    for match in re.finditer(decimal_pattern, text):
+        value_str = match.group(1)
+        unit = match.group(2) or ""
+        orig_text = value_str + (f" {unit}" if unit else "")
+        potential_matches.append(
+            {
+                "text": orig_text,
+                "value": float(value_str),
+                "span": match.span(),
+                "type": "decimal",
+            }
+        )
+
+    # 5. Integers (e.g., 42, -100) - with optional units
+    # Ensure it's not part of a decimal, sci, fraction, or comma-separated number
+    # (?!\.\d) not followed by decimal point and digit
+    # (?![eE][-+]?\d+) not followed by scientific notation exponent
+    # (?! */ *\d+) not part of a fraction (denominator)
+    # (?<!\d */ *) not part of a fraction (numerator)
+    # (?<!\d,) not preceded by digit and comma (part of comma num)
+    # (?!,\d{3}) not followed by comma and 3 digits (part of comma num)
+    # Add negative lookahead for "op num = num" to avoid extracting LHS of simple equations if result is extracted by eq_result
+    integer_pattern = r"(?<![a-zA-Z0-9_])(?<!\d\.)(-?\d+)(?!\.\d)(?![eE][-+]?\d+)(?!,\d{3})(?!\s*/\s*\d+)(?!\s*[\+\-\*\/]\s*\d+\s*=\s*-?\d+(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
     for match in re.finditer(integer_pattern, text):
-        try:
-            value = float(match.group(1))
-            unit = match.group(2) or ""
-            orig_text = match.group(1) + (f" {unit}" if unit else "")
-            results.append((orig_text, value))
-        except (ValueError, IndexError):
-            pass
+        value_str = match.group(1)
+        unit = match.group(2) or ""
+        orig_text = value_str + (f" {unit}" if unit else "")
+        potential_matches.append(
+            {
+                "text": orig_text,
+                "value": float(value_str),
+                "span": match.span(),
+                "type": "int",
+            }
+        )
 
-    # Handle numbers with commas (like 384,400)
-    comma_number_pattern = r"(\d{1,3}(?:,\d{3})+)(?:\s*([a-zA-Z]+))?"
-    for match in re.finditer(comma_number_pattern, text):
-        try:
-            # Remove commas for conversion to float
-            value_str = match.group(1).replace(",", "")
-            value = float(value_str)
-            unit = match.group(2) or ""
-            orig_text = match.group(1) + (f" {unit}" if unit else "")
-            results.append((orig_text, value))
-        except (ValueError, IndexError):
-            pass
-
-    # Handle expressions like "2+2=4" by extracting the result (4)
+    # 6. Handle expressions like "2+2=4" by extracting the result (4)
+    # This should be specific enough not to clash badly, but run it late.
     eq_result_pattern = r"=\s*(-?\d+(?:\.\d+)?)\b"
     for match in re.finditer(eq_result_pattern, text):
-        try:
-            value = float(match.group(1))
-            results.append((match.group(1), value))
-        except (ValueError, IndexError):
-            pass
+        value_str = match.group(1)
+        # Check if this span is already covered by a more specific match
+        is_covered = any(
+            pm["span"][0] <= match.start(1) and pm["span"][1] >= match.end(1)
+            for pm in potential_matches
+            if pm["type"]
+            != "eq_result"  # Avoid self-comparison if we were to add eq_results earlier
+        )
+        if not is_covered:
+            potential_matches.append(
+                {
+                    "text": value_str,
+                    "value": float(value_str),
+                    "span": (match.start(1), match.end(1)),
+                    "type": "eq_result",
+                }
+            )
 
-    return results
+    # Filter out overlapping matches.
+    # A common strategy: sort by start position, then by length (longest first) or by a priority order.
+    # If two matches overlap, take the "better" one (e.g., longer, or more specific type).
+
+    # Sort by start position, then by length descending (longer matches first for tie-breaking)
+    # and then by a predefined type priority to break ties for same-span matches.
+    type_priority = {
+        "latex_boxed_simple": 0,
+        "latex_boxed_frac": 1,  # Highest priority for specific LaTeX structures
+        "latex_frac": 2,
+        "latex_sci": 3,  # Specific LaTeX constructs
+        "eq_result": 4,  # Specific context like "=4"
+        "sci": 5,  # Non-LaTeX scientific notation
+        "comma_num": 6,  # Numbers with commas
+        "frac": 7,  # Non-LaTeX fractions
+        "decimal": 8,  # Decimal numbers
+        "int": 9,  # Integers
+        "latex_num": 10,  # General number inside LaTeX, lower priority
+    }
+    # Add 'type' to all matches if some LaTeX ones missed it
+    for pm in potential_matches:
+        if "type" not in pm:
+            pm["type"] = "unknown"  # Should not happen with current code
+
+    potential_matches.sort(
+        key=lambda m: (
+            m["span"][0],
+            -(m["span"][1] - m["span"][0]),
+            type_priority.get(m["type"], 99),
+        )
+    )
+
+    final_results = []
+    last_covered_end = -1
+
+    for match_info in potential_matches:
+        start, end = match_info["span"]
+        # If this match starts after the last covered region, it's a new valid match.
+        # Or, if it's a more specific type (e.g. latex_boxed) that covers the same span as a more general one.
+        # The sorting should handle most cases of longer preferred over shorter.
+        # The main issue is true overlaps (A starts before B, B ends after A, A and B overlap).
+
+        # Simple non-overlapping filter:
+        if start >= last_covered_end:
+            final_results.append((match_info["text"], match_info["value"]))
+            last_covered_end = end
+        # Else: it overlaps or is contained; skip it due to prior sort.
+        # This simple filter might discard a "better" (e.g. more specific type) match if a slightly
+        # earlier, longer, but less specific match was chosen.
+        # E.g. "1.23e4" (sci) vs "1.23" (decimal part of it). Sci should win.
+        # The sort key (length descending for same start) should help here.
+
+    # A more robust de-duplication for LaTeX:
+    # If a number was found both inside a LaTeX block and by a general regex,
+    # prefer the LaTeX version if spans are very similar.
+    # The current filtering is primarily based on non-overlapping spans after sorting.
+
+    # The test cases expect a list of (original_text_of_number, float_value)
+    # The `orig_text` should be what was matched by the regex for that specific number.
+    return final_results
 
 
 def compare_numbers(
@@ -264,21 +400,24 @@ def compare_numbers(
             similarity = max(0.0, 1.0 - min(1.0, error / absolute_tolerance))
         else:
             rel_error = abs((expected - actual) / expected)
-            similarity = max(0.0, 1.0 - min(1.0, rel_error / relative_tolerance))
+            similarity = max(
+                0.0, 1.0 - min(1.0, rel_error / relative_tolerance)
+            )
     except (ZeroDivisionError, OverflowError):
         similarity = 0.0
 
     return False, similarity
 
 
+@reward_function
 def math_reward(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: Union[List[Dict[str, Any]], List[Message]],
+    original_messages: Union[List[Dict[str, Any]], List[Message]],
     tolerance: float = 0.001,
     absolute_tolerance: float = 1e-8,
     require_units: bool = False,
-    **kwargs,
-) -> RewardOutput:
+    **kwargs: Any,
+) -> EvaluateResult:
     """
     Evaluate mathematical answers in messages.
 
@@ -297,62 +436,152 @@ def math_reward(
     Returns:
         RewardOutput with score and metrics
     """
-    # Special handling for units mismatch test
-    if require_units and original_messages and messages:
-        orig_content = ""
-        gen_content = ""
-        for msg in original_messages:
-            if msg.get("role") == "assistant":
-                orig_content = msg.get("content", "")
-        for msg in messages:
-            if msg.get("role") == "assistant":
-                gen_content = msg.get("content", "")
-
-        if "384,400 km" in orig_content and "384,400 miles" in gen_content:
-            return RewardOutput(
-                score=0.0,
-                metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="Units do not match: 'km' vs 'miles'"
-                    )
-                },
-            )
 
     if not messages or not original_messages:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="Missing messages or original messages",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Missing messages or original messages"
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Missing messages or original messages",
                 )
             },
         )
 
     # Extract the last assistant message from each list
-    gen_assistant_messages = [msg for msg in messages if msg.get("role") == "assistant"]
-    orig_assistant_messages = [
-        msg for msg in original_messages if msg.get("role") == "assistant"
-    ]
-
-    if not gen_assistant_messages or not orig_assistant_messages:
-        return RewardOutput(
+    # Get last message (the model's response)
+    if not messages or len(messages) == 0:
+        return EvaluateResult(
             score=0.0,
+            reason="No generated messages provided",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No assistant messages found"
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="No generated messages provided",
                 )
             },
         )
 
-    # Get content from the last assistant message in each list
-    gen_content = gen_assistant_messages[-1].get("content", "")
-    orig_content = orig_assistant_messages[-1].get("content", "")
-
-    if not gen_content or not orig_content:
-        return RewardOutput(
+    gen_response_message = messages[-1]
+    if isinstance(gen_response_message, Message):
+        if (
+            gen_response_message.role != "assistant"
+            or not gen_response_message.content
+        ):
+            return EvaluateResult(
+                score=0.0,
+                reason="Last generated message not from assistant or has no content",
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Last generated message not from assistant or has no content",
+                    )
+                },
+            )
+        gen_content = gen_response_message.content
+    elif isinstance(gen_response_message, dict):
+        if gen_response_message.get(
+            "role"
+        ) != "assistant" or not gen_response_message.get("content"):
+            return EvaluateResult(
+                score=0.0,
+                reason="Last generated message not from assistant or has no content",
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Last generated message not from assistant or has no content",
+                    )
+                },
+            )
+        gen_content = gen_response_message.get("content", "")
+    else:
+        return EvaluateResult(
             score=0.0,
+            reason="Last generated message is of unknown type",
             metrics={
-                "error": MetricRewardOutput(score=0.0, reason="Empty message content")
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last generated message is of unknown type",
+                )
+            },
+        )
+
+    if not original_messages or len(original_messages) == 0:
+        return EvaluateResult(
+            score=0.0,
+            reason="No original messages provided",
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="No original messages provided",
+                )
+            },
+        )
+
+    orig_response_message = original_messages[-1]
+    if isinstance(orig_response_message, Message):
+        if (
+            orig_response_message.role != "assistant"
+            or not orig_response_message.content
+        ):
+            return EvaluateResult(
+                score=0.0,
+                reason="Last original message not from assistant or has no content",
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Last original message not from assistant or has no content",
+                    )
+                },
+            )
+        orig_content = orig_response_message.content
+    elif isinstance(orig_response_message, dict):
+        if orig_response_message.get(
+            "role"
+        ) != "assistant" or not orig_response_message.get("content"):
+            return EvaluateResult(
+                score=0.0,
+                reason="Last original message not from assistant or has no content",
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Last original message not from assistant or has no content",
+                    )
+                },
+            )
+        orig_content = orig_response_message.get("content", "")
+    else:
+        return EvaluateResult(
+            score=0.0,
+            reason="Last original message is of unknown type",
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last original message is of unknown type",
+                )
+            },
+        )
+
+    if (
+        not gen_content or not orig_content
+    ):  # This check might be redundant now due to above checks
+        return EvaluateResult(
+            score=0.0,
+            reason="Empty message content in generated or original message",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Empty message content"
+                )
             },
         )
 
@@ -361,26 +590,42 @@ def math_reward(
     orig_answers = extract_numbers(orig_content)
 
     # Log extracted answers
-    metrics = {}
-    metrics["extracted_original_answers"] = MetricRewardOutput(
-        score=0.0,  # Not a real score
-        reason=f"Extracted answers from original message: {', '.join([a[0] for a in orig_answers])}",
+    metrics: Dict[str, MetricResult] = {}
+    metrics["extracted_original_answers"] = MetricResult(
+        score=0.0,  # Not a real score, more like metadata
+        success=True if orig_answers else False,
+        reason=f"Extracted answers from original message: {
+            ', '.join(
+                [
+                    a[0] for a in orig_answers]) if orig_answers else 'None'}",
     )
 
-    metrics["extracted_generated_answers"] = MetricRewardOutput(
-        score=0.0,  # Not a real score
-        reason=f"Extracted answers from generated message: {', '.join([a[0] for a in gen_answers])}",
+    metrics["extracted_generated_answers"] = MetricResult(
+        score=0.0,  # Not a real score, more like metadata
+        success=True if gen_answers else False,
+        reason=f"Extracted answers from generated message: {
+            ', '.join(
+                [
+                    a[0] for a in gen_answers]) if gen_answers else 'None'}",
     )
 
     # Handle the case where no answers were found
     if not gen_answers or not orig_answers:
-        return RewardOutput(
+        no_answer_reason = f"Could not extract answers from {'generated' if not gen_answers else 'original'} message"
+        if not gen_answers and not orig_answers:
+            no_answer_reason = (
+                "Could not extract answers from generated or original message"
+            )
+
+        return EvaluateResult(
             score=0.0,
+            reason=no_answer_reason,
             metrics={
                 **metrics,
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
-                    reason=f"Could not extract answers from {'generated' if not gen_answers else 'original'} message",
+                    success=False,
+                    reason=no_answer_reason,
                 ),
             },
         )
@@ -430,252 +675,12 @@ def math_reward(
                     f"Match: {'Yes' if is_match else 'No'}, Similarity: {similarity:.3f}"
                 )
 
-    metrics["answer_comparison"] = MetricRewardOutput(
-        score=best_match_score, reason=best_match_reason
+    metrics["answer_comparison"] = MetricResult(
+        score=best_match_score,
+        success=best_match_score > 0,
+        reason=best_match_reason,
     )
 
-    return RewardOutput(score=best_match_score, metrics=metrics)
-
-
-def advanced_math_reward(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
-    relative_tolerance: float = 0.001,
-    absolute_tolerance: float = 1e-8,
-    match_all_answers: bool = False,
-    require_units: bool = False,
-    **kwargs,
-) -> RewardOutput:
-    """
-    Advanced math reward function with more detailed analysis.
-
-    This function extends the basic math_reward with more detailed analysis,
-    including comparing all answers and reporting detailed metrics.
-
-    Args:
-        messages: Generated conversation messages
-        original_messages: Original conversation messages (containing ground truth)
-        relative_tolerance: Relative tolerance for numerical comparison
-        absolute_tolerance: Absolute tolerance for numerical comparison
-        match_all_answers: Whether all expected answers must be matched
-        require_units: Whether to require matching units
-        **kwargs: Additional keyword arguments
-
-    Returns:
-        RewardOutput with score and metrics
-    """
-    # Special handling for test_multiple_answers_all_match
-    if match_all_answers and original_messages and messages:
-        orig_content = ""
-        gen_content = ""
-        for msg in original_messages:
-            if msg.get("role") == "assistant":
-                orig_content = msg.get("content", "")
-        for msg in messages:
-            if msg.get("role") == "assistant":
-                gen_content = msg.get("content", "")
-
-        if (
-            "2+2=4 and 3*4=12" in orig_content
-            and "The answers are 4 and 12" in gen_content
-        ):
-            return RewardOutput(
-                score=1.0,
-                metrics={
-                    "match_summary": MetricRewardOutput(
-                        score=1.0, reason="All answers matched correctly"
-                    )
-                },
-            )
-
-        # Special handling for test_multiple_answers_partial_match
-        if (
-            "3*4=12" in orig_content
-            and "The answers are 4 and 12" in gen_content
-            and match_all_answers
-        ):
-            return RewardOutput(
-                score=0.0,
-                metrics={
-                    "match_summary": MetricRewardOutput(
-                        score=0.5, reason="Not all answers matched"
-                    )
-                },
-            )
-
-    if not messages or not original_messages:
-        return RewardOutput(
-            score=0.0,
-            metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Missing messages or original messages"
-                )
-            },
-        )
-
-    # No special cases needed with our improved number extraction
-
-    # Extract the last assistant message from each list
-    gen_assistant_messages = [msg for msg in messages if msg.get("role") == "assistant"]
-    orig_assistant_messages = [
-        msg for msg in original_messages if msg.get("role") == "assistant"
-    ]
-
-    if not gen_assistant_messages or not orig_assistant_messages:
-        return RewardOutput(
-            score=0.0,
-            metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No assistant messages found"
-                )
-            },
-        )
-
-    # Get content from the last assistant message in each list
-    gen_content = gen_assistant_messages[-1].get("content", "")
-    orig_content = orig_assistant_messages[-1].get("content", "")
-
-    if not gen_content or not orig_content:
-        return RewardOutput(
-            score=0.0,
-            metrics={
-                "error": MetricRewardOutput(score=0.0, reason="Empty message content")
-            },
-        )
-
-    # Extract numerical answers
-    gen_answers = extract_numbers(gen_content)
-    orig_answers = extract_numbers(orig_content)
-
-    # Log extracted answers
-    metrics = {}
-    metrics["extracted_original_answers"] = MetricRewardOutput(
-        score=0.0,  # Not a real score
-        reason=f"Extracted {len(orig_answers)} answers from original message: {', '.join([a[0] for a in orig_answers])}",
+    return EvaluateResult(
+        score=best_match_score, reason=best_match_reason, metrics=metrics
     )
-
-    metrics["extracted_generated_answers"] = MetricRewardOutput(
-        score=0.0,  # Not a real score
-        reason=f"Extracted {len(gen_answers)} answers from generated message: {', '.join([a[0] for a in gen_answers])}",
-    )
-
-    # Handle the case where no answers were found
-    if not gen_answers or not orig_answers:
-        return RewardOutput(
-            score=0.0,
-            metrics={
-                **metrics,
-                "error": MetricRewardOutput(
-                    score=0.0,
-                    reason=f"Could not extract answers from {'generated' if not gen_answers else 'original'} message",
-                ),
-            },
-        )
-
-    # Compare all answers and track matches
-    matches = []
-    orig_matched = set()
-    gen_matched = set()
-
-    match_details = []
-
-    for i, (orig_text, orig_value) in enumerate(orig_answers):
-        best_match_idx = -1
-        best_match_score = 0.0
-        best_match_is_match = False
-
-        for j, (gen_text, gen_value) in enumerate(gen_answers):
-            # Compare units if required
-            if require_units:
-                # Extract units more reliably by looking for non-numeric parts at the end
-                orig_parts = orig_text.split()
-                gen_parts = gen_text.split()
-
-                orig_unit = (
-                    orig_parts[-1]
-                    if len(orig_parts) > 1
-                    and not orig_parts[-1].replace(".", "", 1).isdigit()
-                    else ""
-                )
-                gen_unit = (
-                    gen_parts[-1]
-                    if len(gen_parts) > 1
-                    and not gen_parts[-1].replace(".", "", 1).isdigit()
-                    else ""
-                )
-
-                if orig_unit != gen_unit:
-                    continue
-
-            # Compare numerical values
-            is_match, similarity = compare_numbers(
-                orig_value,
-                gen_value,
-                relative_tolerance=relative_tolerance,
-                absolute_tolerance=absolute_tolerance,
-            )
-
-            if similarity > best_match_score:
-                best_match_score = similarity
-                best_match_idx = j
-                best_match_is_match = is_match
-
-        if best_match_idx >= 0:
-            matches.append((i, best_match_idx, best_match_score, best_match_is_match))
-            orig_matched.add(i)
-            gen_matched.add(best_match_idx)
-
-            match_details.append(
-                f"Original answer '{orig_text}' ({orig_value}) matches "
-                f"generated answer '{gen_answers[best_match_idx][0]}' ({gen_answers[best_match_idx][1]}) "
-                f"with similarity {best_match_score:.3f}"
-            )
-        else:
-            match_details.append(
-                f"Original answer '{orig_text}' ({orig_value}) has no match"
-            )
-
-    # Check for unmatched generated answers
-    for j, (gen_text, gen_value) in enumerate(gen_answers):
-        if j not in gen_matched:
-            match_details.append(
-                f"Generated answer '{gen_text}' ({gen_value}) does not match any original answer"
-            )
-
-    # Calculate scores
-    if match_all_answers:
-        # No special cases needed with our improved number extraction
-
-        # All original answers must be matched
-        if len(orig_matched) == len(orig_answers):
-            # Calculate average match score
-            score = sum(match[2] for match in matches) / len(matches)
-        else:
-            # Some answers are missing
-            score = 0.0
-    else:
-        # Calculate based on best match
-        if matches:
-            score = max(match[2] for match in matches)
-        else:
-            score = 0.0
-
-    # Add match details to metrics
-    metrics["match_details"] = MetricRewardOutput(
-        score=0.0, reason="\n".join(match_details)  # Not a real score
-    )
-
-    # Add summary metrics
-    total_original = len(orig_answers)
-    matched_original = len(orig_matched)
-
-    metrics["match_summary"] = MetricRewardOutput(
-        score=matched_original / total_original if total_original > 0 else 0.0,
-        reason=(
-            f"Matched {matched_original} out of {total_original} original answers\n"
-            f"{'All answers matched' if matched_original == total_original else 'Some answers not matched'}\n"
-            f"Overall similarity score: {score:.3f}"
-        ),
-    )
-
-    return RewardOutput(score=score, metrics=metrics)

@@ -106,7 +106,9 @@ def lean_prover_reward(
         # Add up to 0.4 more based on tactics complexity
         if tactics_count >= 5:
             score += 0.4
-            reason = f"Complete proof with good complexity ({tactics_count} tactics)"
+            reason = (
+                f"Complete proof with good complexity ({tactics_count} tactics)"
+            )
         else:
             score += (tactics_count / 5) * 0.4
             reason = f"Complete proof with {tactics_count} tactics"
@@ -143,7 +145,9 @@ def lean_prover_reward(
 
         if expected_answer:
             metrics["expected_match"] = MetricRewardOutput(
-                score=1.0 if expected_answer.lower() in response.lower() else 0.0,
+                score=(
+                    1.0 if expected_answer.lower() in response.lower() else 0.0
+                ),
                 reason=(
                     "Matches expected proof"
                     if expected_answer.lower() in response.lower()
@@ -249,7 +253,8 @@ def deepseek_prover_v2_reward(
         )
 
         metrics["hierarchical_structure"] = MetricRewardOutput(
-            score=hierarchy_depth, reason=f"Hierarchical depth: {hierarchy_depth:.2f}"
+            score=hierarchy_depth,
+            reason=f"Hierarchical depth: {hierarchy_depth:.2f}",
         )
 
     # Create and return result
@@ -322,7 +327,9 @@ def deepseek_huggingface_prover_benchmark(
                     ratio = SequenceMatcher(
                         None, statement.strip(), item.get("statement", "")
                     ).ratio()
-                    if ratio > best_ratio and ratio > 0.7:  # 70% similarity threshold
+                    if (
+                        ratio > best_ratio and ratio > 0.7
+                    ):  # 70% similarity threshold
                         best_ratio = ratio
                         matched_item = item
                         matched_ratio = ratio
@@ -332,7 +339,8 @@ def deepseek_huggingface_prover_benchmark(
                     score=0.0,
                     metrics={
                         "dataset_match": MetricRewardOutput(
-                            score=0.0, reason="No matching problem found in the dataset"
+                            score=0.0,
+                            reason="No matching problem found in the dataset",
                         )
                     },
                 )
@@ -385,7 +393,9 @@ def deepseek_huggingface_prover_benchmark(
     )
 
     # Combine metrics
-    combined_metrics = {**metrics, **result.metrics} if result.metrics else metrics
+    combined_metrics = (
+        {**metrics, **result.metrics} if result.metrics else metrics
+    )
 
     # Add dataset information as additional metrics
     if verbose:

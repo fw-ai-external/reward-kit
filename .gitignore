@@ -11,6 +11,7 @@ references
 
 samples.json
 tmp_metrics/*
+temp_metrics/*
 
 dist/*
 verl/*

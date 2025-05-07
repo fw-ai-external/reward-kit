@@ -1,8 +1,6 @@
 # Reward-Kit SDK Issues
 
+- tests/test_math.py::TestAdvancedMathReward::test_multiple_answers_all_match still has a failure
+- I get a lot of lint error, please help me fix those. Maybe just change linter to be line with 80 instead.
 
-Glaive-fc <-> function calling
-https://huggingface.co/datasets/deepseek-ai/DeepSeek-ProverBench <-> prover
-https://huggingface.co/datasets/open-r1/OpenR1-Math-220k <-> Math & can combine with length
-
-https://huggingface.co/datasets/open-r1/codeforces or https://huggingface.co/datasets/open-r1/codeforces-cots <-> Coding Or 
+Check README_dev.md for all the dev guide

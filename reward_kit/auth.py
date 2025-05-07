@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
+
 def get_authentication() -> Tuple[str, str]:
     """
     Get authentication information for the Fireworks API.
@@ -50,7 +51,9 @@ def get_authentication() -> Tuple[str, str]:
     # Handle Dev API special case for account ID
     api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
     if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
-        logger.info("Using development API base, defaulting to pyroworks-dev account")
+        logger.info(
+            "Using development API base, defaulting to pyroworks-dev account"
+        )
         account_id = "pyroworks-dev"  # Default dev account
 
     return account_id, auth_token
@@ -85,7 +88,9 @@ def get_auth_token() -> Optional[str]:
                         if key == "id_token":
                             return value
         except Exception as e:
-            logger.warning(f"Error reading auth.ini as key-value pairs: {str(e)}")
+            logger.warning(
+                f"Error reading auth.ini as key-value pairs: {str(e)}"
+            )
 
     return None
 
@@ -105,7 +110,10 @@ def get_account_id() -> Optional[str]:
     try:
         settings_config = configparser.ConfigParser()
         settings_config.read(settings_path)
-        if "default" in settings_config and "account_id" in settings_config["default"]:
+        if (
+            "default" in settings_config
+            and "account_id" in settings_config["default"]
+        ):
             return settings_config["default"]["account_id"]
     except Exception:
         # If standard parsing fails, try to read as key-value pairs
@@ -119,6 +127,8 @@ def get_account_id() -> Optional[str]:
                         if key == "account_id":
                             return value
         except Exception as e:
-            logger.warning(f"Error reading settings.ini as key-value pairs: {str(e)}")
+            logger.warning(
+                f"Error reading settings.ini as key-value pairs: {str(e)}"
+            )
 
     return None

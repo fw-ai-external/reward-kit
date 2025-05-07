@@ -12,8 +12,8 @@ import re
 import json
 import asyncio
 import aiohttp
-from typing import Dict, List, Any, Optional, Union, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional, Union  # Tuple removed
+from dataclasses import dataclass  # field removed
 
 from ..models import MetricRewardOutput, RewardOutput, Message
 from ..reward_function import reward_function
@@ -24,6 +24,7 @@ class TestResult:
     """
     Represents the result of a single test case execution.
     """
+
     test_name: str
     score: float = 0.0
     status: str = "SKIPPED"
@@ -34,27 +35,28 @@ class TestResult:
 
 class PistonError(Exception):
     """Exception raised for errors from the Piston API."""
+
     pass
 
 
 class PistonClient:
     """
     A client that communicates with Piston API endpoints for code execution.
-    
+
     Piston is a general purpose code execution engine:
     https://github.com/engineer-man/piston
     """
-    
+
     def __init__(
         self,
         base_endpoint: str = "https://emkc.org/api/v2/piston",
         session: Optional[aiohttp.ClientSession] = None,
-        timeout: int = 30
+        timeout: int = 30,
     ):
         self.base_endpoint = base_endpoint
         self._session = session
         self.timeout = timeout
-        
+
     @property
     def session(self):
         if self._session is None:
@@ -67,20 +69,22 @@ class PistonClient:
                 ),
             )
         return self._session
-    
+
     async def close(self):
         """Close the session."""
         if self._session:
             await self._session.close()
             self._session = None
-    
+
     async def get_runtimes(self) -> List[Dict[str, Any]]:
         """Get list of supported runtimes."""
-        async with self.session.get(f"{self.base_endpoint}/runtimes") as response:
+        async with self.session.get(
+            f"{self.base_endpoint}/runtimes"
+        ) as response:
             if response.status != 200:
                 raise PistonError(f"Error getting runtimes: {response.status}")
             return await response.json()
-    
+
     async def execute(
         self,
         language: str,
@@ -91,11 +95,11 @@ class PistonClient:
         compile_timeout: int = 10000,
         run_timeout: int = 3000,
         compile_memory_limit: int = -1,
-        run_memory_limit: int = -1
+        run_memory_limit: int = -1,
     ) -> Dict[str, Any]:
         """
         Execute code using the Piston API.
-        
+
         Args:
             language: Programming language (e.g., "c", "cpp")
             version: Version of the language (e.g., "10.2.0")
@@ -106,7 +110,7 @@ class PistonClient:
             run_timeout: Maximum execution time in milliseconds
             compile_memory_limit: Maximum memory for compilation in bytes (-1 for unlimited)
             run_memory_limit: Maximum memory for execution in bytes (-1 for unlimited)
-            
+
         Returns:
             Dictionary containing the execution results
         """
@@ -119,38 +123,42 @@ class PistonClient:
             "compile_timeout": compile_timeout,
             "run_timeout": run_timeout,
             "compile_memory_limit": compile_memory_limit,
-            "run_memory_limit": run_memory_limit
+            "run_memory_limit": run_memory_limit,
         }
-        
+
         async with self.session.post(
             f"{self.base_endpoint}/execute",
             json=payload,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         ) as response:
             if response.status != 200:
                 error_text = await response.text()
-                raise PistonError(f"Error executing code: {response.status} - {error_text}")
-            
+                raise PistonError(
+                    f"Error executing code: {response.status} - {error_text}"
+                )
+
             result = await response.json()
-            
+
             # Check for internal errors
             if "message" in result:
                 raise PistonError(result["message"])
-                
+
             return result
 
 
 def get_piston_client(endpoint: Optional[str] = None) -> PistonClient:
     """
     Get a Piston client instance.
-    
+
     Args:
         endpoint: Optional custom Piston API endpoint
-        
+
     Returns:
         PistonClient instance
     """
-    piston_endpoint = endpoint or os.environ.get("PISTON_ENDPOINT", "https://emkc.org/api/v2/piston")
+    piston_endpoint = endpoint or os.environ.get(
+        "PISTON_ENDPOINT", "https://emkc.org/api/v2/piston"
+    )
     return PistonClient(base_endpoint=piston_endpoint)
 
 
@@ -176,7 +184,7 @@ def extract_code_blocks(
         # Skip if language filter is specified and doesn't match
         # C++ can be specified as cpp, c++, or just c in some cases
         lang = lang.lower()
-        
+
         # Process language filter
         if language and lang:
             if language == "cpp" and lang not in ["cpp", "c++"]:
@@ -198,19 +206,19 @@ def extract_code_blocks(
 def add_cpp_includes(code: str) -> str:
     """
     Add common C++ includes if they're missing.
-    
+
     Args:
         code: C++ code
-        
+
     Returns:
         Code with added includes if necessary
     """
     if not code:
         return code
-    
+
     # Common include for C++
     includes = []
-    
+
     # Check for standard includes
     if "#include <iostream>" not in code:
         includes.append("#include <iostream>")
@@ -218,37 +226,37 @@ def add_cpp_includes(code: str) -> str:
         includes.append("#include <vector>")
     if "#include <string>" not in code:
         includes.append("#include <string>")
-    
+
     # For competitive programming, bits/stdc++.h includes most standard libraries
     if "#include <bits/stdc++.h>" not in code:
         includes.append("#include <bits/stdc++.h>")
-    
+
     # Check for namespace
     if "using namespace std;" not in code and "std::" not in code:
         includes.append("using namespace std;")
-    
+
     if includes:
         return "\n".join(includes) + "\n\n" + code
-    
+
     return code
 
 
 def add_c_includes(code: str) -> str:
     """
     Add common C includes if they're missing.
-    
+
     Args:
         code: C code
-        
+
     Returns:
         Code with added includes if necessary
     """
     if not code:
         return code
-    
+
     # Common includes for C
     includes = []
-    
+
     # Check for standard includes
     if "#include <stdio.h>" not in code:
         includes.append("#include <stdio.h>")
@@ -256,10 +264,10 @@ def add_c_includes(code: str) -> str:
         includes.append("#include <stdlib.h>")
     if "#include <string.h>" not in code:
         includes.append("#include <string.h>")
-    
+
     if includes:
         return "\n".join(includes) + "\n\n" + code
-    
+
     return code
 
 
@@ -270,11 +278,11 @@ async def execute_cpp_code(
     version: str = "11.4.0",
     timeout: int = 5000,
     memory_limit: int = 512000000,
-    piston_endpoint: Optional[str] = None
+    piston_endpoint: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute C/C++ code using the Piston API.
-    
+
     Args:
         code: C/C++ code to execute
         stdin: Standard input to provide to the program
@@ -283,7 +291,7 @@ async def execute_cpp_code(
         timeout: Maximum execution time in milliseconds
         memory_limit: Maximum memory in bytes
         piston_endpoint: Optional custom Piston API endpoint
-        
+
     Returns:
         Dictionary with execution results
     """
@@ -292,69 +300,69 @@ async def execute_cpp_code(
         code = add_cpp_includes(code)
     else:
         code = add_c_includes(code)
-    
+
     # Set up the Piston client
     client = get_piston_client(piston_endpoint)
-    
+
     try:
         # Set up the main file
         main_file = {
             "name": "main.cpp" if language == "cpp" else "main.c",
-            "content": code
+            "content": code,
         }
-        
+
         # Execute the code
         result = await client.execute(
-            language=language, 
+            language=language,
             version=version,
             files=[main_file],
             stdin=stdin,
             compile_timeout=timeout,
             run_timeout=timeout,
-            run_memory_limit=memory_limit
+            run_memory_limit=memory_limit,
         )
-        
+
         # Check compilation errors
         if "compile" in result and result["compile"]["code"] != 0:
             return {
                 "success": False,
                 "output": None,
-                "error": f"Compilation error: {result['compile']['stderr']}"
+                "error": f"Compilation error: {result['compile']['stderr']}",
             }
-        
+
         # Check runtime errors
         if "run" in result:
             if result["run"]["code"] == 0:
                 return {
                     "success": True,
                     "output": result["run"]["stdout"],
-                    "error": None
+                    "error": None,
                 }
             else:
                 return {
                     "success": False,
-                    "output": result["run"]["stdout"] if result["run"]["stdout"] else None,
-                    "error": f"Runtime error (exit code {result['run']['code']}): {result['run']['stderr']}"
+                    "output": (
+                        result["run"]["stdout"]
+                        if result["run"]["stdout"]
+                        else None
+                    ),
+                    "error": f"Runtime error (exit code {result['run']['code']}): {result['run']['stderr']}",
                 }
-        
+
         return {
             "success": False,
             "output": None,
-            "error": "Unknown error during execution"
+            "error": "Unknown error during execution",
         }
-        
+
     except PistonError as e:
         return {
             "success": False,
             "output": None,
-            "error": f"Piston error: {str(e)}"
+            "error": f"Piston error: {str(e)}",
         }
     except Exception as e:
-        return {
-            "success": False,
-            "output": None,
-            "error": f"Error: {str(e)}"
-        }
+        return {"success": False, "output": None, "error": f"Error: {str(e)}"}
     finally:
         # Ensure the session is closed
         loop = asyncio.get_event_loop()
@@ -364,11 +372,11 @@ async def execute_cpp_code(
 def compare_outputs(actual: str, expected: str) -> float:
     """
     Compare actual and expected outputs to calculate a similarity score.
-    
+
     Args:
         actual: Actual output from code execution
         expected: Expected output
-        
+
     Returns:
         Similarity score between 0.0 and 1.0
     """
@@ -376,26 +384,26 @@ def compare_outputs(actual: str, expected: str) -> float:
         actual = ""
     if expected is None:
         expected = ""
-        
+
     # Normalize outputs by removing whitespace variations
-    actual_norm = re.sub(r'\s+', ' ', actual.strip())
-    expected_norm = re.sub(r'\s+', ' ', expected.strip())
-    
+    actual_norm = re.sub(r"\s+", " ", actual.strip())
+    expected_norm = re.sub(r"\s+", " ", expected.strip())
+
     # Exact match
     if actual_norm == expected_norm:
         return 1.0
-    
+
     # Handle numeric comparison
     try:
         # Try to convert to float, handle both integers and floating point values
         actual_num = float(actual_norm)
         expected_num = float(expected_norm)
-        
+
         if expected_num == 0:
             return 1.0 if actual_num == 0 else 0.0
-            
+
         rel_diff = abs(actual_num - expected_num) / abs(expected_num)
-        
+
         if rel_diff <= 0.001:  # Very close
             return 1.0
         elif rel_diff <= 0.01:  # Close
@@ -407,16 +415,16 @@ def compare_outputs(actual: str, expected: str) -> float:
     except (ValueError, TypeError):
         # Not numeric values, continue with other comparisons
         pass
-    
+
     # If outputs are multi-line, compare line by line
-    if '\n' in actual_norm or '\n' in expected_norm:
-        actual_lines = actual_norm.split('\n')
-        expected_lines = expected_norm.split('\n')
-        
+    if "\n" in actual_norm or "\n" in expected_norm:
+        actual_lines = actual_norm.split("\n")
+        expected_lines = expected_norm.split("\n")
+
         common_len = min(len(actual_lines), len(expected_lines))
         if common_len == 0:
             return 0.0
-            
+
         # Calculate line-by-line similarity
         line_similarities = []
         for i in range(common_len):
@@ -424,18 +432,24 @@ def compare_outputs(actual: str, expected: str) -> float:
                 line_similarities.append(1.0)
             else:
                 # Use string similarity for different lines
-                line_similarities.append(string_similarity(actual_lines[i], expected_lines[i]))
-        
+                line_similarities.append(
+                    string_similarity(actual_lines[i], expected_lines[i])
+                )
+
         # Average similarity, weighted by line importance (first lines more important)
         total_weight = sum(1 / (i + 1) for i in range(common_len))
-        weighted_sum = sum((1 / (i + 1)) * sim for i, sim in enumerate(line_similarities))
+        weighted_sum = sum(
+            (1 / (i + 1)) * sim for i, sim in enumerate(line_similarities)
+        )
         similarity = weighted_sum / total_weight if total_weight > 0 else 0.0
-        
+
         # Penalize for length difference
-        length_penalty = min(len(actual_lines), len(expected_lines)) / max(len(actual_lines), len(expected_lines))
-        
+        length_penalty = min(len(actual_lines), len(expected_lines)) / max(
+            len(actual_lines), len(expected_lines)
+        )
+
         return similarity * length_penalty
-    
+
     # Fallback to string similarity
     return string_similarity(actual_norm, expected_norm)
 
@@ -443,11 +457,11 @@ def compare_outputs(actual: str, expected: str) -> float:
 def string_similarity(s1: str, s2: str) -> float:
     """
     Calculate string similarity.
-    
+
     Args:
         s1: First string
         s2: Second string
-        
+
     Returns:
         Similarity score between 0.0 and 1.0
     """
@@ -455,7 +469,7 @@ def string_similarity(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    
+
     # Simple Levenshtein distance-based similarity
     distance = levenshtein_distance(s1, s2)
     max_len = max(len(s1), len(s2))
@@ -465,20 +479,20 @@ def string_similarity(s1: str, s2: str) -> float:
 def levenshtein_distance(s1: str, s2: str) -> int:
     """
     Calculate the Levenshtein distance between two strings.
-    
+
     Args:
         s1: First string
         s2: Second string
-        
+
     Returns:
         Edit distance between strings
     """
     if len(s1) < len(s2):
         return levenshtein_distance(s2, s1)
-    
+
     if not s2:
         return len(s1)
-    
+
     previous_row = range(len(s2) + 1)
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
@@ -488,7 +502,7 @@ def levenshtein_distance(s1: str, s2: str) -> int:
             substitutions = previous_row[j] + (c1 != c2)
             current_row.append(min(insertions, deletions, substitutions))
         previous_row = current_row
-    
+
     return previous_row[-1]
 
 
@@ -499,11 +513,11 @@ async def run_cpp_test_cases(
     version: str = "11.4.0",
     timeout: int = 5000,
     memory_limit: int = 512000000,
-    piston_endpoint: Optional[str] = None
+    piston_endpoint: Optional[str] = None,
 ) -> List[TestResult]:
     """
     Run C/C++ code against multiple test cases.
-    
+
     Args:
         code: C/C++ code to execute
         test_cases: List of test cases with "input" and "expected_output" keys
@@ -512,18 +526,18 @@ async def run_cpp_test_cases(
         timeout: Maximum execution time in milliseconds
         memory_limit: Maximum memory in bytes
         piston_endpoint: Optional custom Piston API endpoint
-        
+
     Returns:
         List of TestResult objects
     """
     results = []
-    
+
     # Process each test case sequentially
     for i, test_case in enumerate(test_cases):
         test_input = test_case.get("input", "")
         expected_output = test_case.get("expected_output", "")
         test_name = test_case.get("name", f"Test {i+1}")
-        
+
         # Execute code with test input
         execution_result = await execute_cpp_code(
             code=code,
@@ -532,23 +546,22 @@ async def run_cpp_test_cases(
             version=version,
             timeout=timeout,
             memory_limit=memory_limit,
-            piston_endpoint=piston_endpoint
+            piston_endpoint=piston_endpoint,
         )
-        
+
         # Process the result
         test_result = TestResult(
-            test_name=test_name,
-            expected_output=expected_output
+            test_name=test_name, expected_output=expected_output
         )
-        
+
         if execution_result["success"]:
             actual_output = execution_result["output"]
             test_result.actual_output = actual_output
-            
+
             # Compare with expected output
             similarity = compare_outputs(actual_output, expected_output)
             test_result.score = similarity
-            
+
             # Determine status based on similarity
             if similarity >= 0.99:
                 test_result.status = "AC"  # Accepted
@@ -556,26 +569,32 @@ async def run_cpp_test_cases(
                 test_result.status = "PA"  # Partially Accepted
             else:
                 test_result.status = "WA"  # Wrong Answer
-                
+
             test_result.feedback = f"Similarity: {similarity:.2f}"
         else:
-            test_result.status = "CE" if "Compilation error" in execution_result["error"] else "RE"
+            test_result.status = (
+                "CE"
+                if "Compilation error" in execution_result["error"]
+                else "RE"
+            )
             test_result.feedback = execution_result["error"]
             test_result.score = 0.0
-        
+
         results.append(test_result)
-        
+
         # If a test fails, we can optionally stop testing
         if test_result.score == 0.0:
             break
-            
+
     return results
 
 
 @reward_function
 def ioi_cpp_code_reward(
     messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None,
+    original_messages: Optional[
+        Union[List[Dict[str, Any]], List[Message]]
+    ] = None,
     expected_output: Optional[str] = None,
     test_cases: Optional[List[Dict[str, Any]]] = None,
     language: str = "cpp",
@@ -584,7 +603,7 @@ def ioi_cpp_code_reward(
     memory_limit: int = 512000000,
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> RewardOutput:
     """
     Wrapper function for the asynchronous implementation to make it compatible with the reward_function decorator.
@@ -592,7 +611,7 @@ def ioi_cpp_code_reward(
     # Create a new event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     try:
         # This calls the actual implementation with all the same arguments
         return _ioi_cpp_code_reward_impl(
@@ -606,7 +625,7 @@ def ioi_cpp_code_reward(
             memory_limit=memory_limit,
             piston_endpoint=piston_endpoint,
             pass_threshold=pass_threshold,
-            **kwargs
+            **kwargs,
         )
     finally:
         loop.close()
@@ -614,7 +633,9 @@ def ioi_cpp_code_reward(
 
 def _ioi_cpp_code_reward_impl(
     messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None,
+    original_messages: Optional[
+        Union[List[Dict[str, Any]], List[Message]]
+    ] = None,
     expected_output: Optional[str] = None,
     test_cases: Optional[List[Dict[str, Any]]] = None,
     language: str = "cpp",
@@ -623,14 +644,14 @@ def _ioi_cpp_code_reward_impl(
     memory_limit: int = 512000000,
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> RewardOutput:
     """
     Evaluate C/C++ code correctness using the Piston execution engine.
-    
+
     This function evaluates code for competitive programming problems (like IOI)
     by compiling and executing C/C++ code against test cases.
-    
+
     Args:
         messages: Generated conversation messages
         original_messages: Original conversation context (optional)
@@ -643,57 +664,64 @@ def _ioi_cpp_code_reward_impl(
         piston_endpoint: Optional custom Piston API endpoint
         pass_threshold: Similarity threshold for considering a test passed
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         RewardOutput with score and metrics
     """
     # Initialize metrics dictionary
     metrics = {}
-    
+
     # Extract the last assistant message
     if not messages:
         return RewardOutput(
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="No messages provided")}
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0, reason="No messages provided"
+                )
+            },
         )
-    
+
     last_message = messages[-1]
-    
+
     # Check role of the last message
     if getattr(last_message, "role", last_message.get("role")) != "assistant":
         return RewardOutput(
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="Last message is not from assistant")}
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0, reason="Last message is not from assistant"
+                )
+            },
         )
-    
+
     # Get content from the message
     content = getattr(last_message, "content", last_message.get("content", ""))
-    
+
     # Extract code blocks from the message
     code_blocks = extract_code_blocks(content, language)
-    
+
     if not code_blocks:
         return RewardOutput(
             score=0.0,
-            metrics={"error": MetricRewardOutput(
-                score=0.0, 
-                reason=f"No {language} code blocks found in message"
-            )}
+            metrics={
+                "error": MetricRewardOutput(
+                    score=0.0,
+                    reason=f"No {language} code blocks found in message",
+                )
+            },
         )
-    
+
     # Extract expected output if not provided directly
     if expected_output is None and original_messages and not test_cases:
         # Convert original_messages to standard dict format if needed
         orig_msgs = []
         for msg in original_messages:
             if hasattr(msg, "role"):
-                orig_msgs.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
+                orig_msgs.append({"role": msg.role, "content": msg.content})
             else:
                 orig_msgs.append(msg)
-        
+
         # Try to find expected output in the original messages
         for msg in orig_msgs:
             if msg.get("role") == "user":
@@ -720,139 +748,150 @@ def _ioi_cpp_code_reward_impl(
 
                 if expected_output:
                     break
-    
+
     # Use the first code block for execution
     code = code_blocks[0]["code"]
-    
+
     # Log the extracted code
     metrics["extracted_code"] = MetricRewardOutput(
         score=0.0,  # Not a real score
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
-    
+
     # Add expected output to metrics if available
     if expected_output and not test_cases:
         metrics["expected_output"] = MetricRewardOutput(
             score=0.0,  # Not a real score
             reason=f"Expected output:\n{expected_output}",
         )
-    
+
     # Multiple test cases
     if test_cases:
         # Execute the tests and get results
         # We're already in a function that has an event loop set up,
         # so we can just use run_until_complete
-        results = asyncio.get_event_loop().run_until_complete(run_cpp_test_cases(
-            code=code,
-            test_cases=test_cases,
-            language=language,
-            version=version,
-            timeout=timeout,
-            memory_limit=memory_limit,
-            piston_endpoint=piston_endpoint
-        ))
-        
+        results = asyncio.get_event_loop().run_until_complete(
+            run_cpp_test_cases(
+                code=code,
+                test_cases=test_cases,
+                language=language,
+                version=version,
+                timeout=timeout,
+                memory_limit=memory_limit,
+                piston_endpoint=piston_endpoint,
+            )
+        )
+
         # Calculate overall score as the ratio of passed tests
         passed = sum(1 for result in results if result.score >= pass_threshold)
         total = len(results)
         overall_score = passed / total if total > 0 else 0.0
-        
+
         # Add test results to metrics
         metrics["test_results"] = MetricRewardOutput(
             score=overall_score,
-            reason=json.dumps([{
-                "test_name": result.test_name,
-                "status": result.status,
-                "score": result.score,
-                "feedback": result.feedback
-            } for result in results], indent=2)
+            reason=json.dumps(
+                [
+                    {
+                        "test_name": result.test_name,
+                        "status": result.status,
+                        "score": result.score,
+                        "feedback": result.feedback,
+                    }
+                    for result in results
+                ],
+                indent=2,
+            ),
         )
-        
+
         metrics["pass_rate"] = MetricRewardOutput(
             score=overall_score,
-            reason=f"{passed}/{total} tests passed ({overall_score:.2%})"
+            reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
-        
+
         return RewardOutput(score=overall_score, metrics=metrics)
-    
+
     # Single test case with expected output
     elif expected_output:
         # Execute the code against the expected output
-        execution_result = asyncio.get_event_loop().run_until_complete(execute_cpp_code(
-            code=code,
-            language=language,
-            version=version,
-            timeout=timeout,
-            memory_limit=memory_limit,
-            piston_endpoint=piston_endpoint
-        ))
-        
+        execution_result = asyncio.get_event_loop().run_until_complete(
+            execute_cpp_code(
+                code=code,
+                language=language,
+                version=version,
+                timeout=timeout,
+                memory_limit=memory_limit,
+                piston_endpoint=piston_endpoint,
+            )
+        )
+
         if execution_result["success"]:
             output = execution_result["output"]
-            
+
             metrics["execution_result"] = MetricRewardOutput(
                 score=1.0,
-                reason=f"Code executed successfully with output:\n{output}"
+                reason=f"Code executed successfully with output:\n{output}",
             )
-            
+
             # Compare with expected output
             similarity = compare_outputs(output, expected_output)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
-            
+
             metrics["output_match"] = MetricRewardOutput(
-                score=similarity,
-                reason=match_reason
+                score=similarity, reason=match_reason
             )
-            
+
             return RewardOutput(score=similarity, metrics=metrics)
         else:
             # Execution failed
             error = execution_result["error"]
-            
+
             metrics["execution_result"] = MetricRewardOutput(
-                score=0.0,
-                reason=f"Code execution failed with error:\n{error}"
+                score=0.0, reason=f"Code execution failed with error:\n{error}"
             )
-            
+
             return RewardOutput(score=0.0, metrics=metrics)
-    
+
     # No expected output or test cases
     else:
         # Just check if it compiles and runs
-        execution_result = asyncio.get_event_loop().run_until_complete(execute_cpp_code(
-            code=code,
-            language=language,
-            version=version,
-            timeout=timeout,
-            memory_limit=memory_limit,
-            piston_endpoint=piston_endpoint
-        ))
-        
+        execution_result = asyncio.get_event_loop().run_until_complete(
+            execute_cpp_code(
+                code=code,
+                language=language,
+                version=version,
+                timeout=timeout,
+                memory_limit=memory_limit,
+                piston_endpoint=piston_endpoint,
+            )
+        )
+
         if execution_result["success"]:
             output = execution_result["output"]
-            
+
             metrics["execution_result"] = MetricRewardOutput(
                 score=1.0,
-                reason=f"Code executed successfully with output:\n{output}"
+                reason=f"Code executed successfully with output:\n{output}",
             )
-            
+
             return RewardOutput(score=1.0, metrics=metrics)
         else:
             # Execution failed
             error = execution_result["error"]
-            
+
             metrics["execution_result"] = MetricRewardOutput(
-                score=0.0,
-                reason=f"Code execution failed with error:\n{error}"
+                score=0.0, reason=f"Code execution failed with error:\n{error}"
             )
-            
+
             return RewardOutput(score=0.0, metrics=metrics)
 
 
 @reward_function
 def binary_cpp_code_reward(
     messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None,
+    original_messages: Optional[
+        Union[List[Dict[str, Any]], List[Message]]
+    ] = None,
     expected_output: Optional[str] = None,
     test_cases: Optional[List[Dict[str, Any]]] = None,
     language: str = "cpp",
@@ -861,14 +900,14 @@ def binary_cpp_code_reward(
     memory_limit: int = 512000000,
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> RewardOutput:
     """
     Evaluate C/C++ code correctness and return a binary result (passed/failed).
-    
-    This function is a wrapper around ioi_cpp_code_reward that returns 1.0 if the 
+
+    This function is a wrapper around ioi_cpp_code_reward that returns 1.0 if the
     score is at or above the pass_threshold, and 0.0 otherwise.
-    
+
     Args:
         messages: Generated conversation messages
         original_messages: Original conversation context (optional)
@@ -881,14 +920,14 @@ def binary_cpp_code_reward(
         piston_endpoint: Optional custom Piston API endpoint
         pass_threshold: Similarity threshold for considering a test passed
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         RewardOutput with binary score (0.0 or 1.0) and metrics
     """
     # Create a new event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     try:
         # Call the main reward function using the _impl version to avoid double event loop issues
         reward_output = _ioi_cpp_code_reward_impl(
@@ -902,22 +941,22 @@ def binary_cpp_code_reward(
             memory_limit=memory_limit,
             piston_endpoint=piston_endpoint,
             pass_threshold=pass_threshold,
-            **kwargs
+            **kwargs,
         )
-        
+
         # Get the score, accessing directly since we're using the _impl version
         score = reward_output.score
-        
+
         # Convert to binary result
         binary_score = 1.0 if score >= pass_threshold else 0.0
-        
+
         # Add binary result to metrics
         metrics = dict(reward_output.metrics)
         metrics["binary_result"] = MetricRewardOutput(
             score=binary_score,
-            reason=f"{'Passed' if binary_score > 0 else 'Failed'} (threshold: {pass_threshold:.2f}, actual: {score:.2f})"
+            reason=f"{'Passed' if binary_score > 0 else 'Failed'} (threshold: {pass_threshold:.2f}, actual: {score:.2f})",
         )
-        
+
         return RewardOutput(score=binary_score, metrics=metrics)
     finally:
         loop.close()

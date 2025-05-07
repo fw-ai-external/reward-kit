@@ -7,10 +7,13 @@ import os
 import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)
 
 from reward_kit.rewards.reasoning_steps import (
-    reasoning_steps_reward, sequence_reward
+    reasoning_steps_reward,
+    sequence_reward,
 )
 from reward_kit.models import Message
 
@@ -36,21 +39,19 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         Therefore, x = 2 is the solution.
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve the equation 2x + 3 = 7"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages)
+
         # Should be high score for explicit steps
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
         self.assertIn("explicit_steps", result["metrics"])
-        
+
     def test_numbered_list(self):
         """Test detection of numbered list items."""
         content = """
@@ -63,21 +64,22 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         This algorithm has a time complexity of O(n).
         """
-        
+
         messages = [
-            {"role": "user", "content": "Explain how to count specific elements in an array"},
-            {"role": "assistant", "content": content}
+            {
+                "role": "user",
+                "content": "Explain how to count specific elements in an array",
+            },
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages)
+
         # Should be high score for numbered lists
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
         self.assertIn("numbered_lists", result["metrics"])
-        
+
     def test_bullet_points(self):
         """Test detection of bullet points."""
         content = """
@@ -91,21 +93,22 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         This pattern ensures maintainability and modularity.
         """
-        
+
         messages = [
-            {"role": "user", "content": "How do I implement a reusable component?"},
-            {"role": "assistant", "content": content}
+            {
+                "role": "user",
+                "content": "How do I implement a reusable component?",
+            },
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages)
+
         # Should be high score for bullet points
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
         self.assertIn("bullet_points", result["metrics"])
-        
+
     def test_transition_phrases(self):
         """Test detection of transition phrases."""
         content = """
@@ -118,21 +121,19 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The solution is 42.
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve this word problem"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages)
+
         # Should be high score for transition phrases
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
         self.assertIn("transition_phrases", result["metrics"])
-        
+
     def test_custom_pattern(self):
         """Test with custom pattern."""
         content = """
@@ -145,43 +146,41 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The answer is 42.
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve this calculation problem"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
+
         # Using a custom pattern that detects "STEP-X:" format
         result = reasoning_steps_reward(
             messages=messages,
             pattern=r"STEP-[A-Z]:",
             exclusive_patterns=True,
-            min_steps=3
+            min_steps=3,
         )
-        
+
         # Should be high score with custom pattern
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
-        
+
     def test_insufficient_steps(self):
         """Test with insufficient reasoning steps."""
         content = """
         The answer is 42.
         """
-        
+
         messages = [
             {"role": "user", "content": "What is 6 times 7?"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages)
+
         # Should be low score for insufficient steps
         self.assertEqual(result["score"], 0.0)
         self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
-        
+
     def test_partial_score(self):
         """Test with partial reasoning steps."""
         content = """
@@ -190,22 +189,19 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The answer is 42.
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve this problem"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = reasoning_steps_reward(
-            messages=messages,
-            min_steps=3
-        )
-        
+
+        result = reasoning_steps_reward(messages=messages, min_steps=3)
+
         # Should be partial score for some but not enough steps
         self.assertGreater(result["score"], 0.0)
         self.assertLess(result["score"], 1.0)
         self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
-        
+
     def test_max_steps(self):
         """Test with maximum steps parameter."""
         content = """
@@ -218,22 +214,20 @@ class TestReasoningStepsReward(unittest.TestCase):
         Step 5: Verify the solution
         Step 6: Interpret the result
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve this complex equation"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
+
         result = reasoning_steps_reward(
-            messages=messages,
-            min_steps=3,
-            max_steps=5
+            messages=messages, min_steps=3, max_steps=5
         )
-        
+
         # Should be max score even with more than max_steps
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
-        
+
     def test_sequence_reward_basic(self):
         """Test sequence reward with default terms."""
         content = """
@@ -244,20 +238,18 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The solution is correct.
         """
-        
+
         messages = [
             {"role": "user", "content": "Show how to solve this step by step"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = sequence_reward(
-            messages=messages
-        )
-        
+
+        result = sequence_reward(messages=messages)
+
         # Should detect sequential terms correctly
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
-        
+
     def test_sequence_reward_custom(self):
         """Test sequence reward with custom terms."""
         content = """
@@ -268,22 +260,22 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The argument is valid.
         """
-        
+
         messages = [
             {"role": "user", "content": "Analyze this logical argument"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
+
         result = sequence_reward(
             messages=messages,
             sequence_terms=["Begin", "Continue", "Proceed", "End"],
-            min_matches=3
+            min_matches=3,
         )
-        
+
         # Should detect custom sequential terms correctly
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
-        
+
     def test_sequence_reward_partial(self):
         """Test sequence reward with partial matches."""
         content = """
@@ -292,17 +284,14 @@ class TestReasoningStepsReward(unittest.TestCase):
         
         The answer is 42.
         """
-        
+
         messages = [
             {"role": "user", "content": "Solve this problem"},
-            {"role": "assistant", "content": content}
+            {"role": "assistant", "content": content},
         ]
-        
-        result = sequence_reward(
-            messages=messages,
-            min_matches=3
-        )
-        
+
+        result = sequence_reward(messages=messages, min_matches=3)
+
         # Should have partial score for some but not enough sequential terms
         self.assertGreater(result["score"], 0.0)
         self.assertLess(result["score"], 1.0)

@@ -44,11 +44,9 @@ def format_reward(
             reason="No messages provided",
             metrics={
                 "format_check": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No messages provided"
+                    score=0.0, success=False, reason="No messages provided"
                 )
-            }
+            },
         )
 
     response = messages[-1]
@@ -63,9 +61,9 @@ def format_reward(
                     "format_check": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.content
     elif isinstance(response, dict):
@@ -77,9 +75,9 @@ def format_reward(
                     "format_check": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.get("content", "")
 
@@ -100,9 +98,9 @@ def format_reward(
                 "format_check": MetricResult(
                     score=1.0,
                     success=True,
-                    reason="Text follows the required format pattern"
+                    reason="Text follows the required format pattern",
                 )
-            }
+            },
         )
     else:
         return EvaluateResult(
@@ -112,7 +110,7 @@ def format_reward(
                 "format_check": MetricResult(
                     score=0.0,
                     success=False,
-                    reason="Text does not follow the required format pattern"
+                    reason="Text does not follow the required format pattern",
                 )
-            }
+            },
         )

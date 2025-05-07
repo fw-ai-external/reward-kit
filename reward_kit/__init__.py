@@ -20,7 +20,10 @@ from .models import (
 )
 
 # Import from reward_function
-from .reward_function import RewardFunction, reward_function as legacy_reward_function  # Deprecated
+from .reward_function import (
+    RewardFunction,
+    reward_function as legacy_reward_function,
+)  # Deprecated
 
 # Import the decorator from typed_interface (this is the one we want to expose)
 from .typed_interface import reward_function
@@ -31,7 +34,9 @@ from .agent import ToolRegistry, AgentEvaluator, Database
 import warnings
 
 # Show deprecation warnings
-warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
+warnings.filterwarnings(
+    "default", category=DeprecationWarning, module="reward_kit"
+)
 
 __all__ = [
     # Preferred interfaces

@@ -15,9 +15,7 @@ def test_lean_prover_reward_empty():
 
 def test_lean_prover_reward_basic():
     """Test lean_prover_reward with a basic example"""
-    statement = (
-        "All even integers greater than 2 can be expressed as the sum of two primes."
-    )
+    statement = "All even integers greater than 2 can be expressed as the sum of two primes."
     response = """theorem goldbach (n : ℕ) (h1 : n > 2) (h2 : even n) : ∃ p q, prime p ∧ prime q ∧ p + q = n :=
 begin
   sorry
@@ -25,10 +23,12 @@ end
     """
     result = lean_prover_reward(response, statement)
     assert hasattr(result, "score")
-    
+
     # Get completeness score from metrics if available
     if hasattr(result, "metrics") and "completeness" in result.metrics:
-        assert result.metrics["completeness"].score < 1.0  # Should detect "sorry"
+        assert (
+            result.metrics["completeness"].score < 1.0
+        )  # Should detect "sorry"
 
 
 def test_lean_prover_reward_complete():
@@ -61,9 +61,7 @@ end
 
 def test_deepseek_prover_v2_reward():
     """Test deepseek_prover_v2_reward with a sample containing subgoals"""
-    statement = (
-        "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
-    )
+    statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
     response = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
 begin
   -- We'll prove this by induction on n
@@ -89,14 +87,16 @@ end
     result = deepseek_prover_v2_reward(response, statement, verbose=True)
     assert hasattr(result, "score")
     assert result.score > 0.7  # Should be high due to good subgoals
-    
+
     # Check for subgoal analysis in metrics
     assert hasattr(result, "metrics")
     assert "subgoal_decomposition" in result.metrics
     assert "hierarchical_structure" in result.metrics
 
 
-@pytest.mark.skip(reason="Requires Hugging Face datasets package and internet access")
+@pytest.mark.skip(
+    reason="Requires Hugging Face datasets package and internet access"
+)
 def test_deepseek_huggingface_prover_benchmark_mock():
     """Test deepseek_huggingface_prover_benchmark with mocked dataset"""
     statement = "If a and b are positive real numbers, then the arithmetic mean is greater than or equal to the geometric mean."

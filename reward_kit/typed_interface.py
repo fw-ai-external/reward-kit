@@ -17,8 +17,10 @@ class EvaluateFunction(Protocol):
     """Protocol for evaluate functions that take typed messages."""
 
     def __call__(
-        self, messages: Union[List[Message], List[Dict[str, Any]]], **kwargs: Any
-    ) -> Union[EvaluateResult, "RewardOutput"]: ...
+        self,
+        messages: Union[List[Message], List[Dict[str, Any]]],
+        **kwargs: Any,
+    ) -> Union[EvaluateResult, Dict[str, Any]]: ...
 
 
 # Define return type protocol
@@ -62,30 +64,38 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
                     # It's a dictionary, validate and convert to Message
                     if "role" not in msg:
                         raise ValueError("Role is required in message")
-                    
+
                     role = msg.get("role", "")
-                    content = msg.get("content", "")  # Default to empty string if None
-                    
+                    content = msg.get(
+                        "content", ""
+                    )  # Default to empty string if None
+
                     # Common message parameters
                     message_params = {"role": role}
-                    
+
                     # Add content only if it exists (can be None for tool calls)
                     if "content" in msg:
-                        message_params["content"] = content if content is not None else ""
-                    
+                        message_params["content"] = (
+                            content if content is not None else ""
+                        )
+
                     # Add role-specific parameters
                     if role == "tool":
-                        message_params["tool_call_id"] = msg.get("tool_call_id", "")
+                        message_params["tool_call_id"] = msg.get(
+                            "tool_call_id", ""
+                        )
                         message_params["name"] = msg.get("name", "")
                     elif role == "function":
                         message_params["name"] = msg.get("name", "")
                     elif role == "assistant" and "tool_calls" in msg:
                         message_params["tool_calls"] = msg.get("tool_calls")
-                        
+
                     # Create the message object
                     typed_messages.append(Message(**message_params))
         except Exception as err:
-            raise ValueError(f"Input messages failed validation:\n{err}") from None
+            raise ValueError(
+                f"Input messages failed validation:\n{err}"
+            ) from None
 
         # 2. Call the author's function
         result = func(typed_messages, **kwargs)
@@ -99,7 +109,9 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
                 # Otherwise validate it
                 result_model = _res_adapter.validate_python(result)
         except ValidationError as err:
-            raise ValueError(f"Return value failed validation:\n{err}") from None
+            raise ValueError(
+                f"Return value failed validation:\n{err}"
+            ) from None
 
         # 3. Dump back to a plain dict for the outside world
         # Handle the updated EvaluateResult model structure

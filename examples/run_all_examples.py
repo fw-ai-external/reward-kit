@@ -23,8 +23,8 @@ import logging
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("run_examples")
 
@@ -41,16 +41,19 @@ E2B_EXAMPLES = [
     "e2b_reward_example.py",
     "e2b_javascript_example.py",
     "e2b_auto_extract_example.py",
-    "e2b_fallback_example.py"
+    "e2b_fallback_example.py",
 ]
 
 
 def list_examples():
     """List all available example scripts."""
-    all_examples = sorted([
-        p.name for p in EXAMPLES_DIR.glob("*.py")
-        if p.name != "run_all_examples.py" and not p.name.startswith("__")
-    ])
+    all_examples = sorted(
+        [
+            p.name
+            for p in EXAMPLES_DIR.glob("*.py")
+            if p.name != "run_all_examples.py" and not p.name.startswith("__")
+        ]
+    )
 
     logger.info("Available examples:")
     for example in all_examples:
@@ -81,14 +84,14 @@ def run_example(example_path, env=None):
 
         # Add special arguments for specific examples
         cmd = [sys.executable, example_path]
-        
+
         # Handle special cases
         if example_name == "folder_based_evaluation_example.py":
             cmd.append("--auto-mode")  # Run in non-interactive mode
         elif example_name == "server_example.py":
             # For the server example, use the test script instead
             cmd[1] = str(Path(example_path).parent / "server_example_test.py")
-        
+
         # Run the example as a subprocess with a timeout
         result = subprocess.run(
             cmd,
@@ -96,7 +99,7 @@ def run_example(example_path, env=None):
             check=False,
             capture_output=True,
             text=True,
-            timeout=60  # Set a 60-second timeout
+            timeout=60,  # Set a 60-second timeout
         )
 
         # Log the result
@@ -127,7 +130,8 @@ def run_all_examples(args):
     """Run all examples or a subset based on the command line arguments."""
     # Get list of all example scripts
     all_examples = [
-        p for p in EXAMPLES_DIR.glob("*.py")
+        p
+        for p in EXAMPLES_DIR.glob("*.py")
         if p.name != "run_all_examples.py" and not p.name.startswith("__")
     ]
 
@@ -159,8 +163,10 @@ def run_all_examples(args):
     env = {}
     if not args.skip_deploy:
         # Check if Fireworks API key is available
-        if ("FIREWORKS_API_KEY" not in os.environ and
-                "DEV_FIREWORKS_API_KEY" not in os.environ):
+        if (
+            "FIREWORKS_API_KEY" not in os.environ
+            and "DEV_FIREWORKS_API_KEY" not in os.environ
+        ):
             logger.warning(
                 "FIREWORKS_API_KEY or DEV_FIREWORKS_API_KEY not set. "
                 "Deploy examples may fail."
@@ -196,22 +202,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--skip-deploy",
         action="store_true",
-        help="Skip examples that deploy to Fireworks"
+        help="Skip examples that deploy to Fireworks",
     )
     parser.add_argument(
-        "--skip-e2b",
-        action="store_true",
-        help="Skip examples that use E2B"
+        "--skip-e2b", action="store_true", help="Skip examples that use E2B"
     )
     parser.add_argument(
-        "--only",
-        type=str,
-        help="Run only this specific example"
+        "--only", type=str, help="Run only this specific example"
     )
     parser.add_argument(
-        "--list",
-        action="store_true",
-        help="List all available examples"
+        "--list", action="store_true", help="List all available examples"
     )
 
     args = parser.parse_args()

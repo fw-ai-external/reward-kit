@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 
+
 # Load the evaluation_preview_example module directly from the examples folder
 def load_module_from_path(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -19,11 +20,11 @@ def load_module_from_path(name, path):
 def evaluation_preview_example():
     # Path to the evaluation_preview_example.py file
     file_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 
-        "examples", 
-        "evaluation_preview_example.py"
+        os.path.dirname(os.path.dirname(__file__)),
+        "examples",
+        "evaluation_preview_example.py",
     )
-    
+
     # Load the module
     return load_module_from_path("evaluation_preview_example", file_path)
 
@@ -39,50 +40,56 @@ def mock_env_variables(monkeypatch):
 @pytest.fixture
 def mock_preview_api():
     """Mock the preview API calls"""
-    with patch('requests.post') as mock_post:
+    with patch("requests.post") as mock_post:
         # Set up mock for preview API
         preview_response = {
             "totalSamples": 2,
             "totalRuntimeMs": 1234,
             "results": [
                 {
-                    "success": True, 
-                    "score": 0.26, 
+                    "success": True,
+                    "score": 0.26,
                     "perMetricEvals": {
-                        "word_count": {"score": 0.26, "reason": "Word count: 26"}
-                    }
+                        "word_count": {
+                            "score": 0.26,
+                            "reason": "Word count: 26",
+                        }
+                    },
                 },
                 {
-                    "success": True, 
-                    "score": 0.22, 
+                    "success": True,
+                    "score": 0.22,
                     "perMetricEvals": {
-                        "word_count": {"score": 0.22, "reason": "Word count: 22"}
-                    }
-                }
-            ]
+                        "word_count": {
+                            "score": 0.22,
+                            "reason": "Word count: 22",
+                        }
+                    },
+                },
+            ],
         }
-        
+
         mock_post.return_value = MagicMock()
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = preview_response
-        
+
         yield mock_post
 
 
 @pytest.fixture
 def mock_create_api():
     """Mock the create API calls"""
-    with patch('requests.post') as mock_post:
+    with patch("requests.post") as mock_post:
         create_response = {
             "name": "accounts/test_account/evaluators/word-count-eval",
             "displayName": "Word Count Evaluator",
-            "description": "Evaluates responses based on word count"
+            "description": "Evaluates responses based on word count",
         }
-        
+
         mock_post.return_value = MagicMock()
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = create_response
-        
+
         yield mock_post
 
 
@@ -90,13 +97,16 @@ def mock_create_api():
 def mock_word_count_metric():
     """Create a temporary directory with a word count metric"""
     tmp_dir = tempfile.mkdtemp()
-    
+
     # Create the metrics/word_count directory
     os.makedirs(os.path.join(tmp_dir, "metrics", "word_count"), exist_ok=True)
-    
+
     # Create main.py in the word_count directory
-    with open(os.path.join(tmp_dir, "metrics", "word_count", "main.py"), "w") as f:
-        f.write("""
+    with open(
+        os.path.join(tmp_dir, "metrics", "word_count", "main.py"), "w"
+    ) as f:
+        f.write(
+            """
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
@@ -111,45 +121,64 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         'score': score,
         'reason': f'Word count: {word_count}'
     }
-""")
-    
+"""
+        )
+
     # Create a samples directory and sample file
     os.makedirs(os.path.join(tmp_dir, "samples"), exist_ok=True)
-    
+
     # Create a sample file
     with open(os.path.join(tmp_dir, "samples", "samples.jsonl"), "w") as f:
-        f.write(json.dumps({
-            "messages": [
-                {"role": "user", "content": "Hello"},
-                {"role": "assistant", "content": "Hi there! How can I help you today?"}
-            ]
-        }) + "\n")
-        f.write(json.dumps({
-            "messages": [
-                {"role": "user", "content": "What is AI?"},
-                {"role": "assistant", "content": "AI stands for Artificial Intelligence."}
-            ]
-        }) + "\n")
-    
+        f.write(
+            json.dumps(
+                {
+                    "messages": [
+                        {"role": "user", "content": "Hello"},
+                        {
+                            "role": "assistant",
+                            "content": "Hi there! How can I help you today?",
+                        },
+                    ]
+                }
+            )
+            + "\n"
+        )
+        f.write(
+            json.dumps(
+                {
+                    "messages": [
+                        {"role": "user", "content": "What is AI?"},
+                        {
+                            "role": "assistant",
+                            "content": "AI stands for Artificial Intelligence.",
+                        },
+                    ]
+                }
+            )
+            + "\n"
+        )
+
     yield tmp_dir
-    
+
     # Clean up
     import shutil
+
     shutil.rmtree(tmp_dir)
 
 
 def test_preview_evaluation(mock_env_variables, mock_preview_api, monkeypatch):
     """Test the preview_evaluation function in isolation"""
     from reward_kit.evaluation import preview_evaluation
-    
+
     # Create a temporary directory for the test
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Create a metrics directory with word_count
         os.makedirs(os.path.join(tmp_dir, "word_count"), exist_ok=True)
-        
+
         # Create main.py in the word_count directory
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
-            f.write("""
+            f.write(
+                """
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
@@ -164,38 +193,58 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         'score': score,
         'reason': f'Word count: {word_count}'
     }
-""")
-        
+"""
+            )
+
         # Create a temporary sample file
         sample_fd, sample_path = tempfile.mkstemp(suffix=".jsonl")
         with os.fdopen(sample_fd, "w") as f:
-            f.write(json.dumps({
-                "messages": [
-                    {"role": "user", "content": "Hello"},
-                    {"role": "assistant", "content": "Hi there! How can I help you today?"}
-                ]
-            }) + "\n")
-            f.write(json.dumps({
-                "messages": [
-                    {"role": "user", "content": "What is AI?"},
-                    {"role": "assistant", "content": "AI stands for Artificial Intelligence."}
-                ]
-            }) + "\n")
-        
+            f.write(
+                json.dumps(
+                    {
+                        "messages": [
+                            {"role": "user", "content": "Hello"},
+                            {
+                                "role": "assistant",
+                                "content": "Hi there! How can I help you today?",
+                            },
+                        ]
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "messages": [
+                            {"role": "user", "content": "What is AI?"},
+                            {
+                                "role": "assistant",
+                                "content": "AI stands for Artificial Intelligence.",
+                            },
+                        ]
+                    }
+                )
+                + "\n"
+            )
+
         # Set used_preview_api flag to simulate successful preview
         import reward_kit.evaluation
+
         reward_kit.evaluation.used_preview_api = True
-        
+
         # Call preview_evaluation
         result = preview_evaluation(
-            metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
+            metric_folders=[
+                f"word_count={os.path.join(tmp_dir, 'word_count')}"
+            ],
             sample_file=sample_path,
-            max_samples=2
+            max_samples=2,
         )
-        
+
         # Clean up
         os.unlink(sample_path)
-        
+
         # Verify results
         assert result.total_samples == 2
         assert len(result.results) == 2
@@ -206,15 +255,16 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
 def test_create_evaluation(mock_env_variables, mock_create_api, monkeypatch):
     """Test the create_evaluation function in isolation"""
     from reward_kit.evaluation import create_evaluation
-    
+
     # Create a temporary directory for the test
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Create a metrics directory with word_count
         os.makedirs(os.path.join(tmp_dir, "word_count"), exist_ok=True)
-        
+
         # Create main.py in the word_count directory
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
-            f.write("""
+            f.write(
+                """
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
@@ -229,35 +279,45 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         'score': score,
         'reason': f'Word count: {word_count}'
     }
-""")
-        
+"""
+            )
+
         # Call create_evaluation
         result = create_evaluation(
             evaluator_id="word-count-eval",
-            metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
+            metric_folders=[
+                f"word_count={os.path.join(tmp_dir, 'word_count')}"
+            ],
             display_name="Word Count Evaluator",
             description="Evaluates responses based on word count",
-            force=True
+            force=True,
         )
-        
+
         # Verify results
-        assert result["name"] == "accounts/test_account/evaluators/word-count-eval"
+        assert (
+            result["name"] == "accounts/test_account/evaluators/word-count-eval"
+        )
         assert result["displayName"] == "Word Count Evaluator"
-        assert result["description"] == "Evaluates responses based on word count"
+        assert (
+            result["description"] == "Evaluates responses based on word count"
+        )
 
 
-def test_preview_then_create(monkeypatch, mock_env_variables, mock_preview_api, mock_create_api):
+def test_preview_then_create(
+    monkeypatch, mock_env_variables, mock_preview_api, mock_create_api
+):
     """Test the full example flow (simulated)"""
     # Patch input to always return 'y'
-    monkeypatch.setattr('builtins.input', lambda _: 'y')
-    
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Create a metrics directory with word_count
         os.makedirs(os.path.join(tmp_dir, "word_count"), exist_ok=True)
-        
+
         # Create main.py in the word_count directory
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
-            f.write("""
+            f.write(
+                """
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
@@ -272,67 +332,92 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         'score': score,
         'reason': f'Word count: {word_count}'
     }
-""")
-        
+"""
+            )
+
         # Create a temporary sample file
         sample_fd, sample_path = tempfile.mkstemp(suffix=".jsonl")
         with os.fdopen(sample_fd, "w") as f:
-            f.write(json.dumps({
-                "messages": [
-                    {"role": "user", "content": "Hello"},
-                    {"role": "assistant", "content": "Hi there! How can I help you today?"}
-                ]
-            }) + "\n")
-            f.write(json.dumps({
-                "messages": [
-                    {"role": "user", "content": "What is AI?"},
-                    {"role": "assistant", "content": "AI stands for Artificial Intelligence."}
-                ]
-            }) + "\n")
-        
+            f.write(
+                json.dumps(
+                    {
+                        "messages": [
+                            {"role": "user", "content": "Hello"},
+                            {
+                                "role": "assistant",
+                                "content": "Hi there! How can I help you today?",
+                            },
+                        ]
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "messages": [
+                            {"role": "user", "content": "What is AI?"},
+                            {
+                                "role": "assistant",
+                                "content": "AI stands for Artificial Intelligence.",
+                            },
+                        ]
+                    }
+                )
+                + "\n"
+            )
+
         # Create a patched example module with modified paths
         from reward_kit.evaluation import preview_evaluation, create_evaluation
-        
+
         # Define a patched main function
         def patched_main():
             # Preview the evaluation using metrics folder and samples file
             print("Previewing evaluation...")
             preview_result = preview_evaluation(
-                metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
+                metric_folders=[
+                    f"word_count={os.path.join(tmp_dir, 'word_count')}"
+                ],
                 sample_file=sample_path,
-                max_samples=2
+                max_samples=2,
             )
-            
+
             preview_result.display()
-            
+
             # Check if 'used_preview_api' attribute exists and is True
             import reward_kit.evaluation as evaluation_module
-            
+
             # For testing, always assume the API was used successfully
             evaluation_module.used_preview_api = True
-            
+
             print("\nCreating evaluation...")
             try:
                 evaluator = create_evaluation(
                     evaluator_id="word-count-eval",
-                    metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
+                    metric_folders=[
+                        f"word_count={os.path.join(tmp_dir, 'word_count')}"
+                    ],
                     display_name="Word Count Evaluator",
                     description="Evaluates responses based on word count",
-                    force=True
+                    force=True,
                 )
                 print(f"Created evaluator: {evaluator['name']}")
                 return evaluator
             except Exception as e:
                 print(f"Error creating evaluator: {str(e)}")
-                print("Make sure you have proper Fireworks API credentials set up.")
+                print(
+                    "Make sure you have proper Fireworks API credentials set up."
+                )
                 return None
-        
+
         # Run the patched main function
         result = patched_main()
-        
+
         # Clean up
         os.unlink(sample_path)
-        
+
         # Verify the result
         assert result is not None
-        assert result["name"] == "accounts/test_account/evaluators/word-count-eval"
+        assert (
+            result["name"] == "accounts/test_account/evaluators/word-count-eval"
+        )

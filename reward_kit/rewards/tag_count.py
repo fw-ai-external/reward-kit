@@ -18,7 +18,7 @@ def tag_count_reward(
     required_tags: List[str],
     score_per_tag: float = 0.25,
     require_balanced: bool = True,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Reward function that checks for presence of specific tags in response.
@@ -43,11 +43,9 @@ def tag_count_reward(
             reason="No messages provided",
             metrics={
                 "tag_count": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No messages provided"
+                    score=0.0, success=False, reason="No messages provided"
                 )
-            }
+            },
         )
 
     response = messages[-1]
@@ -62,9 +60,9 @@ def tag_count_reward(
                     "tag_count": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.content
     elif isinstance(response, dict):
@@ -76,9 +74,9 @@ def tag_count_reward(
                     "tag_count": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.get("content", "")
 
@@ -100,9 +98,9 @@ def tag_count_reward(
         # Determine if tag is found based on balance requirements
         if require_balanced:
             is_found = (
-                opening_count > 0 and
-                closing_count > 0 and
-                opening_count == closing_count
+                opening_count > 0
+                and closing_count > 0
+                and opening_count == closing_count
             )
         else:
             is_found = opening_count > 0 or closing_count > 0
@@ -113,21 +111,22 @@ def tag_count_reward(
             found_tags.add(tag)
             total_found += 1
 
-        if (require_balanced and not is_balanced and
-                (opening_count > 0 or closing_count > 0)):
+        if (
+            require_balanced
+            and not is_balanced
+            and (opening_count > 0 or closing_count > 0)
+        ):
             mismatched_tags.add(tag)
 
         # Add metrics for this tag
         if require_balanced:
-            tag_score = 1.0 if (
-                opening_count > 0 and
-                closing_count > 0 and
-                is_balanced
-            ) else 0.0
+            tag_score = (
+                1.0
+                if (opening_count > 0 and closing_count > 0 and is_balanced)
+                else 0.0
+            )
             tag_success = (
-                opening_count > 0 and
-                closing_count > 0 and
-                is_balanced
+                opening_count > 0 and closing_count > 0 and is_balanced
             )
         else:
             has_tags = opening_count > 0 or closing_count > 0
@@ -139,7 +138,7 @@ def tag_count_reward(
             success=tag_success,
             reason=_get_tag_reason(
                 tag, opening_count, closing_count, require_balanced
-            )
+            ),
         )
 
     # Calculate overall score
@@ -151,9 +150,8 @@ def tag_count_reward(
         total_score = max(0.0, total_score - penalty)
 
     # Determine overall success
-    success = (
-        len(found_tags) == len(required_tags) and
-        (not require_balanced or not mismatched_tags)
+    success = len(found_tags) == len(required_tags) and (
+        not require_balanced or not mismatched_tags
     )
 
     # Create overall tag count metric
@@ -161,23 +159,14 @@ def tag_count_reward(
         required_tags, found_tags, mismatched_tags, require_balanced
     )
     tag_metrics["overall"] = MetricResult(
-        score=total_score,
-        success=success,
-        reason=reason
+        score=total_score, success=success, reason=reason
     )
 
-    return EvaluateResult(
-        score=total_score,
-        reason=reason,
-        metrics=tag_metrics
-    )
+    return EvaluateResult(score=total_score, reason=reason, metrics=tag_metrics)
 
 
 def _get_tag_reason(
-    tag: str,
-    opening_count: int,
-    closing_count: int,
-    require_balanced: bool
+    tag: str, opening_count: int, closing_count: int, require_balanced: bool
 ) -> str:
     """Generate a descriptive reason for a tag's evaluation."""
     if opening_count == 0 and closing_count == 0:
@@ -205,7 +194,7 @@ def _get_overall_reason(
     required_tags: List[str],
     found_tags: Set[str],
     mismatched_tags: Set[str],
-    require_balanced: bool
+    require_balanced: bool,
 ) -> str:
     """Generate an overall reason for the evaluation."""
     if not found_tags:

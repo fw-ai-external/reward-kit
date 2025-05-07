@@ -13,7 +13,9 @@ import sys
 import os
 
 # Add project directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)
 
 from reward_kit.rewards.lean_prover import (
     lean_prover_reward,
@@ -56,9 +58,7 @@ end
 
     # Test with a complex proof with subgoals
     print("\nTest: Complex proof with subgoals")
-    statement = (
-        "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
-    )
+    statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
     response = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
 begin
   -- We'll prove this by induction on n
@@ -96,6 +96,7 @@ end
 def test_lean_prover_functions():
     """Run tests for lean prover functions through pytest integration"""
     run_tests()
+
 
 if __name__ == "__main__":
     run_tests()

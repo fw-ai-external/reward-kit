@@ -29,7 +29,7 @@ def cosine_scaled_accuracy_length_reward(
     token_method: str = "whitespace",
     correctness_weight: float = 0.7,
     length_weight: float = 0.3,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Reward function that combines accuracy with cosine-scaled length rewards.
@@ -63,11 +63,9 @@ def cosine_scaled_accuracy_length_reward(
             reason="No messages provided",
             metrics={
                 "combined_reward": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No messages provided"
+                    score=0.0, success=False, reason="No messages provided"
                 )
-            }
+            },
         )
 
     response = messages[-1]
@@ -82,9 +80,9 @@ def cosine_scaled_accuracy_length_reward(
                     "combined_reward": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.content
     elif isinstance(response, dict):
@@ -96,9 +94,9 @@ def cosine_scaled_accuracy_length_reward(
                     "combined_reward": MetricResult(
                         score=0.0,
                         success=False,
-                        reason="Message not from assistant or has no content"
+                        reason="Message not from assistant or has no content",
                     )
-                }
+                },
             )
         text = response.get("content", "")
 
@@ -107,7 +105,7 @@ def cosine_scaled_accuracy_length_reward(
         messages=messages,
         ground_truth=ground_truth,
         extract_fn=extract_fn,
-        compare_fn=compare_fn
+        compare_fn=compare_fn,
     )
 
     # Unpack the accuracy result
@@ -120,8 +118,7 @@ def cosine_scaled_accuracy_length_reward(
     else:  # It's an EvaluateResult object
         accuracy_score = accuracy_result.score
         answer_accuracy = accuracy_result.metrics.get(
-            "answer_accuracy",
-            MetricResult(score=0.0, success=False, reason="")
+            "answer_accuracy", MetricResult(score=0.0, success=False, reason="")
         )
         accuracy_success = answer_accuracy.success
         accuracy_reason = accuracy_result.reason or ""
@@ -160,7 +157,7 @@ def cosine_scaled_accuracy_length_reward(
     combined_score = max(0.0, min(1.0, combined_score))
 
     # Prepare detailed reason
-    reward_type = 'reward' if accuracy_success else 'penalty'
+    reward_type = "reward" if accuracy_success else "penalty"
     length_reason = (
         f"Length-based {reward_type}: {token_count}/{max_length} tokens, "
         f"cosine factor: {cosine_factor:.2f}"
@@ -177,27 +174,25 @@ def cosine_scaled_accuracy_length_reward(
         "combined_reward": MetricResult(
             score=combined_score,
             success=success,
-            reason=f"Combined score: {combined_score:.2f}"
+            reason=f"Combined score: {combined_score:.2f}",
         ),
         "accuracy": MetricResult(
             score=accuracy_score,
             success=accuracy_success,
-            reason=f"Accuracy: {accuracy_score:.2f}"
+            reason=f"Accuracy: {accuracy_score:.2f}",
         ),
         "length": MetricResult(
             score=length_score,
             success=token_count <= max_length,
-            reason=f"Length: {token_count}/{max_length} tokens, score: {length_score:.2f}"  # noqa
+            reason=f"Length: {token_count}/{max_length} tokens, score: {length_score:.2f}",  # noqa
         ),
         "token_count": MetricResult(
             score=min(1.0, max(0.0, 1.0 - progress)),
             success=token_count <= max_length,
-            reason=f"Token count: {token_count}/{max_length}"
-        )
+            reason=f"Token count: {token_count}/{max_length}",
+        ),
     }
 
     return EvaluateResult(
-        score=combined_score,
-        reason=combined_reason,
-        metrics=metrics
+        score=combined_score, reason=combined_reason, metrics=metrics
     )

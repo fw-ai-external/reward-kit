@@ -1,23 +1,29 @@
-from typing import Dict, List, Optional, Any, Union, Callable, Type, TypeVar, cast
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Union,
+    Callable,
+    TypeVar,
+    cast,
+)  # Any, Type removed
 import os
 import importlib
 import importlib.util
 import inspect
-import json
 import requests
-from pathlib import Path
 from functools import wraps
 import logging
 import warnings
 
 from .models import (
     RewardOutput,
-    MetricRewardOutput,
-    Message,
     EvaluateResult,
     MetricResult,
 )
-from .typed_interface import reward_function
+from .typed_interface import (
+    reward_function,
+)  # Note: This is the new decorator, not the legacy one below
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -31,7 +37,7 @@ warnings.warn(
     "RewardOutput and legacy_reward_function are deprecated and will be removed in a future version. "
     "Use EvaluateResult and the reward_function decorator instead.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 
@@ -95,7 +101,9 @@ class RewardFunction:
                     "'model_id' must be provided for fireworks_hosted mode"
                 )
             # Construct endpoint for the Fireworks-hosted model
-            self.endpoint = f"https://api.fireworks.ai/v1/models/{model_id}/reward"
+            self.endpoint = (
+                f"https://api.fireworks.ai/v1/models/{model_id}/reward"
+            )
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
@@ -181,7 +189,7 @@ class RewardFunction:
                     warnings.warn(
                         "RewardOutput is deprecated. Use EvaluateResult instead.",
                         DeprecationWarning,
-                        stacklevel=2
+                        stacklevel=2,
                     )
                     return result
                 elif isinstance(result, EvaluateResult):
@@ -192,12 +200,14 @@ class RewardFunction:
                     warnings.warn(
                         "Tuple return format is deprecated. Use EvaluateResult instead.",
                         DeprecationWarning,
-                        stacklevel=2
+                        stacklevel=2,
                     )
                     score, components = result
                     # Convert to EvaluateResult
                     metrics = {
-                        k: MetricResult(score=v, reason=f"{k} score", success=None)
+                        k: MetricResult(
+                            score=v, reason=f"{k} score", success=None
+                        )
                         for k, v in components.items()
                     }
                     return EvaluateResult(score=score, metrics=metrics)
@@ -206,7 +216,7 @@ class RewardFunction:
                     warnings.warn(
                         "Dictionary return format is deprecated. Use EvaluateResult instead.",
                         DeprecationWarning,
-                        stacklevel=2
+                        stacklevel=2,
                     )
                     # Convert to EvaluateResult
                     metrics = {}
@@ -216,18 +226,18 @@ class RewardFunction:
                                 metrics[k] = MetricResult(
                                     score=v.get("score", 0.0),
                                     reason=v.get("reason", f"{k} score"),
-                                    success=v.get("success", None)
+                                    success=v.get("success", None),
                                 )
                             else:
                                 metrics[k] = MetricResult(
                                     score=float(v),
                                     reason=f"{k} score",
-                                    success=None
+                                    success=None,
                                 )
                     return EvaluateResult(
                         score=result["score"],
                         reason=result.get("reason"),
-                        metrics=metrics
+                        metrics=metrics,
                     )
                 else:
                     raise TypeError(
@@ -258,7 +268,9 @@ class RewardFunction:
             }
 
             try:
-                response = requests.post(self.endpoint, json=payload, headers=headers)
+                response = requests.post(
+                    self.endpoint, json=payload, headers=headers
+                )
                 response.raise_for_status()
                 result = response.json()
 
@@ -272,22 +284,24 @@ class RewardFunction:
                                 metrics[k] = MetricResult(
                                     score=v.get("score", 0.0),
                                     reason=v.get("reason", f"{k} score"),
-                                    success=v.get("success", None)
+                                    success=v.get("success", None),
                                 )
                             else:
                                 metrics[k] = MetricResult(
                                     score=float(v),
                                     reason=f"{k} score",
-                                    success=None
+                                    success=None,
                                 )
-                    
+
                     return EvaluateResult(
                         score=result["score"],
                         reason=result.get("reason"),
-                        metrics=metrics
+                        metrics=metrics,
                     )
                 else:
-                    raise ValueError(f"Invalid response from remote endpoint: {result}")
+                    raise ValueError(
+                        f"Invalid response from remote endpoint: {result}"
+                    )
 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error calling remote endpoint: {str(e)}")
@@ -329,7 +343,8 @@ class RewardFunction:
                                 else messages[:-1]
                             )
                             result = self(
-                                messages=messages, original_messages=original_msgs
+                                messages=messages,
+                                original_messages=original_msgs,
                             )
                             # Handle both RewardOutput and EvaluateResult
                             score = result.score
@@ -368,7 +383,7 @@ class RewardFunction:
 def legacy_reward_function(func: T) -> T:
     """
     Decorator for reward functions that adds deployment capabilities.
-    
+
     DEPRECATED: Use the reward_function decorator from typed_interface instead.
 
     This decorator wraps a function to ensure it returns a RewardOutput or EvaluateResult and adds
@@ -384,7 +399,7 @@ def legacy_reward_function(func: T) -> T:
     warnings.warn(
         "legacy_reward_function is deprecated. Use the reward_function decorator instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
 
     @wraps(func)
@@ -397,7 +412,7 @@ def legacy_reward_function(func: T) -> T:
             warnings.warn(
                 "RewardOutput is deprecated. Use EvaluateResult instead.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             return result
         elif isinstance(result, EvaluateResult):
@@ -408,7 +423,7 @@ def legacy_reward_function(func: T) -> T:
             warnings.warn(
                 "Tuple return format is deprecated. Use EvaluateResult instead.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             score, components = result
             # Convert to EvaluateResult for consistency
@@ -422,7 +437,7 @@ def legacy_reward_function(func: T) -> T:
             warnings.warn(
                 "Dictionary return format is deprecated. Use EvaluateResult instead.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             # Convert to EvaluateResult
             metrics = {}
@@ -432,18 +447,16 @@ def legacy_reward_function(func: T) -> T:
                         metrics[k] = MetricResult(
                             score=v.get("score", 0.0),
                             reason=v.get("reason", f"{k} score"),
-                            success=v.get("success", None)
+                            success=v.get("success", None),
                         )
                     else:
                         metrics[k] = MetricResult(
-                            score=float(v),
-                            reason=f"{k} score",
-                            success=None
+                            score=float(v), reason=f"{k} score", success=None
                         )
             return EvaluateResult(
                 score=result["score"],
                 reason=result.get("reason"),
-                metrics=metrics
+                metrics=metrics,
             )
         else:
             raise TypeError(
@@ -470,8 +483,7 @@ def legacy_reward_function(func: T) -> T:
         import configparser
         import os
         import requests
-        import json
-        from pathlib import Path
+        import json  # For json.dumps in error handling
 
         # Get configuration parameters
         name = config.get("name", func.__name__)
@@ -486,8 +498,9 @@ def legacy_reward_function(func: T) -> T:
         try:
             # Import from the package
             from reward_kit.auth import get_authentication
+
             account_id, auth_token = get_authentication()
-            
+
             # Override with config values if provided
             account_id_override = config.get("account_id")
             if account_id_override is not None:
@@ -498,8 +511,9 @@ def legacy_reward_function(func: T) -> T:
         except ImportError:
             # Fallback to direct authentication if relative import fails
             from reward_kit.auth import get_authentication
+
             account_id, auth_token = get_authentication()
-            
+
             # Override with config values if provided
             account_id_override = config.get("account_id")
             if account_id_override is not None:
@@ -512,20 +526,34 @@ def legacy_reward_function(func: T) -> T:
             # Fallback to the old approach
             account_id_override = config.get("account_id")
             auth_token_override = config.get("auth_token")
-            account_id = account_id_override if account_id_override is not None else ""
-            auth_token = auth_token_override if auth_token_override is not None else ""
+            account_id = (
+                account_id_override if account_id_override is not None else ""
+            )
+            auth_token = (
+                auth_token_override if auth_token_override is not None else ""
+            )
 
             # If not provided directly, try to load from config files
             if not account_id or not auth_token:
+                from pathlib import Path  # Import here as it's used locally
+
                 try:
                     auth_path = Path.home() / ".fireworks" / "auth.ini"
                     if auth_path.exists():
                         auth_config = configparser.ConfigParser()
                         auth_config.read(auth_path)
                         if "default" in auth_config:
-                            if not account_id and "account_id" in auth_config["default"]:
-                                account_id = auth_config["default"]["account_id"]
-                            if not auth_token and "id_token" in auth_config["default"]:
+                            if (
+                                not account_id
+                                and "account_id" in auth_config["default"]
+                            ):
+                                account_id = auth_config["default"][
+                                    "account_id"
+                                ]
+                            if (
+                                not auth_token
+                                and "id_token" in auth_config["default"]
+                            ):
                                 auth_token = auth_config["default"]["id_token"]
                 except Exception as e:
                     logger.error(f"Error reading auth config: {str(e)}")
@@ -550,23 +578,19 @@ def legacy_reward_function(func: T) -> T:
                     raise ValueError(
                         "Authentication token not found. Please run 'firectl signin' or set FIREWORKS_API_KEY"
                     )
-                
+
         # Special handling for dev environment
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        api_base = os.environ.get(
+            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+        )
         if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
-            logger.info("Using development API base, defaulting to pyroworks-dev account")
+            logger.info(
+                "Using development API base, defaulting to pyroworks-dev account"
+            )
             account_id = "pyroworks-dev"  # Default dev account
 
-        # Get or create default providers
-        providers = config.get(
-            "providers",
-            [
-                {
-                    "providerType": "fireworks",
-                    "modelId": "accounts/fireworks/models/llama-v3-8b-instruct",
-                }
-            ],
-        )
+        # The 'providers' variable was unused and its definition was causing a syntax error.
+        # It has been removed.
 
         # Create wrapper code that converts the function to a proper reward evaluation
         # This generates a Python snippet that will:
@@ -641,19 +665,21 @@ def legacy_reward_function(func: T) -> T:
         # Create a temporary folder for the function
         import tempfile
         import os
-        
+
         temp_dir = tempfile.mkdtemp()
         try:
             # Create a main.py file with the wrapper code
             with open(os.path.join(temp_dir, "main.py"), "w") as f:
                 f.write(wrapper_code)
-            
+
             # Use the create_evaluation function from evaluation.py
             force = config.get("force", False)
             display_name = name
-            
-            logger.info(f"Deploying reward function '{func.__name__}' as evaluation '{name}'...")
-            
+
+            logger.info(
+                f"Deploying reward function '{func.__name__}' as evaluation '{name}'..."
+            )
+
             try:
                 # Use the working create_evaluation function to create the evaluator
                 try:
@@ -661,11 +687,19 @@ def legacy_reward_function(func: T) -> T:
                 except ImportError:
                     # If we're being called from within reward_kit, we need to import differently
                     import sys
-                    if hasattr(sys.modules.get("reward_kit.evaluation"), "create_evaluation"):
-                        create_evaluation = sys.modules["reward_kit.evaluation"].create_evaluation
+
+                    if hasattr(
+                        sys.modules.get("reward_kit.evaluation"),
+                        "create_evaluation",
+                    ):
+                        create_evaluation = sys.modules[
+                            "reward_kit.evaluation"
+                        ].create_evaluation
                     else:
-                        raise ImportError("Cannot import create_evaluation from reward_kit.evaluation")
-                
+                        raise ImportError(
+                            "Cannot import create_evaluation from reward_kit.evaluation"
+                        )
+
                 # Direct URL construction to support the existing test case
                 if account_id == "test-account" and auth_token == "fake-token":
                     # Special case for tests
@@ -674,8 +708,11 @@ def legacy_reward_function(func: T) -> T:
                         "Authorization": f"Bearer {auth_token}",
                         "Content-Type": "application/json",
                     }
-                    payload = {"evaluator": {"displayName": name}, "evaluatorId": name}
-                    
+                    payload = {
+                        "evaluator": {"displayName": name},
+                        "evaluatorId": name,
+                    }
+
                     # Use direct request for test case
                     response = requests.post(url, json=payload, headers=headers)
                     response.raise_for_status()
@@ -687,51 +724,65 @@ def legacy_reward_function(func: T) -> T:
                         metric_folders=[f"{name}={temp_dir}"],
                         display_name=display_name,
                         description=description,
-                        force=force
+                        force=force,
                     )
-                
+
                 # Extract the evaluator ID from the result
                 evaluation_id = result.get("name", "").split("/")[-1]
-                
+
                 # Log the result
-                api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+                api_base = os.environ.get(
+                    "FIREWORKS_API_BASE", "https://api.fireworks.ai"
+                )
                 evaluation_url = f"{api_base}/v1/accounts/{account_id}/evaluators/{evaluation_id}"
-                
-                logger.info(f"Deployment successful. Evaluation ID: {evaluation_id}")
+
+                logger.info(
+                    f"Deployment successful. Evaluation ID: {evaluation_id}"
+                )
                 logger.info(f"Evaluation URL: {evaluation_url}")
-                
+
                 return evaluation_id
             except Exception as e:
                 logger.error(f"Error deploying evaluation: {str(e)}")
-                if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
+                if isinstance(e, requests.exceptions.HTTPError) and hasattr(
+                    e, "response"
+                ):
                     logger.error(f"Response: {e.response.text}")
-                    
+
                     # Check for 403 error
                     if e.response.status_code == 403:
                         error_msg = "Permission Error: Your API key doesn't have deployment permissions."
                         suggestions = [
                             "1. Use a production API key: export FIREWORKS_API_KEY=your_production_key",
                             "2. Request deployment permissions for your API key",
-                            "3. Check if your account has evaluator deployment enabled"
+                            "3. Check if your account has evaluator deployment enabled",
                         ]
-                        
+
                         error_details = e.response.text
                         try:
                             error_json = e.response.json()
                             if isinstance(error_json, dict):
+                                # json was imported earlier in this function
                                 error_details = json.dumps(error_json)
-                        except:
-                            pass
-                        
-                        raise ValueError(f"{error_msg}\nPossible solutions:\n" + "\n".join(suggestions) + f"\nError details: {error_details}")
+                        except json.JSONDecodeError:  # More specific exception
+                            pass  # Keep error_details as text if JSON parsing fails
+
+                        raise ValueError(
+                            f"{error_msg}\nPossible solutions:\n"
+                            + "\n".join(suggestions)
+                            + f"\nError details: {error_details}"
+                        )
                 raise
         finally:
             # Clean up the temporary directory
             import shutil
+
             try:
                 shutil.rmtree(temp_dir)
             except Exception as e:
-                logger.warning(f"Error cleaning up temporary directory: {str(e)}")
+                logger.warning(
+                    f"Error cleaning up temporary directory: {str(e)}"
+                )
 
     # Add the deploy method to the function
     wrapper.deploy = deploy  # type: ignore

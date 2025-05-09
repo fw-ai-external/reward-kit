@@ -12,8 +12,6 @@ __version__ = "0.2.0"
 
 # Import everything from models
 from .models import (
-    RewardOutput,  # Deprecated
-    MetricRewardOutput,  # Deprecated
     Message,
     MetricResult,
     EvaluateResult,
@@ -50,7 +48,5 @@ __all__ = [
     "AgentEvaluator",
     "Database",
     # Deprecated (will be removed in a future version)
-    "RewardOutput",
-    "MetricRewardOutput",
     "legacy_reward_function",
 ]

@@ -4,13 +4,31 @@ from reward_kit.rewards.lean_prover import (
     deepseek_prover_v2_reward,
     deepseek_huggingface_prover_benchmark,
 )
+from reward_kit.models import Message # Import Message
 
+# Helper to create messages list
+def create_messages(statement_content: str, assistant_response: str):
+    return [
+        Message(role="user", content=f"Prove the following statement: {statement_content}"),
+        Message(role="assistant", content=assistant_response),
+    ]
 
 def test_lean_prover_reward_empty():
     """Test lean_prover_reward with empty input"""
-    result = lean_prover_reward("", "")
-    assert hasattr(result, "score")
-    assert result.score == 0.0
+    # Pass empty messages list, or messages with empty content
+    messages_empty_assistant = create_messages("some statement", "")
+    result = lean_prover_reward(messages=messages_empty_assistant, statement="some statement")
+    assert "score" in result
+    assert result['score'] == 0.0
+
+    messages_no_assistant = [Message(role="user", content="Prove something")]
+    result_no_assistant = lean_prover_reward(messages=messages_no_assistant, statement="something")
+    assert "score" in result_no_assistant
+    assert result_no_assistant['score'] == 0.0
+    
+    result_no_statement = lean_prover_reward(messages=messages_empty_assistant, statement=None)
+    assert "score" in result_no_statement
+    assert result_no_statement['score'] == 0.0
 
 
 def test_lean_prover_reward_basic():
@@ -21,14 +39,13 @@ begin
   sorry
 end
     """
-    result = lean_prover_reward(response, statement)
-    assert hasattr(result, "score")
+    messages = create_messages(statement, response)
+    result = lean_prover_reward(messages=messages, statement=statement)
+    assert "score" in result
 
     # Get completeness score from metrics if available
-    if hasattr(result, "metrics") and "completeness" in result.metrics:
-        assert (
-            result.metrics["completeness"].score < 1.0
-        )  # Should detect "sorry"
+    if "metrics" in result and "completeness" in result['metrics']:
+        assert result['metrics']["completeness"]['score'] < 1.0  # Should detect "sorry"
 
 
 def test_lean_prover_reward_complete():
@@ -39,9 +56,10 @@ begin
   apply Nat.lt_succ_self,
 end
     """
-    result = lean_prover_reward(response, statement)
-    assert hasattr(result, "score")
-    assert result.score >= 0.5
+    messages = create_messages(statement, response)
+    result = lean_prover_reward(messages=messages, statement=statement)
+    assert "score" in result
+    assert result['score'] >= 0.5
 
 
 def test_lean_prover_reward_verbose():
@@ -52,11 +70,12 @@ begin
   apply Nat.lt_succ_self,
 end
     """
-    result = lean_prover_reward(response, statement, verbose=True)
-    assert hasattr(result, "score")
-    assert hasattr(result, "metrics")
-    assert "syntax" in result.metrics
-    assert result.metrics["syntax"].score > 0
+    messages = create_messages(statement, response)
+    result = lean_prover_reward(messages=messages, statement=statement, verbose=True)
+    assert "score" in result
+    assert "metrics" in result
+    assert "syntax" in result['metrics']
+    assert result['metrics']["syntax"]['score'] > 0
 
 
 def test_deepseek_prover_v2_reward():
@@ -84,14 +103,15 @@ begin
   }
 end
     """
-    result = deepseek_prover_v2_reward(response, statement, verbose=True)
-    assert hasattr(result, "score")
-    assert result.score > 0.7  # Should be high due to good subgoals
+    messages = create_messages(statement, response)
+    result = deepseek_prover_v2_reward(messages=messages, statement=statement, verbose=True)
+    assert "score" in result
+    assert result['score'] > 0.7  # Should be high due to good subgoals
 
     # Check for subgoal analysis in metrics
-    assert hasattr(result, "metrics")
-    assert "subgoal_decomposition" in result.metrics
-    assert "hierarchical_structure" in result.metrics
+    assert "metrics" in result
+    assert "subgoal_decomposition" in result['metrics']
+    assert "hierarchical_structure" in result['metrics']
 
 
 @pytest.mark.skip(
@@ -119,6 +139,7 @@ begin
   exact step5,
 end
     """
+    messages = create_messages(statement, response)
     dataset_item = {
         "id": "AM_GM_inequality",
         "statement": "If a and b are positive real numbers, then the arithmetic mean is greater than or equal to the geometric mean.",
@@ -128,9 +149,9 @@ end
 
     try:
         result = deepseek_huggingface_prover_benchmark(
-            response, statement, dataset_item=dataset_item, verbose=True
+            messages=messages, statement=statement, dataset_item=dataset_item, verbose=True
         )
-        assert hasattr(result, "score")
-        assert result.score >= 0.8  # Should be high for good proof
+        assert "score" in result
+        assert result['score'] >= 0.8  # Should be high for good proof
     except ImportError:
         pytest.skip("Hugging Face datasets package not installed")

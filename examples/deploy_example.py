@@ -24,39 +24,44 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/deploy_example.py"
     )
 
-from reward_kit import legacy_reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult
 from reward_kit.auth import get_authentication
 
 
-@legacy_reward_function
+@reward_function
 def informativeness_reward(
     messages: List[Dict[str, str]],
     original_messages: List[Dict[str, str]],
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluates the informativeness of an assistant response based on
     specificity markers and content density.
     """
     # Get the assistant's response
-    if not messages or messages[-1].get("role") != "assistant":
-        return RewardOutput(
+    # messages are List[Dict[str, str]] as per type hint, but decorator converts to List[Message]
+    # However, the decorator in typed_interface.py passes List[Message] to the wrapped function.
+    # So, messages[-1] here will be a Message object.
+    if not messages or messages[-1].role != "assistant": # Use attribute access
+        return EvaluateResult(
             score=0.0,
+            reason="No assistant response found", # Added reason for EvaluateResult
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No assistant response found"
+                "error": MetricResult(
+                    score=0.0, success=False, reason="No assistant response found" # success added
                 )
             },
         )
 
-    response = messages[-1].get("content", "")
+    response = messages[-1].content if messages[-1].content is not None else "" # Use attribute access
     metrics = {}
 
     # 1. Length check - reward concise but informative responses
     length = len(response)
     length_score = min(length / 1000.0, 1.0)  # Cap at 1000 chars
-    metrics["length"] = MetricRewardOutput(
+    metrics["length"] = MetricResult(
         score=length_score * 0.2,  # 20% weight
+        success=length_score > 0, # Basic success if length > 0
         reason=f"Response length: {length} chars",
     )
 
@@ -76,8 +81,9 @@ def informativeness_reward(
         if marker.lower() in response.lower()
     )
     marker_score = min(marker_count / 2.0, 1.0)  # Cap at 2 markers
-    metrics["specificity"] = MetricRewardOutput(
+    metrics["specificity"] = MetricResult(
         score=marker_score * 0.3,  # 30% weight
+        success=marker_count > 0, # Basic success if markers found
         reason=f"Found {marker_count} specificity markers",
     )
 
@@ -104,15 +110,23 @@ def informativeness_reward(
     else:
         density_score = 0.0
 
-    metrics["content_density"] = MetricRewardOutput(
+    metrics["content_density"] = MetricResult(
         score=density_score * 0.5,  # 50% weight
+        success=density_score > 0.1, # Basic success if density is somewhat reasonable
         reason=f"Content density: {content_word_count} content words in {word_count} total words",
     )
 
     # Calculate final score as weighted sum of metrics
     final_score = sum(metric.score for metric in metrics.values())
+    # Determine overall reason based on score
+    overall_reason = "Evaluation based on length, specificity, and content density."
+    if final_score > 0.7:
+        overall_reason = "Response is informative."
+    elif final_score < 0.3:
+        overall_reason = "Response lacks informativeness."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
 
 
 # Test the reward function with example messages

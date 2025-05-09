@@ -4,7 +4,7 @@ from reward_kit.rewards.json_schema import (
     json_schema_reward,
     json_schema_reward_with_llm_judge,
 )
-from reward_kit.models import RewardOutput
+from reward_kit.models import EvaluateResult # Changed
 from unittest.mock import patch, MagicMock
 
 

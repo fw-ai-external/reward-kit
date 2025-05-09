@@ -2,7 +2,7 @@ from typing import Dict, List, Any, Optional, Union
 import json
 import re
 
-from ..models import RewardOutput, MetricRewardOutput
+from ..models import EvaluateResult, MetricResult
 from .function_calling import (
     calculate_jaccard_similarity,
     extract_schema_properties,
@@ -16,7 +16,7 @@ def json_schema_reward(
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate JSON content against an expected schema using Jaccard similarity.
 
@@ -41,11 +41,12 @@ def json_schema_reward(
     # Extract JSON content from messages if not provided directly
     if json_content is None:
         if not messages:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No messages provided to extract JSON content.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No messages provided"
+                    "error": MetricResult(
+                        score=0.0, reason="No messages provided", success=False
                     )
                 },
             )
@@ -70,22 +71,24 @@ def json_schema_reward(
                 pass
 
         if not json_content:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No JSON content found in messages.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No JSON content found in messages"
+                    "error": MetricResult(
+                        score=0.0, reason="No JSON content found in messages", success=False
                     )
                 },
             )
 
     # Normalize expected schema
     if expected_schema is None:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No expected schema provided for comparison.",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No expected schema provided"
+                "error": MetricResult(
+                    score=0.0, reason="No expected schema provided", success=False
                 )
             },
         )
@@ -99,11 +102,12 @@ def json_schema_reward(
         else:
             parsed_content = json_content
     except json.JSONDecodeError:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason=f"Invalid JSON content: {json_content}",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason=f"Invalid JSON content: {json_content}"
+                "error": MetricResult(
+                    score=0.0, reason=f"Invalid JSON content: {json_content}", success=False
                 )
             },
         )
@@ -173,15 +177,17 @@ def json_schema_reward(
 
     schema_comparison_reason = "\n".join(comparison_details)
 
-    metrics["schema_similarity"] = MetricRewardOutput(
+    metrics["schema_similarity"] = MetricResult(
         score=schema_similarity,
         reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
+        success=schema_similarity == 1.0
     )
 
     # Calculate final score based on schema similarity
     final_score = schema_similarity
+    final_reason = f"Final score based on schema similarity: {final_score:.2f}."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
 def json_schema_reward_with_llm_judge(
@@ -195,7 +201,7 @@ def json_schema_reward_with_llm_judge(
     temperature: float = 0.0,
     weights: Optional[Dict[str, float]] = None,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Combined reward function that evaluates JSON content using both schema
     validation and LLM judgment.
@@ -221,12 +227,14 @@ def json_schema_reward_with_llm_judge(
     try:
         from openai import OpenAI
     except ImportError:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="OpenAI package not installed.",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
                     reason="OpenAI package not installed. Install it with: pip install openai",
+                    success=False,
                 )
             },
         )
@@ -390,25 +398,26 @@ EXPLANATION: [your detailed explanation]
     combined_metrics = {}
 
     # Add schema metrics with "schema_" prefix
-    for key, metric in schema_result.metrics.items():
+    for key, metric_val in schema_result.metrics.items(): # Renamed to metric_val
         if key != "schema_similarity":
-            combined_metrics[f"schema_{key}"] = metric
+            combined_metrics[f"schema_{key}"] = metric_val
         else:
-            combined_metrics[key] = metric
+            combined_metrics[key] = metric_val
 
     # Add llm metrics
-    combined_metrics["llm_judge"] = MetricRewardOutput(
-        score=llm_score, reason=llm_reason
+    combined_metrics["llm_judge"] = MetricResult(
+        score=llm_score, reason=llm_reason, success=llm_score >= 0.8 # Assuming high score means success
     )
 
     # Add summary metrics
-    combined_metrics["schema_score"] = MetricRewardOutput(
+    combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
+        success=schema_result.score == 1.0
     )
 
-    combined_metrics["llm_score"] = MetricRewardOutput(
-        score=llm_score, reason=f"LLM judge score: {llm_score:.2f}"
+    combined_metrics["llm_score"] = MetricResult(
+        score=llm_score, reason=f"LLM judge score: {llm_score:.2f}", success=llm_score >= 0.8
     )
 
     # Calculate weighted final score
@@ -418,11 +427,13 @@ EXPLANATION: [your detailed explanation]
     final_score = (schema_result.score * schema_weight) + (
         llm_score * llm_weight
     )
+    final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_score:.2f} * {llm_weight:.2f})."
 
     # Add weight information
-    combined_metrics["weights"] = MetricRewardOutput(
+    combined_metrics["weights"] = MetricResult(
         score=0.0,  # Not a real score
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
+        success=True # Informational metric
     )
 
-    return RewardOutput(score=final_score, metrics=combined_metrics)
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=combined_metrics)

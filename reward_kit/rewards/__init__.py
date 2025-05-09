@@ -18,9 +18,11 @@ from . import repetition
 from . import cpp_code
 from . import accuracy_length
 from . import lean_prover
+from . import deepcoder_reward # Added import
 
 # Directly import specific reward functions for easy access
 from .code_execution import fractional_code_reward
+from .deepcoder_reward import deepcoder_code_reward # Added import
 from .cpp_code import ioi_cpp_code_reward, binary_cpp_code_reward
 from .accuracy_length import cosine_scaled_accuracy_length_reward
 from .lean_prover import (
@@ -45,7 +47,9 @@ __all__ = [
     "cpp_code",
     "accuracy_length",
     "lean_prover",
+    "deepcoder_reward", # Added module to __all__
     "fractional_code_reward",
+    "deepcoder_code_reward", # Added function to __all__
     "ioi_cpp_code_reward",
     "binary_cpp_code_reward",
     "cosine_scaled_accuracy_length_reward",

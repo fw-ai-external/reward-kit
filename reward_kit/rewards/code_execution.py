@@ -24,18 +24,21 @@ import subprocess
 import faulthandler
 import multiprocessing
 import traceback
+import shlex # Added for robust splitting of arguments
 from io import StringIO
 from typing import Dict, List, Any, Optional, Tuple, Callable, Union
 
 # Try to import from e2b_code_interpreter first (preferred)
 try:
-    from e2b_code_interpreter import Sandbox  # type: ignore
+    from e2b_code_interpreter.sync import Sandbox  # type: ignore # Use SyncSandbox
 
     _HAS_E2B = True
     _E2B_SOURCE = "e2b_code_interpreter"
 except ImportError:
     # Fallback to e2b
     try:
+        # Assuming 'e2b' package's default Sandbox is synchronous.
+        # If 'e2b' also defaults to async, this part might need adjustment too.
         from e2b import Sandbox  # type: ignore
 
         _HAS_E2B = True
@@ -45,8 +48,6 @@ except ImportError:
         _E2B_SOURCE = None
 
 from ..models import (
-    RewardOutput,
-    MetricRewardOutput,
     Message,
     EvaluateResult,
     MetricResult,
@@ -72,7 +73,22 @@ def extract_code_blocks(
     matches = re.findall(pattern, text)
 
     code_blocks = []
-    for lang, code in matches:
+    verbose_patterns_removed = []
+
+    # Define patterns for verbose text that might appear inside code blocks
+    # These patterns will be removed.
+    # Using re.DOTALL to make '.' match newlines.
+    verbose_regex_patterns = [
+        re.compile(r"<think>.*?</think>", re.DOTALL),
+        re.compile(r"<reasoning>.*?</reasoning>", re.DOTALL),
+        re.compile(
+            r"Thinking:\s*.*?(?=\n\S)", re.DOTALL
+        ),  # Matches "Thinking: ..." until a new non-whitespace line
+        re.compile(r"^\s*Here's the Python code.*?\n", re.MULTILINE | re.IGNORECASE),
+        re.compile(r"^\s*Okay, here is the code:.*?\n", re.MULTILINE | re.IGNORECASE),
+    ]
+
+    for lang, code_content in matches:
         # Skip if language filter is specified and doesn't match
         if language and lang and language.lower() != lang.lower():
             continue
@@ -80,8 +96,36 @@ def extract_code_blocks(
         # Use "unknown" for empty language specifier
         detected_lang = lang.lower() if lang else "unknown"
 
+        original_code_content = code_content  # Keep a copy for comparison
+        cleaned_code_content = code_content
+
+        for verbose_pattern in verbose_regex_patterns:
+            cleaned_code_content = verbose_pattern.sub("", cleaned_code_content)
+
+        if cleaned_code_content != original_code_content:
+            verbose_patterns_removed.append(
+                f"Verbose content removed from '{detected_lang}' block."
+            )
+            # Potentially log the actual removed content here if needed for debugging,
+            # e.g., by diffing original_code_content and cleaned_code_content.
+
         # Add to results
-        code_blocks.append({"language": detected_lang, "code": code.strip()})
+        # Store both cleaned code and information about removed verbosity
+        block_info = {
+            "language": detected_lang,
+            "code": cleaned_code_content.strip(),
+        }
+        if (
+            verbose_patterns_removed
+        ):  # Add only if something was actually removed for this block
+            block_info["verbosity_cleaned_reason"] = "; ".join(verbose_patterns_removed)
+            verbose_patterns_removed = []  # Reset for next block
+
+        code_blocks.append(block_info)
+
+    # If verbose_patterns_removed has items here, it means some patterns were found
+    # outside of any specific block, or it's a general flag.
+    # For now, the verbosity_cleaned_reason is per-block.
 
     return code_blocks
 
@@ -95,7 +139,7 @@ def local_code_execution_reward(
     timeout: int = 5,
     max_memory_mb: int = 100,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:  # Changed
     """
     Evaluate code correctness by executing it locally and comparing the output.
 
@@ -123,11 +167,12 @@ def local_code_execution_reward(
 
     # Extract the last assistant message
     if not messages:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="No messages provided for evaluation.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No messages provided"
+                "error": MetricResult(  # Changed
+                    score=0.0, reason="No messages provided", success=False
                 )
             },
         )
@@ -135,26 +180,31 @@ def local_code_execution_reward(
     last_message = messages[-1]
 
     # Check role of the last message
-    if last_message.get("role") != "assistant":
-        return RewardOutput(
+    if last_message.role != "assistant":
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="Last message is not from assistant.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Last message is not from assistant"
+                "error": MetricResult(  # Changed
+                    score=0.0,
+                    reason="Last message is not from assistant",
+                    success=False,
                 )
             },
         )
 
     # Extract code blocks from the message
-    code_blocks = extract_code_blocks(last_message.get("content", ""), language)
+    code_blocks = extract_code_blocks(last_message.content or "", language)
 
     if not code_blocks:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason=f"No {language} code blocks found in message.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(  # Changed
                     score=0.0,
                     reason=f"No {language} code blocks found in message",
+                    success=False,
                 )
             },
         )
@@ -192,16 +242,18 @@ def local_code_execution_reward(
     code = code_blocks[0]["code"]
 
     # Log the extracted code
-    metrics["extracted_code"] = MetricRewardOutput(
+    metrics["extracted_code"] = MetricResult(  # Changed
         score=0.0,  # Not a real score
         reason=f"Extracted code:\n```{language}\n{code}\n```",
+        success=True,  # Informational
     )
 
     # Add expected output to metrics if available
     if expected_output:
-        metrics["expected_output"] = MetricRewardOutput(
+        metrics["expected_output"] = MetricResult(  # Changed
             score=0.0,  # Not a real score
             reason=f"Expected output:\n{expected_output}",
+            success=True,  # Informational
         )
 
     # Execute the code based on language
@@ -210,23 +262,21 @@ def local_code_execution_reward(
     elif language.lower() in ["javascript", "js"]:
         execution_result = execute_javascript_code(code, timeout)
     else:
-        return RewardOutput(
-            score=0.0,
-            metrics={
-                **metrics,
-                "error": MetricRewardOutput(
-                    score=0.0, reason=f"Unsupported language: {language}"
-                ),
-            },
+        metrics["error"] = MetricResult(  # Changed
+            score=0.0, reason=f"Unsupported language: {language}", success=False
         )
+        return EvaluateResult(
+            score=0.0, reason=f"Unsupported language: {language}", metrics=metrics
+        )  # Changed
 
     # Check execution result
     if execution_result["success"]:
         output = execution_result["output"]
 
-        metrics["execution_result"] = MetricRewardOutput(
+        metrics["execution_result"] = MetricResult(  # Changed
             score=1.0,
             reason=f"Code executed successfully with output:\n{output}",
+            success=True,
         )
 
         # Compare with expected output if provided
@@ -234,23 +284,33 @@ def local_code_execution_reward(
             similarity = compare_outputs(output, expected_output)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
 
-            metrics["output_match"] = MetricRewardOutput(
-                score=similarity, reason=match_reason
+            metrics["output_match"] = MetricResult(  # Changed
+                score=similarity, reason=match_reason, success=similarity == 1.0
             )
-
-            return RewardOutput(score=similarity, metrics=metrics)
+            # Reason for overall EvaluateResult
+            final_reason = f"Execution successful. Output similarity: {similarity:.2f}."
+            return EvaluateResult(
+                score=similarity, reason=final_reason, metrics=metrics
+            )  # Changed
 
         # No expected output provided, score based on successful execution
-        return RewardOutput(score=1.0, metrics=metrics)
+        final_reason = "Execution successful. No expected output to compare."
+        return EvaluateResult(
+            score=1.0, reason=final_reason, metrics=metrics
+        )  # Changed
     else:
         # Execution failed
         error = execution_result["error"]
 
-        metrics["execution_result"] = MetricRewardOutput(
-            score=0.0, reason=f"Code execution failed with error:\n{error}"
+        metrics["execution_result"] = MetricResult(  # Changed
+            score=0.0,
+            reason=f"Code execution failed with error:\n{error}",
+            success=False,
         )
-
-        return RewardOutput(score=0.0, metrics=metrics)
+        final_reason = f"Code execution failed: {error}"
+        return EvaluateResult(
+            score=0.0, reason=final_reason, metrics=metrics
+        )  # Changed
 
 
 def _execute_code_in_process(
@@ -327,9 +387,7 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     try:
         # Create temporary file for the code
-        with tempfile.NamedTemporaryFile(
-            suffix=".py", delete=False
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp_file:
             temp_file_path = temp_file.name
 
             # Add imports and reliability guard
@@ -443,9 +501,7 @@ def execute_python_code(code: str, timeout: int = 5) -> Dict[str, Any]:
     )
 
 
-def _execute_javascript_in_subprocess(
-    code: str, timeout: int
-) -> Dict[str, Any]:
+def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     Inner function to execute JavaScript code in a subprocess.
 
@@ -459,9 +515,7 @@ def _execute_javascript_in_subprocess(
     try:
         # Check if Node.js is installed
         try:
-            subprocess.run(
-                ["node", "--version"], capture_output=True, check=True
-            )
+            subprocess.run(["node", "--version"], capture_output=True, check=True)
         except (subprocess.SubprocessError, FileNotFoundError):
             return {
                 "success": False,
@@ -470,9 +524,7 @@ def _execute_javascript_in_subprocess(
             }
 
         # Create temporary file for the code
-        with tempfile.NamedTemporaryFile(
-            suffix=".js", delete=False
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".js", delete=False) as temp_file:
             temp_file_path = temp_file.name
 
             # Add safety wrapper around the code to prevent dangerous operations
@@ -640,9 +692,7 @@ def compare_outputs(actual: str, expected: str) -> float:
             if not actual_list and not expected_list:
                 return 1.0
 
-            if not isinstance(actual_list, list) or not isinstance(
-                expected_list, list
-            ):
+            if not isinstance(actual_list, list) or not isinstance(expected_list, list):
                 raise ValueError("Not a list")
 
             # Check length similarity
@@ -661,9 +711,7 @@ def compare_outputs(actual: str, expected: str) -> float:
                     best_match = 0.0
                     for act_item in actual_list:
                         # Recursively compare items
-                        item_similarity = compare_outputs(
-                            str(act_item), str(exp_item)
-                        )
+                        item_similarity = compare_outputs(str(act_item), str(exp_item))
                         best_match = max(best_match, item_similarity)
                     total_similarity += best_match
 
@@ -697,9 +745,7 @@ def compare_outputs(actual: str, expected: str) -> float:
             total_similarity = 0.0
             for i in range(common_len):
                 # Use string similarity for each line
-                line_similarity = string_similarity(
-                    actual_lines[i], expected_lines[i]
-                )
+                line_similarity = string_similarity(actual_lines[i], expected_lines[i])
                 total_similarity += line_similarity
 
             lines_similarity = total_similarity / common_len
@@ -836,11 +882,10 @@ def execute_code_with_e2b(
                 "error": "API key is required for E2B execution. Set it using the api_key parameter or E2B_API_KEY environment variable.",
             }
 
-        # Initialize sandbox with the provided API key or use environment variable
-        sandbox = Sandbox(api_key=api_key)
-
-        # Capture stdout and stderr
-        stdout = []
+        # Use sandbox as a context manager
+        with Sandbox(api_key=api_key) as sandbox:
+            # Capture stdout and stderr
+            stdout = []
         stderr = []
 
         def capture_stdout(output):
@@ -871,15 +916,32 @@ def execute_code_with_e2b(
 
         # Write code to file in sandbox
         try:
+            fs_handler = None
+            if _E2B_SOURCE == "e2b_code_interpreter":
+                if hasattr(sandbox, "filesystem"):
+                    fs_handler = sandbox.filesystem
+            elif _E2B_SOURCE == "e2b":  # Fallback for 'e2b'
+                if hasattr(sandbox, "_filesystem"):  # Older 'e2b' might use _filesystem
+                    fs_handler = sandbox._filesystem
+                elif hasattr(sandbox, "filesystem"):  # Or it might have been updated
+                    fs_handler = sandbox.filesystem
+
+            if not fs_handler:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": "Could not access E2B sandbox filesystem handler.",
+                }
+
             # Create directory if it doesn't exist
             try:
-                sandbox.files.mkdir("/code")
+                fs_handler.make_dir("/code")
             except Exception:
-                # Directory might already exist, ignore error
-                pass
+                # Directory might already exist, or other error
+                pass  # Continue to attempt writing the file
 
             # Write code to file
-            sandbox.files.write(file_path, code)
+            fs_handler.write(file_path, code)
         except Exception as e:
             return {
                 "success": False,
@@ -901,11 +963,7 @@ def execute_code_with_e2b(
             output = "\n".join(stdout)
             error_output = "\n".join(stderr)
 
-            # Clean up sandbox
-            try:
-                sandbox.close()
-            except Exception:
-                pass
+            # Sandbox is automatically closed by the 'with' statement
 
             if result.exit_code == 0:
                 return {"success": True, "output": output, "error": None}
@@ -917,11 +975,7 @@ def execute_code_with_e2b(
                 }
 
         except Exception as e:
-            # Ensure sandbox is closed even if execution fails
-            try:
-                sandbox.close()
-            except Exception:
-                pass
+            # Sandbox is automatically closed by the 'with' statement even on exception
 
             return {
                 "success": False,
@@ -947,7 +1001,7 @@ def e2b_code_execution_reward(
     timeout: int = 30,
     api_key: Optional[str] = None,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:  # Changed
     """
     Evaluate code correctness by executing it in E2B sandbox and comparing the output.
 
@@ -966,24 +1020,28 @@ def e2b_code_execution_reward(
         RewardOutput with score and metrics
     """
     if not _HAS_E2B:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="E2B package not installed.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(  # Changed
                     score=0.0,
                     reason="E2B package not installed. Install with: pip install e2b",
+                    success=False,
                 )
             },
         )
 
     # Check for E2B API key in environment variables if not provided
     if api_key is None and os.environ.get("E2B_API_KEY") is None:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="E2B API key is required.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(  # Changed
                     score=0.0,
                     reason="E2B API key is required. Set the E2B_API_KEY environment variable or provide api_key parameter.",
+                    success=False,
                 )
             },
         )
@@ -993,38 +1051,44 @@ def e2b_code_execution_reward(
 
     # Extract the last assistant message
     if not messages:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="No messages provided for evaluation.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No messages provided"
-                )
+                "error": MetricResult(
+                    score=0.0, reason="No messages provided", success=False
+                )  # Changed
             },
         )
 
     last_message = messages[-1]
 
     # Check role of the last message
-    if last_message.get("role") != "assistant":
-        return RewardOutput(
+    if last_message.role != "assistant":
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason="Last message is not from assistant.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Last message is not from assistant"
+                "error": MetricResult(  # Changed
+                    score=0.0,
+                    reason="Last message is not from assistant",
+                    success=False,
                 )
             },
         )
 
     # Extract code blocks from the message
-    code_blocks = extract_code_blocks(last_message.get("content", ""), language)
+    code_blocks = extract_code_blocks(last_message.content or "", language)
 
     if not code_blocks:
-        return RewardOutput(
+        return EvaluateResult(  # Changed
             score=0.0,
+            reason=f"No {language} code blocks found in message.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(  # Changed
                     score=0.0,
                     reason=f"No {language} code blocks found in message",
+                    success=False,
                 )
             },
         )
@@ -1062,16 +1126,18 @@ def e2b_code_execution_reward(
     code = code_blocks[0]["code"]
 
     # Log the extracted code
-    metrics["extracted_code"] = MetricRewardOutput(
+    metrics["extracted_code"] = MetricResult(  # Changed
         score=0.0,  # Not a real score
         reason=f"Extracted code:\n```{language}\n{code}\n```",
+        success=True,  # Informational
     )
 
     # Add expected output to metrics if available
     if expected_output:
-        metrics["expected_output"] = MetricRewardOutput(
+        metrics["expected_output"] = MetricResult(  # Changed
             score=0.0,  # Not a real score
             reason=f"Expected output:\n{expected_output}",
+            success=True,  # Informational
         )
 
     # Execute the code in E2B sandbox
@@ -1083,9 +1149,10 @@ def e2b_code_execution_reward(
     if execution_result["success"]:
         output = execution_result["output"]
 
-        metrics["execution_result"] = MetricRewardOutput(
+        metrics["execution_result"] = MetricResult(  # Changed
             score=1.0,
             reason=f"Code executed successfully in E2B sandbox with output:\n{output}",
+            success=True,
         )
 
         # Compare with expected output if provided
@@ -1093,32 +1160,40 @@ def e2b_code_execution_reward(
             similarity = compare_outputs(output, expected_output)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
 
-            metrics["output_match"] = MetricRewardOutput(
-                score=similarity, reason=match_reason
+            metrics["output_match"] = MetricResult(  # Changed
+                score=similarity, reason=match_reason, success=similarity == 1.0
             )
-
-            return RewardOutput(score=similarity, metrics=metrics)
+            final_reason = (
+                f"E2B execution successful. Output similarity: {similarity:.2f}."
+            )
+            return EvaluateResult(
+                score=similarity, reason=final_reason, metrics=metrics
+            )  # Changed
 
         # No expected output provided, score based on successful execution
-        return RewardOutput(score=1.0, metrics=metrics)
+        final_reason = "E2B execution successful. No expected output to compare."
+        return EvaluateResult(
+            score=1.0, reason=final_reason, metrics=metrics
+        )  # Changed
     else:
         # Execution failed
         error = execution_result["error"]
 
-        metrics["execution_result"] = MetricRewardOutput(
+        metrics["execution_result"] = MetricResult(  # Changed
             score=0.0,
             reason=f"Code execution failed in E2B sandbox with error:\n{error}",
+            success=False,
         )
-
-        return RewardOutput(score=0.0, metrics=metrics)
+        final_reason = f"E2B code execution failed: {error}"
+        return EvaluateResult(
+            score=0.0, reason=final_reason, metrics=metrics
+        )  # Changed
 
 
 @reward_function
 def fractional_code_reward(
     messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[
-        Union[List[Dict[str, Any]], List[Message]]
-    ] = None,
+    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None,
     expected_output: Optional[str] = None,
     language: str = "python",
     timeout: int = 30,
@@ -1126,7 +1201,7 @@ def fractional_code_reward(
     api_key: Optional[str] = None,
     test_cases: Optional[List[Dict[str, Any]]] = None,
     **kwargs: Any,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Execute code and return the exact pass rate as a score between 0 and 1.
 
@@ -1152,11 +1227,12 @@ def fractional_code_reward(
 
     # Extract the last assistant message
     if not messages:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No messages provided for fractional code reward.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No messages provided"
+                "error": MetricResult(  # Changed
+                    score=0.0, reason="No messages provided", success=False
                 )
             },
         )
@@ -1164,29 +1240,34 @@ def fractional_code_reward(
     last_message = messages[-1]
 
     # Check role of the last message
-    if getattr(last_message, "role", last_message.get("role")) != "assistant":
-        return RewardOutput(
+    if last_message.role != "assistant":
+        return EvaluateResult(
             score=0.0,
+            reason="Last message is not from assistant for fractional code reward.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Last message is not from assistant"
+                "error": MetricResult(  # Changed
+                    score=0.0,
+                    reason="Last message is not from assistant",
+                    success=False,
                 )
             },
         )
 
     # Get content from the message
-    content = getattr(last_message, "content", last_message.get("content", ""))
+    content = last_message.content or ""
 
     # Extract code blocks from the message
     code_blocks = extract_code_blocks(content, language)
 
     if not code_blocks:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason=f"No {language} code blocks found in message for fractional code reward.",  # Added reason
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(  # Changed
                     score=0.0,
                     reason=f"No {language} code blocks found in message",
+                    success=False,
                 )
             },
         )
@@ -1240,19 +1321,28 @@ def fractional_code_reward(
 
     # Handle multiple test cases if provided
     if test_cases:
+        # Pass kwargs through to _run_test_cases
         return _run_test_cases(
-            code, language, test_cases, timeout, environment, api_key
+            code=code,
+            language=language,
+            test_cases=test_cases,
+            timeout=timeout,
+            environment=environment,
+            api_key=api_key,
+            **kwargs,  # Pass any extra args like function_to_call
         )
 
     # Execute code in specified environment
     if environment.lower() == "e2b":
         if not _HAS_E2B:
-            return RewardOutput(
+            return EvaluateResult(  # Changed
                 score=0.0,
+                reason="E2B package not installed for fractional code reward.",  # Added reason
                 metrics={
-                    "error": MetricRewardOutput(
+                    "error": MetricResult(  # Changed
                         score=0.0,
                         reason="E2B package not installed. Install with: pip install e2b",
+                        success=False,
                     )
                 },
             )
@@ -1266,21 +1356,39 @@ def fractional_code_reward(
         elif language.lower() in ["javascript", "js"]:
             execution_result = execute_javascript_code(code, timeout)
         else:
-            return RewardOutput(
+            return EvaluateResult(  # Changed
                 score=0.0,
+                reason=f"Unsupported language for fractional code reward: {language}",  # Added reason
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason=f"Unsupported language: {language}"
+                    "error": MetricResult(  # Changed
+                        score=0.0,
+                        reason=f"Unsupported language: {language}",
+                        success=False,
                     )
                 },
             )
 
     # Check execution result
+    metric_results: Dict[str, MetricResult] = {}  # Ensure metric_results is defined
+    for (
+        key,
+        value_str,
+    ) in metrics.items():  # Convert initial string metrics to MetricResult
+        metric_results[key] = MetricResult(
+            score=0.0,
+            reason=str(value_str),
+            success=(
+                True if key == "extracted_code" or key == "expected_output" else False
+            ),
+        )
+
     if execution_result["success"]:
         output = execution_result["output"]
 
-        metrics["execution_result"] = (
-            f"Code executed successfully with output:\n{output}"
+        metric_results["execution_result"] = MetricResult(  # Changed
+            score=1.0,
+            reason=f"Code executed successfully with output:\n{output}",
+            success=True,
         )
 
         # Compare with expected output if provided
@@ -1288,98 +1396,34 @@ def fractional_code_reward(
             similarity = compare_outputs(output, expected_output)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
 
-            # Convert metrics dict to MetricResult objects
-            metric_results = {}
-            for key, value in metrics.items():
-                if isinstance(value, str):
-                    metric_results[key] = MetricResult(score=1.0, reason=value)
-                elif (
-                    isinstance(value, dict)
-                    and "score" in value
-                    and "reason" in value
-                ):
-                    metric_results[key] = MetricResult(
-                        score=value.get("score", 1.0),
-                        reason=value.get("reason", ""),
-                    )
-
-            # Add output match metric
-            metric_results["output_match"] = MetricResult(
-                score=similarity, reason=match_reason
+            metric_results["output_match"] = MetricResult(  # Changed
+                score=similarity, reason=match_reason, success=similarity == 1.0
             )
-
-            # Convert MetricResult objects to MetricRewardOutput for RewardOutput
-            reward_metrics = {}
-            for key, value in metric_results.items():
-                if isinstance(value, MetricResult):
-                    reward_metrics[key] = MetricRewardOutput(
-                        score=value.score, reason=value.reason
-                    )
-                else:
-                    reward_metrics[key] = value
-
-            return RewardOutput(score=similarity, metrics=reward_metrics)
+            final_reason = f"Fractional code execution successful. Output similarity: {similarity:.2f}."
+            return EvaluateResult(
+                score=similarity, reason=final_reason, metrics=metric_results
+            )  # Changed
 
         # No expected output provided, score based on successful execution
-        # Convert metrics dict to MetricResult objects
-        metric_results = {}
-        for key, value in metrics.items():
-            if isinstance(value, str):
-                metric_results[key] = MetricResult(score=1.0, reason=value)
-            elif (
-                isinstance(value, dict)
-                and "score" in value
-                and "reason" in value
-            ):
-                metric_results[key] = MetricResult(
-                    score=value.get("score", 1.0),
-                    reason=value.get("reason", ""),
-                )
-
-        # Convert MetricResult objects to MetricRewardOutput for RewardOutput
-        reward_metrics = {}
-        for key, value in metric_results.items():
-            if isinstance(value, MetricResult):
-                reward_metrics[key] = MetricRewardOutput(
-                    score=value.score, reason=value.reason
-                )
-            else:
-                reward_metrics[key] = value
-
-        return RewardOutput(score=1.0, metrics=reward_metrics)
+        final_reason = (
+            "Fractional code execution successful. No expected output to compare."
+        )
+        return EvaluateResult(
+            score=1.0, reason=final_reason, metrics=metric_results
+        )  # Changed
     else:
         # Execution failed
         error = execution_result["error"]
 
-        metrics["execution_result"] = (
-            f"Code execution failed with error:\n{error}"
+        metric_results["execution_result"] = MetricResult(  # Changed
+            score=0.0,
+            reason=f"Code execution failed with error:\n{error}",
+            success=False,
         )
-
-        metric_results = {}
-        for key, value in metrics.items():
-            if isinstance(value, str):
-                metric_results[key] = MetricResult(score=0.0, reason=value)
-            elif (
-                isinstance(value, dict)
-                and "score" in value
-                and "reason" in value
-            ):
-                metric_results[key] = MetricResult(
-                    score=value.get("score", 0.0),
-                    reason=value.get("reason", ""),
-                )
-
-        # Convert MetricResult objects to MetricRewardOutput for RewardOutput
-        reward_metrics = {}
-        for key, value in metric_results.items():
-            if isinstance(value, MetricResult):
-                reward_metrics[key] = MetricRewardOutput(
-                    score=value.score, reason=value.reason
-                )
-            else:
-                reward_metrics[key] = value
-
-        return RewardOutput(score=0.0, metrics=reward_metrics)
+        final_reason = f"Fractional code execution failed: {error}"
+        return EvaluateResult(
+            score=0.0, reason=final_reason, metrics=metric_results
+        )  # Changed
 
 
 def _run_test_cases(
@@ -1389,9 +1433,15 @@ def _run_test_cases(
     timeout: int,
     environment: str,
     api_key: Optional[str] = None,
-) -> EvaluateResult:
+    function_to_call: Optional[str] = None,
+    prompt_for_name_extraction: Optional[
+        str
+    ] = None,  # Not used yet, but for future use
+    **kwargs: Any,  # Keep kwargs for flexibility, though function_to_call is now explicit
+) -> EvaluateResult:  # Changed return type hint to match actual returns
     """
     Run code against multiple test cases and return the fraction of passing tests.
+    Can optionally call a specific function if `function_to_call` is provided.
 
     Args:
         code: The code to execute
@@ -1404,72 +1454,248 @@ def _run_test_cases(
     Returns:
         EvaluateResult with score representing the fraction of passing tests
     """
+    # --- Start of Reverted Code ---
     metrics = {}
     results = []
     passed = 0
     total = len(test_cases)
 
     if total == 0:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No test cases provided",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No test cases provided"
+                "error": MetricResult(  # Changed
+                    score=0.0, reason="No test cases provided", success=False
                 )
             },
         )
 
-    # Prepare the code wrapper based on language
+    # Prepare the code wrapper based on language and whether a function name is provided
     if language.lower() in ["python", "py"]:
-        # Python code wrapper that captures input/output and provides test input
-        def prepare_test_code(test_code: str, test_input: str) -> str:
-            return (
-                "import sys\n"
-                "from io import StringIO\n\n"
-                "# Capture stdout\n"
-                "original_stdout = sys.stdout\n"
-                "sys.stdout = StringIO()\n\n"
-                "# Set up test input\n"
-                f"sys.stdin = StringIO('''{test_input}''')\n\n"
-                "# User code\n"
-                f"{test_code}\n\n"
-                "# Get output\n"
-                "output = sys.stdout.getvalue()\n"
-                "sys.stdout = original_stdout\n"
-                "print(output, end='')"
-            )
+        if function_to_call:
+            # Mode 1: Function Call Harness (Python)
+            def prepare_test_code(
+                user_code: str, test_input_str: str, func_name: str
+            ) -> str:
+                import json  # For json.loads and json.JSONDecodeError
+                import ast  # For ast.literal_eval
+
+                # Helper function to refine evaluated values
+                def refine_evaluated_value(val: Any) -> Any:
+                    # If val is a string, try to parse it further if it looks like list/dict or number
+                    if isinstance(val, str):
+                        stripped_val = val.strip()
+                        if stripped_val.startswith(("[", "{")):  # Looks like list/dict
+                            try:
+                                return json.loads(stripped_val)
+                            except json.JSONDecodeError:
+                                return val  # Keep original string if json.loads fails
+                        else:  # Not list-like or dict-like string
+                            try:  # Try to convert to number
+                                if (
+                                    "." in stripped_val
+                                    or "e" in stripped_val.lower()
+                                    or "E" in stripped_val
+                                ):
+                                    return float(stripped_val)
+                                else:
+                                    return int(stripped_val)
+                            except ValueError:
+                                return val  # Keep original string if not a number
+                    return val  # Not a string, or already refined (e.g. actual list/int from initial parse)
+
+                # Argument parsing logic:
+                # The goal is to convert the test_input_str into a list of Python objects
+                # that will be used as arguments to the target function.
+                # This involves a multi-stage approach to handle various input string formats:
+                # 1. Try to parse the whole input string as a single JSON entity.
+                # 2. If that fails, try to parse the whole input string as a single Python literal.
+                # 3. If both fail, split the string by spaces and parse each part as a Python literal.
+                # The `refine_evaluated_value` helper is used to further process parsed strings
+                # into more specific types (list, dict, int, float) if applicable.
+                parsed_args = []
+                args_str_stripped = test_input_str.strip()
+
+                if not args_str_stripped:
+                    # No arguments if the input string is empty.
+                    pass
+                else:
+                    parsed_as_single_arg = False
+                    # Attempt 1: Parse the entire string as a single JSON entity.
+                    # Handles valid JSON values like "[1,2,3]", "5", "\"a string\"", "true".
+                    try:
+                        val_from_json = json.loads(args_str_stripped)
+                        parsed_args.append(refine_evaluated_value(val_from_json))
+                        parsed_as_single_arg = True
+                    except json.JSONDecodeError:
+                        # Attempt 2: If JSON parsing fails, try parsing as a single Python literal.
+                        # Handles Python literals like "['a','b']", "{'k':'v'}", "None".
+                        try:
+                            val_from_ast = ast.literal_eval(args_str_stripped)
+                            parsed_args.append(refine_evaluated_value(val_from_ast))
+                            parsed_as_single_arg = True
+                        except (ValueError, SyntaxError):
+                            # Both single-argument parse attempts failed.
+                            # Proceed to split by space for multiple arguments.
+                            pass  # Fall through to space-splitting logic
+
+                    if not parsed_as_single_arg:
+                        # Attempt 3: Fallback - treat as space-separated arguments, respecting quotes.
+                        # Each part is treated as a Python literal.
+                        # Handles inputs like "1 'foo' \"[1, 2]\"" or "item1 item2".
+                        try:
+                            arg_parts = shlex.split(args_str_stripped)
+                        except ValueError: # Handle shlex errors e.g. unmatched quotes
+                            arg_parts = [args_str_stripped] # Fallback to treating as a single, possibly problematic, part
+
+                        for part_str in arg_parts:
+                            try:
+                                # Try to evaluate the part as a Python literal
+                                val_from_part_ast = ast.literal_eval(part_str)
+                                parsed_args.append(
+                                    refine_evaluated_value(val_from_part_ast)
+                                )
+                            except (ValueError, SyntaxError):
+                                # If ast.literal_eval fails on a part, it's likely an unquoted string
+                                # or a malformed literal. Treat it as a string, but still refine.
+                                # (e.g. "item" or even "[1,2,3" if it ended up here due to earlier parse failures)
+                                parsed_args.append(refine_evaluated_value(part_str))
+
+                # Create the final argument string for the function call template.
+                args_repr = ", ".join(map(repr, parsed_args))
+
+                # Use triple quotes for the multi-line string
+                return f"""import sys
+import json
+import traceback
+
+# User code (contains function definition)
+{user_code}
+
+# Call the function with parsed arguments and print repr(result)
+try:
+    result = {func_name}({args_repr})
+    print(repr(result))
+except Exception as e:
+    import traceback # Ensure traceback is imported
+    print(f'Error calling function {func_name}: {{traceback.format_exc()}}', file=sys.stderr)
+    import sys # Ensure sys is imported here
+    sys.exit(1) # Exit non-zero
+"""
+
+        else:
+            # Mode 2: Stdin/Stdout Harness (Python) - Fallback
+            def prepare_test_code(
+                user_code: str, test_input_str: str, func_name: Optional[str]
+            ) -> str:
+                escaped_test_input = json.dumps(test_input_str)[1:-1].replace(
+                    "'''", "'\\''\\''\\''"
+                )
+                # Use triple quotes here too for consistency
+                return f"""import sys
+from io import StringIO
+
+original_stdout = sys.stdout
+sys.stdout = captured_stdout = StringIO()
+sys.stdin = StringIO('''{escaped_test_input}''')
+
+try:
+    exec({repr(user_code)}) # Execute user code as a script
+except Exception as e:
+    import traceback
+    print(f'Error executing script: {{traceback.format_exc()}}', file=sys.stderr)
+    import sys # Ensure sys is imported here
+    sys.exit(1) # Exit non-zero
+
+sys.stdout = original_stdout
+print(captured_stdout.getvalue(), end='')
+"""
 
     elif language.lower() in ["javascript", "js"]:
-        # JavaScript code wrapper that captures console output and provides input
-        def prepare_test_code(test_code: str, test_input: str) -> str:
-            # Create a simple input simulation for JavaScript
-            input_lines = test_input.strip().split("\n")
-            input_setup = "const inputs = " + json.dumps(input_lines) + ";\n"
-            input_setup += "let inputIndex = 0;\n"
-            input_setup += "const readline = () => inputs[inputIndex++];\n"
+        if function_to_call:
+            # Mode 1: Function Call Harness (JavaScript) - Basic implementation
+            def prepare_test_code(
+                user_code: str, test_input_str: str, func_name: str
+            ) -> str:
+                # Basic input parsing for JS (similar to Python, less robust)
+                args_str = test_input_str.strip()
+                parsed_args_js = []
+                if args_str:
+                    for arg in args_str.split():
+                        if arg.isdigit() or (arg.startswith("-") and arg[1:].isdigit()):
+                            parsed_args_js.append(arg)  # Keep as string number
+                        elif "." in arg and all(
+                            c.isdigit() or c == "." or (i == 0 and c == "-")
+                            for i, c in enumerate(arg)
+                        ):
+                            try:
+                                float(arg)  # Check if it's a float
+                                parsed_args_js.append(arg)  # Keep as string number
+                            except ValueError:
+                                parsed_args_js.append(json.dumps(arg))  # String literal
+                        else:
+                            parsed_args_js.append(json.dumps(arg))  # String literal
 
-            return (
-                "// Capture console.log output\n"
-                "const originalLog = console.log;\n"
-                "let output = '';\n"
-                "console.log = function() {\n"
-                "  output += Array.from(arguments).join(' ') + '\\n';\n"
-                "};\n\n"
-                f"{input_setup}\n\n"
-                "// User code\n"
-                f"{test_code}\n\n"
-                "// Print captured output\n"
-                "console.log = originalLog;\n"
-                "console.log(output);"
-            )
+                args_js_repr = ", ".join(parsed_args_js)
+                # Use triple quotes for JS harness string
+                return f"""// User code (contains function definition)
+{user_code}
+
+// Call the function and print result
+try {{
+    const result = {func_name}({args_js_repr});
+    // Use JSON.stringify for more robust output representation
+    console.log(JSON.stringify(result));
+}} catch (error) {{
+    console.error(`Error calling function {func_name}:`, error);
+    process.exitCode = 1; // Indicate error
+}}
+"""
+
+        else:
+            # Mode 2: Stdin/Stdout Harness (JavaScript) - Fallback
+            def prepare_test_code(
+                user_code: str, test_input: str, func_name: Optional[str]
+            ) -> str:
+                input_lines = test_input.strip().split("\n")
+                input_setup = "const inputs = " + json.dumps(input_lines) + ";\n"
+                input_setup += "let inputIndex = 0;\n"
+                input_setup += "const readline = () => inputs[inputIndex++];\n"
+                # Use triple quotes for JS harness string
+                return f"""// Capture console.log output
+const originalLog = console.log;
+let output = '';
+console.log = function(...args) {{ // Capture multiple args
+  output += args.map(String).join(' ') + '\\n';
+}};
+
+{input_setup}
+
+// User code
+try {{
+    {user_code} // Execute user code as script
+}} catch (error) {{
+    console.error('Error executing script:', error);
+    process.exitCode = 1; // Indicate error
+}}
+
+// Print captured output
+console.log = originalLog;
+process.stdout.write(output); // Write directly to avoid extra newline
+"""
 
     else:
-        return RewardOutput(
+        # This case should be caught by the prepare_test_code logic or earlier language checks
+        # However, to be safe, return an error EvaluateResult
+        return EvaluateResult(
             score=0.0,
+            reason=f"Unsupported language for test cases: {language}",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
                     reason=f"Unsupported language for test cases: {language}",
+                    success=False,
                 )
             },
         )
@@ -1479,33 +1705,49 @@ def _run_test_cases(
         test_input = test_case.get("input", "")
         expected = test_case.get("expected_output", "")
 
-        # Prepare code with test input
-        test_code = prepare_test_code(code, test_input)
+        # Prepare code with test input using the appropriate harness
+        test_code_prepared = prepare_test_code(code, test_input, function_to_call)
 
         # Execute code in the specified environment
         if environment.lower() == "e2b":
             if not _HAS_E2B:
-                return RewardOutput(
+                return EvaluateResult(  # Changed
                     score=0.0,
+                    reason="E2B package not installed for test cases.",  # Added reason
                     metrics={
-                        "error": MetricRewardOutput(
+                        "error": MetricResult(  # Changed
                             score=0.0,
                             reason="E2B package not installed. Install with: pip install e2b",
+                            success=False,
                         )
                     },
                 )
 
+            # Always execute the prepared code harness
             execution_result = execute_code_with_e2b(
-                code=test_code,
+                code=test_code_prepared,
                 language=language,
                 timeout=timeout,
                 api_key=api_key,
             )
         else:  # local execution
             if language.lower() in ["python", "py"]:
-                execution_result = execute_python_code(test_code, timeout)
+                execution_result = execute_python_code(test_code_prepared, timeout)
             elif language.lower() in ["javascript", "js"]:
-                execution_result = execute_javascript_code(test_code, timeout)
+                execution_result = execute_javascript_code(test_code_prepared, timeout)
+            # Need to handle the case where language is not supported here too
+            else:
+                return EvaluateResult(
+                    score=0.0,
+                    reason=f"Unsupported language for local execution: {language}",
+                    metrics={
+                        "error": MetricResult(
+                            score=0.0,
+                            reason=f"Unsupported language for local execution: {language}",
+                            success=False,
+                        )
+                    },
+                )  # Changed
 
         # Process the result
         test_result = {
@@ -1518,13 +1760,32 @@ def _run_test_cases(
 
         if execution_result["success"]:
             output = execution_result["output"]
-            similarity = compare_outputs(output, expected)
+            # Use exact match after normalization for DeepCoder style pass/fail
+            # Normalize both actual and expected outputs
+            normalized_output = normalize_output(output)
+            normalized_expected = normalize_output(expected)
 
-            # Consider the test passed if similarity is high (above 0.9)
-            test_result["passed"] = similarity > 0.9
-            test_result["similarity"] = similarity
-            test_result["actual_output"] = output
-            test_result["details"] = f"Similarity: {similarity:.2f}"
+            # For function call mode, expected output might be repr() format
+            # Try to match repr() format if function_to_call was used
+            expected_repr = (
+                repr(expected)
+                if function_to_call and language.lower() in ["python", "py"]
+                else None
+            )
+            normalized_expected_repr = (
+                normalize_output(expected_repr) if expected_repr else None
+            )
+
+            # Check for exact match against normalized expected or its repr() form
+            is_pass = normalized_output == normalized_expected
+            if not is_pass and normalized_expected_repr:
+                is_pass = normalized_output == normalized_expected_repr
+
+            test_result["passed"] = is_pass
+            test_result["actual_output"] = output  # Store raw output
+            test_result["normalized_actual"] = normalized_output
+            test_result["normalized_expected"] = normalized_expected
+            test_result["details"] = f"Passed: {is_pass}"
 
             if test_result["passed"]:
                 passed += 1
@@ -1537,35 +1798,34 @@ def _run_test_cases(
     # Calculate the final score as the fraction of passing tests
     score = passed / total if total > 0 else 0.0
 
-    metrics["test_results"] = results
+    metrics["test_results"] = results  # results is List[Dict], not MetricResult
     metrics["pass_rate"] = f"{passed}/{total} tests passed ({score:.2%})"
 
     # Convert metrics to MetricResult objects
-    metric_results = {}
+    final_metrics: Dict[str, MetricResult] = {}
     for key, value in metrics.items():
-        if key == "test_results":  # Special handling for test results array
-            metric_results[key] = MetricResult(
-                score=score,
-                reason=str(value),  # Convert test results to string for display
+        if key == "test_results":
+            final_metrics[key] = MetricResult(
+                score=score,  # Use overall score for this summary metric
+                reason=json.dumps(value, indent=2),  # Serialize list of dicts
+                success=score == 1.0,
             )
-        elif isinstance(value, str):
-            metric_results[key] = MetricResult(score=score, reason=value)
-        elif isinstance(value, dict) and "score" in value and "reason" in value:
-            metric_results[key] = MetricResult(
-                score=value.get("score", score), reason=value.get("reason", "")
+        elif key == "pass_rate":
+            final_metrics[key] = MetricResult(
+                score=score,  # Use overall score
+                reason=str(value),
+                success=score == 1.0,
             )
+        elif isinstance(
+            value, MetricResult
+        ):  # Should not happen here as metrics are strings or lists
+            final_metrics[key] = value
+        elif isinstance(value, str):  # Should not happen here anymore
+            final_metrics[key] = MetricResult(score=0.0, reason=value, success=False)
 
-    # Convert MetricResult objects to MetricRewardOutput for RewardOutput
-    reward_metrics = {}
-    for key, value in metric_results.items():
-        if isinstance(value, MetricResult):
-            reward_metrics[key] = MetricRewardOutput(
-                score=value.score, reason=value.reason
-            )
-        else:
-            reward_metrics[key] = value
-
-    return RewardOutput(score=score, metrics=reward_metrics)
+    return EvaluateResult(
+        score=score, reason=f"{passed}/{total} tests passed.", metrics=final_metrics
+    )
 
 
 def reliability_guard(maximum_memory_bytes: Optional[int] = None) -> None:

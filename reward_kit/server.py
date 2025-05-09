@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .models import RewardOutput
+from .models import EvaluateResult # Changed
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -130,14 +130,20 @@ class RewardServer:
                 )
 
                 # Handle different return types
-                if isinstance(result, RewardOutput):
-                    return result.to_dict()
-                elif isinstance(result, tuple) and len(result) == 2:
+                # The self.reward_func is expected to be decorated by the new @reward_function,
+                # which returns a dictionary.
+                if isinstance(result, dict) and "score" in result:
+                    return result # Return the dictionary directly
+                elif isinstance(result, EvaluateResult): # Should not happen if func is from new decorator
+                    logger.warning("Reward function returned EvaluateResult object directly to server; expected dict.")
+                    return result.model_dump()
+                elif isinstance(result, tuple) and len(result) == 2: # Legacy tuple
+                    logger.warning("Reward function returned legacy tuple format to server.")
                     score, components = result
                     return {"score": score, "metrics": components}
                 else:
                     raise TypeError(
-                        f"Invalid return type from reward function: {type(result)}"
+                        f"Invalid return type from reward function after decoration: {type(result)}"
                     )
 
             except Exception as e:
@@ -198,7 +204,7 @@ def serve_tunnel(func_path: str, port: int = 8000):
     serve(func_path=func_path, host="0.0.0.0", port=port)
 
 
-def create_app(reward_func: Callable[..., RewardOutput]) -> FastAPI:
+def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI: # Changed
     """
     Create a FastAPI app for the given reward function.
 
@@ -256,14 +262,20 @@ def create_app(reward_func: Callable[..., RewardOutput]) -> FastAPI:
             )
 
             # Handle different return types
-            if isinstance(result, RewardOutput):
-                return result.to_dict()
-            elif isinstance(result, tuple) and len(result) == 2:
+            # The reward_func is expected to be decorated by the new @reward_function,
+            # which returns a dictionary.
+            if isinstance(result, dict) and "score" in result:
+                return result # Return the dictionary directly
+            elif isinstance(result, EvaluateResult): # Should not happen if func is from new decorator
+                logger.warning("Reward function passed to create_app returned EvaluateResult object directly; expected dict after decoration.")
+                return result.model_dump()
+            elif isinstance(result, tuple) and len(result) == 2: # Legacy tuple
+                logger.warning("Reward function passed to create_app returned legacy tuple format.")
                 score, components = result
                 return {"score": score, "metrics": components}
             else:
                 raise TypeError(
-                    f"Invalid return type from reward function: {type(result)}"
+                    f"Invalid return type from reward function after decoration: {type(result)}"
                 )
 
         except Exception as e:

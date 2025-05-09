@@ -21,8 +21,16 @@ from reward_kit.rewards.lean_prover import (
     lean_prover_reward,
     deepseek_prover_v2_reward,
 )
-from reward_kit.models import MetricRewardOutput
+from reward_kit.models import Message # Import Message
 
+# Helper to create messages list for the runner
+def create_runner_messages(statement_content: str, assistant_response: str):
+    # The decorator expects list of dicts or list of Message objects.
+    # For direct calls in this runner, using dicts is fine.
+    return [
+        {"role": "user", "content": f"Prove the following statement: {statement_content}"},
+        {"role": "assistant", "content": assistant_response},
+    ]
 
 def run_tests():
     """Run basic tests for the Lean Prover reward functions"""
@@ -31,35 +39,38 @@ def run_tests():
 
     # Test with an empty response
     print("\nTest: Empty response")
-    result = lean_prover_reward("", "")
-    print(f"Score: {result.score}")
-    assert result.score == 0.0
+    empty_statement = "Any statement"
+    empty_response_messages = create_runner_messages(empty_statement, "")
+    result = lean_prover_reward(messages=empty_response_messages, statement=empty_statement)
+    print(f"Score: {result['score']}")
+    assert result['score'] == 0.0
 
     # Skip to complete proof and subgoal tests for basic functionality
 
     # Test with a complete proof
     print("\nTest: Complete proof")
-    statement = "If n is a natural number, then n + 1 > n."
-    response = """theorem n_lt_n_plus_one (n : ℕ) : n < n + 1 :=
+    statement_complete = "If n is a natural number, then n + 1 > n."
+    response_complete = """theorem n_lt_n_plus_one (n : ℕ) : n < n + 1 :=
 begin
   apply Nat.lt_succ_self,
 end
     """
-    result = lean_prover_reward(response, statement, verbose=True)
-    print(f"Score: {result.score}")
+    messages_complete = create_runner_messages(statement_complete, response_complete)
+    result = lean_prover_reward(messages=messages_complete, statement=statement_complete, verbose=True)
+    print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
-    if hasattr(result, "metrics") and result.metrics:
+    if "metrics" in result and result['metrics']:
         print(
-            f"Metrics: {json.dumps({k: {'score': v.score, 'reason': v.reason} for k, v in result.metrics.items()}, indent=2)}"
+            f"Metrics: {json.dumps({k: {'score': v['score'], 'reason': v['reason']} for k, v in result['metrics'].items()}, indent=2)}"
         )
-    assert result.score >= 0.5
+    assert result['score'] >= 0.5
 
     print("\nTesting deepseek_prover_v2_reward...")
 
     # Test with a complex proof with subgoals
     print("\nTest: Complex proof with subgoals")
-    statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
-    response = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
+    statement_complex = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    response_complex = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
 begin
   -- We'll prove this by induction on n
   induction n with d hd,
@@ -81,14 +92,15 @@ begin
   }
 end
     """
-    result = deepseek_prover_v2_reward(response, statement, verbose=True)
-    print(f"Score: {result.score}")
+    messages_complex = create_runner_messages(statement_complex, response_complex)
+    result = deepseek_prover_v2_reward(messages=messages_complex, statement=statement_complex, verbose=True)
+    print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
-    if hasattr(result, "metrics") and result.metrics:
+    if "metrics" in result and result['metrics']:
         print(
-            f"Metrics: {json.dumps({k: {'score': v.score, 'reason': v.reason} for k, v in result.metrics.items()}, indent=2)}"
+            f"Metrics: {json.dumps({k: {'score': v['score'], 'reason': v['reason']} for k, v in result['metrics'].items()}, indent=2)}"
         )
-    assert result.score > 0.7
+    assert result['score'] > 0.7
 
     print("\nAll tests passed!")
 

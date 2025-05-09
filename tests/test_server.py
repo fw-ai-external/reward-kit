@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from typing import List, Dict, Any, Optional
 
 from reward_kit.server import create_app
-from reward_kit.models import RewardOutput, MetricRewardOutput
+from reward_kit.models import EvaluateResult, MetricResult
 
 
 @pytest.fixture
@@ -15,10 +15,10 @@ def test_reward_func():
         messages: List[Dict[str, str]],
         original_messages: Optional[List[Dict[str, str]]] = None,
         **kwargs
-    ) -> RewardOutput:
+    ) -> EvaluateResult:
         """Test reward function that returns a simple score."""
-        metrics = {"test": MetricRewardOutput(score=0.5, reason="Test reason")}
-        return RewardOutput(score=0.5, metrics=metrics)
+        metrics = {"test": MetricResult(score=0.5, success=True, reason="Test reason")}
+        return EvaluateResult(score=0.5, reason="Test score reason", metrics=metrics)
 
     return _reward_func
 
@@ -52,10 +52,12 @@ class TestServer:
         assert response.status_code == 200
         data = response.json()
         assert data["score"] == 0.5
+        assert data["reason"] == "Test score reason"
         assert "metrics" in data
         assert "test" in data["metrics"]
         assert data["metrics"]["test"]["score"] == 0.5
         assert data["metrics"]["test"]["reason"] == "Test reason"
+        assert data["metrics"]["test"]["success"] is True
 
     def test_reward_endpoint_with_metadata(self, client):
         """Test the reward endpoint with metadata."""

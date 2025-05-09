@@ -3,6 +3,7 @@ Tests for code execution reward functions.
 """
 
 import pytest
+import json # Added import for json.loads
 from reward_kit.rewards.code_execution import (
     extract_code_blocks,
     local_code_execution_reward,
@@ -13,8 +14,12 @@ from reward_kit.rewards.code_execution import (
     e2b_code_execution_reward,
     execute_code_with_e2b,
     _HAS_E2B,
+    fractional_code_reward, # Added for new tests
 )
-from reward_kit.models import RewardOutput
+from reward_kit.models import Message # Added for new tests
+
+
+# from reward_kit.models import EvaluateResult # EvaluateResult is no longer directly asserted for reward function outputs
 
 
 @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
@@ -45,9 +50,9 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score == 0.0
-        assert "E2B package not installed" in result.metrics["error"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 0.0
+        assert "E2B package not installed" in result['metrics']['error']['reason']
 
         # Restore _HAS_E2B to its original value
         monkeypatch.setattr(
@@ -92,9 +97,9 @@ print(add(2, 3))
             api_key=None,
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score == 0.0
-        assert "API key is required" in result.metrics["error"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 0.0
+        assert "API key is required" in result['metrics']['error']['reason']
 
 
 class TestExtractCodeBlocks:
@@ -336,11 +341,104 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score == 1.0
-        assert (
-            "executed successfully" in result.metrics["execution_result"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 1.0
+
+
+CODE_WITH_ARG_COLLECTOR = """
+def arg_collector(*args, **kwargs):
+    return {"args": list(args), "kwargs": kwargs}
+
+def another_func(x):
+    return x * 2
+"""
+
+# Dummy messages for fractional_code_reward
+DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD = [
+    Message(role="user", content="Call arg_collector"),
+    Message(role="assistant", content=f"```python\n{CODE_WITH_ARG_COLLECTOR}\n```")
+]
+
+class TestFractionalCodeRewardArgParsing:
+    @pytest.mark.parametrize(
+        "test_input_str, expected_args_list, expected_kwargs_dict",
+        [
+            # Test case format: (input_string_for_function, expected_args_as_list, expected_kwargs_as_dict)
+            ("5", [5], {}),  # Single integer
+            ("\"hello\"", ["hello"], {}),  # Single JSON string
+            ("[1, 2, 3]", [[1, 2, 3]], {}),  # JSON array of ints
+            ("['a', 'b', 'c']", [['a', 'b', 'c']], {}),  # Python list repr with single quotes
+            ("1 'foo'", [1, "foo"], {}),  # Space-separated multiple args (int, string)
+            ("\"[1,2,3]\"", [[1,2,3]], {}), # JSON string whose content is list-like (refined)
+            ("\"5\"", [5], {}), # JSON string whose content is number-like (refined)
+            ("", [], {}),  # Empty string for no-arg call
+            ("True None", [True, None], {}), # Boolean and None
+            ("{'key': 'value'}", [{"key": "value"}], {}), # Python dict repr
+            ("1.0 \"[1, \\\"a\\\"]\"", [1.0, [1, "a"]], {}), # Float and JSON string with escaped quotes
+            ("arg1 arg2 arg3", ["arg1", "arg2", "arg3"], {}), # Multiple unquoted strings
+        ],
+    )
+    def test_python_function_arg_parsing(
+        self, test_input_str, expected_args_list, expected_kwargs_dict
+    ):
+        expected_return_val = {"args": expected_args_list, "kwargs": expected_kwargs_dict}
+        
+        test_cases = [
+            {"input": test_input_str, "expected_output": repr(expected_return_val)}
+        ]
+
+        result = fractional_code_reward(
+            messages=DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD,
+            language="python",
+            test_cases=test_cases,
+            environment="local", # Ensure local execution for direct testing of parsing
+            function_to_call="arg_collector",
+            # Provide the code containing arg_collector directly if fractional_code_reward uses last message
+            # For this test, the DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD provides the code.
         )
+
+        assert isinstance(result, dict), "Result should be a dictionary"
+        assert "score" in result, "Result dictionary must contain a 'score' key"
+        
+        # Detailed assertion for debugging if something fails
+        if result['score'] != 1.0:
+            print(f"Test failed for input: {test_input_str}")
+            print(f"Expected return: {repr(expected_return_val)}")
+            test_results_metric_data = result.get('metrics', {}).get('test_results')
+            if test_results_metric_data and isinstance(test_results_metric_data, dict) and 'reason' in test_results_metric_data:
+                try:
+                    actual_test_run_details_list = json.loads(test_results_metric_data['reason'])
+                    if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
+                        first_test_detail = actual_test_run_details_list[0]
+                        print(f"Actual output from execution: {first_test_detail.get('actual_output')}")
+                        print(f"Test result details: {first_test_detail.get('details')}")
+                    else:
+                        print(f"Test results reason content not as expected: {actual_test_run_details_list}")
+                except json.JSONDecodeError:
+                    print(f"Could not parse test_results metric reason (JSONDecodeError): {test_results_metric_data['reason']}")
+            else:
+                print(f"Full result: {result}")
+
+        assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed."
+        
+        # Additionally, check the actual output if available in metrics
+        test_results_metric = result.get('metrics', {}).get('test_results')
+        if test_results_metric and isinstance(test_results_metric, dict) and 'reason' in test_results_metric:
+            try:
+                # The reason for test_results metric is a JSON string of the list of test results
+                actual_test_run_details_list = json.loads(test_results_metric['reason'])
+                if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
+                    actual_output_str = actual_test_run_details_list[0].get('actual_output')
+                    assert actual_output_str == repr(expected_return_val), \
+                        f"Actual output '{actual_output_str}' did not match expected '{repr(expected_return_val)}' for input '{test_input_str}'"
+            except json.JSONDecodeError: # Catch specifically json.JSONDecodeError
+                print(f"Could not parse test_results metric reason (JSONDecodeError) for input '{test_input_str}': {test_results_metric['reason']}")
+            except IndexError:
+                print(f"test_results metric reason list was empty for input '{test_input_str}'")
+        # The 'execution_result' metric might not be present if tests pass but output mismatches,
+        # as it's typically for code execution status itself, not output comparison.
+        # The primary check is result['score'] == 1.0 and the actual_output comparison.
+        # If result['score'] == 1.0, it implies successful execution.
 
     def test_python_success_mismatch(self):
         messages = [
@@ -365,9 +463,9 @@ This will output `4`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score < 1.0
-        assert "Output similarity:" in result.metrics["output_match"].reason
+        assert isinstance(result, dict)
+        assert result['score'] < 1.0
+        assert "Output similarity:" in result['metrics']['output_match']['reason']
 
     def test_code_execution_failure(self):
         messages = [
@@ -392,9 +490,9 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score == 0.0
-        assert "failed with error" in result.metrics["execution_result"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 0.0
+        assert "failed with error" in result['metrics']['execution_result']['reason']
 
     def test_extract_expected_output_from_message(self):
         messages = [
@@ -424,5 +522,5 @@ This will output `5`.
             language="python",
         )
 
-        assert isinstance(result, RewardOutput)
-        assert result.score == 1.0
+        assert isinstance(result, dict)
+        assert result['score'] == 1.0

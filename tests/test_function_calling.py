@@ -8,7 +8,7 @@ from reward_kit.rewards.function_calling import (
     llm_judge_reward,
     composite_function_call_reward,
 )
-from reward_kit.models import RewardOutput
+from reward_kit.models import EvaluateResult # Changed
 from unittest.mock import patch, MagicMock
 
 

@@ -5,7 +5,7 @@ without having to deal with threading or servers.
 """
 
 from typing import List, Dict, Any, Optional
-from reward_kit import RewardOutput, MetricRewardOutput, reward_function
+from reward_kit import reward_function
 from reward_kit.models import Message, EvaluateResult
 
 

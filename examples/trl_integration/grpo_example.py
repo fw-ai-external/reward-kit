@@ -34,11 +34,13 @@ try:
     from trl import GRPOConfig, GRPOTrainer
     from datasets import load_dataset
     from peft import LoraConfig, get_peft_model
+    import math_verify # Import math_verify, may become unused by this script but kept for plan alignment
+    from reward_kit.rewards.math import math_reward as rk_math_reward # Import the library's math_reward
 
     HAS_TRL = True
 except ImportError:
     print(
-        "TRL or related packages not installed. Install with: pip install trl peft datasets"
+        "TRL or related packages not installed. Install with: pip install trl peft datasets math-verify"
     )
     HAS_TRL = False
 
@@ -96,133 +98,88 @@ def format_reward(
         f"{re.escape(think_tag)}(.*?){re.escape(think_tag.replace('<', '</'))}"
     )
     answer_pattern = f"{re.escape(answer_tag)}(.*?){re.escape(answer_tag.replace('<', '</'))}"
+    boxed_answer_pattern = r"\\boxed\{.*?}" # Pattern for \boxed{...}
 
     think_match = re.search(think_pattern, text, re.DOTALL)
     answer_match = re.search(answer_pattern, text, re.DOTALL)
 
     has_think = bool(think_match)
-    has_answer = bool(answer_match)
+    has_answer_tag = bool(answer_match)
+    has_boxed_in_answer = False
+
+    if has_answer_tag:
+        answer_content = answer_match.group(1)
+        if answer_content:
+            has_boxed_in_answer = bool(re.search(boxed_answer_pattern, answer_content))
 
     # Check for correct order (think should come before answer)
     correct_order = True
-    if has_think and has_answer:
+    if has_think and has_answer_tag:
         think_pos = text.find(think_tag)
         answer_pos = text.find(answer_tag)
         correct_order = think_pos < answer_pos
-
+    
     # Calculate score based on format compliance
-    if has_think and has_answer and correct_order:
+    # Max score if all conditions met
+    if has_think and has_answer_tag and has_boxed_in_answer and correct_order:
         score = 1.0
-        reason = "Format is compliant with think/answer tags in correct order"
-    elif has_think and has_answer:
-        score = 0.5
-        reason = "Has both think and answer tags but in incorrect order"
-    elif has_think:
+        reason = "Compliant: think, answer tags in order, and boxed answer present."
+    # Penalize if boxed answer is missing
+    elif has_think and has_answer_tag and correct_order:
+        score = 0.8
+        reason = "Partial: think, answer tags in order, but boxed answer missing."
+    # Penalize for incorrect order
+    elif has_think and has_answer_tag and has_boxed_in_answer:
+        score = 0.6
+        reason = "Partial: think, answer, boxed answer tags present, but incorrect order."
+    # Further penalizations for missing tags
+    elif has_think and has_answer_tag: # Incorrect order, no boxed
+        score = 0.4
+        reason = "Partial: think, answer tags present, incorrect order, no boxed answer."
+    elif has_think and has_boxed_in_answer: # Missing answer tag but has think and boxed (unlikely)
         score = 0.3
-        reason = "Has think tag but missing answer tag"
-    elif has_answer:
+        reason = "Partial: has think and boxed answer, but missing answer tag."
+    elif has_answer_tag and has_boxed_in_answer: # Missing think tag
         score = 0.2
-        reason = "Has answer tag but missing think tag"
+        reason = "Partial: has answer tag with boxed answer, but missing think tag."
+    elif has_think:
+        score = 0.1
+        reason = "Poor: Has think tag but missing answer tag and boxed answer."
+    elif has_answer_tag: # Has answer tag but no boxed and no think
+        score = 0.05
+        reason = "Poor: Has answer tag but missing think tag and boxed answer."
     else:
         score = 0.0
-        reason = "Missing both think and answer tags"
+        reason = "Non-compliant: Missing think, answer, and boxed answer."
 
     # Create metrics
     metrics = {
-        "has_think": MetricResult(
+        "has_think_tag": MetricResult(
             score=1.0 if has_think else 0.0,
             success=has_think,
             reason=f"{'Has' if has_think else 'Missing'} think tag",
         ),
-        "has_answer": MetricResult(
-            score=1.0 if has_answer else 0.0,
-            success=has_answer,
-            reason=f"{'Has' if has_answer else 'Missing'} answer tag",
+        "has_answer_tag": MetricResult(
+            score=1.0 if has_answer_tag else 0.0,
+            success=has_answer_tag,
+            reason=f"{'Has' if has_answer_tag else 'Missing'} answer tag",
         ),
-        "correct_order": MetricResult(
+        "has_boxed_in_answer": MetricResult(
+            score=1.0 if has_boxed_in_answer else 0.0,
+            success=has_boxed_in_answer,
+            reason=f"{'Has' if has_boxed_in_answer else 'Missing'} boxed answer within answer tag",
+        ),
+        "correct_tag_order": MetricResult(
             score=1.0 if correct_order else 0.0,
             success=correct_order,
-            reason=f"Tags are in {'correct' if correct_order else 'incorrect'} order",
+            reason=f"Tags are in {'correct' if correct_order else 'incorrect'} order (if both present)",
         ),
     }
 
     return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
 
-@reward_function
-def math_accuracy_reward(
-    messages: List[Dict[str, Any]],
-    original_messages: Optional[List[Dict[str, Any]]] = None,
-    solution: Optional[str] = None,
-    **kwargs,
-) -> EvaluateResult:
-    """
-    Reward function that checks if the math solution is correct.
-
-    Args:
-        messages: List of conversation messages
-        original_messages: Original messages for context
-        solution: Expected solution/answer
-
-    Returns:
-        EvaluateResult with score based on solution accuracy
-    """
-    # In a real implementation, we would:
-    # 1. Extract the answer from the text
-    # 2. Compare it with the expected solution
-    # 3. Calculate a similarity score
-
-    # For this example, we'll use a simplified implementation
-    if not messages or len(messages) == 0:
-        return EvaluateResult(
-            score=0.0,
-            reason="No messages provided",
-            metrics={
-                "accuracy": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
-                )
-            },
-        )
-
-    # Extract response text
-    response = messages[-1]
-    if response.get("role") != "assistant" or not response.get("content"):
-        return EvaluateResult(
-            score=0.0,
-            reason="No assistant response found",
-            metrics={
-                "accuracy": MetricResult(
-                    score=0.0, success=False, reason="No assistant response"
-                )
-            },
-        )
-
-    text = response.get("content", "")
-
-    # Simplified implementation: check if solution appears in the response
-    if solution and solution.lower() in text.lower():
-        score = 1.0
-        reason = f"Solution '{solution}' found in response"
-        success = True
-    else:
-        # Normally we would do a more sophisticated comparison
-        # For the example, we're using a random score
-        import random
-
-        score = random.uniform(0.3, 0.8)
-        reason = f"Solution '{solution}' not directly found, partial match assessment"
-        success = score > 0.7
-
-    return EvaluateResult(
-        score=score,
-        reason=reason,
-        metrics={
-            "accuracy": MetricResult(
-                score=score, success=success, reason=reason
-            )
-        },
-    )
-
+# The local math_accuracy_reward function is now removed, replaced by rk_math_reward from the library.
 
 def combine_rewards(reward_functions, weights=None):
     """
@@ -251,22 +208,38 @@ def combine_rewards(reward_functions, weights=None):
         ]
 
     # Create adapters for each reward function
+    # Note: We assume get_trl_adapter prepares the function to accept batch_input (List[List[Dict]])
+    # and **kwargs which might include 'solution' etc.
     adapters = [rf.get_trl_adapter() for rf in reward_functions]
 
-    def combined_adapter(batch_input, batch_orig_input=None, **adapter_kwargs):
-        """Combined adapter function that works with TRL."""
-        # Collect scores from all reward functions
+    def combined_adapter(prompts: List[List[Dict[str, str]]], completions: List[str], **kwargs):
+        """
+        Combined adapter function compatible with TRL's expected signature.
+        It reconstructs the full message list for each sample.
+        
+        Args:
+            prompts: List of prompt message lists (e.g., [[{'role':'system',...}, {'role':'user',...}]])
+            completions: List of generated completion strings.
+            **kwargs: Additional arguments passed by TRL (e.g., ground truth 'solution').
+        """
+        if len(prompts) != len(completions):
+             raise ValueError("Length of prompts and completions must match.")
+
+        # The individual adapters returned by get_trl_adapter now expect the TRL signature.
+        # We pass the arguments received by combined_adapter directly to them.
         all_scores = []
-        for i, adapter in enumerate(adapters):
-            scores = adapter(batch_input, batch_orig_input, **adapter_kwargs)
+        for adapter in adapters:
+            # Call the individual adapter with the arguments received from TRL trainer
+            scores = adapter(prompts=prompts, completions=completions, **kwargs)
             all_scores.append(scores)
 
         # Combine weighted scores for each sample
         combined_scores = []
-        for i in range(len(all_scores[0])):
+        num_samples = len(completions)
+        for i in range(num_samples):
             weighted_sum = sum(
-                scores[i] * weight
-                for scores, weight in zip(all_scores, weights)
+                all_scores[adapter_idx][i] * weight
+                for adapter_idx, weight in enumerate(weights)
             )
             combined_scores.append(weighted_sum)
 
@@ -335,12 +308,15 @@ def prepare_dataset_for_trl(
 
     # Prepare GRPO style system prompt
     if system_prompt is None:
+        # System prompt from Open R1 blog:
+        system_prompt = "Please reason step by step, and put your final answer within \\boxed{}."
+        # We also need to instruct about <think> and <answer> tags for the format reward.
+        # Let's combine this with the GRPO structure.
         system_prompt = (
-            "A conversation between User and Assistant. The user asks a question, and the Assistant solves it. "
-            "The assistant first thinks about the reasoning process in the mind and then provides the user "
+            f"{system_prompt} The assistant first thinks about the reasoning process in the mind and then provides the user "
             "with the answer. The reasoning process and answer are enclosed within <think> </think> and "
             "<answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>"
-            "<answer> answer here </answer>"
+            "<answer> \\boxed{answer here} </answer>" # Show example of boxed answer in the final tag structure
         )
 
     # Create the dataset in the format expected by TRL
@@ -381,31 +357,39 @@ def train_with_grpo_example():
 
     # 1. Create reward functions
     format_reward_fn = RewardFunction(func=format_reward)
-    accuracy_reward_fn = RewardFunction(func=math_accuracy_reward)
+    # Use the math_reward from reward_kit.rewards.math
+    accuracy_reward_fn = RewardFunction(func=rk_math_reward) 
 
     # 2. Prepare dataset
     try:
         print("Preparing dataset...")
+        # Using OpenR1-Math-220k as per user choice and blog
+        # The blog mentions a "default" split with 94k problems.
+        # Error indicated 'train' is the available split.
         dataset = prepare_dataset_for_trl(
-            dataset_name="AI-MO/NuminaMath-TIR",
-            split="train[:1%]",  # Use a small subset for demonstration
-            prompt_key="problem",
+            dataset_name="open-r1/OpenR1-Math-220k",
+            split="train", # Using the 'train' split
+            prompt_key="problem", # Assuming 'problem' and 'solution' keys are consistent or handled by prepare_dataset_for_trl
             response_key="solution",
-            max_samples=10,
+            max_samples=1000,  # Use a larger subset for more meaningful initial runs
         )
-        print(f"Dataset prepared: {len(dataset)} samples")
+        print(f"Dataset prepared: {len(dataset)} samples from open-r1/OpenR1-Math-220k (train split)")
+
     except Exception as e:
         print(f"Error preparing dataset: {str(e)}")
         return
 
     # 3. Load model (would be done for actual training)
-    if False:  # Skip model loading for example
+    # Set to True to enable model loading and training when ready
+    ACTUALLY_TRAIN_FLAG = True # Re-enabled training
+    if ACTUALLY_TRAIN_FLAG: # ACTUALLY_TRAIN_FLAG - Enabling training
         print("Loading model...")
-        model_id = "Qwen/Qwen2-0.5B-Instruct"
+        model_id = "Qwen/Qwen2-7B-Instruct" # Updated model ID
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            torch_dtype="auto",
+            torch_dtype="auto", # Or torch.bfloat16 for H100s
             device_map="auto",
+            rope_theta=300000.0, # For 32k context length, as per blog
         )
 
         # Configure LoRA for efficient fine-tuning
@@ -421,18 +405,25 @@ def train_with_grpo_example():
     # 4. Configure GRPO training
     training_args = GRPOConfig(
         output_dir="./trl-output",
-        learning_rate=1e-5,
+        learning_rate=5e-5,  # Updated LR from blog
         remove_unused_columns=False,  # Keep solution column for reward function
-        gradient_accumulation_steps=16,
-        num_train_epochs=1,
-        max_completion_length=64,
-        num_generations=4,
-        max_prompt_length=128,
+        gradient_accumulation_steps=16, # Keep or adjust based on hardware
+        num_train_epochs=3,  # Updated epochs from blog
+        max_completion_length=2048, # Increased, blog mentions 16k limit for data gen, 8k for 75%
+        num_generations=4, # Keep or adjust
+        max_prompt_length=1024, # Increased, ensure it accommodates problem statements
         report_to=["tensorboard"],
         logging_steps=10,
         push_to_hub=False,
         save_strategy="steps",
-        save_steps=10,
+        save_steps=100, # Save less frequently for larger datasets/longer training
+        lr_scheduler_type="linear", # Linear scheduler
+        warmup_ratio=0.1, # 10% warmup as per blog
+        per_device_train_batch_size=1, # Adjust based on GPU memory
+        # per_device_eval_batch_size=1, # If evaluation is added
+        # evaluation_strategy="steps", # If evaluation is added
+        # eval_steps=100, # If evaluation is added
+        # max_steps=5, # Removed to allow training for num_train_epochs
     )
 
     # 5. Combine reward functions for TRL
@@ -443,7 +434,8 @@ def train_with_grpo_example():
     )
 
     # 6. Create and run trainer (would be done for actual training)
-    if False:  # Skip actual training
+    # Set to True to enable model loading and training when ready
+    if ACTUALLY_TRAIN_FLAG: # ACTUALLY_TRAIN_FLAG - Enabling training
         print("Creating GRPO trainer...")
         trainer = GRPOTrainer(
             model=model,
@@ -465,33 +457,77 @@ def train_with_grpo_example():
     )
 
     # Print dataset sample to show the format
-    print("\nDataset format example:")
-    print(dataset[0])
+    print("\nDataset format example (first sample):")
+    first_dataset_sample = dataset[0]
+    print(first_dataset_sample)
 
-    # Show how reward functions would be called
-    print("\nReward function test on sample data:")
-    sample_messages = [
-        {"role": "system", "content": "Solve the following math problem."},
-        {"role": "user", "content": "What is 2+2?"},
-        {
-            "role": "assistant",
-            "content": "<think>To solve 2+2, I need to add the numbers. 2+2=4</think><answer>4</answer>",
-        },
-    ]
+    # Show how reward functions would be called on a real dataset sample
+    print("\nReward function test on the first actual dataset sample:")
+    
+    # Construct messages for the reward function using the first dataset sample
+    # The 'prompt' field in the dataset is already a list of messages (system, user)
+    actual_sample_prompt_messages = first_dataset_sample['prompt']
+    
+    # For testing, let's create a mock assistant response.
+    # A perfect response would use the dataset's 'solution' and format it correctly.
+    ground_truth_full_solution_text = first_dataset_sample['solution']
+    
+    # Extract the actual final answer from the ground_truth_full_solution_text for math_verify
+    # This was for the old local math_accuracy_reward. rk_math_reward will parse the full text.
+    # We still need ground_truth_full_solution_text for constructing original_messages.
+    
+    # The warning about no \boxed in GT is still relevant if the dataset often lacks it.
+    boxed_gt_match_in_solution = re.search(r"\\boxed\{(.*?)\}", ground_truth_full_solution_text)
+    if not boxed_gt_match_in_solution:
+        print(f"Informational: Ground truth solution for sample does not contain \\boxed{{...}}: {ground_truth_full_solution_text[:100]}...")
 
-    format_result = format_reward(sample_messages)
-    accuracy_result = math_accuracy_reward(sample_messages, solution="4")
+    # Mock assistant responses. For rk_math_reward, the comparison will be against numbers extracted from ground_truth_full_solution_text.
+    # Let's use a known number from the example solution if possible for mock model answer.
+    # The example solution is: "## Solution.\n\nLet $t$ be the time required... speed of the river is $v_{R}=4 \\mathrm{~km} / \\mathrm{h}$, and the speed of the boat is $v_{B}=10 \\mathrm{~km} / \\mathrm{h}$."
+    # Let's assume the target answer for the mock is 10 (boat speed) or 4 (river speed).
+    # For the mock, we'll use "10" as the boxed answer.
+    mock_model_boxed_answer_val = "10"
 
-    print(
-        f"Format reward score: {format_result.score} - {format_result.reason}"
-    )
-    print(
-        f"Accuracy reward score: {accuracy_result.score} - {accuracy_result.reason}"
-    )
+    mock_assistant_content_perfect = f"<think>Some reasoning based on problem: {first_dataset_sample['prompt'][-1]['content'][:50]}...</think><answer>\\boxed{{{mock_model_boxed_answer_val}}}</answer>"
+    mock_assistant_content_no_box = f"<think>Some reasoning...</think><answer>{mock_model_boxed_answer_val}</answer>" # Missing box
+    mock_assistant_content_no_think = f"<answer>\\boxed{{{mock_model_boxed_answer_val}}}</answer>" # Missing think
 
-    # Show combined reward calculation
-    combined_score = 0.3 * format_result.score + 0.7 * accuracy_result.score
-    print(f"Combined reward score: {combined_score}")
+    # Original messages for rk_math_reward
+    original_messages_for_test = actual_sample_prompt_messages + [{"role": "assistant", "content": ground_truth_full_solution_text}]
+
+    # Test case 1: "Perfect" format
+    print("\n--- Test Case 1: Mock 'Perfect' Format ---")
+    messages_test_case_1 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_perfect}]
+    format_result_1 = format_reward_fn.func(messages_test_case_1) # Call .func directly for testing
+    accuracy_result_1 = accuracy_reward_fn.func(messages=messages_test_case_1, original_messages=original_messages_for_test)
+    print(f"Format reward (perfect mock): {format_result_1.score} - {format_result_1.reason}")
+    # Use dictionary access if accuracy_result is a dict
+    print(f"Accuracy reward (perfect mock): {accuracy_result_1['score']} - {accuracy_result_1.get('reason', 'N/A')}")
+    combined_score_1 = 0.3 * format_result_1.score + 0.7 * accuracy_result_1['score']
+    print(f"Combined reward (perfect mock): {combined_score_1}")
+
+    # Test case 2: No box in answer (model's response)
+    print("\n--- Test Case 2: Mock 'No Box in Answer' ---")
+    messages_test_case_2 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_no_box}]
+    format_result_2 = format_reward_fn.func(messages_test_case_2)
+    accuracy_result_2 = accuracy_reward_fn.func(messages=messages_test_case_2, original_messages=original_messages_for_test)
+    print(f"Format reward (no box): {format_result_2.score} - {format_result_2.reason}")
+    # rk_math_reward will extract "10" from the no_box content if it's a plain number.
+    # Use dictionary access if accuracy_result is a dict
+    print(f"Accuracy reward (no box): {accuracy_result_2['score']} - {accuracy_result_2.get('reason', 'N/A')}")
+    combined_score_2 = 0.3 * format_result_2.score + 0.7 * accuracy_result_2['score']
+    print(f"Combined reward (no box): {combined_score_2}")
+
+    # Test case 3: No think tag
+    print("\n--- Test Case 3: Mock 'No Think Tag' ---")
+    messages_test_case_3 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_no_think}]
+    format_result_3 = format_reward_fn.func(messages_test_case_3)
+    accuracy_result_3 = accuracy_reward_fn.func(messages=messages_test_case_3, original_messages=original_messages_for_test)
+    print(f"Format reward (no think): {format_result_3.score} - {format_result_3.reason}")
+    # Use dictionary access if accuracy_result is a dict
+    print(f"Accuracy reward (no think): {accuracy_result_3['score']} - {accuracy_result_3.get('reason', 'N/A')}")
+    combined_score_3 = 0.3 * format_result_3.score + 0.7 * accuracy_result_3['score']
+    print(f"Combined reward (no think): {combined_score_3}")
 
 
 if __name__ == "__main__":

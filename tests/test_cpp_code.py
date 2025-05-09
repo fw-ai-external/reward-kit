@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from typing import Dict, List, Any
-from reward_kit.models import MetricRewardOutput
+from reward_kit.models import MetricResult, EvaluateResult # Changed
 
 from reward_kit.rewards.cpp_code import (
     extract_code_blocks,
@@ -21,7 +21,7 @@ from reward_kit.rewards.cpp_code import (
     binary_cpp_code_reward,
     _ioi_cpp_code_reward_impl,
 )
-from reward_kit.models import RewardOutput
+# RewardOutput import removed, EvaluateResult is already imported
 
 # Example C++ code for testing
 SAMPLE_CPP_CODE = """
@@ -586,7 +586,7 @@ This program reads two integers and outputs their sum.
         )
 
         # Check result - execution should have succeeded with perfect match
-        assert isinstance(result, RewardOutput)
+        assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
         assert (
             "executed successfully" in result.metrics["execution_result"].reason
@@ -630,7 +630,7 @@ This program reads two integers and outputs their sum.
         )
 
         # Check result - should have partial match
-        assert isinstance(result, RewardOutput)
+        assert isinstance(result, EvaluateResult)
         assert result.score < 1.0
         assert "Output similarity:" in result.metrics["output_match"].reason
 
@@ -677,7 +677,7 @@ int main() {
         )
 
         # Check result - execution should have failed
-        assert isinstance(result, RewardOutput)
+        assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
         assert "failed with error" in result.metrics["execution_result"].reason
 
@@ -737,7 +737,7 @@ This program reads two integers and outputs their sum.
         )
 
         # Check result
-        assert isinstance(result, RewardOutput)
+        assert isinstance(result, EvaluateResult)
 
         # The score in _ioi_cpp_code_reward_impl is calculated based on the ratio of tests
         # that pass the pass_threshold (not an average of scores).
@@ -757,15 +757,15 @@ class TestBinaryCppCodeReward:
     def test_binary_pass(self, mock_reward_impl):
         # Set up mock response
         mock_metrics = {
-            "execution_result": MetricRewardOutput(
-                score=1.0, reason="Code executed successfully"
+            "execution_result": MetricResult(
+                score=1.0, reason="Code executed successfully", success=True
             ),
-            "output_match": MetricRewardOutput(
-                score=1.0, reason="Perfect match"
+            "output_match": MetricResult(
+                score=1.0, reason="Perfect match", success=True
             ),
         }
-        mock_reward_impl.return_value = RewardOutput(
-            score=1.0, metrics=mock_metrics
+        mock_reward_impl.return_value = EvaluateResult(
+            score=1.0, reason="Binary pass", metrics=mock_metrics
         )
 
         messages = [
@@ -790,21 +790,21 @@ class TestBinaryCppCodeReward:
         )
 
         # Check result
-        assert isinstance(result, RewardOutput)
-        assert result.score == 1.0
-        assert "Passed" in result.metrics["binary_result"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 1.0
+        assert "Passed" in result['metrics']['binary_result']['reason']
 
     @patch("reward_kit.rewards.cpp_code._ioi_cpp_code_reward_impl")
     def test_binary_fail(self, mock_reward_impl):
         # Set up mock response
         mock_metrics = {
-            "execution_result": MetricRewardOutput(
-                score=1.0, reason="Code executed successfully"
+            "execution_result": MetricResult(
+                score=1.0, reason="Code executed successfully", success=True
             ),
-            "output_match": MetricRewardOutput(score=0.8, reason="Close match"),
+            "output_match": MetricResult(score=0.8, reason="Close match", success=False),
         }
-        mock_reward_impl.return_value = RewardOutput(
-            score=0.8, metrics=mock_metrics
+        mock_reward_impl.return_value = EvaluateResult(
+            score=0.8, reason="Binary fail due to partial match", metrics=mock_metrics
         )
 
         messages = [
@@ -832,6 +832,6 @@ class TestBinaryCppCodeReward:
         )
 
         # Check result
-        assert isinstance(result, RewardOutput)
-        assert result.score == 0.0
-        assert "Failed" in result.metrics["binary_result"].reason
+        assert isinstance(result, dict)
+        assert result['score'] == 0.0
+        assert "Failed" in result['metrics']['binary_result']['reason']

@@ -13,7 +13,7 @@ except ImportError:
     # Type to mock in tests
     OpenAI = None  # type: ignore
 
-from ..models import RewardOutput, MetricRewardOutput
+from ..models import EvaluateResult, MetricResult
 
 
 def match_function_call(
@@ -24,7 +24,7 @@ def match_function_call(
     expected_call_schema: Dict[str, Any],
     argument_match_strictness: str = "exact",
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate how well a function call matches an expected schema.
 
@@ -49,8 +49,8 @@ def match_function_call(
     name_match = function_name == expected_name
     name_score = 1.0 if name_match else 0.0
     name_reason = f"Function name {'matches' if name_match else 'does not match'}: expected '{expected_name}', got '{function_name}'"
-    metrics["function_name_match"] = MetricRewardOutput(
-        score=name_score, reason=name_reason
+    metrics["function_name_match"] = MetricResult(
+        score=name_score, reason=name_reason, success=name_match
     )
 
     # 2. Arguments match
@@ -155,14 +155,15 @@ def match_function_call(
         )
 
     arg_reason = "\n".join(arg_details)
-    metrics["arguments_match"] = MetricRewardOutput(
-        score=arg_score, reason=arg_reason
+    metrics["arguments_match"] = MetricResult(
+        score=arg_score, reason=arg_reason, success=arg_score == 1.0 if len(expected_args) > 0 else True
     )
 
     # 3. Calculate final score (equally weighted between name and args)
     final_score = (name_score + arg_score) / 2.0
+    final_reason = f"Overall score based on name match ({name_score:.2f}) and argument match ({arg_score:.2f})."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
 def calculate_jaccard_similarity(set1: Set, set2: Set) -> float:
@@ -270,7 +271,7 @@ def schema_jaccard_reward(
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate a function call using Jaccard similarity between actual and expected schema.
 
@@ -292,11 +293,12 @@ def schema_jaccard_reward(
     # Extract function call from messages if not provided directly
     if function_call is None:
         if not messages:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No messages provided to extract function call.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No messages provided"
+                    "error": MetricResult(
+                        score=0.0, reason="No messages provided", success=False
                     )
                 },
             )
@@ -324,22 +326,24 @@ def schema_jaccard_reward(
                             break
 
         if not function_call:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No function call found in messages.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No function call found in messages"
+                    "error": MetricResult(
+                        score=0.0, reason="No function call found in messages", success=False
                     )
                 },
             )
 
     # Normalize expected schema
     if expected_schema is None:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No expected schema provided for comparison.",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No expected schema provided"
+                "error": MetricResult(
+                    score=0.0, reason="No expected schema provided", success=False
                 )
             },
         )
@@ -357,12 +361,14 @@ def schema_jaccard_reward(
         else:
             parsed_arguments = arguments_str
     except json.JSONDecodeError:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason=f"Invalid JSON in function arguments: {arguments_str}",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
                     reason=f"Invalid JSON in function arguments: {arguments_str}",
+                    success=False,
                 )
             },
         )
@@ -372,15 +378,16 @@ def schema_jaccard_reward(
     name_match = function_name == expected_name
     name_score = 1.0 if name_match else 0.0
     name_reason = f"Function name {'matches' if name_match else 'does not match'}: expected '{expected_name}', got '{function_name}'"
-    metrics["function_name_match"] = MetricRewardOutput(
-        score=name_score, reason=name_reason
+    metrics["function_name_match"] = MetricResult(
+        score=name_score, reason=name_reason, success=name_match
     )
 
     # If function name doesn't match, return low score immediately
     if not name_match:
-        return RewardOutput(
-            score=0.1,
-            metrics=metrics,  # Some small score for partial matching attempts
+        return EvaluateResult(
+            score=0.1, # Some small score for partial matching attempts
+            reason=name_reason,
+            metrics=metrics,
         )
 
     # 2. Create schemas for comparison
@@ -469,17 +476,18 @@ def schema_jaccard_reward(
 
     schema_comparison_reason = "\n".join(comparison_details)
 
-    metrics["schema_similarity"] = MetricRewardOutput(
+    metrics["schema_similarity"] = MetricResult(
         score=schema_similarity,
         reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
+        success=schema_similarity == 1.0
     )
 
     # 6. Calculate final score
     # Name match is critical but schema similarity is also important
     # Weight: 30% name match, 70% schema similarity
     final_score = (name_score * 0.3) + (schema_similarity * 0.7)
-
-    return RewardOutput(score=final_score, metrics=metrics)
+    final_reason = f"Final score based on name match ({name_score*0.3:.2f}) and schema similarity ({schema_similarity*0.7:.2f})."
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
 def llm_judge_reward(
@@ -492,7 +500,7 @@ def llm_judge_reward(
     model: str = "gpt-4o-mini",
     temperature: float = 0.0,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate a function call using an LLM (GPT-4o-mini) as a judge.
 
@@ -515,12 +523,14 @@ def llm_judge_reward(
     """
     # Check if OpenAI is available
     if OpenAI is None:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="OpenAI package not installed.",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
                     reason="OpenAI package not installed. Install it with: pip install openai",
+                    success=False,
                 )
             },
         )
@@ -530,11 +540,12 @@ def llm_judge_reward(
     # Extract function call from messages if not provided directly
     if function_call is None:
         if not messages:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No messages provided to extract function call.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No messages provided"
+                    "error": MetricResult(
+                        score=0.0, reason="No messages provided", success=False
                     )
                 },
             )
@@ -562,11 +573,12 @@ def llm_judge_reward(
                             break
 
         if not function_call:
-            return RewardOutput(
+            return EvaluateResult(
                 score=0.0,
+                reason="No function call found in messages.",
                 metrics={
-                    "error": MetricRewardOutput(
-                        score=0.0, reason="No function call found in messages"
+                    "error": MetricResult(
+                        score=0.0, reason="No function call found in messages", success=False
                     )
                 },
             )
@@ -574,12 +586,14 @@ def llm_judge_reward(
     # Get API key
     api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="OpenAI API key not provided.",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
                     reason="OpenAI API key not provided. Set it as openai_api_key parameter or OPENAI_API_KEY environment variable.",
+                    success=False,
                 )
             },
         )
@@ -688,18 +702,19 @@ EXPLANATION: [your detailed explanation]
         )
 
         # Create metrics
-        metrics["llm_judge"] = MetricRewardOutput(
-            score=score, reason=explanation
+        metrics["llm_judge"] = MetricResult(
+            score=score, reason=explanation, success=score >= 0.8 # Assuming high score means success
         )
 
-        return RewardOutput(score=score, metrics=metrics)
+        return EvaluateResult(score=score, reason=explanation, metrics=metrics)
 
     except Exception as e:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason=f"Error calling OpenAI API: {str(e)}",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason=f"Error calling OpenAI API: {str(e)}"
+                "error": MetricResult(
+                    score=0.0, reason=f"Error calling OpenAI API: {str(e)}", success=False
                 )
             },
         )
@@ -715,7 +730,7 @@ def composite_function_call_reward(
     llm_model: str = "gpt-4o-mini",
     weights: Optional[Dict[str, float]] = None,
     **kwargs,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Combined reward function that evaluates function calls using both schema validation and LLM judgment.
 
@@ -764,11 +779,12 @@ def composite_function_call_reward(
         )
     else:
         # Skip LLM evaluation if no behavior specified
-        llm_result = RewardOutput(
+        llm_result = EvaluateResult(
             score=0.0,
+            reason="LLM judge skipped: No expected behavior provided.",
             metrics={
-                "llm_judge": MetricRewardOutput(
-                    score=0.0, reason="Skipped: No expected behavior provided"
+                "llm_judge": MetricResult(
+                    score=0.0, reason="Skipped: No expected behavior provided", success=True # Success because it's an expected skip
                 )
             },
         )
@@ -777,22 +793,24 @@ def composite_function_call_reward(
     combined_metrics = {}
 
     # Add schema metrics with "schema_" prefix
-    for key, metric in schema_result.metrics.items():
-        combined_metrics[f"schema_{key}"] = metric
+    for key, metric_val in schema_result.metrics.items(): # Renamed to metric_val to avoid conflict
+        combined_metrics[f"schema_{key}"] = metric_val
 
     # Add llm metrics with "llm_" prefix
-    for key, metric in llm_result.metrics.items():
-        combined_metrics[f"llm_{key}"] = metric
+    for key, metric_val in llm_result.metrics.items(): # Renamed to metric_val
+        combined_metrics[f"llm_{key}"] = metric_val
 
     # Add summary metrics
-    combined_metrics["schema_score"] = MetricRewardOutput(
+    combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
+        success=schema_result.score == 1.0
     )
 
-    combined_metrics["llm_score"] = MetricRewardOutput(
+    combined_metrics["llm_score"] = MetricResult(
         score=llm_result.score,
         reason=f"LLM judge score: {llm_result.score:.2f}",
+        success=llm_result.score >= 0.8 # Assuming high score means success
     )
 
     # Calculate weighted final score
@@ -802,14 +820,17 @@ def composite_function_call_reward(
     final_score = (schema_result.score * schema_weight) + (
         llm_result.score * llm_weight
     )
+    final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_result.score:.2f} * {llm_weight:.2f})."
+
 
     # Add weight information
-    combined_metrics["weights"] = MetricRewardOutput(
+    combined_metrics["weights"] = MetricResult(
         score=0.0,  # Not a real score
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
+        success=True # Informational metric
     )
 
-    return RewardOutput(score=final_score, metrics=combined_metrics)
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=combined_metrics)
 
 
 # JSON schema reward functions have been moved to json_schema.py module

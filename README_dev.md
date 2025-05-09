@@ -181,10 +181,9 @@ pytest tests/test_file.py::test_function
 
 # Run with coverage report
 pytest --cov=reward_kit
-
-# Run tests with verbose output
-pytest -v
 ```
+
+We only care about tests/ folder for now since there are a lot of other repos
 
 ### Writing Tests
 

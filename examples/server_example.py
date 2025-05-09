@@ -30,8 +30,8 @@ import time
 import json
 import requests
 from typing import List, Dict, Any, Optional, Union
-from reward_kit import RewardOutput, MetricRewardOutput, reward_function
-from reward_kit.models import Message, EvaluateResult
+from reward_kit import reward_function # RewardOutput and MetricRewardOutput removed
+from reward_kit.models import Message, EvaluateResult, MetricResult # MetricResult added
 from reward_kit.server import serve
 
 
@@ -64,14 +64,18 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
 
     if response_length < 50:
         length_reason = "Response is too short"
+        length_success = False
     elif response_length < 200:
         length_reason = "Response is somewhat brief"
+        length_success = False
     elif response_length < 500:
         length_reason = "Response has good length"
+        length_success = True
     else:
         length_reason = "Response is comprehensive"
+        length_success = True
 
-    metrics["length"] = {"score": length_score, "reason": length_reason}
+    metrics["length"] = MetricResult(score=length_score, success=length_success, reason=length_reason)
 
     # 2. Informativeness score
     # Keywords that suggest an informative response about RLHF
@@ -94,13 +98,16 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
 
     if found_keywords:
         info_reason = f"Found informative keywords: {', '.join(found_keywords)}"
+        info_success = True
     else:
         info_reason = "No informative keywords detected"
+        info_success = False
 
-    metrics["informativeness"] = {
-        "score": informativeness_score,
-        "reason": info_reason,
-    }
+    metrics["informativeness"] = MetricResult(
+        score=informativeness_score,
+        success=info_success,
+        reason=info_reason,
+    )
 
     # 3. Clarity score (simple heuristic - paragraphs, bullet points, headings add clarity)
     has_paragraphs = len(last_response.split("\n\n")) > 1
@@ -108,23 +115,26 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
     has_structure = has_paragraphs or has_bullets
 
     clarity_score = 0.5  # Base score
+    clarity_success = False
     if has_structure:
         clarity_score += 0.5
         clarity_reason = (
             "Response has good structure with paragraphs or bullet points"
         )
+        clarity_success = True
     else:
         clarity_reason = "Response could be improved with better structure"
 
-    metrics["clarity"] = {"score": clarity_score, "reason": clarity_reason}
+    metrics["clarity"] = MetricResult(score=clarity_score, success=clarity_success, reason=clarity_reason)
 
     # Calculate final score (weighted average)
     weights = {"length": 0.2, "informativeness": 0.5, "clarity": 0.3}
     final_score = sum(
-        metrics[key]["score"] * weight for key, weight in weights.items()
+        metrics[key].score * weight for key, weight in weights.items() # Access .score attribute
     )
+    overall_reason = f"Final score based on weighted average of length ({metrics['length'].score:.2f}), informativeness ({metrics['informativeness'].score:.2f}), and clarity ({metrics['clarity'].score:.2f})."
 
-    return EvaluateResult(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
 
 
 def run_test_request():

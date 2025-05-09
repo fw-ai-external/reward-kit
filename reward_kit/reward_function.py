@@ -17,7 +17,6 @@ import logging
 import warnings
 
 from .models import (
-    RewardOutput,
     EvaluateResult,
     MetricResult,
 )
@@ -29,16 +28,16 @@ from .typed_interface import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Type for reward function (support both return types for backwards compatibility)
-T = TypeVar("T", bound=Callable[..., Union[RewardOutput, EvaluateResult]])
+# Type for reward function
+T = TypeVar("T", bound=Callable[..., EvaluateResult])
 
 # Show deprecation warning
-warnings.warn(
-    "RewardOutput and legacy_reward_function are deprecated and will be removed in a future version. "
-    "Use EvaluateResult and the reward_function decorator instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+# warnings.warn(
+#     "RewardOutput and legacy_reward_function are deprecated and will be removed in a future version. "
+#     "Use EvaluateResult and the reward_function decorator instead.",
+#     DeprecationWarning,
+#     stacklevel=2,
+# )
 
 
 class RewardFunction:
@@ -153,7 +152,7 @@ class RewardFunction:
         messages: List[Dict[str, str]],
         original_messages: Optional[List[Dict[str, str]]] = None,
         **kwargs,
-    ) -> Union[RewardOutput, EvaluateResult]:
+    ) -> EvaluateResult:
         """
         Call the reward function with the provided messages.
 
@@ -184,15 +183,7 @@ class RewardFunction:
                 )
 
                 # Handle different result types
-                if isinstance(result, RewardOutput):
-                    # Deprecated but still supported
-                    warnings.warn(
-                        "RewardOutput is deprecated. Use EvaluateResult instead.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    return result
-                elif isinstance(result, EvaluateResult):
+                if isinstance(result, EvaluateResult):
                     # Preferred return type
                     return result
                 elif isinstance(result, tuple) and len(result) == 2:
@@ -242,7 +233,7 @@ class RewardFunction:
                 else:
                     raise TypeError(
                         f"Invalid return type from reward function: {type(result)}. "
-                        f"Expected EvaluateResult, RewardOutput, or (float, Dict[str, float]) tuple."
+                        f"Expected EvaluateResult or (float, Dict[str, float]) tuple."
                     )
 
             except Exception as e:
@@ -319,61 +310,109 @@ class RewardFunction:
         2. Batch of texts (List[str]) for simpler cases
 
         Returns:
-            A callable function compatible with TRL
+            A callable function compatible with TRL's expected signature for reward functions.
         """
 
-        def adapter(batch_input, batch_orig_input=None) -> List[float]:
+        def adapter(prompts: List[List[Dict]], completions: List[str], **kwargs) -> List[float]:
+            """
+            Adapter function compatible with TRL's reward function signature.
+
+            Args:
+                prompts: A batch of prompt message lists.
+                         e.g., [[{'role':'system',...}, {'role':'user',...}], ...]
+                completions: A batch of generated completion strings by the model.
+                **kwargs: Additional keyword arguments passed by TRL, potentially including
+                          ground truth data like 'solution'. TRL typically passes these
+                          as lists matching the batch size.
+
+            Returns:
+                A list of float reward scores for the batch.
+            """
             results = []
+            batch_size = len(prompts)
+            if batch_size != len(completions):
+                raise ValueError("Batch size mismatch between prompts and completions.")
 
-            # Check if this is simple text input or structured messages
-            if isinstance(batch_input, list):
-                if not batch_input:
-                    return []
+            # Extract potential ground truth solutions if available
+            # TRL passes columns from the dataset that weren't removed.
+            # We expect 'solution' based on our grpo_example.py setup.
+            solutions = kwargs.get("solution", [None] * batch_size)
+            if not isinstance(solutions, list) or len(solutions) != batch_size:
+                 logger.warning(f"Expected 'solution' kwarg to be a list of size {batch_size}, but got {type(solutions)}. Ground truth might not be passed correctly.")
+                 solutions = [None] * batch_size # Fallback
 
-                # Case 1: List of message arrays (TRL batch format)
-                if isinstance(batch_input[0], list) and all(
-                    isinstance(m, dict) for m in batch_input[0]
-                ):
-                    for i, messages in enumerate(batch_input):
-                        try:
-                            # Get original messages if provided, otherwise use messages minus last one
-                            original_msgs = (
-                                batch_orig_input[i]
-                                if batch_orig_input
-                                else messages[:-1]
+            for i in range(batch_size):
+                # Construct the full message list for this sample
+                completion_input = completions[i]
+                actual_completion_str = ""
+
+                if isinstance(completion_input, list):
+                    if completion_input:  # If the list is not empty
+                        first_element = completion_input[0]
+                        if isinstance(first_element, dict) and 'content' in first_element and isinstance(first_element.get("role"), str) and first_element.get("role") == "assistant":
+                            # Expected structure: completions[i] = [{'role': 'assistant', 'content': 'str_content'}]
+                            actual_completion_str = str(first_element['content'])
+                            logger.debug(f"Adapter: completions[{i}] is a list with an assistant message dict. Extracted content.")
+                        else:
+                            logger.warning(
+                                f"Adapter: completions[{i}] is a list, but its first element "
+                                f"is not the expected assistant message dict or is malformed: {first_element}. "
+                                f"Using str(first_element) as content."
                             )
-                            result = self(
-                                messages=messages,
-                                original_messages=original_msgs,
-                            )
-                            # Handle both RewardOutput and EvaluateResult
-                            score = result.score
-                            results.append(score)
-                        except Exception as e:
-                            logger.error(f"Error in TRL adapter: {str(e)}")
-                            results.append(0.0)
-
-                # Case 2: List of strings (simple TRL format)
-                elif all(isinstance(text, str) for text in batch_input):
-                    for text in batch_input:
-                        try:
-                            # TRL typically provides just the completion, so wrap it in a message
-                            messages = [{"role": "assistant", "content": text}]
-                            result = self(messages=messages)
-                            # Handle both RewardOutput and EvaluateResult
-                            score = result.score
-                            results.append(score)
-                        except Exception as e:
-                            logger.error(f"Error in TRL adapter: {str(e)}")
-                            results.append(0.0)
+                            actual_completion_str = str(first_element) # Fallback: stringify the element
+                    else:
+                        logger.warning(f"Adapter: completions[{i}] is an empty list. Using empty string for content.")
+                        actual_completion_str = ""
+                elif isinstance(completion_input, str):
+                    actual_completion_str = completion_input # It's already a string
                 else:
-                    raise ValueError(
-                        f"Unsupported input format for TRL adapter: {type(batch_input[0])}"
+                    # Fallback for other types (e.g. a direct dict, though less likely given warnings)
+                    logger.warning(
+                        f"Adapter: completions[{i}] is of unexpected type: {type(completion_input)}. "
+                        f"Attempting to stringify for content: {completion_input}"
                     )
-            else:
-                raise ValueError(
-                    f"Unsupported input type for TRL adapter: {type(batch_input)}"
-                )
+                    actual_completion_str = str(completion_input)
+
+                messages = prompts[i] + [{"role": "assistant", "content": actual_completion_str}]
+                
+                # Prepare kwargs for the underlying reward function call for this specific sample
+                call_kwargs = {}
+                current_solution = solutions[i] # Get the solution for the current sample
+                
+                # --- DEBUG PRINT ---
+                debug_solution_val_str = str(current_solution) if current_solution is not None else "None"
+                logger.debug(f"Adapter loop i={i}, type(current_solution)={type(current_solution)}, value='{debug_solution_val_str[:100]}...'") 
+                # --- END DEBUG PRINT ---
+
+                if current_solution is not None:
+                     # Ensure it's actually a string before passing, handle potential lists defensively
+                    if isinstance(current_solution, list):
+                         logger.warning(f"Sample {i} solution is a list, attempting to use first element: {current_solution}")
+                         if current_solution: # If list is not empty
+                             call_kwargs['solution'] = str(current_solution[0]) # Convert first element to string
+                         else:
+                              call_kwargs['solution'] = None # Treat empty list as None
+                    else:
+                         call_kwargs['solution'] = str(current_solution) # Ensure it's a string
+
+                # Add any other necessary kwargs extraction here if needed in the future
+
+                try:
+                    # Call the underlying RewardFunction instance (__call__)
+                    # Pass the constructed messages and the extracted kwargs for this sample
+                    result = self(
+                        messages=messages,
+                        # original_messages are implicitly handled by self() if needed,
+                        # as it defaults to messages[:-1]
+                        **call_kwargs 
+                    )
+                    # Handle both RewardOutput and EvaluateResult
+                    score = result.score
+                    results.append(score)
+                except Exception as e:
+                    logger.error(f"Error processing sample {i} in TRL adapter: {str(e)}")
+                    # Append a default low score (e.g., 0.0) on error
+                    results.append(0.0)
 
             return results
 
@@ -396,26 +435,18 @@ def legacy_reward_function(func: T) -> T:
         The decorated function with added deployment capabilities
     """
     # Show deprecation warning
-    warnings.warn(
-        "legacy_reward_function is deprecated. Use the reward_function decorator instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+    # warnings.warn(
+    #     "legacy_reward_function is deprecated. Use the reward_function decorator instead.",
+    #     DeprecationWarning,
+    #     stacklevel=2,
+    # )
 
     @wraps(func)
-    def wrapper(*args, **kwargs) -> Union[RewardOutput, EvaluateResult]:
+    def wrapper(*args, **kwargs) -> EvaluateResult:
         result = func(*args, **kwargs)
 
-        # Handle different return types
-        if isinstance(result, RewardOutput):
-            # Deprecated but still supported
-            warnings.warn(
-                "RewardOutput is deprecated. Use EvaluateResult instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return result
-        elif isinstance(result, EvaluateResult):
+        # Handle different result types
+        if isinstance(result, EvaluateResult):
             # Preferred return type
             return result
         elif isinstance(result, tuple) and len(result) == 2:
@@ -461,7 +492,7 @@ def legacy_reward_function(func: T) -> T:
         else:
             raise TypeError(
                 f"Invalid return type from reward function: {type(result)}. "
-                f"Expected EvaluateResult, RewardOutput, or (float, Dict[str, float]) tuple."
+                f"Expected EvaluateResult or (float, Dict[str, float]) tuple."
             )
 
     def deploy(**config) -> str:
@@ -602,30 +633,14 @@ def legacy_reward_function(func: T) -> T:
         module_imports = inspect.getsource(module) if module else ""
 
         # Define needed imports for the wrapper code
-        imports_needed = (
-            "from typing import Dict, List, Optional, Any\n"
-            "from dataclasses import dataclass\n\n"
-            "@dataclass\n"
-            "class MetricRewardOutput:\n"
-            "    score: float\n"
-            "    reason: Optional[str] = None\n\n"
-            "@dataclass\n"
-            "class RewardOutput:\n"
-            "    score: float\n"
-            "    metrics: Dict[str, MetricRewardOutput] = None\n"
-            "    \n"
-            "    def to_dict(self):\n"
-            "        return {\n"
-            '            "score": self.score,\n'
-            '            "metrics": {\n'
-            '                k: {"score": v.score, "reason": v.reason}\n'
-            "                for k, v in (self.metrics or {}).items()\n"
-            "            }\n"
-            "        }\n"
-        )
+        # RewardOutput and MetricRewardOutput are removed, so this is now empty.
+        # The deployed code should use EvaluateResult and MetricResult from the environment
+        # or define them itself if necessary.
+        imports_needed = ""
 
         # Only add imports if they're not already in the module
-        if "class RewardOutput" not in module_imports:
+        # Since imports_needed is empty, extra_imports will also be empty.
+        if "class RewardOutput" not in module_imports: # This condition is somewhat moot now
             extra_imports = imports_needed
         else:
             extra_imports = ""
@@ -790,5 +805,6 @@ def legacy_reward_function(func: T) -> T:
     return cast(T, wrapper)
 
 
-# Alias for backward compatibility - to be removed in future version
-reward_function = legacy_reward_function  # type: ignore # noqa: F811
+# The alias below is removed to ensure that `from .typed_interface import reward_function`
+# is the one used throughout the library, thus avoiding the deprecation warning
+# when using the @reward_function decorator.

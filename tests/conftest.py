@@ -4,7 +4,7 @@ Pytest configuration file for reward-kit tests.
 
 import pytest
 from typing import List, Dict, Any, Optional
-from reward_kit.models import RewardOutput, MetricRewardOutput
+from reward_kit.models import EvaluateResult, MetricResult
 
 
 @pytest.fixture
@@ -29,15 +29,16 @@ def sample_original_messages(sample_messages):
 def sample_reward_output():
     """Sample reward output structure."""
     metrics = {
-        "helpfulness": MetricRewardOutput(
-            score=0.7, reason="Response acknowledges limitations"
+        "helpfulness": MetricResult(
+            score=0.7, reason="Response acknowledges limitations", success=True
         ),
-        "accuracy": MetricRewardOutput(
+        "accuracy": MetricResult(
             score=0.8,
             reason="Response correctly states lack of access to weather data",
+            success=True,
         ),
     }
-    return RewardOutput(score=0.75, metrics=metrics)
+    return EvaluateResult(score=0.75, reason="Overall assessment", metrics=metrics)
 
 
 @pytest.fixture

@@ -7,8 +7,9 @@ import tempfile
 import pytest
 from pathlib import Path
 
-from reward_kit import reward_function, RewardOutput
+from reward_kit import reward_function # RewardOutput removed
 from reward_kit.agent import ToolRegistry, AgentEvaluator, load_task_from_file
+from reward_kit.models import EvaluateResult, MetricResult # Added for use in string
 
 
 @pytest.fixture
@@ -64,33 +65,37 @@ def subtract(a, b):
     # Create reward.py with reward function
     with open(os.path.join(module_dir, "reward.py"), "w") as f:
         f.write(
-            """from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+            """from reward_kit import reward_function, EvaluateResult, MetricResult
 
 @reward_function
 def evaluate(messages, *, answer=None, **kwargs):
     if not answer:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No answer provided for evaluation.",
             metrics={}
         )
     
     # Check if the last message contains the expected answer
     if not messages or messages[-1].role != "assistant":
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No assistant message found for evaluation.",
             metrics={}
         )
     
     last_message = messages[-1].content
     if str(answer) in last_message:
-        return RewardOutput(
+        return EvaluateResult(
             score=1.0,
-            metrics={"answer_correct": MetricRewardOutput(score=1.0, reason="Answer matched")}
+            reason="Answer matched.",
+            metrics={"answer_correct": MetricResult(score=1.0, reason="Answer matched", success=True)}
         )
     else:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
-            metrics={"answer_correct": MetricRewardOutput(score=0.0, reason="Answer did not match")}
+            reason="Answer did not match.",
+            metrics={"answer_correct": MetricResult(score=0.0, reason="Answer did not match", success=False)}
         )
 """
         )

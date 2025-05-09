@@ -76,11 +76,11 @@ def test_informativeness_reward(deploy_example):
     )
 
     # Verify results
-    assert isinstance(result.score, float)
-    assert 0.0 <= result.score <= 1.0
-    assert "length" in result.metrics
-    assert "specificity" in result.metrics
-    assert "content_density" in result.metrics
+    assert isinstance(result['score'], float)
+    assert 0.0 <= result['score'] <= 1.0
+    assert "length" in result['metrics']
+    assert "specificity" in result['metrics']
+    assert "content_density" in result['metrics']
 
 
 def test_deploy_to_fireworks(

@@ -15,7 +15,7 @@ import aiohttp
 from typing import Dict, List, Any, Optional, Union  # Tuple removed
 from dataclasses import dataclass  # field removed
 
-from ..models import MetricRewardOutput, RewardOutput, Message
+from ..models import EvaluateResult, MetricResult, Message
 from ..reward_function import reward_function
 
 
@@ -604,7 +604,7 @@ def ioi_cpp_code_reward(
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
     **kwargs: Any,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Wrapper function for the asynchronous implementation to make it compatible with the reward_function decorator.
     """
@@ -645,7 +645,7 @@ def _ioi_cpp_code_reward_impl(
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
     **kwargs: Any,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate C/C++ code correctness using the Piston execution engine.
 
@@ -670,14 +670,16 @@ def _ioi_cpp_code_reward_impl(
     """
     # Initialize metrics dictionary
     metrics = {}
+    error_reason = None
 
     # Extract the last assistant message
     if not messages:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="No messages provided",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="No messages provided"
+                "error": MetricResult(
+                    score=0.0, success=False, reason="No messages provided"
                 )
             },
         )
@@ -686,11 +688,12 @@ def _ioi_cpp_code_reward_impl(
 
     # Check role of the last message
     if getattr(last_message, "role", last_message.get("role")) != "assistant":
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason="Last message is not from assistant",
             metrics={
-                "error": MetricRewardOutput(
-                    score=0.0, reason="Last message is not from assistant"
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Last message is not from assistant"
                 )
             },
         )
@@ -702,11 +705,13 @@ def _ioi_cpp_code_reward_impl(
     code_blocks = extract_code_blocks(content, language)
 
     if not code_blocks:
-        return RewardOutput(
+        return EvaluateResult(
             score=0.0,
+            reason=f"No {language} code blocks found in message",
             metrics={
-                "error": MetricRewardOutput(
+                "error": MetricResult(
                     score=0.0,
+                    success=False,
                     reason=f"No {language} code blocks found in message",
                 )
             },
@@ -753,15 +758,17 @@ def _ioi_cpp_code_reward_impl(
     code = code_blocks[0]["code"]
 
     # Log the extracted code
-    metrics["extracted_code"] = MetricRewardOutput(
+    metrics["extracted_code"] = MetricResult(
         score=0.0,  # Not a real score
+        success=True,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
 
     # Add expected output to metrics if available
     if expected_output and not test_cases:
-        metrics["expected_output"] = MetricRewardOutput(
+        metrics["expected_output"] = MetricResult(
             score=0.0,  # Not a real score
+            success=True,
             reason=f"Expected output:\n{expected_output}",
         )
 
@@ -786,10 +793,12 @@ def _ioi_cpp_code_reward_impl(
         passed = sum(1 for result in results if result.score >= pass_threshold)
         total = len(results)
         overall_score = passed / total if total > 0 else 0.0
+        final_reason = f"{passed}/{total} tests passed ({overall_score:.2%})."
 
         # Add test results to metrics
-        metrics["test_results"] = MetricRewardOutput(
+        metrics["test_results"] = MetricResult(
             score=overall_score,
+            success=overall_score >= pass_threshold, # Success if pass_threshold is met
             reason=json.dumps(
                 [
                     {
@@ -804,12 +813,13 @@ def _ioi_cpp_code_reward_impl(
             ),
         )
 
-        metrics["pass_rate"] = MetricRewardOutput(
+        metrics["pass_rate"] = MetricResult(
             score=overall_score,
+            success=overall_score == 1.0, # Full success if all pass
             reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
 
-        return RewardOutput(score=overall_score, metrics=metrics)
+        return EvaluateResult(score=overall_score, reason=final_reason, metrics=metrics)
 
     # Single test case with expected output
     elif expected_output:
@@ -827,30 +837,34 @@ def _ioi_cpp_code_reward_impl(
 
         if execution_result["success"]:
             output = execution_result["output"]
+            final_reason = "Code executed successfully."
 
-            metrics["execution_result"] = MetricRewardOutput(
+            metrics["execution_result"] = MetricResult(
                 score=1.0,
+                success=True,
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
             # Compare with expected output
             similarity = compare_outputs(output, expected_output)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
+            final_reason += f" Output similarity: {similarity:.2f}."
 
-            metrics["output_match"] = MetricRewardOutput(
-                score=similarity, reason=match_reason
+            metrics["output_match"] = MetricResult(
+                score=similarity, success=similarity >= pass_threshold, reason=match_reason
             )
 
-            return RewardOutput(score=similarity, metrics=metrics)
+            return EvaluateResult(score=similarity, reason=final_reason, metrics=metrics)
         else:
             # Execution failed
             error = execution_result["error"]
+            final_reason = f"Code execution failed: {error}"
 
-            metrics["execution_result"] = MetricRewardOutput(
-                score=0.0, reason=f"Code execution failed with error:\n{error}"
+            metrics["execution_result"] = MetricResult(
+                score=0.0, success=False, reason=f"Code execution failed with error:\n{error}"
             )
 
-            return RewardOutput(score=0.0, metrics=metrics)
+            return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
     # No expected output or test cases
     else:
@@ -868,22 +882,24 @@ def _ioi_cpp_code_reward_impl(
 
         if execution_result["success"]:
             output = execution_result["output"]
+            final_reason = "Code executed successfully (no expected output for comparison)."
 
-            metrics["execution_result"] = MetricRewardOutput(
+            metrics["execution_result"] = MetricResult(
                 score=1.0,
+                success=True,
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
-            return RewardOutput(score=1.0, metrics=metrics)
+            return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
         else:
             # Execution failed
             error = execution_result["error"]
-
-            metrics["execution_result"] = MetricRewardOutput(
-                score=0.0, reason=f"Code execution failed with error:\n{error}"
+            final_reason = f"Code execution failed: {error}"
+            metrics["execution_result"] = MetricResult(
+                score=0.0, success=False, reason=f"Code execution failed with error:\n{error}"
             )
 
-            return RewardOutput(score=0.0, metrics=metrics)
+            return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
 @reward_function
@@ -901,7 +917,7 @@ def binary_cpp_code_reward(
     piston_endpoint: Optional[str] = None,
     pass_threshold: float = 0.99,
     **kwargs: Any,
-) -> RewardOutput:
+) -> EvaluateResult:
     """
     Evaluate C/C++ code correctness and return a binary result (passed/failed).
 
@@ -951,12 +967,14 @@ def binary_cpp_code_reward(
         binary_score = 1.0 if score >= pass_threshold else 0.0
 
         # Add binary result to metrics
-        metrics = dict(reward_output.metrics)
-        metrics["binary_result"] = MetricRewardOutput(
+        metrics = dict(reward_output.metrics) # Ensure metrics is a new dict
+        final_reason = f"Binary score based on threshold {pass_threshold:.2f}. Original score: {score:.2f}."
+        metrics["binary_result"] = MetricResult(
             score=binary_score,
+            success=binary_score == 1.0,
             reason=f"{'Passed' if binary_score > 0 else 'Failed'} (threshold: {pass_threshold:.2f}, actual: {score:.2f})",
         )
 
-        return RewardOutput(score=binary_score, metrics=metrics)
+        return EvaluateResult(score=binary_score, reason=final_reason, metrics=metrics)
     finally:
         loop.close()

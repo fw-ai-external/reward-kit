@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import json
 from typing import List, Dict, Any, Optional
 
-from reward_kit.models import RewardOutput, MetricRewardOutput
+from reward_kit.models import EvaluateResult, MetricResult # Changed
 from reward_kit.reward_function import RewardFunction
 
 
@@ -17,7 +17,7 @@ class TestEdgeCases:
             """Function that expects non-empty messages."""
             if not messages or not original_messages:
                 raise ValueError("Messages cannot be empty")
-            return RewardOutput(score=0.5, metrics={})
+            return EvaluateResult(score=0.5, reason="Test reason", metrics={}) # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -43,7 +43,7 @@ class TestEdgeCases:
             for msg in messages + original_messages:
                 if "role" not in msg or "content" not in msg:
                     raise ValueError("Invalid message structure")
-            return RewardOutput(score=0.5, metrics={})
+            return EvaluateResult(score=0.5, reason="Test reason", metrics={}) # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -88,13 +88,15 @@ class TestEdgeCases:
             """Function that processes large messages."""
             # Just calculate based on message length
             content_length = len(messages[-1]["content"])
+            length_score = min(content_length / 10000.0, 1.0)
             metrics = {
-                "length": MetricRewardOutput(
-                    score=min(content_length / 10000.0, 1.0),
+                "length": MetricResult( # Changed
+                    score=length_score,
                     reason=f"Message length: {content_length} chars",
+                    success=length_score == 1.0
                 )
             }
-            return RewardOutput(score=0.5, metrics=metrics)
+            return EvaluateResult(score=0.5, reason="Large message processed", metrics=metrics) # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -122,11 +124,11 @@ class TestEdgeCases:
             # Just return a simple score and the message
             content = messages[-1]["content"]
             metrics = {
-                "content": MetricRewardOutput(
-                    score=0.5, reason=f"Processed: {content}"
+                "content": MetricResult( # Changed
+                    score=0.5, reason=f"Processed: {content}", success=True # Assuming success for this metric
                 )
             }
-            return RewardOutput(score=0.5, metrics=metrics)
+            return EvaluateResult(score=0.5, reason="Unicode message processed", metrics=metrics) # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -148,7 +150,7 @@ class TestEdgeCases:
         assert unicode_message in result.metrics["content"].reason
 
         # Ensure the output can be serialized to JSON and back
-        json_str = json.dumps(result.to_dict())
+        json_str = json.dumps(result.model_dump()) # Changed to model_dump()
         parsed = json.loads(json_str)
         assert (
             parsed["metrics"]["content"]["reason"]

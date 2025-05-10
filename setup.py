@@ -20,6 +20,7 @@ setup(
             "mypy>=0.812",
             "flake8>=3.9.2",
             "autopep8>=1.5.0",
+            "transformers>=4.0.0",
         ],
         "deepseek": [
             "datasets>=2.12.0",

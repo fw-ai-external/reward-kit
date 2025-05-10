@@ -6,7 +6,7 @@ answers by extracting numerical values from text using regex patterns and
 comparing them with expected answers.
 """
 
-from typing import Dict, List, Tuple, Any, Union
+from typing import Dict, List, Tuple, Any, Union, cast, Optional
 import re
 import math
 from ..typed_interface import reward_function
@@ -15,358 +15,277 @@ from ..typed_interface import reward_function
 from ..models import Message, EvaluateResult, MetricResult
 
 
-def extract_numbers(text: str) -> List[Tuple[str, float]]:
+def extract_numbers(text: str) -> List[Tuple[str, Union[float, str]]]:
     """
-    Extract numbers from text using various formats, including LaTeX notation.
-
-    This function extracts numbers in different formats:
-    - Plain numbers (integer and float): "42", "3.14"
-    - Scientific notation: "1.2e-5", "6.022e23"
-    - Fractions: "1/2", "3/4"
-    - With units: "42 km", "3.14 meters"
-    - LaTeX notation:
-      - Boxed values: "$\\boxed{42}$"
-      - Fractions: "$\\frac{3}{4}$"
-      - Scientific notation: "$3 \\times 10^8$"
+    Extracts mathematical answers from text based on a hierarchical priority:
+    1. Boxed LaTeX expressions (e.g., \\boxed{answer})
+    2. GSM8K-style final answer markers (e.g., #### 123)
+    3. Multiple Choice Question (MCQ) options (e.g., (A), B.)
+    4. General numeric or LaTeX-formatted numbers as a fallback.
 
     Args:
-        text: The text to extract numbers from
+        text: The text to extract answers from.
 
     Returns:
-        List of tuples containing (original_text, normalized_value)
+        A list of tuples, where each tuple contains the original matched
+        string and its normalized value (float for numbers, str for MCQs
+        or specific string expressions like "A or B").
+        Returns an empty list if no answer is confidently extracted.
     """
+    # ALGEBRAIC_VARS_SET is used by general number extraction helpers
+    # to avoid misinterpreting coefficients (e.g., "4x") as standalone numbers.
+    ALGEBRAIC_VARS_SET = {'x', 'y', 'z', 'a', 'b', 'c', 'n', 't', 'q', 'p', 'r', 'u', 'v', 'w'}
 
-    # Order of patterns is important to avoid mis-extractions.
-    # More specific patterns should come before more general ones.
-    # We will collect all potential matches with their start and end positions,
-    # then filter out overlapping matches, prioritizing longer/more specific ones.
+    # Helper to parse a string that might be a number or fraction
+    def _parse_numeric_string(s: str) -> Optional[float]:
+        s = s.strip()
+        try:
+            # Simple float/int
+            if re.fullmatch(r"-?\d+(\.\d+)?", s):
+                return float(s)
+            # Fraction
+            m_frac = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*/\s*(-?\d+(?:\.\d+)?)", s)
+            if m_frac:
+                num = float(m_frac.group(1))
+                den = float(m_frac.group(2))
+                return num / den
+        except (ValueError, ZeroDivisionError):
+            return None
+        return None
 
-    potential_matches = []
+    # --- Priority 1: Boxed LaTeX expressions ---
+    boxed_answers: List[Tuple[str, Union[float, str]]] = []
+    found_any_boxed_expr = False
+    for m_boxed in re.finditer(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}", text):
+        found_any_boxed_expr = True
+        original_boxed_expr = m_boxed.group(0)
+        content = m_boxed.group(1).strip()
 
-    # 0. LaTeX expressions (processed recursively to handle nested structures)
-    # We'll find all $...$ and $$...$$ blocks and process their contents.
-    # This needs to be done carefully to avoid double-counting if a non-LaTeX regex
-    # also matches something inside a LaTeX block that we've already parsed.
-    # For simplicity in this pass, we'll extract from LaTeX first, then run other regexes
-    # on the *original* text, and then de-duplicate based on span.
+        if not content:
+            continue
 
-    for latex_match in re.finditer(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL):
-        content = (
-            latex_match.group(1)
-            if latex_match.group(1) is not None
-            else latex_match.group(2)
-        )
-        offset = (
-            latex_match.start(1)
-            if latex_match.group(1) is not None
-            else latex_match.start(2)
-        )
-
-        # a. Boxed LaTeX values (e.g., \boxed{123}, \boxed{1.23}, \boxed{1/2}, \boxed{1.2 \times 10^3})
-        # This regex tries to capture the content of \boxed{}
-        # We need to handle different number types within \boxed{}
-        for m in re.finditer(r"\\boxed\{([^}]*)\}", content):
-            boxed_content = m.group(1)
-            # Try to parse common forms within boxed content:
-            # Simple number: \boxed{123}, \boxed{-1.23}
-            simple_num_match = re.fullmatch(
-                r"\s*(-?\d+(?:\.\d+)?)\s*", boxed_content
-            )
-            if simple_num_match:
-                val_str = simple_num_match.group(1)
-                potential_matches.append(
-                    {
-                        "text": val_str,
-                        "value": float(val_str),
-                        "span": (m.start(1) + offset, m.end(1) + offset),
-                        "type": "latex_boxed_simple",
-                    }
-                )
-                continue  # Matched as simple boxed number
-
-            # Fraction: \boxed{\frac{1}{2}}
-            frac_match = re.fullmatch(
-                r"\s*\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}\s*",
-                boxed_content,
-            )
-            if frac_match:
-                num_str, den_str = frac_match.group(1), frac_match.group(2)
-                try:
-                    val = float(num_str) / float(den_str)
-                    potential_matches.append(
-                        {
-                            "text": f"{num_str}/{den_str}",
-                            "value": val,
-                            "span": (m.start(1) + offset, m.end(1) + offset),
-                            "type": "latex_boxed_frac",
-                        }
-                    )
-                    continue
-                except (ValueError, ZeroDivisionError):
-                    pass
-
-            # Scientific: \boxed{1.2 \times 10^3}
-            sci_match = re.fullmatch(
-                r"\s*(-?\d+(?:\.\d+)?)\s*\\times\s*10\^\{(?:-?\d+)\}\s*",
-                boxed_content,
-            )  # Simplified exponent for now
-            if sci_match:  # Placeholder, needs full sci parsing
-                # This part needs robust parsing similar to non-LaTeX scientific notation
-                # For now, let's assume it's caught by general LaTeX number extraction if not here
-                pass
-
-        # b. LaTeX fractions (e.g., \frac{3}{4})
-        for m in re.finditer(
-            r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", content
-        ):
-            num_str, den_str = m.group(1), m.group(2)
+        if " or " in content.lower():
+            boxed_answers.append((original_boxed_expr, content))
+            continue
+        if re.fullmatch(r"[A-Ea-e]", content):
+            boxed_answers.append((original_boxed_expr, content.upper()))
+            continue
+        
+        m_latex_frac = re.fullmatch(r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", content)
+        if m_latex_frac:
             try:
-                val = float(num_str) / float(den_str)
-                potential_matches.append(
-                    {
-                        "text": f"{num_str}/{den_str}",
-                        "value": val,
-                        "span": (m.start(0) + offset, m.end(0) + offset),
-                        "type": "latex_frac",
-                    }
-                )
+                num = float(m_latex_frac.group(1))
+                den = float(m_latex_frac.group(2))
+                boxed_answers.append((original_boxed_expr, num / den))
+                continue
             except (ValueError, ZeroDivisionError):
                 pass
 
-        # c. LaTeX scientific notation (e.g., 3 \times 10^8)
-        # Pattern for base \times 10^{exponent} with optional braces for exponent
-        latex_sci_pattern = (
-            r"(-?\d+(?:\.\d+)?)\s*\\times\s*10\^(?:\{)?(-?\d+(?:\.\d+)?)(?:\})?"
-        )
-        for m in re.finditer(latex_sci_pattern, content):
+        numeric_val = _parse_numeric_string(content)
+        if numeric_val is not None:
+            boxed_answers.append((original_boxed_expr, numeric_val))
+            continue
+        
+        # NEW: Try to parse "number unit" from boxed content if other parsers failed
+        # e.g. \boxed{10 km}
+        m_num_unit = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*([a-zA-Z%]+)", content)
+        if m_num_unit:
             try:
-                base_str, exp_str = m.group(1), m.group(2)
-                base_val = float(base_str)
-                exp_val = float(exp_str)
-                value = base_val * (10**exp_val)
-                # Constructing original text representation
-                orig_text = f"{base_str} \\times 10^{{{exp_str}}}"  # Keep consistent representation
-                if (
-                    "{" not in exp_str
-                    and "}" not in exp_str
-                    and "^" in m.group(0)
-                    and "{" not in m.group(0)[m.group(0).find("^") :]
-                ):  # Heuristic for unbraced exponent
-                    orig_text = f"{base_str} \\times 10^{exp_str}"
-                potential_matches.append(
-                    {
-                        "text": orig_text,
-                        "value": value,
-                        "span": (m.start(0) + offset, m.end(0) + offset),
-                        "type": "latex_sci",
-                    }
-                )
+                num_val = float(m_num_unit.group(1))
+                # unit = m_num_unit.group(2) # Unit is captured but not stored with the float value directly
+                boxed_answers.append((original_boxed_expr, num_val))
+                continue
             except ValueError:
-                pass
+                pass # Should not happen if regex is correct
 
-        # d. General numbers within LaTeX (could be integers or decimals)
-        for m in re.finditer(r"(-?\d+(?:\.\d+)?)", content):
-            val_str = m.group(1)
-            # Avoid re-matching parts of fractions or sci-notation already handled if possible (tricky)
-            potential_matches.append(
-                {
-                    "text": val_str,
-                    "value": float(val_str),
-                    "span": (m.start(1) + offset, m.end(1) + offset),
-                    "type": "latex_num",
-                }
-            )
+    if found_any_boxed_expr: # If \boxed was found
+        return boxed_answers # Return whatever was parsed from boxes (could be empty if all complex)
 
-    # 1. Scientific notation (e.g., 1.2e-5, 6.022E23) - with optional units
-    # Ensure it's not part of a word, e.g. "evaluate"
-    sci_pattern = (
-        r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
-    )
-    for match in re.finditer(sci_pattern, text):
-        value_str = match.group(1)
-        unit = match.group(2) or ""
-        orig_text = value_str + (f" {unit}" if unit else "")
-        potential_matches.append(
-            {
-                "text": orig_text,
-                "value": float(value_str),
-                "span": match.span(),
-                "type": "sci",
-            }
-        )
-
-    # 2. Fractions (e.g., 1/2, 3 / 4) - with optional units
-    # Ensure it's not part of a date like 01/02/2023. Unit part tries to avoid matching 'and'.
-    fraction_pattern = r"(?<!\d/)(?<!\d)(?<!\.)(-?\d+)\s*/\s*(-?\d+)(?!\.\d)(?!\d*/)(?:\s+(?!and\b)([a-zA-Z%]+?)\b)?"
-    for match in re.finditer(fraction_pattern, text):
-        num_str, den_str = match.group(1), match.group(2)
-        # Group 3 is the unit, group 4 (if it existed due to (?!and\b) ) would be the problem.
-        # The unit is group 3. If it's not there, match.group(3) is None.
-        unit = match.group(3) or ""
+    # --- Priority 2: GSM8K-style final answer marker (#### ...) ---
+    final_marker_answers: List[Tuple[str, Union[float, str]]] = []
+    # More robust number pattern for GSM8K, ensuring group(1) is a clean number string
+    # Handles integers, decimals, and numbers with commas. Does not grab trailing periods not part of the number.
+    GSM8K_NUM_CONTENT_PATTERN = r"-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?"
+    for m_final in re.finditer(rf"####\s*({GSM8K_NUM_CONTENT_PATTERN})", text):
+        original_marker_expr = m_final.group(0) # Full "#### <number>"
+        num_str_from_regex = m_final.group(1)   # The number part itself
+        
+        cleaned_num_str = num_str_from_regex.replace(",", "")
         try:
-            value = float(num_str) / float(den_str)
-            orig_text = f"{num_str}/{den_str}" + (f" {unit}" if unit else "")
-            potential_matches.append(
-                {
-                    "text": orig_text,
-                    "value": value,
-                    "span": match.span(),
-                    "type": "frac",
-                }
-            )
-        except (ValueError, ZeroDivisionError):
-            pass
-
-    # 3. Numbers with commas (e.g., 1,234,567.89, 384,400) - with optional units
-    # Allows for optional decimal part.
-    comma_num_pattern = (
-        r"(?<![a-zA-Z0-9_])(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
-    )
-    for match in re.finditer(comma_num_pattern, text):
-        value_str_commas = match.group(1)
-        unit = match.group(2) or ""
-        value_str_no_commas = value_str_commas.replace(",", "")
-        try:
-            value = float(value_str_no_commas)
-            orig_text = value_str_commas + (f" {unit}" if unit else "")
-            potential_matches.append(
-                {
-                    "text": orig_text,
-                    "value": value,
-                    "span": match.span(),
-                    "type": "comma_num",
-                }
-            )
+            final_marker_answers.append((original_marker_expr, float(cleaned_num_str)))
         except ValueError:
             pass
+    if final_marker_answers:
+        return final_marker_answers
 
-    # 4. Decimal numbers (e.g., 3.14, -0.5) - with optional units
-    # Ensure it's not part of a version number like 1.2.3 or already matched by sci/comma
-    # (?!\d*[eE]) negative lookahead for scientific notation
-    # (?<!,\d{3}) negative lookbehind for comma-separated numbers
-    # Add negative lookahead for "op num = num" to avoid extracting LHS of simple equations if result is extracted by eq_result
-    decimal_pattern = r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?!\s*[\+\-\*\/]\s*\d+\s*=\s*-?\d+(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
-    for match in re.finditer(decimal_pattern, text):
-        value_str = match.group(1)
-        unit = match.group(2) or ""
-        orig_text = value_str + (f" {unit}" if unit else "")
-        potential_matches.append(
-            {
-                "text": orig_text,
-                "value": float(value_str),
-                "span": match.span(),
-                "type": "decimal",
-            }
-        )
+    # --- Priority 3: General number/LaTeX extraction (Fallback, simplified) ---
+    # MCQ extraction is now handled by multiple_choice_math_reward.py
+    # This is for "final text from latex" or plain numbers when no specific markers are found.
+    # This part needs to be careful not to be too greedy.
+    # We'll collect all potential matches and then filter for non-overlapping, prioritizing longer/more specific ones.
+    
+    potential_general_matches: List[Dict[str, Any]] = [] # Store dicts: {text, value, span, type_priority}
 
-    # 5. Integers (e.g., 42, -100) - with optional units
-    # Ensure it's not part of a decimal, sci, fraction, or comma-separated number
-    # (?!\.\d) not followed by decimal point and digit
-    # (?![eE][-+]?\d+) not followed by scientific notation exponent
-    # (?! */ *\d+) not part of a fraction (denominator)
-    # (?<!\d */ *) not part of a fraction (numerator)
-    # (?<!\d,) not preceded by digit and comma (part of comma num)
-    # (?!,\d{3}) not followed by comma and 3 digits (part of comma num)
-    # Add negative lookahead for "op num = num" to avoid extracting LHS of simple equations if result is extracted by eq_result
-    integer_pattern = r"(?<![a-zA-Z0-9_])(?<!\d\.)(-?\d+)(?!\.\d)(?![eE][-+]?\d+)(?!,\d{3})(?!\s*/\s*\d+)(?!\s*[\+\-\*\/]\s*\d+\s*=\s*-?\d+(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
-    for match in re.finditer(integer_pattern, text):
-        value_str = match.group(1)
-        unit = match.group(2) or ""
-        orig_text = value_str + (f" {unit}" if unit else "")
-        potential_matches.append(
-            {
-                "text": orig_text,
-                "value": float(value_str),
-                "span": match.span(),
-                "type": "int",
-            }
-        )
+    # General LaTeX numbers (not inside \boxed, as those are handled)
+    # This includes \frac, \times 10^, and simple numbers in $...$
+    for latex_block_match in re.finditer(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL):
+        content = latex_block_match.group(1) if latex_block_match.group(1) is not None else latex_block_match.group(2)
+        offset = latex_block_match.start(1) if latex_block_match.group(1) is not None else latex_block_match.start(2)
 
-    # 6. Handle expressions like "2+2=4" by extracting the result (4)
-    # This should be specific enough not to clash badly, but run it late.
-    eq_result_pattern = r"=\s*(-?\d+(?:\.\d+)?)\b"
-    for match in re.finditer(eq_result_pattern, text):
-        value_str = match.group(1)
-        # Check if this span is already covered by a more specific match
-        is_covered = any(
-            pm["span"][0] <= match.start(1) and pm["span"][1] >= match.end(1)
-            for pm in potential_matches
-            if pm["type"]
-            != "eq_result"  # Avoid self-comparison if we were to add eq_results earlier
-        )
-        if not is_covered:
-            potential_matches.append(
-                {
-                    "text": value_str,
-                    "value": float(value_str),
-                    "span": (match.start(1), match.end(1)),
-                    "type": "eq_result",
-                }
-            )
+        if not content: continue
 
-    # Filter out overlapping matches.
-    # A common strategy: sort by start position, then by length (longest first) or by a priority order.
-    # If two matches overlap, take the "better" one (e.g., longer, or more specific type).
+        # Avoid re-processing content that IS a \boxed{} expression handled earlier
+        if content.strip().startswith("\\boxed{") and content.strip().endswith("}"):
+            continue # This $...$ was just a wrapper for a \boxed item.
 
-    # Sort by start position, then by length descending (longer matches first for tie-breaking)
-    # and then by a predefined type priority to break ties for same-span matches.
-    type_priority = {
-        "latex_boxed_simple": 0,
-        "latex_boxed_frac": 1,  # Highest priority for specific LaTeX structures
-        "latex_frac": 2,
-        "latex_sci": 3,  # Specific LaTeX constructs
-        "eq_result": 4,  # Specific context like "=4"
-        "sci": 5,  # Non-LaTeX scientific notation
-        "comma_num": 6,  # Numbers with commas
-        "frac": 7,  # Non-LaTeX fractions
-        "decimal": 8,  # Decimal numbers
-        "int": 9,  # Integers
-        "latex_num": 10,  # General number inside LaTeX, lower priority
-    }
-    # Add 'type' to all matches if some LaTeX ones missed it
-    for pm in potential_matches:
-        if "type" not in pm:
-            pm["type"] = "unknown"  # Should not happen with current code
+        # a. LaTeX fractions: \frac{num}{den}
+        for m in re.finditer(r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", content):
+            try:
+                num, den = float(m.group(1)), float(m.group(2))
+                potential_general_matches.append({
+                    "text": m.group(0), "value": num / den, 
+                    "span": (m.start(0) + offset, m.end(0) + offset), "type_priority": 1
+                })
+            except (ValueError, ZeroDivisionError): pass
+        
+        # b. LaTeX scientific: base \times 10^{exp}
+        for m in re.finditer(r"(-?\d+(?:\.\d+)?)\s*\\times\s*10\^\{(.*?)\}", content):
+            try:
+                base, exp = float(m.group(1)), float(m.group(2))
+                potential_general_matches.append({
+                    "text": m.group(0), "value": base * (10**exp),
+                    "span": (m.start(0) + offset, m.end(0) + offset), "type_priority": 2
+                })
+            except ValueError: pass
 
-    potential_matches.sort(
-        key=lambda m: (
-            m["span"][0],
-            -(m["span"][1] - m["span"][0]),
-            type_priority.get(m["type"], 99),
-        )
-    )
+        # c. Simple numbers within LaTeX
+        for m in re.finditer(r"(?<![a-zA-Z0-9_])(-?\d+(?:\.\d+)?)(?![a-zA-Z0-9_])", content):
+            val_str = m.group(1)
+            idx_after_val_str_in_content = m.end(1) # Use end of number group
 
-    final_results = []
+            is_coeff = False
+            # Direct variable: "4y"
+            if idx_after_val_str_in_content < len(content) and \
+               content[idx_after_val_str_in_content].lower() in ALGEBRAIC_VARS_SET and \
+               (idx_after_val_str_in_content + 1 == len(content) or not content[idx_after_val_str_in_content+1].isalnum()):
+                is_coeff = True
+            # Space then variable: "4 y"
+            elif idx_after_val_str_in_content + 1 < len(content) and \
+                 content[idx_after_val_str_in_content] == ' ' and \
+                 content[idx_after_val_str_in_content+1].lower() in ALGEBRAIC_VARS_SET and \
+                 (idx_after_val_str_in_content + 2 == len(content) or not content[idx_after_val_str_in_content+2].isalnum()):
+                is_coeff = True
+            
+            if is_coeff:
+                continue
+
+            try:
+                potential_general_matches.append({
+                    "text": val_str, "value": float(val_str),
+                    "span": (m.start(1) + offset, m.end(1) + offset), "type_priority": 3
+                })
+            except ValueError: pass
+    
+    # General plain numbers (non-LaTeX)
+    # Using simplified versions of the original regexes, ensuring algebraic var check.
+    # Order: scientific, fractions, comma_nums, decimals, integers.
+    # Each pattern should ensure it's not grabbing a coefficient.
+    
+    # Helper for algebraic variable check for plain numbers
+    def _is_coefficient(match_obj, num_group_idx=1, unit_group_idx=2):
+        # num_group_idx is the group index of the number string itself
+        # unit_group_idx is the group index of any captured unit
+        
+        # Check unit if captured
+        unit_candidate = match_obj.group(unit_group_idx) if len(match_obj.groups()) >= unit_group_idx and match_obj.group(unit_group_idx) else ""
+        if unit_candidate and len(unit_candidate) == 1 and unit_candidate.lower() in ALGEBRAIC_VARS_SET:
+            return True # e.g. "4x" where 'x' is unit_candidate
+
+        # Check char immediately after number string if no unit was captured by regex
+        # or if unit was not an algebraic var
+        if not unit_candidate or not (len(unit_candidate) == 1 and unit_candidate.lower() in ALGEBRAIC_VARS_SET) :
+            idx_after_num_str = match_obj.end(num_group_idx)
+            # Direct variable: "4x"
+            if idx_after_num_str < len(text) and text[idx_after_num_str].lower() in ALGEBRAIC_VARS_SET and \
+               (idx_after_num_str + 1 == len(text) or not text[idx_after_num_str+1].isalnum()):
+                return True
+            # Space then variable: "4 x"
+            if idx_after_num_str + 1 < len(text) and text[idx_after_num_str] == ' ' and \
+               text[idx_after_num_str+1].lower() in ALGEBRAIC_VARS_SET and \
+               (idx_after_num_str + 2 == len(text) or not text[idx_after_num_str+2].isalnum()):
+                return True
+        return False
+
+    # Plain scientific: 1.2e-5
+    sci_pattern = r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
+    for m in re.finditer(sci_pattern, text):
+        if _is_coefficient(m): continue
+        try: potential_general_matches.append({"text": m.group(0), "value": float(m.group(1)), "span": m.span(), "type_priority": 4})
+        except ValueError: pass
+
+    # Plain fractions: 1/2
+    # Unit is group 3. Ensure text field is constructed carefully.
+    frac_pattern = r"(?<!\d/)(?<!\d)(?<!\.)(-?\d+)\s*/\s*(-?\d+)(?!\.\d)(?!\d*/)(?:\s+(?!(?:and|or)\b)([a-zA-Z%]+)\b)?"
+    for m in re.finditer(frac_pattern, text):
+        if _is_coefficient(m, unit_group_idx=3): continue
+        try:
+            num, den = float(m.group(1)), float(m.group(2))
+            
+            num_str_clean, den_str_clean = m.group(1), m.group(2)
+            unit_str_clean = m.group(3) or ""
+            
+            display_text = f"{num_str_clean}/{den_str_clean}"
+            if unit_str_clean:
+                display_text += f" {unit_str_clean}"
+            
+            potential_general_matches.append({"text": display_text, "value": num / den, "span": m.span(), "type_priority": 5})
+        except (ValueError, ZeroDivisionError): pass
+
+    # Plain numbers with commas: 1,234.56
+    comma_num_pattern = r"(?<![a-zA-Z0-9_])(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
+    for m in re.finditer(comma_num_pattern, text):
+        if _is_coefficient(m): continue
+        try: potential_general_matches.append({"text": m.group(0), "value": float(m.group(1).replace(",", "")), "span": m.span(), "type_priority": 6})
+        except ValueError: pass
+        
+    # Plain decimals: 3.14 (ensure not part of sci or comma_num already)
+    # Negative lookaheads for e/E and leading comma are important.
+    decimal_pattern = r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?:\s*([a-zA-Z%]+))?"
+    for m in re.finditer(decimal_pattern, text):
+        if _is_coefficient(m): continue
+        try: potential_general_matches.append({"text": m.group(0), "value": float(m.group(1)), "span": m.span(), "type_priority": 7})
+        except ValueError: pass
+
+    # Plain integers: 42 (ensure not part of other patterns)
+    # Negative lookaheads for decimal, e/E, comma, fraction are important.
+    integer_pattern = r"(?<![a-zA-Z0-9_])(?<!\d\.)(-?\d+)(?!\.\d)(?![eE][-+]?\d+)(?!,\d{3})(?!\s*/\s*\d+)(?:\s*([a-zA-Z%]+))?"
+    for m in re.finditer(integer_pattern, text):
+        if _is_coefficient(m): continue
+        try: potential_general_matches.append({"text": m.group(0), "value": float(m.group(1)), "span": m.span(), "type_priority": 8})
+        except ValueError: pass
+
+    # Filter overlapping general matches: sort by start, then length (desc), then priority (asc)
+    potential_general_matches.sort(key=lambda x: (x["span"][0], -(x["span"][1] - x["span"][0]), x["type_priority"]))
+    
+    filtered_general_answers: List[Tuple[str, Union[float, str]]] = []
     last_covered_end = -1
-
-    for match_info in potential_matches:
-        start, end = match_info["span"]
-        # If this match starts after the last covered region, it's a new valid match.
-        # Or, if it's a more specific type (e.g. latex_boxed) that covers the same span as a more general one.
-        # The sorting should handle most cases of longer preferred over shorter.
-        # The main issue is true overlaps (A starts before B, B ends after A, A and B overlap).
-
-        # Simple non-overlapping filter:
+    for item in potential_general_matches:
+        start, end = item["span"]
         if start >= last_covered_end:
-            final_results.append((match_info["text"], match_info["value"]))
+            # Ensure value is float for numbers, str for others (though general is numeric here)
+            value_to_append = item["value"]
+            if isinstance(value_to_append, (int, float)): # Should always be for general
+                 filtered_general_answers.append((item["text"], float(value_to_append)))
+            # else: string values are not expected from general numeric extractors
             last_covered_end = end
-        # Else: it overlaps or is contained; skip it due to prior sort.
-        # This simple filter might discard a "better" (e.g. more specific type) match if a slightly
-        # earlier, longer, but less specific match was chosen.
-        # E.g. "1.23e4" (sci) vs "1.23" (decimal part of it). Sci should win.
-        # The sort key (length descending for same start) should help here.
+            
+    if filtered_general_answers:
+        return filtered_general_answers
 
-    # A more robust de-duplication for LaTeX:
-    # If a number was found both inside a LaTeX block and by a general regex,
-    # prefer the LaTeX version if spans are very similar.
-    # The current filtering is primarily based on non-overlapping spans after sorting.
-
-    # The test cases expect a list of (original_text_of_number, float_value)
-    # The `orig_text` should be what was matched by the regex for that specific number.
-    return final_results
+    return [] # Fallback if nothing found
 
 
-def compare_numbers(
+def compare_numbers( # This function remains for float comparisons
     expected: float,
     actual: float,
     relative_tolerance: float = 1e-5,
@@ -413,31 +332,33 @@ def compare_numbers(
 def math_reward(
     messages: Union[List[Dict[str, Any]], List[Message]],
     original_messages: Union[List[Dict[str, Any]], List[Message]],
-    tolerance: float = 0.001,
-    absolute_tolerance: float = 1e-8,
-    require_units: bool = False,
+    tolerance: float = 0.001, # For float comparisons
+    absolute_tolerance: float = 1e-8, # For float comparisons
+    require_units: bool = False, # Currently for numbers with units
     **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate mathematical answers in messages.
 
-    This function extracts numerical answers from both generated messages
-    and original (ground truth) messages, then compares them to calculate
-    a reward score.
+    Extracts numerical or specific string (MCQ, "or" expressions) answers
+    from generated and original messages, then compares them.
+    Applies strictness rules based on ISSUES.md.
 
     Args:
-        messages: Generated conversation messages
-        original_messages: Original conversation messages (containing ground truth)
-        tolerance: Relative tolerance for numerical comparison
-        absolute_tolerance: Absolute tolerance for numerical comparison
-        require_units: Whether to require matching units
-        **kwargs: Additional keyword arguments
+        messages: Generated conversation messages.
+        original_messages: Original conversation messages (ground truth).
+        tolerance: Relative tolerance for numerical comparison.
+        absolute_tolerance: Absolute tolerance for numerical comparison.
+        require_units: Whether to require matching units for numerical answers.
+                       (Note: unit handling in new extract_numbers is simplified,
+                        this flag's effect might be limited to post-extraction checks if needed)
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics.
     """
 
-    if not messages or not original_messages:
+    if not messages or not original_messages: # Ensure correct type for EvaluateResult
         return EvaluateResult(
             score=0.0,
             reason="Missing messages or original messages",
@@ -451,236 +372,233 @@ def math_reward(
         )
 
     # Extract the last assistant message from each list
-    # Get last message (the model's response)
-    if not messages or len(messages) == 0:
-        return EvaluateResult(
-            score=0.0,
-            reason="No generated messages provided",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No generated messages provided",
-                )
-            },
-        )
+    gen_content = ""
+    if messages and len(messages) > 0:
+        gen_response_message = messages[-1]
+        if isinstance(gen_response_message, Message) and gen_response_message.role == "assistant":
+            gen_content = gen_response_message.content or ""
+        elif isinstance(gen_response_message, dict) and gen_response_message.get("role") == "assistant":
+            gen_content = gen_response_message.get("content", "")
+    
+    if not gen_content:
+        return EvaluateResult(score=0.0, reason="Last generated message not from assistant or has no content",
+                              metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid generated message")})
 
-    gen_response_message = messages[-1]
-    if isinstance(gen_response_message, Message):
-        if (
-            gen_response_message.role != "assistant"
-            or not gen_response_message.content
-        ):
-            return EvaluateResult(
-                score=0.0,
-                reason="Last generated message not from assistant or has no content",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Last generated message not from assistant or has no content",
-                    )
-                },
-            )
-        gen_content = gen_response_message.content
-    elif isinstance(gen_response_message, dict):
-        if gen_response_message.get(
-            "role"
-        ) != "assistant" or not gen_response_message.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="Last generated message not from assistant or has no content",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Last generated message not from assistant or has no content",
-                    )
-                },
-            )
-        gen_content = gen_response_message.get("content", "")
-    else:
-        return EvaluateResult(
-            score=0.0,
-            reason="Last generated message is of unknown type",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="Last generated message is of unknown type",
-                )
-            },
-        )
+    orig_content = ""
+    if original_messages and len(original_messages) > 0:
+        orig_response_message = original_messages[-1]
+        if isinstance(orig_response_message, Message) and orig_response_message.role == "assistant":
+            orig_content = orig_response_message.content or ""
+        elif isinstance(orig_response_message, dict) and orig_response_message.get("role") == "assistant":
+            orig_content = orig_response_message.get("content", "")
 
-    if not original_messages or len(original_messages) == 0:
-        return EvaluateResult(
-            score=0.0,
-            reason="No original messages provided",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No original messages provided",
-                )
-            },
-        )
+    if not orig_content:
+        return EvaluateResult(score=0.0, reason="Last original message not from assistant or has no content",
+                              metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid original message")})
 
-    orig_response_message = original_messages[-1]
-    if isinstance(orig_response_message, Message):
-        if (
-            orig_response_message.role != "assistant"
-            or not orig_response_message.content
-        ):
-            return EvaluateResult(
-                score=0.0,
-                reason="Last original message not from assistant or has no content",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Last original message not from assistant or has no content",
-                    )
-                },
-            )
-        orig_content = orig_response_message.content
-    elif isinstance(orig_response_message, dict):
-        if orig_response_message.get(
-            "role"
-        ) != "assistant" or not orig_response_message.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="Last original message not from assistant or has no content",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Last original message not from assistant or has no content",
-                    )
-                },
-            )
-        orig_content = orig_response_message.get("content", "")
-    else:
-        return EvaluateResult(
-            score=0.0,
-            reason="Last original message is of unknown type",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="Last original message is of unknown type",
-                )
-            },
-        )
+    # Extract numerical or string answers using the new extract_numbers
+    gen_answers_extracted = extract_numbers(gen_content)
+    orig_answers_extracted = extract_numbers(orig_content)
 
-    if (
-        not gen_content or not orig_content
-    ):  # This check might be redundant now due to above checks
-        return EvaluateResult(
-            score=0.0,
-            reason="Empty message content in generated or original message",
-            metrics={
-                "error": MetricResult(
-                    score=0.0, success=False, reason="Empty message content"
-                )
-            },
-        )
-
-    # Extract numerical answers
-    gen_answers = extract_numbers(gen_content)
-    orig_answers = extract_numbers(orig_content)
-
-    # Log extracted answers
     metrics: Dict[str, MetricResult] = {}
+    def format_extracted(items: List[Tuple[str, Union[float, str]]]) -> str:
+        if not items: return "None"
+        return ", ".join([f"'{i[0]}' ({i[1]})" for i in items])
+
     metrics["extracted_original_answers"] = MetricResult(
-        score=0.0,  # Not a real score, more like metadata
-        success=True if orig_answers else False,
-        reason=f"Extracted answers from original message: {
-            ', '.join(
-                [
-                    a[0] for a in orig_answers]) if orig_answers else 'None'}",
+        score=0.0, success=bool(orig_answers_extracted),
+        reason=f"Extracted from original: {format_extracted(orig_answers_extracted)}"
     )
-
     metrics["extracted_generated_answers"] = MetricResult(
-        score=0.0,  # Not a real score, more like metadata
-        success=True if gen_answers else False,
-        reason=f"Extracted answers from generated message: {
-            ', '.join(
-                [
-                    a[0] for a in gen_answers]) if gen_answers else 'None'}",
+        score=0.0, success=bool(gen_answers_extracted),
+        reason=f"Extracted from generated: {format_extracted(gen_answers_extracted)}"
     )
 
-    # Handle the case where no answers were found
-    if not gen_answers or not orig_answers:
-        no_answer_reason = f"Could not extract answers from {'generated' if not gen_answers else 'original'} message"
-        if not gen_answers and not orig_answers:
-            no_answer_reason = (
-                "Could not extract answers from generated or original message"
-            )
+    if not orig_answers_extracted: # If ground truth has no extractable answer, cannot evaluate.
+        return EvaluateResult(score=0.0, reason="Could not extract answers from original message (ground truth).", metrics=metrics)
+    
+    # If gen has no answers but orig does, it's a clear mismatch.
+    if not gen_answers_extracted:
+        return EvaluateResult(score=0.0, reason="Could not extract answers from generated message, but original message has answers.", metrics=metrics)
 
-        return EvaluateResult(
-            score=0.0,
-            reason=no_answer_reason,
-            metrics={
-                **metrics,
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason=no_answer_reason,
-                ),
-            },
-        )
+    # --- Strictness Penalties (as per ISSUES.md) ---
 
-    # Unit handling is now done properly in the comparison loop
+    # Penalty 1 (Issue #1): Generated answer uses unboxed "or" to offer multiple numeric alternatives.
+    # An "unboxed or" means " or " appears in gen_content, AND multiple numeric items were extracted,
+    # AND no single extracted item from gen_answers_extracted is a string like "X or Y" (which would come from \boxed{X or Y}).
+    
+    # Check if any extracted gen_answer is a string containing " or " (this implies it was from \boxed{... or ...})
+    is_gen_single_boxed_or_expr = any(
+        isinstance(val, str) and " or " in val.lower()
+        for _, val in gen_answers_extracted
+    )
+    gen_numeric_values_count = sum(1 for _, val in gen_answers_extracted if isinstance(val, (float, int)))
 
-    # Compare answers
+    if " or " in gen_content.lower() and gen_numeric_values_count > 1 and not is_gen_single_boxed_or_expr:
+        specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
+        full_reason = f"Strictness fail (Issue #1): {specific_reason_detail}"
+        metrics["strictness_penalty_unboxed_or"] = MetricResult(score=0.0, success=False, reason=specific_reason_detail)
+        return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
+
+    if len(orig_answers_extracted) == 1 and len(gen_answers_extracted) > 1:
+        specific_reason_detail = "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
+        full_reason = f"Strictness fail (Issue #2): {specific_reason_detail}"
+        metrics["strictness_penalty_ambiguity"] = MetricResult(score=0.0, success=False, reason=specific_reason_detail)
+        return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
+        
+    # --- End of new strictness penalties ---
+
     best_match_score = 0.0
     best_match_reason = "No matching answer found"
+    match_found_flag = False
+    first_comparison_details_for_no_match = ""
 
-    for orig_text, orig_value in orig_answers:
-        for gen_text, gen_value in gen_answers:
-            # Compare units if required
-            if require_units:
-                # Extract units more reliably by looking for non-numeric parts at the end
-                orig_parts = orig_text.split()
-                gen_parts = gen_text.split()
+    for orig_text, orig_value in orig_answers_extracted:
+        for gen_text, gen_value in gen_answers_extracted:
+            current_match = False
+            current_similarity = 0.0
+            comparison_details = ""
 
-                orig_unit = (
-                    orig_parts[-1]
-                    if len(orig_parts) > 1
-                    and not orig_parts[-1].replace(".", "", 1).isdigit()
-                    else ""
+            # MCQ string comparison is now handled by multiple_choice_math_reward
+            # This function will now focus on numeric or potentially other specific string (like "X or Y") comparisons.
+            if isinstance(orig_value, (float, int)) and isinstance(gen_value, (float, int)):
+                if require_units:
+                    def has_unit_text(full_extracted_text: str, numeric_value: float) -> bool:
+                        content_to_check = full_extracted_text
+                        if content_to_check.startswith("\\boxed{") and content_to_check.endswith("}"):
+                            content_to_check = content_to_check[7:-1].strip()
+                        
+                        num_str_float = str(numeric_value) # e.g. "10.0"
+                        num_str_int = str(int(numeric_value)) if numeric_value == int(numeric_value) else None # e.g. "10"
+                        
+                        # Find the number string (float or int form) and check suffix
+                        # Try float form first, then int form if applicable
+                        search_terms = [num_str_float]
+                        if num_str_int and num_str_int != num_str_float: # Add int form if different and valid
+                            search_terms.append(num_str_int)
+
+                        for term in search_terms:
+                            found_at = content_to_check.find(term)
+                            if found_at != -1:
+                                suffix_start = found_at + len(term)
+                                if suffix_start < len(content_to_check):
+                                    suffix = content_to_check[suffix_start:].strip().split(" ")[0] # Get first word of suffix
+                                    if suffix and not suffix.replace(".","",1).isdigit() and suffix.lower() != "or":
+                                        return True
+                        return False
+
+                    orig_has_unit = has_unit_text(orig_text, float(orig_value))
+                    gen_has_unit = has_unit_text(gen_text, float(gen_value))
+
+                    if orig_has_unit != gen_has_unit:
+                        comparison_details = f"Unit presence mismatch (require_units=True). Orig_text: '{orig_text}', Gen_text: '{gen_text}'"
+                        current_match = False
+                        current_similarity = 0.0
+                    else: # Units presence matches (or both no units), proceed with number comparison
+                        current_match, current_similarity = compare_numbers(
+                            float(orig_value), float(gen_value), tolerance, absolute_tolerance
+                        )
+                        comparison_details = f"Numeric match: {'Yes' if current_match else 'No'}, Similarity: {current_similarity:.3f}"
+                else: # require_units is False
+                    current_match, current_similarity = compare_numbers(
+                        float(orig_value), float(gen_value), tolerance, absolute_tolerance
+                    )
+                    comparison_details = f"Numeric match: {'Yes' if current_match else 'No'}, Similarity: {current_similarity:.3f}"
+            
+            elif isinstance(orig_value, str) and isinstance(gen_value, str):
+                # This handles cases like "\\boxed{A or B}" vs "\\boxed{A or B}"
+                # or other specific string answers that are not MCQs.
+                if orig_value.lower() == gen_value.lower(): # Case-insensitive for general strings
+                    current_match = True
+                    current_similarity = 1.0
+                comparison_details = f"String match: {'Yes' if current_match else 'No'} (value: '{gen_value}' vs '{orig_value}')"
+            
+            else: # Type mismatch
+                comparison_details = f"Type mismatch: Gen({type(gen_value).__name__}) vs Orig({type(orig_value).__name__})"
+            
+            if not first_comparison_details_for_no_match: # Store details of the very first comparison
+                first_comparison_details_for_no_match = (
+                    f"Initial comparison: Gen='{gen_text}' ({gen_value}) vs Orig='{orig_text}' ({orig_value}).\n"
+                    f"{comparison_details}"
                 )
-                gen_unit = (
-                    gen_parts[-1]
-                    if len(gen_parts) > 1
-                    and not gen_parts[-1].replace(".", "", 1).isdigit()
-                    else ""
-                )
 
-                if orig_unit != gen_unit:
-                    continue
-
-            # Compare numerical values
-            is_match, similarity = compare_numbers(
-                orig_value,
-                gen_value,
-                relative_tolerance=tolerance,
-                absolute_tolerance=absolute_tolerance,
-            )
-
-            if similarity > best_match_score:
-                best_match_score = similarity
+            if current_similarity > best_match_score:
+                best_match_score = current_similarity
+                match_found_flag = current_match
                 best_match_reason = (
-                    f"Best match: '{gen_text}' ({gen_value}) vs '{orig_text}' ({orig_value})\n"
-                    f"Match: {'Yes' if is_match else 'No'}, Similarity: {similarity:.3f}"
+                    f"Best match: Gen='{gen_text}' ({gen_value}) vs Orig='{orig_text}' ({orig_value}).\n"
+                    f"{comparison_details}"
+                )
+            elif best_match_score == 0 and not match_found_flag and current_similarity == 0:
+                # If still no match and current is also no match, update reason to current (likely type mismatch)
+                 best_match_reason = (
+                    f"No score match: Gen='{gen_text}' ({gen_value}) vs Orig='{orig_text}' ({orig_value}).\n"
+                    f"{comparison_details}"
+                )
+
+
+    if best_match_score == 0 and not match_found_flag and first_comparison_details_for_no_match and best_match_reason == "No matching answer found":
+        # If loops completed, no match was ever found (score remained 0),
+        # and we have details from the first comparison, use that as the reason.
+        best_match_reason = first_comparison_details_for_no_match
+    
+    # --- Penalty 3: Conflicting Answers (New) ---
+    # Applied if a good match was found, but gen_answers also contains other significant, different numbers.
+    if match_found_flag and best_match_score > 0.75: # Threshold for "good match"
+        orig_numeric_values_set = {val for _, val in orig_answers_extracted if isinstance(val, (float, int))}
+        # Consider only numeric values for this penalty for now
+        
+        conflicting_extra_numeric_values = []
+        # Iterate through all extracted generated answers to find those not matching original solution
+        for gen_text, gen_val in gen_answers_extracted:
+            if not isinstance(gen_val, (float, int)):
+                continue # Only consider numeric generated values for conflicting check
+
+            is_part_of_orig_solution_or_close = False
+            for orig_text_cmp, orig_val_cmp in orig_answers_extracted:
+                if isinstance(orig_val_cmp, (float, int)): # Compare numeric gen_val with numeric orig_val
+                    is_close, _ = compare_numbers(orig_val_cmp, gen_val, tolerance, absolute_tolerance)
+                    if is_close:
+                        is_part_of_orig_solution_or_close = True
+                        break
+                # Not comparing numeric gen_val with string orig_val_cmp here
+            
+            if not is_part_of_orig_solution_or_close:
+                conflicting_extra_numeric_values.append(gen_val)
+        
+        # If there are numeric values in generated output that are not part of (or close to) the original solution
+        if conflicting_extra_numeric_values:
+            # Check if these conflicting values are "significant"
+            # For now, any numeric value not accounted for by the original solution is considered part of a conflict.
+            # This could be refined, e.g. by checking if they are far from original values, or form a sizable set.
+            # Example: orig={10}, gen={10, 100}. 100 is conflicting.
+            # Example: orig={10, 20}, gen={10, 20, 100, 200}. 100, 200 are conflicting.
+            
+            # Filter out very small numbers that might be noise if GT is not zero
+            # This is a heuristic and might need adjustment.
+            # If orig_numeric_values_set contains 0, then small numbers are fine.
+            # Otherwise, filter small conflicting values if they are much smaller than typical orig values.
+            # This is complex, for now, let's assume any distinct extra number is a conflict.
+
+            # A simple check: are there any such conflicting numbers?
+            if conflicting_extra_numeric_values: 
+                formatted_conflicting = ", ".join(map(str, sorted(list(set(conflicting_extra_numeric_values)))))
+                specific_reason_detail = (
+                    f"Generated answer, while containing a match for the original, "
+                    f"also includes other distinct numerical values: [{formatted_conflicting}]"
+                )
+                current_best_reason = best_match_reason # Save pre-penalty reason
+                
+                best_match_score = 0.0
+                match_found_flag = False # No longer a success
+                best_match_reason = f"Strictness fail (Conflicting Answers): {specific_reason_detail}. Initial match was: {current_best_reason}"
+                metrics["strictness_penalty_conflicting_answers"] = MetricResult(
+                    score=0.0, success=False, reason=specific_reason_detail
                 )
 
     metrics["answer_comparison"] = MetricResult(
         score=best_match_score,
-        success=best_match_score > 0,
+        success=match_found_flag and best_match_score > 0, # match_found_flag might be False now
         reason=best_match_reason,
     )
-
-    return EvaluateResult(
-        score=best_match_score, reason=best_match_reason, metrics=metrics
-    )
+    return EvaluateResult(score=best_match_score, reason=best_match_reason, metrics=metrics)

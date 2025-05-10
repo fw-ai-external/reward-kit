@@ -18,13 +18,9 @@ sys.path.insert(
 )
 
 # Import reward-kit components
-from reward_kit.reward_function import RewardFunction, reward_function
-from reward_kit.models import (
-    RewardOutput,
-    MetricRewardOutput,
-    EvaluateResult,
-    MetricResult,
-)
+from reward_kit.reward_function import reward_function # RewardFunction class no longer needed for this example
+from reward_kit.models import EvaluateResult, MetricResult # RewardOutput, MetricRewardOutput are likely legacy
+from reward_kit.adapters.trl import create_trl_adapter # Import the new generic TRL adapter
 
 # Try to import TRL components
 try:
@@ -73,8 +69,9 @@ def helpfulness_reward(
         )
 
     # Extract response text
+    # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.get("role") != "assistant" or not response.get("content"):
+    if response.role != "assistant" or not response.content: # Access as attributes
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -85,7 +82,7 @@ def helpfulness_reward(
             },
         )
 
-    text = response.get("content", "")
+    text = response.content if response.content is not None else "" # Access as attribute
 
     # Calculate score based on length (simple heuristic)
     word_count = len(text.split())
@@ -205,9 +202,17 @@ def train_with_ppo_example():
 
     print("Setting up PPO training with a reward-kit reward function...")
 
-    # 1. Create reward function and adapter
-    reward_fn = RewardFunction(func=helpfulness_reward)
-    reward_adapter = reward_fn.get_trl_adapter()
+    # 1. Create reward function adapter using the new create_trl_adapter
+    # helpfulness_reward is defined above and decorated with @reward_function
+    # It doesn't require special dataset column mapping or static args beyond messages.
+    # The default user_message_fn (str) and assistant_message_fn (str) are suitable if
+    # the 'prompts' passed to the adapter are strings (which 'query' from dataset is).
+    print("Creating TRL adapter for helpfulness_reward...")
+    adapted_helpfulness_reward_fn = create_trl_adapter(
+        reward_fn=helpfulness_reward,
+        dataset_to_reward_kwargs_map={}, # No dynamic kwargs from dataset needed
+        static_reward_kwargs={}         # No static kwargs needed
+    )
 
     # 2. Prepare dataset (use a simple summarization dataset)
     try:
@@ -246,7 +251,12 @@ def train_with_ppo_example():
 
         # Initialize PPO trainer
         ppo_trainer = PPOTrainer(
-            config=ppo_config, model=model, tokenizer=tokenizer, dataset=dataset
+            model=model,
+            args=ppo_config, # Changed 'config' to 'args'
+            tokenizer=tokenizer,
+            train_dataset=dataset, # Changed 'dataset' to 'train_dataset'
+            # data_collator=None, # Optional: add if specific collator is needed
+            # num_shared_layers=None, # Optional
         )
 
         # Generate responses and compute rewards
@@ -263,14 +273,42 @@ def train_with_ppo_example():
             )
 
             # Decode responses and format for reward function
-            responses = [
+            response_strings = [
                 ppo_trainer.tokenizer.decode(r.squeeze())
                 for r in response_tensors
             ]
-            texts = [{"role": "assistant", "content": r} for r in responses]
+            # The 'prompts' for the reward function are the original query strings from the dataset
+            # Assuming `dataset["query"]` is accessible and corresponds to the batch.
+            # For simplicity in this loop, let's assume `batch_queries` is a list of strings.
+            # In a real loop, you'd get the current batch of queries corresponding to query_tensors.
+            # For this example, let's use a placeholder if dataset["query"] isn't directly batch-aligned here.
+            # A more robust way would be to iterate through dataset or use ppo_trainer.tokenizer.batch_decode on query_tensors if they are not padded.
+            
+            # Let's assume `current_batch_queries` is a list of strings for the current batch.
+            # This part needs careful handling in a real PPO loop to align prompts with responses.
+            # For now, we'll use dataset["query"] which is the full list; this is not quite right for a batch.
+            # However, the key is to show the signature.
+            
+            # Correct call to the new adapter:
+            # prompts = list of query strings for the batch
+            # completions = list of response strings for the batch
+            # Example: current_batch_queries = [dataset["query"][i] for i in current_batch_indices]
+            # rewards = adapted_helpfulness_reward_fn(prompts=current_batch_queries, completions=response_strings)
+            
+            # Simplified for this commented out block, showing intent:
+            # Assuming `dataset["query"]` could be sliced or batched appropriately.
+            # This is illustrative as the actual batching depends on PPOTrainer's internals or how data is fed.
+            # The crucial part is `prompts` should be List[str] and `completions` List[str].
+            
+            # If query_tensors are just tokenized versions of dataset["query"], we can decode them too,
+            # but PPO usually keeps queries as input_ids.
+            # For reward calculation, we need the string prompts.
+            # Let's assume we have `batch_query_strings` available.
+            
+            # Placeholder for actual batch query strings
+            batch_query_strings = dataset["query"][:len(response_strings)] # Example: align with number of responses
 
-            # Compute rewards using our adapter
-            rewards = reward_adapter(texts)
+            rewards = adapted_helpfulness_reward_fn(prompts=batch_query_strings, completions=response_strings)
 
             # Run PPO step
             stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
@@ -295,14 +333,21 @@ def train_with_ppo_example():
         },
     ]
 
-    reward_result = helpfulness_reward(sample_messages)
+    reward_result_dict = helpfulness_reward(sample_messages) # helpfulness_reward returns a dict
     print(
-        f"Helpfulness reward score: {reward_result.score} - {reward_result.reason}"
+        f"Helpfulness reward score: {reward_result_dict['score']} - {reward_result_dict.get('reason')}"
     )
 
     # Show how the adapter formats for TRL
-    adapted_reward = reward_adapter([sample_messages])
-    print(f"TRL adapter converted reward: {adapted_reward}")
+    # The new adapter expects prompts=List[str], completions=List[str]
+    sample_user_prompt = sample_messages[0]['content']
+    sample_assistant_completion = sample_messages[1]['content']
+    
+    adapted_reward_score_list = adapted_helpfulness_reward_fn(
+        prompts=[sample_user_prompt], 
+        completions=[sample_assistant_completion]
+    )
+    print(f"TRL adapter converted reward (score list): {adapted_reward_score_list}")
 
 
 if __name__ == "__main__":

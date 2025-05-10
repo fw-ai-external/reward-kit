@@ -24,13 +24,9 @@ sys.path.insert(
 )
 
 # Import reward-kit components
-from reward_kit.reward_function import RewardFunction, reward_function
-from reward_kit.models import (
-    RewardOutput,
-    MetricRewardOutput,
-    EvaluateResult,
-    MetricResult,
-)
+from reward_kit.reward_function import reward_function # RewardFunction class might not be needed
+from reward_kit.models import EvaluateResult, MetricResult # RewardOutput, MetricRewardOutput are legacy
+from reward_kit.adapters.trl import create_trl_adapter # Import the new generic TRL adapter
 
 # Import TRL components
 try:
@@ -82,8 +78,9 @@ def format_reward(
         )
 
     # Extract response text from last message (assistant's response)
+    # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.get("role") != "assistant" or not response.get("content"):
+    if response.role != "assistant" or not response.content: # Access as attributes
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -94,7 +91,7 @@ def format_reward(
             },
         )
 
-    text = response.get("content", "")
+    text = response.content if response.content is not None else "" # Access as attribute
 
     # Check for think/answer tags
     think_pattern = (
@@ -184,8 +181,9 @@ def math_accuracy_reward(
         )
 
     # Extract response text
+    # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.get("role") != "assistant" or not response.get("content"):
+    if response.role != "assistant" or not response.content: # Access as attributes
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -196,7 +194,7 @@ def math_accuracy_reward(
             },
         )
 
-    text = response.get("content", "")
+    text = response.content if response.content is not None else "" # Access as attribute
 
     # If solution is not provided, we can't evaluate accuracy
     if not solution:
@@ -265,10 +263,8 @@ def run_grpo_training_example():
 
     print("\n=== Running GRPO Training Example with reward-kit ===\n")
 
-    # 1. Create reward functions
-    print("Creating reward functions...")
-    format_rf = RewardFunction(func=format_reward)
-    accuracy_rf = RewardFunction(func=math_accuracy_reward)
+    # 1. Reward functions (format_reward and math_accuracy_reward) are defined above.
+    # We will create TRL adapters for them later if needed.
 
     # 2. Prepare dataset
     try:
@@ -364,93 +360,58 @@ def run_grpo_training_example():
         optim="adamw_torch",  # Standard optimizer
     )
 
-    # 5. Create reward function adapters
-    # Get TRL adapters for reward functions
-    format_adapter = format_rf.get_trl_adapter()
-    accuracy_adapter = accuracy_rf.get_trl_adapter()
+    # 5. Create TRL adapter for the format_reward function (defined at the top)
+    print("Creating TRL adapter for format_reward...")
+    adapted_format_reward = create_trl_adapter(
+        reward_fn=format_reward, # The @reward_function decorated one
+        dataset_to_reward_kwargs_map={}, # No dynamic kwargs from dataset
+        static_reward_kwargs={'think_tag': '<think>', 'answer_tag': '<answer>'}
+        # Prompts are strings, so default user_message_fn is fine.
+    )
+    
+    # (Optional) Create TRL adapter for math_accuracy_reward if it were to be used
+    print("Creating TRL adapter for math_accuracy_reward...")
+    adapted_math_accuracy_reward = create_trl_adapter(
+        reward_fn=math_accuracy_reward, # The @reward_function decorated one
+        dataset_to_reward_kwargs_map={"solution": "solution"}, # Map dataset 'solution' to 'solution' param
+        static_reward_kwargs={}
+        # Prompts are strings, so default user_message_fn is fine.
+    )
 
-    # Enhanced format reward function for GRPO
-    def format_reward_fn(completions, prompts=None, **kwargs):
-        # Only debug print stats periodically to avoid flooding logs
-        if len(completions) > 0 and kwargs.get("step", 0) % 5 == 0:
-            print(f"\nReward function stats (step {kwargs.get('step', 0)}):")
-            print(f"Received {len(completions)} completions")
-            print(f"First completion sample: {completions[0][:100]}...")
+    # Combine the adapted rewards
+    def combine_rewards(
+        reward_adapter_configs: List[Dict[str, Any]], # Each dict: {'adapter': callable, 'weight': float}
+    ) -> Callable[[List[Any], List[str], Dict[str, Any]], List[float]]:
+        
+        total_weight = sum(c['weight'] for c in reward_adapter_configs)
+        if abs(total_weight - 1.0) > 1e-6:
+            logger.warning(f"Sum of weights is {total_weight}, normalizing to 1.0.")
+            for config in reward_adapter_configs:
+                config['weight'] /= total_weight
+        
+        def combined_adapter_pipeline(prompts: List[Any], completions: List[str], **kwargs) -> List[float]:
+            batch_size = len(prompts)
+            final_scores = [0.0] * batch_size
 
-        # Check for think/answer tags and assign rewards
-        import re
+            for config in reward_adapter_configs:
+                adapter_fn = config['adapter']
+                weight = config['weight']
+                
+                individual_scores = adapter_fn(prompts=prompts, completions=completions, **kwargs)
+                
+                for i in range(batch_size):
+                    final_scores[i] += individual_scores[i] * weight
+            return final_scores
+        return combined_adapter_pipeline
 
-        rewards = []
-        has_think_count = 0
-        has_answer_count = 0
-        has_both_count = 0
-        correct_order_count = 0
+    print("Creating combined TRL reward function (format + math_accuracy)...")
+    combined_reward_for_trainer = combine_rewards([
+        {'adapter': adapted_format_reward, 'weight': 0.3},
+        {'adapter': adapted_math_accuracy_reward, 'weight': 0.7}
+    ])
 
-        for completion in completions:
-            # Direct implementation checking for think/answer tags
-            think_pattern = r"<think>(.*?)</think>"
-            answer_pattern = r"<answer>(.*?)</answer>"
-
-            think_match = re.search(think_pattern, completion, re.DOTALL)
-            answer_match = re.search(answer_pattern, completion, re.DOTALL)
-
-            has_think = bool(think_match)
-            has_answer = bool(answer_match)
-
-            # Update counters for stats
-            if has_think:
-                has_think_count += 1
-            if has_answer:
-                has_answer_count += 1
-            if has_think and has_answer:
-                has_both_count += 1
-
-            # Check for correct order (think should come before answer)
-            correct_order = True
-            if has_think and has_answer:
-                think_pos = completion.find("<think>")
-                answer_pos = completion.find("<answer>")
-                correct_order = think_pos < answer_pos
-                if correct_order:
-                    correct_order_count += 1
-
-            # Calculate score based on format compliance with more granularity
-            if has_think and has_answer and correct_order:
-                # Check the content between tags for quality
-                think_content = think_match.group(1).strip()
-                answer_content = answer_match.group(1).strip()
-
-                if len(think_content) > 50 and len(answer_content) > 5:
-                    score = 1.0  # Perfect format with substantial content
-                elif len(think_content) > 20:
-                    score = 0.9  # Good format with some content
-                else:
-                    score = 0.8  # Correct format but minimal content
-            elif has_think and has_answer:
-                score = 0.5  # Tags present but wrong order
-            elif has_think:
-                score = 0.3  # Only think tag present
-            elif has_answer:
-                score = 0.2  # Only answer tag present
-            else:
-                score = 0.1  # No tags present
-
-            rewards.append(score)
-
-        # Log statistics periodically
-        if kwargs.get("step", 0) % 5 == 0:
-            print(
-                f"Format stats: Think: {has_think_count}/{len(completions)}, "
-                + f"Answer: {has_answer_count}/{len(completions)}, "
-                + f"Both: {has_both_count}/{len(completions)}, "
-                + f"Correct order: {correct_order_count}/{len(completions)}"
-            )
-            print(
-                f"Reward range: {min(rewards):.2f} - {max(rewards):.2f}, "
-                + f"Mean: {sum(rewards)/len(rewards):.2f}"
-            )
-
-        return rewards
+    # The custom 'format_reward_fn' has been removed.
+    # We will use 'combined_reward_for_trainer'.
 
     # Function to test the model's outputs with the same prompt
     def test_model_outputs(model, tokenizer, test_prompt):
@@ -486,7 +447,7 @@ def run_grpo_training_example():
         print("\nInitializing GRPO trainer...")
         trainer = GRPOTrainer(
             model=model,
-            reward_funcs=[format_reward_fn],  # Use our format reward function
+            reward_funcs=[combined_reward_for_trainer],  # Use the combined reward function
             args=training_args,
             train_dataset=train_dataset,
         )

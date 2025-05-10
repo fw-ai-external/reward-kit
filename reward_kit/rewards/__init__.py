@@ -19,6 +19,8 @@ from . import cpp_code
 from . import accuracy_length
 from . import lean_prover
 from . import deepcoder_reward # Added import
+from . import multiple_choice_math_reward
+from . import list_comparison_math_reward
 
 # Directly import specific reward functions for easy access
 from .code_execution import fractional_code_reward
@@ -30,6 +32,8 @@ from .lean_prover import (
     deepseek_prover_v2_reward,
     deepseek_huggingface_prover_benchmark,
 )
+from .multiple_choice_math_reward import multiple_choice_math_reward
+from .list_comparison_math_reward import list_comparison_math_reward
 
 __all__ = [
     "function_calling",
@@ -48,8 +52,12 @@ __all__ = [
     "accuracy_length",
     "lean_prover",
     "deepcoder_reward", # Added module to __all__
+    "multiple_choice_math_reward",
+    "list_comparison_math_reward",
     "fractional_code_reward",
     "deepcoder_code_reward", # Added function to __all__
+    "multiple_choice_math_reward", # Added function to __all__
+    "list_comparison_math_reward", # Added function to __all__
     "ioi_cpp_code_reward",
     "binary_cpp_code_reward",
     "cosine_scaled_accuracy_length_reward",

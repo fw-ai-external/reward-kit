@@ -29,137 +29,46 @@ except ImportError as e:
     HAS_TRL_AND_TRANSFORMERS = False
 
 # Import reward-kit components
-from reward_kit.reward_function import RewardFunction # Not strictly needed if using deepcoder_code_reward directly
+# from reward_kit.reward_function import RewardFunction # No longer strictly needed here
 from reward_kit.rewards import deepcoder_code_reward
-from reward_kit.models import Message # For constructing messages for the reward function
+# from reward_kit.models import Message # No longer directly needed here
+from reward_kit.adapters.trl import create_trl_adapter # Import the new adapter
+from reward_kit.rewards.code_execution_utils import prepare_deepcoder_sample_for_trl
+from reward_kit.utils.dataset_helpers import load_jsonl_to_hf_dataset
 
-# Import data processing utility
-from data_utils import process_deepcoder_sample
 
 # Configuration
 MODEL_NAME = "Qwen/Qwen3-0.6B" # Small Qwen model for example
-DATASET_PATH = Path(__file__).parent / "data/simulated_deepcoder_raw_sample.jsonl"
+DATASET_PATH = Path(__file__).parent / "data/simulated_deepcoder_raw_sample.jsonl" # This will be processed by prepare_deepcoder_sample_for_trl
 LANGUAGE = "python"
 ENVIRONMENT = "local" # "e2b" if configured
 TIMEOUT = 10 # seconds for code execution
 
 def load_and_prepare_dataset(raw_data_path: Path) -> Optional[Dataset]:
-    """Loads and prepares the DeepCoder-style dataset into HuggingFace Dataset format."""
-    if not raw_data_path.exists():
-        logger.error(f"Dataset file not found at {raw_data_path}")
-        return None
+    """Loads and prepares the DeepCoder-style dataset into HuggingFace Dataset format using reward-kit utilities."""
+    
+    required_cols_for_reward = ["test_cases", "target_function"] # 'prompt' is handled by default by load_jsonl_to_hf_dataset
 
-    processed_data_list = process_deepcoder_sample(str(raw_data_path))
-    if not processed_data_list:
-        logger.error("No data processed from raw file.")
+    hf_dataset = load_jsonl_to_hf_dataset(
+        dataset_path=str(raw_data_path),
+        transform_fn=prepare_deepcoder_sample_for_trl,
+        required_columns=required_cols_for_reward
+    )
+
+    if hf_dataset is None:
+        logger.error(f"Failed to load dataset from {raw_data_path} using reward-kit utilities.")
         return None
     
-    # Convert list of dicts to HuggingFace Dataset
-    # Ensure all required columns are present. GRPOTrainer needs 'prompt'.
-    # Our reward function will need 'test_cases'.
-    try:
-        hf_dataset = Dataset.from_list(processed_data_list)
-        logger.info(f"Dataset loaded and prepared: {len(hf_dataset)} samples. Columns: {hf_dataset.column_names}")
-        if "prompt" not in hf_dataset.column_names:
-            logger.error("Dataset must contain a 'prompt' column for GRPOTrainer.")
-            return None
-        if "test_cases" not in hf_dataset.column_names:
-            logger.error("Dataset must contain a 'test_cases' column for the reward function.")
-            return None
-        # Also check for the new target_function column
-        if "target_function" not in hf_dataset.column_names:
-             logger.error("Dataset must contain a 'target_function' column for the reward function.")
-             return None
-        return hf_dataset
-    except Exception as e:
-        logger.error(f"Error converting data to HuggingFace Dataset: {e}")
+    if len(hf_dataset) == 0:
+        logger.error(f"No samples loaded from {raw_data_path}. Check dataset content and transform_fn.")
         return None
 
+    logger.info(f"Dataset loaded and prepared: {len(hf_dataset)} samples. Columns: {hf_dataset.column_names}")
+    return hf_dataset
 
-def deepcoder_grpo_reward_adapter(
-    prompts: List[str],
-    completions: List[str],
-    # original_data: List[Dict[str, Any]], # Removed from explicit params
-    **kwargs # original_data should be in here
-) -> List[float]:
-    """
-    Adapter function to make deepcoder_code_reward compatible with GRPOTrainer.
-    GRPOTrainer expects a function that takes:
-    - prompts (List[str]): list of prompts used for generation
-    - completions (List[str]): list of generated texts
-    - original_data (List[Dict[str, Any]]): list of original dataset items (passed via kwargs)
-    and returns a list of reward scores (float).
-    """
-    logger.debug(f"deepcoder_grpo_reward_adapter called. Prompts: {len(prompts)}, Completions: {len(completions)}. kwargs keys: {list(kwargs.keys())}")
 
-    # GRPOTrainer passes other columns from the dataset directly in kwargs.
-    # Our dataset now has 'prompt', 'test_cases', and 'target_function'.
-    batch_test_cases = kwargs.get("test_cases")
-    batch_target_functions = kwargs.get("target_function") # Extract target functions
-
-    if batch_test_cases is None or batch_target_functions is None:
-        logger.error(f"'test_cases' ({batch_test_cases is not None}) or 'target_function' ({batch_target_functions is not None}) not found in reward function kwargs. Returning 0.0 for all.")
-        logger.error(f"Full kwargs received: {kwargs}") # Log for debugging
-        return [0.0] * len(completions)
-
-    rewards = []
-    num_samples = len(prompts)
-
-    # Basic check for consistent lengths
-    if len(completions) != num_samples or len(batch_test_cases) != num_samples or len(batch_target_functions) != num_samples:
-        logger.warning(
-            f"Mismatch in lengths of prompts ({len(prompts)}), "
-            f"completions ({len(completions)}), batch_test_cases ({len(batch_test_cases)}), "
-            f"and batch_target_functions ({len(batch_target_functions)}). Using min length."
-        )
-        num_samples = min(len(prompts), len(completions), len(batch_test_cases), len(batch_target_functions))
-    
-    for i in range(num_samples):
-        prompt_text = prompts[i]
-        completion_text = completions[i]
-        test_cases = batch_test_cases[i] # Get test_cases for the current sample
-        target_function = batch_target_functions[i] # Get target_function for the current sample
-
-        if test_cases is None: # Target function can be None, handled by deepcoder_code_reward
-            logger.warning(f"Sample {i} missing 'test_cases'. Assigning 0 reward.")
-            rewards.append(0.0)
-            continue
-
-        messages_for_reward = [
-            Message(role="user", content=prompt_text),
-            Message(role="assistant", content=completion_text)
-        ]
-        
-        try:
-            reward_output = deepcoder_code_reward( # Call the core reward function directly
-                messages=messages_for_reward,
-                language=LANGUAGE,
-                test_cases=test_cases,
-                environment=ENVIRONMENT,
-                timeout=TIMEOUT,
-                target_function=target_function # Pass the target function name
-            )
-            # The reward_output from a function decorated with @reward_function (from typed_interface)
-            # is a dictionary (due to model_dump()). Access score via key.
-            if isinstance(reward_output, dict) and "score" in reward_output:
-                rewards.append(reward_output['score'])
-            elif hasattr(reward_output, 'score'): # Fallback if it's an object (e.g. direct EvaluateResult)
-                rewards.append(reward_output.score)
-            else:
-                logger.error(f"Sample {i} - Reward output is not a dict with 'score' or an object with .score attribute: {type(reward_output)}")
-                rewards.append(0.0) # Default on unexpected reward format
-
-            # Log more details from reward_output for debugging
-            logger.debug(f"Sample {i} - Prompt: {prompt_text[:50]}... Completion: {completion_text[:50]}... RewardOutput: {reward_output}")
-        except Exception as e:
-            logger.error(f"Error calculating reward for completion {i}: {e}", exc_info=True)
-            rewards.append(0.0) # Assign 0 score on error
-            
-    # Log some stats about rewards if needed
-    if rewards:
-        # Use INFO level for this summary as it's key to seeing if rewards are non-zero
-        logger.info(f"Batch rewards calculated. Count: {len(rewards)}, Min: {min(rewards)}, Max: {max(rewards)}, Avg: {sum(rewards)/len(rewards):.2f}")
-    return rewards
+# The custom deepcoder_grpo_reward_adapter function is no longer needed.
+# It will be replaced by using create_trl_adapter from reward_kit.
 
 
 def generate_for_comparison(model, tokenizer, prompt_text: str, device) -> str:
@@ -252,7 +161,23 @@ def main():
     # For GRPO, the dataset should be a HuggingFace Dataset object
     # The load_and_prepare_dataset function now returns this.
 
-    # 3. Configure GRPO Training
+    # 3. Create the adapted reward function using the new TRL adapter
+    logger.info("Creating TRL adapter for the reward function...")
+    adapted_reward_func = create_trl_adapter(
+        reward_fn=deepcoder_code_reward,
+        dataset_to_reward_kwargs_map={
+            "test_cases": "test_cases",  # dataset_column_name maps to reward_fn_param_name
+            "target_function": "target_function"
+        },
+        static_reward_kwargs={
+            "language": LANGUAGE,
+            "environment": ENVIRONMENT,
+            "timeout": TIMEOUT
+        }
+        # user_message_fn and assistant_message_fn can be omitted for default behavior
+    )
+
+    # 4. Configure GRPO Training
     logger.info("Configuring GRPO training...")
     # Reduce batch size and steps for a quick test
     training_args = GRPOConfig(
@@ -284,7 +209,7 @@ def main():
     logger.info(f"Response (before): {pre_train_response[:200]}...")
 
 
-    # 4. Create and run GRPOTrainer
+    # 5. Create and run GRPOTrainer
     try:
         logger.info("Initializing GRPOTrainer...")
         trainer = GRPOTrainer(
@@ -292,7 +217,7 @@ def main():
             args=training_args,
             # tokenizer=tokenizer, # Removed: GRPOTrainer likely infers tokenizer from model or args
             train_dataset=train_dataset,
-            reward_funcs=[deepcoder_grpo_reward_adapter], # Pass the adapter
+            reward_funcs=[adapted_reward_func], # Pass the new adapted reward function
             # peft_config=lora_config, # Already applied with get_peft_model
         )
 

@@ -20,13 +20,9 @@ sys.path.insert(
 )
 
 # Import reward-kit components
-from reward_kit.reward_function import RewardFunction, reward_function
-from reward_kit.models import (
-    RewardOutput,
-    MetricRewardOutput,
-    EvaluateResult,
-    MetricResult,
-)
+from reward_kit.reward_function import reward_function # RewardFunction class no longer needed for this example's core logic
+from reward_kit.models import EvaluateResult, MetricResult 
+from reward_kit.adapters.trl import create_trl_adapter # Import the new generic TRL adapter
 
 # Try to import TRL components
 try:
@@ -79,8 +75,9 @@ def format_reward(
         )
 
     # Extract response text from last message (assistant's response)
+    # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.get("role") != "assistant" or not response.get("content"):
+    if response.role != "assistant" or not response.content: # Access as attributes
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -91,7 +88,7 @@ def format_reward(
             },
         )
 
-    text = response.get("content", "")
+    text = response.content if response.content is not None else "" # Access as attribute
 
     # Check for think/answer tags
     think_pattern = (
@@ -181,59 +178,70 @@ def format_reward(
 
 # The local math_accuracy_reward function is now removed, replaced by rk_math_reward from the library.
 
-def combine_rewards(reward_functions, weights=None):
-    """
-    Combine multiple reward functions into a single TRL-compatible function.
+# Helper function to extract user content from a list of message dicts
+def _extract_user_content_from_messages(prompt_msg_list: List[Dict[str, str]]) -> str:
+    for msg in reversed(prompt_msg_list):
+        if msg.get("role") == "user":
+            return msg.get("content", "")
+    return ""
 
+def combine_rewards_with_new_adapter(
+    reward_configs: List[Dict[str, Any]], # Each dict contains 'func', 'map', 'static_kwargs'
+    weights: Optional[List[float]] = None
+):
+    """
+    Combine multiple reward functions using the new create_trl_adapter.
     Args:
-        reward_functions: List of RewardFunction instances
-        weights: Optional weights for each reward function (normalized if not summing to 1)
-
+        reward_configs: A list of dictionaries, each configuring one reward function.
+                        Each dict should have:
+                        - 'func': The raw reward function.
+                        - 'map': dataset_to_reward_kwargs_map for this function.
+                        - 'static_kwargs': static_reward_kwargs for this function.
+                        - 'user_msg_fn' (optional): custom user_message_fn for this function.
+        weights: Optional weights for each reward function.
     Returns:
-        A callable function compatible with TRL
+        A callable function compatible with TRL.
     """
-    # Normalize weights if provided
+    if not reward_configs:
+        raise ValueError("Must provide at least one reward function configuration.")
+    
     if weights:
-        if len(weights) != len(reward_functions):
-            raise ValueError(
-                "Number of weights must match number of reward functions"
-            )
+        if len(weights) != len(reward_configs):
+            raise ValueError("Number of weights must match number of reward functions.")
         weight_sum = sum(weights)
-        if weight_sum != 1.0:
-            weights = [w / weight_sum for w in weights]
+        if abs(weight_sum - 1.0) > 1e-6: # Allow for small floating point inaccuracies
+             print(f"Normalizing weights from sum {weight_sum} to 1.0")
+             weights = [w / weight_sum for w in weights]
     else:
-        # Equal weights for all reward functions
-        weights = [
-            1.0 / len(reward_functions) for _ in range(len(reward_functions))
-        ]
+        weights = [1.0 / len(reward_configs)] * len(reward_configs)
 
-    # Create adapters for each reward function
-    # Note: We assume get_trl_adapter prepares the function to accept batch_input (List[List[Dict]])
-    # and **kwargs which might include 'solution' etc.
-    adapters = [rf.get_trl_adapter() for rf in reward_functions]
+    adapters = []
+    for config in reward_configs:
+        user_msg_fn_to_use = config.get('user_msg_fn', _extract_user_content_from_messages)
+        
+        adapter = create_trl_adapter(
+            reward_fn=config['func'],
+            dataset_to_reward_kwargs_map=config['map'],
+            static_reward_kwargs=config.get('static_kwargs', {}),
+            user_message_fn=user_msg_fn_to_use
+            # assistant_message_fn can be None for default behavior
+        )
+        adapters.append(adapter)
 
-    def combined_adapter(prompts: List[List[Dict[str, str]]], completions: List[str], **kwargs):
+    def combined_adapter(prompts: List[Any], completions: List[str], **kwargs):
         """
         Combined adapter function compatible with TRL's expected signature.
-        It reconstructs the full message list for each sample.
-        
-        Args:
-            prompts: List of prompt message lists (e.g., [[{'role':'system',...}, {'role':'user',...}]])
-            completions: List of generated completion strings.
-            **kwargs: Additional arguments passed by TRL (e.g., ground truth 'solution').
+        'prompts' here will be List[List[Dict[str, str]]] from this example's dataset.
         """
         if len(prompts) != len(completions):
-             raise ValueError("Length of prompts and completions must match.")
+            raise ValueError("Length of prompts and completions must match.")
 
-        # The individual adapters returned by get_trl_adapter now expect the TRL signature.
-        # We pass the arguments received by combined_adapter directly to them.
         all_scores = []
-        for adapter in adapters:
-            # Call the individual adapter with the arguments received from TRL trainer
-            scores = adapter(prompts=prompts, completions=completions, **kwargs)
+        for adapter_fn in adapters:
+            # Each adapter created by create_trl_adapter expects this signature
+            scores = adapter_fn(prompts=prompts, completions=completions, **kwargs)
             all_scores.append(scores)
-
-        # Combine weighted scores for each sample
+        
         combined_scores = []
         num_samples = len(completions)
         for i in range(num_samples):
@@ -242,7 +250,6 @@ def combine_rewards(reward_functions, weights=None):
                 for adapter_idx, weight in enumerate(weights)
             )
             combined_scores.append(weighted_sum)
-
         return combined_scores
 
     return combined_adapter
@@ -355,10 +362,25 @@ def train_with_grpo_example():
 
     print("Setting up GRPO training with reward-kit reward functions...")
 
-    # 1. Create reward functions
-    format_reward_fn = RewardFunction(func=format_reward)
-    # Use the math_reward from reward_kit.rewards.math
-    accuracy_reward_fn = RewardFunction(func=rk_math_reward) 
+    # 1. Define reward function configurations (no RewardFunction class needed here)
+    # format_reward is defined locally. rk_math_reward is imported.
+    
+    # Configuration for format_reward
+    format_reward_config = {
+        "func": format_reward,
+        "map": {}, # No dynamic kwargs from dataset needed for format_reward
+        "static_kwargs": {"think_tag": "<think>", "answer_tag": "<answer>"} # Default tags
+        # user_msg_fn will default to _extract_user_content_from_messages
+    }
+
+    # Configuration for rk_math_reward
+    # rk_math_reward needs 'original_messages' (ground truth) from the 'solution' column
+    math_reward_config = {
+        "func": rk_math_reward,
+        "map": {"solution": "original_messages"}, # Map 'solution' dataset column to 'original_messages' param
+        "static_kwargs": {}
+        # user_msg_fn will default to _extract_user_content_from_messages
+    }
 
     # 2. Prepare dataset
     try:
@@ -426,11 +448,11 @@ def train_with_grpo_example():
         # max_steps=5, # Removed to allow training for num_train_epochs
     )
 
-    # 5. Combine reward functions for TRL
-    print("Creating combined reward function...")
-    combined_reward = combine_rewards(
-        [format_reward_fn, accuracy_reward_fn],
-        weights=[0.3, 0.7],  # Format is 30%, accuracy is 70%
+    # 5. Combine reward functions for TRL using the new adapter logic
+    print("Creating combined reward function using new adapter...")
+    combined_reward_new = combine_rewards_with_new_adapter(
+        reward_configs=[format_reward_config, math_reward_config],
+        weights=[0.3, 0.7]  # Format is 30%, accuracy is 70%
     )
 
     # 6. Create and run trainer (would be done for actual training)
@@ -439,7 +461,7 @@ def train_with_grpo_example():
         print("Creating GRPO trainer...")
         trainer = GRPOTrainer(
             model=model,
-            reward_funcs=[combined_reward],
+            reward_funcs=[combined_reward_new], # Use the new combined reward
             args=training_args,
             train_dataset=dataset,
         )
@@ -498,35 +520,32 @@ def train_with_grpo_example():
     # Test case 1: "Perfect" format
     print("\n--- Test Case 1: Mock 'Perfect' Format ---")
     messages_test_case_1 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_perfect}]
-    format_result_1 = format_reward_fn.func(messages_test_case_1) # Call .func directly for testing
-    accuracy_result_1 = accuracy_reward_fn.func(messages=messages_test_case_1, original_messages=original_messages_for_test)
-    print(f"Format reward (perfect mock): {format_result_1.score} - {format_result_1.reason}")
-    # Use dictionary access if accuracy_result is a dict
+    # Call raw functions for testing, as they are already decorated by @reward_function
+    format_result_1 = format_reward(messages_test_case_1, think_tag="<think>", answer_tag="<answer>") 
+    accuracy_result_1 = rk_math_reward(messages=messages_test_case_1, original_messages=original_messages_for_test)
+    print(f"Format reward (perfect mock): {format_result_1['score']} - {format_result_1.get('reason', 'N/A')}")
     print(f"Accuracy reward (perfect mock): {accuracy_result_1['score']} - {accuracy_result_1.get('reason', 'N/A')}")
-    combined_score_1 = 0.3 * format_result_1.score + 0.7 * accuracy_result_1['score']
+    combined_score_1 = 0.3 * format_result_1['score'] + 0.7 * accuracy_result_1['score']
     print(f"Combined reward (perfect mock): {combined_score_1}")
 
     # Test case 2: No box in answer (model's response)
     print("\n--- Test Case 2: Mock 'No Box in Answer' ---")
     messages_test_case_2 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_no_box}]
-    format_result_2 = format_reward_fn.func(messages_test_case_2)
-    accuracy_result_2 = accuracy_reward_fn.func(messages=messages_test_case_2, original_messages=original_messages_for_test)
-    print(f"Format reward (no box): {format_result_2.score} - {format_result_2.reason}")
-    # rk_math_reward will extract "10" from the no_box content if it's a plain number.
-    # Use dictionary access if accuracy_result is a dict
+    format_result_2 = format_reward(messages_test_case_2, think_tag="<think>", answer_tag="<answer>")
+    accuracy_result_2 = rk_math_reward(messages=messages_test_case_2, original_messages=original_messages_for_test)
+    print(f"Format reward (no box): {format_result_2['score']} - {format_result_2.get('reason', 'N/A')}")
     print(f"Accuracy reward (no box): {accuracy_result_2['score']} - {accuracy_result_2.get('reason', 'N/A')}")
-    combined_score_2 = 0.3 * format_result_2.score + 0.7 * accuracy_result_2['score']
+    combined_score_2 = 0.3 * format_result_2['score'] + 0.7 * accuracy_result_2['score']
     print(f"Combined reward (no box): {combined_score_2}")
 
     # Test case 3: No think tag
     print("\n--- Test Case 3: Mock 'No Think Tag' ---")
     messages_test_case_3 = actual_sample_prompt_messages + [{"role": "assistant", "content": mock_assistant_content_no_think}]
-    format_result_3 = format_reward_fn.func(messages_test_case_3)
-    accuracy_result_3 = accuracy_reward_fn.func(messages=messages_test_case_3, original_messages=original_messages_for_test)
-    print(f"Format reward (no think): {format_result_3.score} - {format_result_3.reason}")
-    # Use dictionary access if accuracy_result is a dict
+    format_result_3 = format_reward(messages_test_case_3, think_tag="<think>", answer_tag="<answer>")
+    accuracy_result_3 = rk_math_reward(messages=messages_test_case_3, original_messages=original_messages_for_test)
+    print(f"Format reward (no think): {format_result_3['score']} - {format_result_3.get('reason', 'N/A')}")
     print(f"Accuracy reward (no think): {accuracy_result_3['score']} - {accuracy_result_3.get('reason', 'N/A')}")
-    combined_score_3 = 0.3 * format_result_3.score + 0.7 * accuracy_result_3['score']
+    combined_score_3 = 0.3 * format_result_3['score'] + 0.7 * accuracy_result_3['score']
     print(f"Combined reward (no think): {combined_score_3}")
 
 

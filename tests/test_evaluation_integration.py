@@ -318,7 +318,7 @@ def test_integration_cli_commands(
 
     try:
         # Test preview command
-        with patch("reward_kit.cli.preview_evaluation") as mock_preview:
+        with patch("reward_kit.cli_commands.preview.preview_evaluation") as mock_preview: # Corrected patch target
             # Create mock preview result
             mock_preview_result = MagicMock()
             mock_preview_result.display = MagicMock()
@@ -337,7 +337,7 @@ def test_integration_cli_commands(
             args.huggingface_key_map = None
 
             # Run preview command
-            with patch("reward_kit.cli.Path.exists", return_value=True):
+            with patch("reward_kit.cli_commands.preview.Path.exists", return_value=True): # Corrected patch target for Path
                 result = preview_command(args)
 
                 # Verify the result
@@ -355,7 +355,7 @@ def test_integration_cli_commands(
                 mock_preview_result.display.assert_called_once()
 
         # Test deploy command
-        with patch("reward_kit.cli.create_evaluation") as mock_create:
+        with patch("reward_kit.cli_commands.deploy.create_evaluation") as mock_create: # Corrected patch target
             # Configure the mock
             mock_create.return_value = {
                 "name": "accounts/test_account/evaluators/test-eval",

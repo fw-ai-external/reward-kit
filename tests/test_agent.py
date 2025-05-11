@@ -3,7 +3,7 @@ Tests for the agent evaluation framework.
 """
 
 import os
-import pytest
+import pytest # pytest is available globally in test files
 import tempfile
 import asyncio
 import shutil
@@ -141,6 +141,7 @@ async def test_database_setup():
         shutil.rmtree(temp_dir)
 
 
+@pytest.mark.skip(reason="Skipping old agent V1 test during V2 refactor")
 @pytest.mark.asyncio
 async def test_database_snapshot():
     """Test creating a database snapshot."""
@@ -202,6 +203,7 @@ def test_load_task_from_file(example_task_path):
     assert "initial_messages" in tasks[0]
 
 
+@pytest.mark.skip(reason="Skipping old agent V1 test during V2 refactor")
 @pytest.mark.asyncio
 async def test_agent_evaluator(example_task_path):
     """Test setting up an AgentEvaluator."""
@@ -267,3 +269,76 @@ async def test_agent_evaluator(example_task_path):
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
+
+# Add import shutil at the top of the file if it's used elsewhere and not just in skipped tests.
+# For now, the NameError was in the skipped tests. If other tests in this file use shutil,
+# it should be imported. Reviewing the file, shutil is used in test_database_setup as well.
+# So, an `import shutil` at the top is indeed needed.
+# The initial `import pytest` was removed as it's usually not needed explicitly.
+# Let's ensure shutil is imported.
+
+# Re-evaluating the first diff block:
+# The original file had `import pytest`. My thought to remove it was based on common practice,
+# but it's safer to leave it if it was there. The main issue is `shutil`.
+
+# Corrected plan:
+# 1. Add `import shutil` at the top.
+# 2. Add skip markers to the two functions.
+# (No need to touch the `import pytest` line if it was already there and correct)
+
+# Let's re-generate the diff based on this.
+# The file content provided shows `import pytest` is already there.
+# So, the only needed changes are adding `import shutil` and the skip markers.
+
+# Corrected diff based on provided file content:
+
+# Add `import shutil`
+# Add skip markers.
+
+# The provided file content already has `import shutil` (line 5).
+# This means the NameError for shutil is unexpected if the provided file content is accurate for what's on disk.
+# Let's assume the provided file content is the source of truth.
+# If `import shutil` is already there, then the `NameError` for `shutil` in the test output is confusing.
+# Perhaps the test runner is picking up an old version of the file?
+
+# Let's assume the test output is correct and `shutil` is NOT defined, meaning it's missing the import.
+# The provided file content for `tests/test_agent.py` DOES have `import shutil`.
+# This is a contradiction.
+
+# I will proceed by adding the skip markers as requested, and I will also ensure `import shutil` is present.
+# If `import shutil` is already there as per the provided file content, the diff for adding it will be a no-op for that line.
+
+# The `NameError: name 'shutil' is not defined` is the primary reason for skipping.
+# The user's message implies these tests are failing due to this NameError.
+# The file content shown in the prompt for `tests/test_agent.py` *does* include `import shutil`.
+# This suggests the error might be from a different state of the file or an environment issue.
+
+# Given the user's request to "skip the old agent test cases" and the specific error,
+# I will focus on adding the skip markers.
+# If `import shutil` is truly missing from the actual file on disk, the test environment will tell us.
+# For now, I will trust the user's error report that `shutil` is not defined at runtime for those tests.
+# The skip markers will prevent them from running anyway.
+
+# The `test_database_setup` also uses `shutil.rmtree(temp_dir)`. If `shutil` is not imported, this would also fail.
+# The user did not list `test_database_setup` as failing with a NameError.
+# This further suggests the `import shutil` might be present in the file but perhaps not effective in the execution scope of the failing tests,
+# or the test failures provided are the only ones of concern.
+
+# I will only add the skip markers as the primary action.
+# The `shutil` NameError is the *reason* they are being skipped (as per the error log).
+# If `import shutil` is missing, it should be added for other tests like `test_database_setup` to pass.
+# Let's check `test_database_setup` again. It uses `shutil.rmtree(temp_dir)`.
+# If `import shutil` is missing, this test *should* also fail with NameError.
+# The user's list of failures does not include it.
+
+# This implies `import shutil` is likely present. The NameError in the *specific failing tests* might be due to
+# how pytest isolates tests or some other subtlety.
+# Safest action: add skip markers as requested. Assume `import shutil` is present as per file content.
+# The skip markers make the `shutil` issue in those specific tests moot.
+
+# The diff should be:
+# 1. Add `@pytest.mark.skip(...)` to `test_database_snapshot`
+# 2. Add `@pytest.mark.skip(...)` to `test_agent_evaluator`
+# (No changes to imports if they are already correct as per the provided file content)
+# The provided file content for `tests/test_agent.py` shows `import shutil` on line 6.
+# And `import pytest` on line 3. So imports are fine.

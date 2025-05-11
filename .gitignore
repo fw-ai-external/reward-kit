@@ -26,3 +26,6 @@ training.log
 rllm
 grpo_deepcoder_output
 SandboxFusion
+atropos
+gorilla
+tau-bench

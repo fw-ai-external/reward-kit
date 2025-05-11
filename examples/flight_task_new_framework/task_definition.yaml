@@ -1,0 +1,35 @@
+name: "Flight Booking Task (New Framework)"
+description: "Agent needs to book a flight given user constraints, using the new ForkableResource framework."
+resource_type: "SQLResource"
+
+base_resource_config:
+  db_type: "sqlite" # SQLResource currently defaults to SQLite
+  # Directory to store DB files for this task, relative to project root.
+  db_base_path: "./agent_run_dbs/flight_task_new_framework/"
+  db_name: "flight_booking_base.db" # Name for the base DB created by SQLResource setup
+  # Paths to schema and seed files, relative to project root.
+  # We will copy seed.sql from the old example here.
+  schema_file: "examples/flight_task_new_framework/seed.sql"
+  seed_data_file: "examples/flight_task_new_framework/seed.sql"
+
+# Python import paths for modules/functions
+# Example: "my_package.my_module.my_function"
+tools_module_path: "examples.flight_task_new_framework.sql_tools" # Points to the new tools module we will create
+reward_function_path: "examples.flight_task_new_framework.reward.evaluate_flight_booking" # Points to the refactored reward function
+
+goal_description: "A round-trip flight for Alice from SFO to JFK for next Monday, returning Friday, must be booked and paid."
+
+# Configuration for the Orchestrator to evaluate task success.
+# This is conceptual for the PoC Orchestrator and will be fleshed out later.
+evaluation_criteria:
+  # A query the Orchestrator runs on the final state of the EpisodeResource's database.
+  final_state_query: "SELECT COUNT(*) FROM bookings WHERE passenger='Alice' AND status='paid';"
+  # A Python lambda string the Orchestrator can use to interpret the query result.
+  # e.g., if query returns a count, `lambda count_result: count_result[0] > 0`
+  # For a single value result: `lambda val: val > 0`
+  expected_query_result_transform: "lambda result: result > 0" # Assumes final_state_query returns a single numeric value.
+
+# Information for the agent interaction loop (to be used by a more advanced Orchestrator)
+initial_user_prompt: "Book me a flight from SFO to JFK for tomorrow morning for passenger Alice."
+# max_turns: 10 # Example
+# n_rollouts: 1 # Example

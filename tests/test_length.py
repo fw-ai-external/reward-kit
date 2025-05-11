@@ -16,7 +16,7 @@ from reward_kit.rewards.length import (
     cosine_length_reward,
     count_tokens,
 )
-from reward_kit.models import Message
+from reward_kit.models import Message, EvaluateResult
 
 
 class TestLengthReward(unittest.TestCase):
@@ -55,9 +55,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_target, target_length=target_length
         )
 
+        self.assertIsInstance(result_target, EvaluateResult)
         # Should be high score for matching target length
-        self.assertEqual(result_target["score"], 1.0)
-        self.assertTrue(result_target["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertEqual(result_target.score, 1.0)
+        self.assertTrue(result_target.metrics["length"].success)
+        # Dictionary access
+        self.assertEqual(result_target['score'], 1.0)
+        self.assertTrue(result_target['metrics']["length"]['success'])
 
         # Test with response shorter than target length
         messages_short = [
@@ -69,8 +74,12 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_short, target_length=target_length
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
         # Should be lower score for not matching target length
-        self.assertLess(result_short["score"], 1.0)
+        # Attribute access
+        self.assertLess(result_short.score, 1.0)
+        # Dictionary access
+        self.assertLess(result_short['score'], 1.0)
 
         # Test with response longer than target length
         messages_long = [
@@ -82,8 +91,12 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_long, target_length=target_length
         )
 
+        self.assertIsInstance(result_long, EvaluateResult)
         # Should be lower score for not matching target length
-        self.assertLess(result_long["score"], 1.0)
+        # Attribute access
+        self.assertLess(result_long.score, 1.0)
+        # Dictionary access
+        self.assertLess(result_long['score'], 1.0)
 
     def test_min_length(self):
         """Test reward calculation with minimum length."""
@@ -102,9 +115,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_adequate, min_length=min_length
         )
 
+        self.assertIsInstance(result_adequate, EvaluateResult)
         # Should be high score for meeting minimum length
-        self.assertEqual(result_adequate["score"], 1.0)
-        self.assertTrue(result_adequate["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertEqual(result_adequate.score, 1.0)
+        self.assertTrue(result_adequate.metrics["length"].success)
+        # Dictionary access
+        self.assertEqual(result_adequate['score'], 1.0)
+        self.assertTrue(result_adequate['metrics']["length"]['success'])
 
         # Test with response below minimum length
         messages_short = [
@@ -116,9 +134,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_short, min_length=min_length
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
         # Should be lower score for not meeting minimum length
-        self.assertLess(result_short["score"], 1.0)
-        self.assertFalse(result_short["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertLess(result_short.score, 1.0)
+        self.assertFalse(result_short.metrics["length"].success)
+        # Dictionary access
+        self.assertLess(result_short['score'], 1.0)
+        self.assertFalse(result_short['metrics']["length"]['success'])
 
     def test_max_length(self):
         """Test reward calculation with maximum length."""
@@ -137,9 +160,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_short, max_length=max_length
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
         # Should be high score for staying within maximum length
-        self.assertEqual(result_short["score"], 1.0)
-        self.assertTrue(result_short["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertEqual(result_short.score, 1.0)
+        self.assertTrue(result_short.metrics["length"].success)
+        # Dictionary access
+        self.assertEqual(result_short['score'], 1.0)
+        self.assertTrue(result_short['metrics']["length"]['success'])
 
         # Test with response exceeding maximum length
         messages_long = [
@@ -151,9 +179,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_long, max_length=max_length
         )
 
+        self.assertIsInstance(result_long, EvaluateResult)
         # Should be lower score for exceeding maximum length
-        self.assertLess(result_long["score"], 1.0)
-        self.assertFalse(result_long["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertLess(result_long.score, 1.0)
+        self.assertFalse(result_long.metrics["length"].success)
+        # Dictionary access
+        self.assertLess(result_long['score'], 1.0)
+        self.assertFalse(result_long['metrics']["length"]['success'])
 
     def test_min_max_range(self):
         """Test reward calculation with both min and max length."""
@@ -176,9 +209,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_good, min_length=min_length, max_length=max_length
         )
 
+        self.assertIsInstance(result_good, EvaluateResult)
         # Should be high score for staying within range
-        self.assertEqual(result_good["score"], 1.0)
-        self.assertTrue(result_good["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertEqual(result_good.score, 1.0)
+        self.assertTrue(result_good.metrics["length"].success)
+        # Dictionary access
+        self.assertEqual(result_good['score'], 1.0)
+        self.assertTrue(result_good['metrics']["length"]['success'])
 
         # Test with response too short
         messages_short = [
@@ -192,9 +230,14 @@ class TestLengthReward(unittest.TestCase):
             max_length=max_length,
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
         # Should be lower score for being too short
-        self.assertLess(result_short["score"], 1.0)
-        self.assertFalse(result_short["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertLess(result_short.score, 1.0)
+        self.assertFalse(result_short.metrics["length"].success)
+        # Dictionary access
+        self.assertLess(result_short['score'], 1.0)
+        self.assertFalse(result_short['metrics']["length"]['success'])
 
         # Test with response too long
         messages_long = [
@@ -206,9 +249,14 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_long, min_length=min_length, max_length=max_length
         )
 
+        self.assertIsInstance(result_long, EvaluateResult)
         # Should be lower score for being too long
-        self.assertLess(result_long["score"], 1.0)
-        self.assertFalse(result_long["metrics"]["length"]["success"])
+        # Attribute access
+        self.assertLess(result_long.score, 1.0)
+        self.assertFalse(result_long.metrics["length"].success)
+        # Dictionary access
+        self.assertLess(result_long['score'], 1.0)
+        self.assertFalse(result_long['metrics']["length"]['success'])
 
     def test_cosine_scaling(self):
         """Test cosine scaling for reward calculation."""
@@ -238,8 +286,13 @@ class TestLengthReward(unittest.TestCase):
             scaling="cosine",
         )
 
+        self.assertIsInstance(result_linear, EvaluateResult)
+        self.assertIsInstance(result_cosine, EvaluateResult)
         # Cosine scaling should result in different scores than linear
-        self.assertNotEqual(result_linear["score"], result_cosine["score"])
+        # Attribute access
+        self.assertNotEqual(result_linear.score, result_cosine.score)
+        # Dictionary access
+        self.assertNotEqual(result_linear['score'], result_cosine['score'])
 
     def test_cosine_length_reward(self):
         """Test the cosine length reward function."""
@@ -268,9 +321,16 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_long, is_correct=True, max_length=50
         )
 
+        self.assertIsInstance(result_short_correct, EvaluateResult)
+        self.assertIsInstance(result_long_correct, EvaluateResult)
         # Shorter correct answer should score higher than longer correct answer
+        # Attribute access
         self.assertGreater(
-            result_short_correct["score"], result_long_correct["score"]
+            result_short_correct.score, result_long_correct.score
+        )
+        # Dictionary access
+        self.assertGreater(
+            result_short_correct['score'], result_long_correct['score']
         )
 
         # Test with incorrect answers
@@ -282,17 +342,32 @@ class TestLengthReward(unittest.TestCase):
             messages=messages_long, is_correct=False, max_length=50
         )
 
+        self.assertIsInstance(result_short_incorrect, EvaluateResult)
+        self.assertIsInstance(result_long_incorrect, EvaluateResult)
         # Longer incorrect answer should be penalized less than shorter incorrect
+        # Attribute access
         self.assertGreater(
-            result_long_incorrect["score"], result_short_incorrect["score"]
+            result_long_incorrect.score, result_short_incorrect.score
+        )
+        # Dictionary access
+        self.assertGreater(
+            result_long_incorrect['score'], result_short_incorrect['score']
         )
 
         # Correct answers should score higher than incorrect answers
+        # Attribute access
         self.assertGreater(
-            result_short_correct["score"], result_short_incorrect["score"]
+            result_short_correct.score, result_short_incorrect.score
         )
         self.assertGreater(
-            result_long_correct["score"], result_long_incorrect["score"]
+            result_long_correct.score, result_long_incorrect.score
+        )
+        # Dictionary access
+        self.assertGreater(
+            result_short_correct['score'], result_short_incorrect['score']
+        )
+        self.assertGreater(
+            result_long_correct['score'], result_long_incorrect['score']
         )
 
     def test_correctness_parameter(self):
@@ -315,8 +390,13 @@ class TestLengthReward(unittest.TestCase):
             messages=messages, correctness=0.5, max_length=50  # Low correctness
         )
 
+        self.assertIsInstance(result_high, EvaluateResult)
+        self.assertIsInstance(result_low, EvaluateResult)
         # Higher correctness should result in higher score
-        self.assertGreater(result_high["score"], result_low["score"])
+        # Attribute access
+        self.assertGreater(result_high.score, result_low.score)
+        # Dictionary access
+        self.assertGreater(result_high['score'], result_low['score'])
 
 
 if __name__ == "__main__":

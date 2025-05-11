@@ -587,9 +587,15 @@ This program reads two integers and outputs their sum.
 
         # Check result - execution should have succeeded with perfect match
         assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score == 1.0
         assert (
             "executed successfully" in result.metrics["execution_result"].reason
+        )
+        # Dictionary access
+        assert result['score'] == 1.0
+        assert (
+            "executed successfully" in result['metrics']["execution_result"]['reason']
         )
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
@@ -631,8 +637,12 @@ This program reads two integers and outputs their sum.
 
         # Check result - should have partial match
         assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score < 1.0
         assert "Output similarity:" in result.metrics["output_match"].reason
+        # Dictionary access
+        assert result['score'] < 1.0
+        assert "Output similarity:" in result['metrics']["output_match"]['reason']
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
     @patch("reward_kit.rewards.cpp_code.execute_cpp_code")
@@ -678,8 +688,12 @@ int main() {
 
         # Check result - execution should have failed
         assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score == 0.0
         assert "failed with error" in result.metrics["execution_result"].reason
+        # Dictionary access
+        assert result['score'] == 0.0
+        assert "failed with error" in result['metrics']["execution_result"]['reason']
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
     @patch("reward_kit.rewards.cpp_code.run_cpp_test_cases")
@@ -744,12 +758,16 @@ This program reads two integers and outputs their sum.
         # With a default pass_threshold of 0.99, only the first two tests would pass,
         # resulting in 2/3 = 0.6666...
         expected_score = 2.0 / 3.0  # 2 out of 3 tests pass the threshold
+        # Attribute access
         assert (
             abs(result.score - expected_score) < 0.001
         )  # Use approximate comparison
-
-        # Check that the passing rate is correctly reported
         assert "2/3 tests passed" in result.metrics["pass_rate"].reason
+        # Dictionary access
+        assert (
+            abs(result['score'] - expected_score) < 0.001
+        )
+        assert "2/3 tests passed" in result['metrics']["pass_rate"]['reason']
 
 
 class TestBinaryCppCodeReward:
@@ -790,7 +808,11 @@ class TestBinaryCppCodeReward:
         )
 
         # Check result
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 1.0
+        assert "Passed" in result.metrics['binary_result'].reason
+        # Dictionary access
         assert result['score'] == 1.0
         assert "Passed" in result['metrics']['binary_result']['reason']
 
@@ -832,6 +854,10 @@ class TestBinaryCppCodeReward:
         )
 
         # Check result
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 0.0
+        assert "Failed" in result.metrics['binary_result'].reason
+        # Dictionary access
         assert result['score'] == 0.0
         assert "Failed" in result['metrics']['binary_result']['reason']

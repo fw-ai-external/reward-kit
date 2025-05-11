@@ -14,7 +14,7 @@ sys.path.insert(
 from reward_kit.rewards.accuracy_length import (
     cosine_scaled_accuracy_length_reward,
 )
-from reward_kit.models import Message
+from reward_kit.models import Message, EvaluateResult
 
 
 class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
@@ -33,10 +33,16 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should get a high score for short correct answer
-        self.assertGreaterEqual(result["score"], 0.7)
-        self.assertTrue(result["metrics"]["combined_reward"]["success"])
-        self.assertTrue(result["metrics"]["accuracy"]["success"])
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.7)
+        self.assertTrue(result.metrics["combined_reward"].success)
+        self.assertTrue(result.metrics["accuracy"].success)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.7)
+        self.assertTrue(result['metrics']["combined_reward"]['success'])
+        self.assertTrue(result['metrics']["accuracy"]['success'])
 
     def test_correct_long_answer(self):
         """Test with a correct but verbose answer."""
@@ -60,10 +66,16 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should get a medium score for correct but verbose answer
-        self.assertGreaterEqual(result["score"], 0.5)
-        self.assertTrue(result["metrics"]["combined_reward"]["success"])
-        self.assertTrue(result["metrics"]["accuracy"]["success"])
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.5)
+        self.assertTrue(result.metrics["combined_reward"].success)
+        self.assertTrue(result.metrics["accuracy"].success)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.5)
+        self.assertTrue(result['metrics']["combined_reward"]['success'])
+        self.assertTrue(result['metrics']["accuracy"]['success'])
 
     def test_incorrect_short_answer(self):
         """Test with an incorrect short answer."""
@@ -78,10 +90,16 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should get a low score for incorrect answer
-        self.assertLess(result["score"], 0.5)
-        self.assertFalse(result["metrics"]["combined_reward"]["success"])
-        self.assertFalse(result["metrics"]["accuracy"]["success"])
+        # Attribute access
+        self.assertLess(result.score, 0.5)
+        self.assertFalse(result.metrics["combined_reward"].success)
+        self.assertFalse(result.metrics["accuracy"].success)
+        # Dictionary access
+        self.assertLess(result['score'], 0.5)
+        self.assertFalse(result['metrics']["combined_reward"]['success'])
+        self.assertFalse(result['metrics']["accuracy"]['success'])
 
     def test_incorrect_long_answer(self):
         """Test with an incorrect verbose answer."""
@@ -106,11 +124,17 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should get a low score for incorrect verbose answer
         # But slightly higher than incorrect short answer
-        self.assertLess(result["score"], 0.5)
-        self.assertFalse(result["metrics"]["combined_reward"]["success"])
-        self.assertFalse(result["metrics"]["accuracy"]["success"])
+        # Attribute access
+        self.assertLess(result.score, 0.5)
+        self.assertFalse(result.metrics["combined_reward"].success)
+        self.assertFalse(result.metrics["accuracy"].success)
+        # Dictionary access
+        self.assertLess(result['score'], 0.5)
+        self.assertFalse(result['metrics']["combined_reward"]['success'])
+        self.assertFalse(result['metrics']["accuracy"]['success'])
 
     def test_correct_short_vs_correct_long(self):
         """Test that correct short answers score higher than correct long answers."""
@@ -144,8 +168,13 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages_long, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
+        self.assertIsInstance(result_long, EvaluateResult)
         # Short correct should score higher than long correct
-        self.assertGreater(result_short["score"], result_long["score"])
+        # Attribute access
+        self.assertGreater(result_short.score, result_long.score)
+        # Dictionary access
+        self.assertGreater(result_short['score'], result_long['score'])
 
     def test_incorrect_short_vs_incorrect_long(self):
         """Test that incorrect long answers score slightly higher than incorrect short."""
@@ -180,9 +209,14 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages_long, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result_short, EvaluateResult)
+        self.assertIsInstance(result_long, EvaluateResult)
         # Long incorrect should score slightly higher than short incorrect
         # This rewards showing work even if the answer is wrong
-        self.assertGreaterEqual(result_long["score"], result_short["score"])
+        # Attribute access
+        self.assertGreaterEqual(result_long.score, result_short.score)
+        # Dictionary access
+        self.assertGreaterEqual(result_long['score'], result_short['score'])
 
     def test_custom_weights(self):
         """Test with custom accuracy and length weights."""
@@ -207,8 +241,13 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             length_weight=0.1,
         )
 
+        self.assertIsInstance(result_default, EvaluateResult)
+        self.assertIsInstance(result_custom, EvaluateResult)
         # Scores should be different with different weights
-        self.assertNotEqual(result_default["score"], result_custom["score"])
+        # Attribute access
+        self.assertNotEqual(result_default.score, result_custom.score)
+        # Dictionary access
+        self.assertNotEqual(result_default['score'], result_custom['score'])
 
     def test_correct_beats_incorrect(self):
         """Test that even long correct answers beat short incorrect answers."""
@@ -244,9 +283,16 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             messages=messages_short_incorrect, ground_truth="4", max_length=50
         )
 
+        self.assertIsInstance(result_long_correct, EvaluateResult)
+        self.assertIsInstance(result_short_incorrect, EvaluateResult)
         # Long correct should always beat short incorrect
+        # Attribute access
         self.assertGreater(
-            result_long_correct["score"], result_short_incorrect["score"]
+            result_long_correct.score, result_short_incorrect.score
+        )
+        # Dictionary access
+        self.assertGreater(
+            result_long_correct['score'], result_short_incorrect['score']
         )
 
 

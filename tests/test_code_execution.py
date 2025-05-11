@@ -16,10 +16,7 @@ from reward_kit.rewards.code_execution import (
     _HAS_E2B,
     fractional_code_reward, # Added for new tests
 )
-from reward_kit.models import Message # Added for new tests
-
-
-# from reward_kit.models import EvaluateResult # EvaluateResult is no longer directly asserted for reward function outputs
+from reward_kit.models import Message, EvaluateResult # Added for new tests
 
 
 @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
@@ -50,7 +47,11 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 0.0
+        assert "E2B package not installed" in result.metrics['error'].reason
+        # Dictionary access
         assert result['score'] == 0.0
         assert "E2B package not installed" in result['metrics']['error']['reason']
 
@@ -97,7 +98,11 @@ print(add(2, 3))
             api_key=None,
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 0.0
+        assert "API key is required" in result.metrics['error'].reason
+        # Dictionary access
         assert result['score'] == 0.0
         assert "API key is required" in result['metrics']['error']['reason']
 
@@ -341,7 +346,10 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 1.0
+        # Dictionary access
         assert result['score'] == 1.0
 
 
@@ -397,17 +405,19 @@ class TestFractionalCodeRewardArgParsing:
             # For this test, the DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD provides the code.
         )
 
-        assert isinstance(result, dict), "Result should be a dictionary"
-        assert "score" in result, "Result dictionary must contain a 'score' key"
+        assert isinstance(result, EvaluateResult), "Result should be an EvaluateResult object"
+        assert hasattr(result, "score"), "Result object must contain a 'score' attribute"
         
         # Detailed assertion for debugging if something fails
-        if result['score'] != 1.0:
+        # Attribute access for score
+        if result.score != 1.0:
             print(f"Test failed for input: {test_input_str}")
             print(f"Expected return: {repr(expected_return_val)}")
-            test_results_metric_data = result.get('metrics', {}).get('test_results')
-            if test_results_metric_data and isinstance(test_results_metric_data, dict) and 'reason' in test_results_metric_data:
+            # Attribute access for metrics
+            test_results_metric_data = result.metrics.get('test_results') if result.metrics else None
+            if test_results_metric_data: # MetricResult object
                 try:
-                    actual_test_run_details_list = json.loads(test_results_metric_data['reason'])
+                    actual_test_run_details_list = json.loads(test_results_metric_data.reason)
                     if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
                         first_test_detail = actual_test_run_details_list[0]
                         print(f"Actual output from execution: {first_test_detail.get('actual_output')}")
@@ -415,18 +425,21 @@ class TestFractionalCodeRewardArgParsing:
                     else:
                         print(f"Test results reason content not as expected: {actual_test_run_details_list}")
                 except json.JSONDecodeError:
-                    print(f"Could not parse test_results metric reason (JSONDecodeError): {test_results_metric_data['reason']}")
+                    # Accessing reason from MetricResult object
+                    print(f"Could not parse test_results metric reason (JSONDecodeError): {test_results_metric_data.reason}")
             else:
-                print(f"Full result: {result}")
+                print(f"Full result (object): {result.model_dump()}") # Dump object for full view
 
-        assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed."
+        # Attribute and dictionary access for score
+        assert result.score == 1.0, f"Test case for input '{test_input_str}' failed (attribute access)."
+        assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed (dictionary access)."
         
         # Additionally, check the actual output if available in metrics
-        test_results_metric = result.get('metrics', {}).get('test_results')
-        if test_results_metric and isinstance(test_results_metric, dict) and 'reason' in test_results_metric:
+        test_results_metric = result.metrics.get('test_results') if result.metrics else None
+        if test_results_metric: # MetricResult object
             try:
                 # The reason for test_results metric is a JSON string of the list of test results
-                actual_test_run_details_list = json.loads(test_results_metric['reason'])
+                actual_test_run_details_list = json.loads(test_results_metric.reason)
                 if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
                     actual_output_str = actual_test_run_details_list[0].get('actual_output')
                     assert actual_output_str == repr(expected_return_val), \
@@ -463,7 +476,11 @@ This will output `4`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score < 1.0
+        assert "Output similarity:" in result.metrics['output_match'].reason
+        # Dictionary access
         assert result['score'] < 1.0
         assert "Output similarity:" in result['metrics']['output_match']['reason']
 
@@ -490,7 +507,11 @@ This will output `5`.
             messages=messages, expected_output="5", language="python"
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 0.0
+        assert "failed with error" in result.metrics['execution_result'].reason
+        # Dictionary access
         assert result['score'] == 0.0
         assert "failed with error" in result['metrics']['execution_result']['reason']
 
@@ -522,5 +543,8 @@ This will output `5`.
             language="python",
         )
 
-        assert isinstance(result, dict)
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
+        assert result.score == 1.0
+        # Dictionary access
         assert result['score'] == 1.0

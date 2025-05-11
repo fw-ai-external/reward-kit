@@ -4,7 +4,7 @@ import os
 from typing import List, Dict, Any
 
 from reward_kit.rewards import deepcoder_code_reward
-from reward_kit.models import Message
+from reward_kit.models import Message, EvaluateResult
 
 # Path to the transformed sample data
 TRANSFORMED_SAMPLE_DATA_PATH = "examples/trl_integration/data/deepcoder_mvp_transformed_sample.jsonl"
@@ -46,9 +46,17 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=sample["test_cases"],
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 1.0)
+        self.assertIn("test_results", result.metrics)
+        if "test_results" in result.metrics and result.metrics["test_results"].reason:
+            details = json.loads(result.metrics["test_results"].reason)
+            self.assertTrue(all(tc.get("passed") for tc in details))
+        # Dictionary access
         self.assertEqual(result['score'], 1.0)
         self.assertIn("test_results", result['metrics'])
-        if "test_results" in result['metrics'] and result['metrics']["test_results"].get('reason'): # Access dict
+        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
             details = json.loads(result['metrics']["test_results"]['reason'])
             self.assertTrue(all(tc.get("passed") for tc in details))
 
@@ -68,10 +76,17 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=sample["test_cases"],
             environment="local"
         )
-        self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"].get('reason'):
-            details = json.loads(result['metrics']["test_results"]['reason'])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        if "test_results" in result.metrics and result.metrics["test_results"].reason:
+            details = json.loads(result.metrics["test_results"].reason)
             self.assertFalse(details[0].get("passed")) # First test case (5 -> expected 6, actual 7) should fail
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+            details = json.loads(result['metrics']["test_results"]['reason'])
+            self.assertFalse(details[0].get("passed"))
 
     def test_python_syntax_error_local(self):
         """Test Python code with a syntax error locally."""
@@ -88,8 +103,15 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=sample["test_cases"],
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        if "test_results" in result.metrics and result.metrics["test_results"].reason:
+            details = json.loads(result.metrics["test_results"].reason)
+            self.assertTrue(any("error" in tc for tc in details))
+        # Dictionary access
         self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"].get('reason'):
+        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
             details = json.loads(result['metrics']["test_results"]['reason'])
             self.assertTrue(any("error" in tc for tc in details))
 
@@ -110,10 +132,16 @@ class TestDeepCoderReward(unittest.TestCase):
             timeout=2, # Short timeout
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        if "test_results" in result.metrics and result.metrics["test_results"].reason:
+            details = json.loads(result.metrics["test_results"].reason)
+            self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
+        # Dictionary access
         self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"].get('reason'):
+        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
             details = json.loads(result['metrics']["test_results"]['reason'])
-            # Check for "timed out" case-insensitively, as the exact error message might vary slightly
             self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
 
     def test_no_code_block(self):
@@ -131,6 +159,13 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=sample["test_cases"],
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertIn("error", result.metrics)
+        if "error" in result.metrics:
+             self.assertIn("No python code block found", result.metrics["error"].reason)
+        # Dictionary access
         self.assertEqual(result['score'], 0.0)
         self.assertIn("error", result['metrics'])
         if "error" in result['metrics']:
@@ -150,6 +185,8 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=js_test_cases,
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 1.0)
         self.assertEqual(result['score'], 1.0)
 
     def test_javascript_one_test_fails_local(self):
@@ -165,6 +202,8 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=js_test_cases,
             environment="local"
         )
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 0.0)
         self.assertEqual(result['score'], 0.0)
 
     @unittest.skip("Skipping E2B tests due to intermittent service issues")
@@ -186,9 +225,17 @@ class TestDeepCoderReward(unittest.TestCase):
             environment="e2b",
             api_key=E2B_API_KEY 
         )
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 1.0)
+        self.assertIn("test_results", result.metrics)
+        if "test_results" in result.metrics and result.metrics["test_results"].reason:
+            details = json.loads(result.metrics["test_results"].reason)
+            self.assertTrue(all(tc.get("passed") for tc in details))
+        # Dictionary access
         self.assertEqual(result['score'], 1.0)
         self.assertIn("test_results", result['metrics'])
-        if "test_results" in result['metrics'] and result['metrics']["test_results"].get('reason'):
+        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
             details = json.loads(result['metrics']["test_results"]['reason'])
             self.assertTrue(all(tc.get("passed") for tc in details))
 
@@ -211,6 +258,8 @@ class TestDeepCoderReward(unittest.TestCase):
             environment="e2b",
             api_key=E2B_API_KEY
         )
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 0.0)
         self.assertEqual(result['score'], 0.0)
 
     def test_empty_test_cases(self):
@@ -225,7 +274,14 @@ class TestDeepCoderReward(unittest.TestCase):
             test_cases=[], # Empty test cases
             environment="local"
         )
-        self.assertEqual(result['score'], 0.0) # Should be 0 as per implementation
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0) # Should be 0 as per implementation
+        self.assertIn("error", result.metrics)
+        if "error" in result.metrics:
+            self.assertEqual(result.metrics["error"].reason, "No test cases provided.")
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
         self.assertIn("error", result['metrics'])
         if "error" in result['metrics']:
             self.assertEqual(result['metrics']["error"]['reason'], "No test cases provided.")

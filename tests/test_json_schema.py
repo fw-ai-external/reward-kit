@@ -51,9 +51,15 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score > 0.9  # Should be very high
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score > 0.9
+        # Dictionary access
+        assert result['score'] > 0.9
+        assert "schema_similarity" in result['metrics']
+        assert result['metrics']["schema_similarity"]['score'] > 0.9
 
     def test_json_schema_reward_partial_match(self):
         """Test JSON schema reward with partial match."""
@@ -96,13 +102,23 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert 0.3 < result.score < 0.8  # Should be in middle range
         assert "schema_similarity" in result.metrics
         assert 0.3 < result.metrics["schema_similarity"].score < 0.8
-        assert (
+        assert result.metrics["schema_similarity"].reason is not None and \
             "Missing properties" in result.metrics["schema_similarity"].reason
-        )
-        assert "Extra properties" in result.metrics["schema_similarity"].reason
+        assert result.metrics["schema_similarity"].reason is not None and \
+            "Extra properties" in result.metrics["schema_similarity"].reason
+        # Dictionary access
+        assert 0.3 < result['score'] < 0.8
+        assert "schema_similarity" in result['metrics']
+        assert 0.3 < result['metrics']["schema_similarity"]['score'] < 0.8
+        assert result['metrics']["schema_similarity"]['reason'] is not None and \
+            "Missing properties" in result['metrics']["schema_similarity"]['reason']
+        assert result['metrics']["schema_similarity"]['reason'] is not None and \
+            "Extra properties" in result['metrics']["schema_similarity"]['reason']
 
     def test_json_schema_reward_extract_from_message(self):
         """Test JSON schema reward with JSON extracted from message content."""
@@ -127,9 +143,15 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score > 0.9  # Should be very high
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score > 0.9
+        # Dictionary access
+        assert result['score'] > 0.9
+        assert "schema_similarity" in result['metrics']
+        assert result['metrics']["schema_similarity"]['score'] > 0.9
 
     def test_json_schema_reward_mismatched_types(self):
         """Test JSON schema reward with mismatched property types."""
@@ -157,12 +179,19 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score < 0.7  # Should be lower due to type mismatches
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score < 0.7
-        assert (
+        assert result.metrics["schema_similarity"].reason is not None and \
             "Matching properties" in result.metrics["schema_similarity"].reason
-        )
+        # Dictionary access
+        assert result['score'] < 0.7
+        assert "schema_similarity" in result['metrics']
+        assert result['metrics']["schema_similarity"]['score'] < 0.7
+        assert result['metrics']["schema_similarity"]['reason'] is not None and \
+            "Matching properties" in result['metrics']["schema_similarity"]['reason']
 
     def test_json_schema_reward_with_json_string(self):
         """Test JSON schema reward with JSON string instead of object."""
@@ -185,9 +214,15 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score > 0.9  # Should be very high
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score > 0.9
+        # Dictionary access
+        assert result['score'] > 0.9
+        assert "schema_similarity" in result['metrics']
+        assert result['metrics']["schema_similarity"]['score'] > 0.9
 
     def test_json_schema_reward_empty_properties(self):
         """Test JSON schema reward with empty properties."""
@@ -204,9 +239,15 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score == 1.0  # Should be perfect match
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score == 1.0
+        # Dictionary access
+        assert result['score'] == 1.0
+        assert "schema_similarity" in result['metrics']
+        assert result['metrics']["schema_similarity"]['score'] == 1.0
 
     def test_json_schema_reward_invalid_json(self):
         """Test JSON schema reward with invalid JSON."""
@@ -229,9 +270,17 @@ class TestJsonSchemaReward:
             expected_schema=expected_schema,
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert result.score == 0.0
         assert "error" in result.metrics
-        assert "Invalid JSON content" in result.metrics["error"].reason
+        assert result.metrics["error"].reason is not None and \
+            "Invalid JSON content" in result.metrics["error"].reason
+        # Dictionary access
+        assert result['score'] == 0.0
+        assert "error" in result['metrics']
+        assert result['metrics']["error"]['reason'] is not None and \
+            "Invalid JSON content" in result['metrics']["error"]['reason']
 
     @patch("openai.OpenAI")
     def test_json_schema_reward_with_llm_judge(self, mock_openai_class):
@@ -269,14 +318,17 @@ class TestJsonSchemaReward:
             openai_api_key="fake_key_for_testing",
         )
 
+        assert isinstance(result, EvaluateResult)
+        # Attribute access
         assert "schema_score" in result.metrics
         assert "llm_score" in result.metrics
         assert "weights" in result.metrics
-
-        # Default weights: schema=0.7, llm=0.3
-        # Schema score should be ~1.0, LLM score is mocked at 0.85
-        # Expected final score ≈ 0.7*1.0 + 0.3*0.85 ≈ 0.955
         assert 0.9 < result.score < 1.0
+        # Dictionary access
+        assert "schema_score" in result['metrics']
+        assert "llm_score" in result['metrics']
+        assert "weights" in result['metrics']
+        assert 0.9 < result['score'] < 1.0
 
         # Check that the LLM was called with the expected schema and content
         mock_client.chat.completions.create.assert_called_once()
@@ -328,8 +380,18 @@ class TestJsonSchemaReward:
                 weights={"schema": 0.3, "llm": 0.7},
             )
 
+            assert isinstance(result, EvaluateResult)
+            # Attribute access
             # Schema score should be ~1.0, LLM score is mocked at 0.60
             # Expected final score ≈ 0.3*1.0 + 0.7*0.60 ≈ 0.72
             assert 0.7 < result.score < 0.75
-            assert "0.30" in result.metrics["weights"].reason  # Schema weight
-            assert "0.70" in result.metrics["weights"].reason  # LLM weight
+            assert result.metrics["weights"].reason is not None and \
+                "0.30" in result.metrics["weights"].reason  # Schema weight
+            assert result.metrics["weights"].reason is not None and \
+                "0.70" in result.metrics["weights"].reason  # LLM weight
+            # Dictionary access
+            assert 0.7 < result['score'] < 0.75
+            assert result['metrics']["weights"]['reason'] is not None and \
+                "0.30" in result['metrics']["weights"]['reason']
+            assert result['metrics']["weights"]['reason'] is not None and \
+                "0.70" in result['metrics']["weights"]['reason']

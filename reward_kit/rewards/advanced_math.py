@@ -179,24 +179,22 @@ def advanced_math_reward(
     orig_answers = extract_numbers(orig_content)
 
     metrics: Dict[str, MetricResult] = {}
+    num_orig_answers_extracted = len(orig_answers)
+    orig_answer_texts = ', '.join([a[0] for a in orig_answers]) if orig_answers else 'None'
+    reason_for_orig_extraction = f"Extracted {num_orig_answers_extracted} answers from original message: {orig_answer_texts}"
     metrics["extracted_original_answers"] = MetricResult(
-        score=0.0,
+        score=0.0, # Score for extraction itself is not the focus, success flag is.
         success=True if orig_answers else False,
-        reason=f"Extracted {
-            len(orig_answers)} answers from original message: {
-            ', '.join(
-                [
-                    a[0] for a in orig_answers]) if orig_answers else 'None'}",
+        reason=reason_for_orig_extraction,
     )
 
+    num_gen_answers_extracted = len(gen_answers)
+    gen_answer_texts = ', '.join([a[0] for a in gen_answers]) if gen_answers else 'None'
+    reason_for_gen_extraction = f"Extracted {num_gen_answers_extracted} answers from generated message: {gen_answer_texts}"
     metrics["extracted_generated_answers"] = MetricResult(
-        score=0.0,
+        score=0.0, # Score for extraction itself is not the focus, success flag is.
         success=True if gen_answers else False,
-        reason=f"Extracted {
-            len(gen_answers)} answers from generated message: {
-            ', '.join(
-                [
-                    a[0] for a in gen_answers]) if gen_answers else 'None'}",
+        reason=reason_for_gen_extraction,
     )
 
     if not gen_answers or not orig_answers:

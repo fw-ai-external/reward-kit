@@ -2,10 +2,6 @@
 
 # High pri issues
 
-## Decorator API update: easier to compose different reward functions
-
-Currently if a reward function has been decorated with reward_function, it is inconvenient to compose it with other functions because the types have been converted to dictionary. Please review the current code, and present me with some options on how we can redesign the API and put it under development/API_DESIGN.md
-
 ## Data filtering script still not filtering things properly
 
 ```
@@ -41,17 +37,6 @@ for example this row passed
 you can see the ground truth answer is not even a numerical number, but it is getting filtered
 
 # Mid pri issues
-
-## Integration with TRL is not clean
-
-Check the examples under examples/trl_integration/, for example minimal_deepcoder_grpo_example.py. The TRL examples need to be much simpler and our library need to handle more of the work
-
-## Clean up to level dir
-
-Top level needs to be cleaned up before we can open source this.
-
-## Replicate the result for coding 
-Check references/DeepCoder_ A Fully Open-Source 14B Coder at O3-mini Level.pdf , we want to reproduce the deep coder example minimally with TRL and with Qwen3 in our example. Check REPRO_CODING.md.
 
 ## Move deepseek deps into coding
 Should be part of main package

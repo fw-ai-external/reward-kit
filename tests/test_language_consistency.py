@@ -16,7 +16,7 @@ from reward_kit.rewards.language_consistency import (
     detect_dominant_language,
     count_words_by_language,
 )
-from reward_kit.models import Message
+from reward_kit.models import Message, EvaluateResult
 
 
 class TestLanguageConsistencyReward(unittest.TestCase):
@@ -39,9 +39,14 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="en"
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent English
-        self.assertGreaterEqual(result["score"], 0.9)
-        self.assertTrue(result["metrics"]["language_consistency"]["success"])
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.9)
+        self.assertTrue(result.metrics["language_consistency"].success)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.9)
+        self.assertTrue(result['metrics']["language_consistency"]['success'])
 
     def test_spanish_consistency(self):
         """Test with fully Spanish content."""
@@ -60,9 +65,14 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="es"
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent Spanish
-        self.assertGreaterEqual(result["score"], 0.9)
-        self.assertTrue(result["metrics"]["language_consistency"]["success"])
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.9)
+        self.assertTrue(result.metrics["language_consistency"].success)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.9)
+        self.assertTrue(result['metrics']["language_consistency"]['success'])
 
     def test_mixed_language(self):
         """Test with mixed English and Spanish content."""
@@ -87,13 +97,16 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="en"
         )
 
+        self.assertIsInstance(result_en, EvaluateResult)
         # Should be medium score for inconsistent English
-        self.assertLess(result_en["score"], 1.0)
-
-        # Instead of testing for Spanish score directly (which is affected by special case handling),
-        # let's test that we can detect both languages in the text
-        self.assertIn("en_percentage", result_en["metrics"])
-        self.assertIn("es_percentage", result_en["metrics"])
+        # Attribute access
+        self.assertLess(result_en.score, 1.0)
+        self.assertIn("en_percentage", result_en.metrics)
+        self.assertIn("es_percentage", result_en.metrics)
+        # Dictionary access
+        self.assertLess(result_en['score'], 1.0)
+        self.assertIn("en_percentage", result_en['metrics'])
+        self.assertIn("es_percentage", result_en['metrics'])
 
     def test_auto_detect_language(self):
         """Test auto-detection of target language from context."""
@@ -113,12 +126,20 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, auto_detect=True  # Auto-detect from context
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Check that we identify Spanish as the target language (special case for test)
+        # Attribute access
         self.assertEqual(
-            result["metrics"]["target_language"]["reason"],
+            result.metrics["target_language"].reason,
             "Target language identified as 'es'",
         )
-        self.assertGreaterEqual(result["score"], 0.8)
+        self.assertGreaterEqual(result.score, 0.8)
+        # Dictionary access
+        self.assertEqual(
+            result['metrics']["target_language"]['reason'],
+            "Target language identified as 'es'",
+        )
+        self.assertGreaterEqual(result['score'], 0.8)
 
     def test_non_latin_script(self):
         """Test with non-Latin script languages."""
@@ -138,9 +159,14 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="zh"
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent Chinese
-        self.assertGreaterEqual(result["score"], 0.9)
-        self.assertTrue(result["metrics"]["language_consistency"]["success"])
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.9)
+        self.assertTrue(result.metrics["language_consistency"].success)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.9)
+        self.assertTrue(result['metrics']["language_consistency"]['success'])
 
     def test_no_content(self):
         """Test behavior with empty content."""
@@ -153,9 +179,14 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="en"
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should give zero score for no content
-        self.assertEqual(result["score"], 0.0)
-        self.assertFalse(result["metrics"]["language_consistency"]["success"])
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertFalse(result.metrics["language_consistency"].success)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertFalse(result['metrics']["language_consistency"]['success'])
 
     def test_technical_code_content(self):
         """Test with technical content containing code."""
@@ -182,8 +213,12 @@ class TestLanguageConsistencyReward(unittest.TestCase):
             messages=messages, target_language="en"
         )
 
+        self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent English, even with code
-        self.assertGreaterEqual(result["score"], 0.8)
+        # Attribute access
+        self.assertGreaterEqual(result.score, 0.8)
+        # Dictionary access
+        self.assertGreaterEqual(result['score'], 0.8)
 
     def test_detect_dominant_language(self):
         """Test the dominant language detection function."""

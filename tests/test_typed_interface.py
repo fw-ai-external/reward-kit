@@ -33,13 +33,28 @@ def test_typed_interface_basic():
 
     result = sample_evaluator(messages=valid_messages)
 
-    # Check the output
-    assert isinstance(result, dict)
-    assert "metrics" in result
-    assert "test" in result["metrics"]
-    assert result["metrics"]["test"]["success"] is True
-    assert result["metrics"]["test"]["score"] == 0.8
-    assert result["metrics"]["test"]["reason"] == "Test reason"
+    # Check the output - Pydantic object access
+    assert isinstance(result, EvaluateResult)
+    assert result.score == 0.8
+    assert result.reason == "Overall test reason"
+    assert result.metrics is not None
+    assert "test" in result.metrics
+    metric_test = result.metrics["test"]
+    assert isinstance(metric_test, MetricResult)
+    assert metric_test.success is True
+    assert metric_test.score == 0.8
+    assert metric_test.reason == "Test reason"
+
+    # Check dictionary-style access
+    assert result['score'] == 0.8
+    assert result['reason'] == "Overall test reason"
+    assert result['metrics'] is not None # Accesses the dict of MetricResult objects
+    assert "test" in result['metrics']
+    metric_test_dict_access = result['metrics']["test"] # This is a MetricResult object
+    assert isinstance(metric_test_dict_access, MetricResult)
+    assert metric_test_dict_access['success'] is True # MetricResult also has __getitem__
+    assert metric_test_dict_access['score'] == 0.8
+    assert metric_test_dict_access['reason'] == "Test reason"
 
 
 def test_typed_interface_input_validation():
@@ -70,7 +85,13 @@ def test_typed_interface_input_validation():
 
     # This should work without error
     result = sample_evaluator(messages=valid_messages)
-    assert result["metrics"]["test"]["score"] == 0.5
+    assert isinstance(result, EvaluateResult)
+    assert result.score == 0.5
+    assert result.metrics["test"].score == 0.5
+
+    # Check dictionary-style access
+    assert result['score'] == 0.5
+    assert result['metrics']["test"]['score'] == 0.5
 
     # Test with invalid messages should raise an error
     invalid_messages = [{"content": "Hello without role"}]
@@ -90,7 +111,13 @@ def test_typed_interface_input_validation():
 
     # This should also work without raising an error
     result = sample_evaluator(messages=unusual_role_messages)
-    assert result["metrics"]["test"]["score"] == 0.5
+    assert isinstance(result, EvaluateResult)
+    assert result.score == 0.5
+    assert result.metrics["test"].score == 0.5
+
+    # Check dictionary-style access
+    assert result['score'] == 0.5
+    assert result['metrics']["test"]['score'] == 0.5
 
 
 def test_typed_interface_output_validation():
@@ -142,12 +169,22 @@ def test_typed_interface_kwargs():
     ]
 
     result = kwargs_evaluator(messages=messages, param1="test", param2=123)
+    assert isinstance(result, EvaluateResult)
 
-    assert "metrics" in result
-    assert "test" in result["metrics"]
+    # Pydantic object access
+    assert result.metrics is not None
+    assert "test" in result.metrics
     assert (
         "Got kwargs: ['param1', 'param2']"
-        == result["metrics"]["test"]["reason"]
+        == result.metrics["test"].reason
+    )
+
+    # Dictionary-style access
+    assert result['metrics'] is not None
+    assert "test" in result['metrics']
+    assert (
+        "Got kwargs: ['param1', 'param2']"
+        == result['metrics']["test"]['reason']
     )
 
 
@@ -175,14 +212,27 @@ def test_typed_interface_model_dump():
 
     result = sample_evaluator(messages=valid_messages)
 
-    # Check the output format matches what's expected
-    assert isinstance(result, dict)
-    assert "metrics" in result
-    assert "test" in result["metrics"]
-    assert result["metrics"]["test"]["success"] is True
-    assert result["metrics"]["test"]["score"] == 0.8
-    assert result["metrics"]["test"]["reason"] == "Test reason"
-    assert "error" in result
-    assert result["error"] == "Sample error message"
-    assert result["score"] == 0.8
-    assert result["reason"] == "Overall test reason"
+    # Check the output format matches what's expected - Pydantic object access
+    assert isinstance(result, EvaluateResult)
+    assert result.score == 0.8
+    assert result.reason == "Overall test reason"
+    assert result.error == "Sample error message"
+    assert result.metrics is not None
+    assert "test" in result.metrics
+    metric_test = result.metrics["test"]
+    assert isinstance(metric_test, MetricResult)
+    assert metric_test.success is True
+    assert metric_test.score == 0.8
+    assert metric_test.reason == "Test reason"
+
+    # Check dictionary-style access
+    assert result['score'] == 0.8
+    assert result['reason'] == "Overall test reason"
+    assert result['error'] == "Sample error message"
+    assert result['metrics'] is not None
+    assert "test" in result['metrics']
+    metric_test_dict_access = result['metrics']["test"]
+    assert isinstance(metric_test_dict_access, MetricResult)
+    assert metric_test_dict_access['success'] is True
+    assert metric_test_dict_access['score'] == 0.8
+    assert metric_test_dict_access['reason'] == "Test reason"

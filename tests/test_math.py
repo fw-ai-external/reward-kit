@@ -283,13 +283,17 @@ class TestMathReward:
         original = [{"role": "assistant", "content": "Answer is \\boxed{4}."}]
         generated = [{"role": "assistant", "content": "It is \\boxed{4}."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_basic_match_gsm8k(self):
         original = [{"role": "assistant", "content": "Final answer: #### 4"}]
         generated = [{"role": "assistant", "content": "The result is #### 4"}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_basic_match_mcq(self):
         # math_reward no longer handles MCQs directly.
@@ -297,62 +301,84 @@ class TestMathReward:
         original = [{"role": "assistant", "content": "Choice (A)."}] # Original still has an MCQ-like string
         generated = [{"role": "assistant", "content": "My answer is (A)."}] # Generated also
         result = math_reward(messages=generated, original_messages=original)
+        assert isinstance(result, EvaluateResult)
         # Expected: No answer extracted from either if they only contain "(A)" and no other numbers.
         # If original_messages's extract_numbers also returns [], then reason is "Could not extract answers from original message"
         # If original_messages's extract_numbers returns something (e.g. if it was "\\boxed{A}"), 
         # and generated's extract_numbers returns [], then reason is "Could not extract answers from generated message"
-        assert result["score"] == 0.0 
+        assert result.score == 0.0 
+        assert result['score'] == 0.0
         # Check for a reason indicating no extractable answer, rather than a specific match/mismatch reason.
-        assert "Could not extract answers from original message" in result["reason"] or \
-               "Could not extract answers from generated message" in result["reason"]
+        assert result.reason is not None and ("Could not extract answers from original message" in result.reason or \
+               "Could not extract answers from generated message" in result.reason)
+        assert result['reason'] is not None and ("Could not extract answers from original message" in result['reason'] or \
+               "Could not extract answers from generated message" in result['reason'])
         
     def test_basic_match_general_fallback_number(self):
         original = [{"role": "assistant", "content": "The number is 4."}]
         generated = [{"role": "assistant", "content": "It is 4."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_close_match_tolerance(self):
         original = [{"role": "assistant", "content": "Pi is \\boxed{3.14159}."}]
         generated = [{"role": "assistant", "content": "Pi is \\boxed{3.14}."}]
         result = math_reward(messages=generated, original_messages=original, tolerance=0.01)
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_wrong_answer_numeric(self):
         original = [{"role": "assistant", "content": "Answer: \\boxed{4}."}]
         generated = [{"role": "assistant", "content": "Answer: \\boxed{5}."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] < 0.1 
+        assert isinstance(result, EvaluateResult)
+        assert result.score < 0.1 
+        assert result['score'] < 0.1
 
     def test_wrong_answer_mcq(self):
         # Both original and generated will have [] from extract_numbers if only MCQs are present.
         original = [{"role": "assistant", "content": "Choice (A)."}]
         generated = [{"role": "assistant", "content": "Choice (B)."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
-        assert "Could not extract answers from original message" in result["reason"]
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
+        assert result.reason is not None and "Could not extract answers from original message" in result.reason
+        assert result['reason'] is not None and "Could not extract answers from original message" in result['reason']
 
     def test_type_mismatch_mcq_vs_number(self):
         original = [{"role": "assistant", "content": "Answer is \\boxed{1}."}] 
         generated = [{"role": "assistant", "content": "Answer is (A)."}] # extract_numbers for this is []
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
         # Original extracts [("\\boxed{1}", 1.0)]. Generated extracts [].
-        assert "Could not extract answers from generated message" in result["reason"]
+        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
+        assert result['reason'] is not None and "Could not extract answers from generated message" in result['reason']
 
     def test_no_answer_in_generated(self):
         original = [{"role": "assistant", "content": "Answer is \\boxed{1}."}]
         generated = [{"role": "assistant", "content": "I don't know."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
-        assert "Could not extract answers from generated message" in result["reason"]
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
+        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
+        assert result['reason'] is not None and "Could not extract answers from generated message" in result['reason']
 
     def test_no_answer_in_original(self):
         original = [{"role": "assistant", "content": "What is it?"}]
         generated = [{"role": "assistant", "content": "Answer is \\boxed{1}."}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
-        assert "Could not extract answers from original message" in result["reason"]
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
+        assert result.reason is not None and "Could not extract answers from original message" in result.reason
+        assert result['reason'] is not None and "Could not extract answers from original message" in result['reason']
 
     # --- Strictness Penalty Tests ---
     def test_penalty_unboxed_or_issue1(self):
@@ -363,9 +389,13 @@ class TestMathReward:
         # Penalty 1 applies.
         generated = [{"role": "assistant", "content": generated_content}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
-        assert "Strictness fail (Issue #1)" in result["reason"]
-        assert result["metrics"]["strictness_penalty_unboxed_or"]["reason"] == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
+        assert result.reason is not None and "Strictness fail (Issue #1)" in result.reason
+        assert result['reason'] == result.reason # Check attribute and dict access give same reason string
+        assert result.metrics["strictness_penalty_unboxed_or"].reason == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
+        assert result['metrics']["strictness_penalty_unboxed_or"]['reason'] == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
 
     def test_no_penalty_if_gen_is_single_boxed_or_expr(self):
         original = [{"role": "assistant", "content": "The answer is $\\boxed{1/2 \\text{ or } 1}$."}]
@@ -375,8 +405,11 @@ class TestMathReward:
         # len(orig) = 1, len(gen) = 1. Penalty 2 does not apply.
         # Comparison: "1/2 or 1" vs "1/2 or 1" -> match.
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 1.0
-        assert "Strictness fail" not in result["reason"]
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
+        assert result.reason is None or "Strictness fail" not in result.reason # reason can be None if score is 1.0
+        assert result['reason'] is None or "Strictness fail" not in result['reason']
 
     def test_penalty_ambiguity_issue2(self):
         original = [{"role": "assistant", "content": "The answer is $\\boxed{1/4}$."}] 
@@ -387,9 +420,13 @@ class TestMathReward:
         # Penalty 2 applies.
         generated = [{"role": "assistant", "content": generated_content}]
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0
-        assert "Strictness fail (Issue #2)" in result["reason"]
-        assert result["metrics"]["strictness_penalty_ambiguity"]["reason"] == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
+        assert result.reason is not None and "Strictness fail (Issue #2)" in result.reason
+        assert result['reason'] == result.reason
+        assert result.metrics["strictness_penalty_ambiguity"].reason == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
+        assert result['metrics']["strictness_penalty_ambiguity"]['reason'] == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
 
     def test_issue_false_mcq_match_on_v_B(self):
         """
@@ -412,9 +449,14 @@ class TestMathReward:
         ]
 
         result = math_reward(messages=generated_messages, original_messages=original_messages)
+        assert isinstance(result, EvaluateResult)
         
-        extracted_gen_reason = result["metrics"]["extracted_generated_answers"]["reason"]
-        extracted_orig_reason = result["metrics"]["extracted_original_answers"]["reason"]
+        extracted_gen_reason = result.metrics["extracted_generated_answers"].reason
+        extracted_orig_reason = result.metrics["extracted_original_answers"].reason
+        # Check dict access for metric reasons
+        assert result['metrics']["extracted_generated_answers"]['reason'] == extracted_gen_reason
+        assert result['metrics']["extracted_original_answers"]['reason'] == extracted_orig_reason
+
 
         assert "'B'" not in extracted_gen_reason, "MCQ 'B' should not be extracted from generated content after fix"
         assert "'B'" not in extracted_orig_reason, "MCQ 'B' should not be extracted from original content after fix"
@@ -422,18 +464,20 @@ class TestMathReward:
         # With the new "Conflicting Answers" penalty, even if (4,10) matches,
         # the presence of (1/6, 1/14) and other numbers in the generated text should cause a penalty.
         # The ground_truth_content is based on the ISSUES.md JSON's "ground_truth_answer_from_column" which is "v_R=4...,v_B=10...".
-        assert result["score"] == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result['score']}. Reason: {result['reason']}"
+        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result.score}. Reason: {result.reason}"
+        assert result['score'] == 0.0 # dict access
         
         # Check that the reason reflects the "Conflicting Answers" penalty.
-        assert "Strictness fail (Conflicting Answers)" in result["reason"], "Reason should indicate Conflicting Answers penalty"
-        assert "also includes other distinct numerical values" in result["reason"], "Reason detail for conflicting answers missing"
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason, "Reason should indicate Conflicting Answers penalty"
+        assert result.reason is not None and "also includes other distinct numerical values" in result.reason, "Reason detail for conflicting answers missing"
         # Verify that some of the conflicting numbers like 1/6 (approx 0.166) or 1/14 (approx 0.071) are mentioned.
         # The formatting in the reason is `sorted(list(set(conflicting_extra_numeric_values)))`.
         # 1/6 = 0.166666..., 1/14 = 0.071428...
         # Other numbers in gen: 0.5, 6, 14.
         # Conflicting set might be [0.071428..., 0.166666..., 0.5, 6.0, 14.0] (if 4,10 are GT)
         # Check for a few representative conflicting numbers in the reason string.
-        assert "0.5" in result["reason"] or "6.0" in result["reason"] or "14.0" in result["reason"] or str(1/6) in result["reason"] or str(1/14) in result["reason"]
+        assert result.reason is not None and ("0.5" in result.reason or "6.0" in result.reason or "14.0" in result.reason or str(1/6) in result.reason or str(1/14) in result.reason)
+        assert result['reason'] == result.reason # check dict access for reason
 
 
     def test_no_penalty_ambiguity_if_gt_is_also_ambiguous(self):
@@ -442,9 +486,12 @@ class TestMathReward:
         # Old Penalty 2 (ambiguity) does not apply because len(orig_answers_extracted) > 1.
         # However, the new Penalty 3 (Conflicting Answers) should apply because '3' is an extra, distinct number.
         result = math_reward(messages=generated, original_messages=original)
-        assert result["score"] == 0.0, f"Score should be 0.0 due to conflicting answer '3'. Got {result['score']}. Reason: {result['reason']}"
-        assert "Strictness fail (Conflicting Answers)" in result["reason"]
-        assert "includes other distinct numerical values: [3.0]" in result["reason"] # Check for the specific conflicting value
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answer '3'. Got {result.score}. Reason: {result.reason}"
+        assert result['score'] == 0.0 # dict access
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason is not None and "includes other distinct numerical values: [3.0]" in result.reason # Check for the specific conflicting value
+        assert result['reason'] == result.reason # check dict access
 
     def test_issue3_scenario_correct_handling(self):
         original_content = "The speed of the river is $v_R=4 \\mathrm{km/h}$, and the speed of the boat is $v_B=10 \\mathrm{km/h}$."
@@ -461,13 +508,16 @@ class TestMathReward:
         # Penalty 2 (ambiguity): len(orig)=2, len(gen)=6. Does not apply as len(orig) > 1.
         # Comparison proceeds.
         result = math_reward(messages=generated, original_messages=original)
+        assert isinstance(result, EvaluateResult)
         # With the new "Conflicting Answers" penalty, this should now fail.
         # GT is (4,10). Generated has (4,10) but also (0.5, 3, 7, etc.).
-        assert result["score"] == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result['score']}. Reason: {result['reason']}"
-        assert "Strictness fail (Conflicting Answers)" in result["reason"], "Reason should indicate Conflicting Answers penalty"
+        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result.score}. Reason: {result.reason}"
+        assert result['score'] == 0.0 # dict access
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason, "Reason should indicate Conflicting Answers penalty"
         # Conflicting numbers here would be 0.5, 3, 7 (if 6, 14 are considered intermediate for 4,10)
         # Let's check for 0.5 as a key conflicting one.
-        assert "0.5" in result["reason"] or "3.0" in result["reason"] or "7.0" in result["reason"]
+        assert result.reason is not None and ("0.5" in result.reason or "3.0" in result.reason or "7.0" in result.reason)
+        assert result['reason'] == result.reason # check dict access
 
 
     def test_require_units_basic_functionality(self):
@@ -476,12 +526,18 @@ class TestMathReward:
         generated_no_unit = [{"role": "assistant", "content": "Answer is \\boxed{10}."}]
         
         result_match = math_reward(messages=generated_match, original_messages=original, require_units=True)
-        assert result_match["score"] == 1.0
-        assert "Unit presence mismatch" not in result_match["reason"]
+        assert isinstance(result_match, EvaluateResult)
+        assert result_match.score == 1.0
+        assert result_match['score'] == 1.0
+        assert result_match.reason is None or "Unit presence mismatch" not in result_match.reason
+        assert result_match['reason'] is None or "Unit presence mismatch" not in result_match['reason']
 
         result_no_unit = math_reward(messages=generated_no_unit, original_messages=original, require_units=True)
-        assert result_no_unit["score"] == 0.0 # Score should be 0 if units mismatch and required
-        assert "Unit presence mismatch" in result_no_unit["reason"]
+        assert isinstance(result_no_unit, EvaluateResult)
+        assert result_no_unit.score == 0.0 # Score should be 0 if units mismatch and required
+        assert result_no_unit['score'] == 0.0
+        assert result_no_unit.reason is not None and "Unit presence mismatch" in result_no_unit.reason
+        assert result_no_unit['reason'] is not None and "Unit presence mismatch" in result_no_unit['reason']
 
 
 class TestAdvancedMathReward:
@@ -504,8 +560,9 @@ class TestAdvancedMathReward:
             original_messages=original_messages,
             match_all_answers=True,
         )
-        assert isinstance(result, dict)
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_multiple_answers_partial_match(self):
         original_messages = [
@@ -525,14 +582,18 @@ class TestAdvancedMathReward:
             original_messages=original_messages,
             match_all_answers=True,
         )
-        assert result["score"] == 0.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result['score'] == 0.0
 
-        result = advanced_math_reward(
+        result_partial_match = advanced_math_reward(
             messages=generated_messages,
             original_messages=original_messages,
             match_all_answers=False,
         )
-        assert result["score"] == 1.0
+        assert isinstance(result_partial_match, EvaluateResult)
+        assert result_partial_match.score == 1.0
+        assert result_partial_match['score'] == 1.0
 
     def test_answer_with_different_formats(self):
         original_messages = [
@@ -548,7 +609,9 @@ class TestAdvancedMathReward:
         result = advanced_math_reward(
             messages=generated_messages, original_messages=original_messages
         )
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0
 
     def test_scientific_notation_match(self):
         original_messages = [
@@ -570,4 +633,6 @@ class TestAdvancedMathReward:
         result = advanced_math_reward(
             messages=generated_messages, original_messages=original_messages
         )
-        assert result["score"] == 1.0
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        assert result['score'] == 1.0

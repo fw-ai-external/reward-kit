@@ -3,13 +3,10 @@ from typing import Any, Dict, List, TypeVar, cast, Protocol, Union
 
 from pydantic import TypeAdapter, ValidationError
 
-from .models import Message, EvaluateResult
+from .models import Message, EvaluateResult # EvaluateResult is now the hybrid model
 
-# Create a type adapter that can handle OpenAI message types
-_msg_adapter = TypeAdapter(List[Message])
 _res_adapter = TypeAdapter(EvaluateResult)
-
-T = TypeVar("T")
+# _msg_adapter is not used. T is not used.
 
 
 # Define protocol for more precise typing
@@ -23,34 +20,41 @@ class EvaluateFunction(Protocol):
     ) -> Union[EvaluateResult, Dict[str, Any]]: ...
 
 
-# Define return type protocol
-class DictEvaluateFunction(Protocol):
-    """Protocol for functions that take dict messages and return dict results."""
-
-    def __call__(
-        self, messages: List[Dict[str, Any]], **kwargs: Any
-    ) -> Dict[str, Any]: ...
-
-
-def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
+# Define return type protocol for the wrapped function
+class HybridEvaluateFunction(Protocol):
     """
-    Wrap an `evaluate`-style function so callers still use raw JSON-ish types.
+    Protocol for functions that take a list of dictionaries (JSON-like messages)
+    and return an EvaluateResult object (which is now a hybrid Pydantic/dict-like model).
+    """
+    def __call__(
+        self, messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
+    ) -> EvaluateResult: ...
 
-    This decorator allows you to write evaluator functions with typed Pydantic models
-    while maintaining backward compatibility with the existing API that uses lists
-    of dictionaries.
+
+def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
+    """
+    Wrap an `evaluate`-style function. It coerces raw JSON-ish input messages
+    to Pydantic `Message` objects for the wrapped function and ensures the output
+    is an `EvaluateResult` object.
+
+    The returned `EvaluateResult` object is a hybrid model that supports both
+    Pydantic attribute access (e.g., result.score) and dictionary-style
+    access (e.g., result['score']).
 
     Args:
-        func: Function that takes List[Message] and returns EvaluateResult
+        func: A function that accepts `List[Message]` (or `List[Dict]`) and
+              returns an `EvaluateResult` instance or a dictionary that can be
+              coerced into one.
 
     Returns:
-        Wrapped function that takes List[dict] and returns Dict[str, Any]
+        A wrapped function that takes `List[Dict[str, Any]]` (or `List[Message]`)
+        and returns an `EvaluateResult` object.
     """
 
     @wraps(func)
     def wrapper(
         messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> Dict[str, Any]:
+    ) -> EvaluateResult: # Changed return type
         # 1. Validate / coerce the incoming messages to list[Message]
         try:
             # Convert messages to Message objects if they're not already
@@ -113,12 +117,8 @@ def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
                 f"Return value failed validation:\n{err}"
             ) from None
 
-        # 3. Dump back to a plain dict for the outside world
-        # Handle the updated EvaluateResult model structure
-        if isinstance(result_model, EvaluateResult):
-            # Build a response including all the metrics
-            return result_model.model_dump()
-        else:
-            return _res_adapter.dump_python(result_model, mode="json")
+        # 3. Return the EvaluateResult object directly
+        # The result_model is an instance of our hybrid EvaluateResult
+        return result_model
 
-    return cast(DictEvaluateFunction, wrapper)
+    return cast(HybridEvaluateFunction, wrapper)

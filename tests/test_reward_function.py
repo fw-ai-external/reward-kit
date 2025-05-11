@@ -159,10 +159,31 @@ class TestRewardFunctionDecorator:
         result = decorated_reward_func(
             messages=test_msgs, original_messages=orig_msgs
         )
-        assert isinstance(result, dict)
+        # The legacy_reward_function (imported as reward_function here)
+        # should return an EvaluateResult object.
+        assert isinstance(result, EvaluateResult)
+
+        # Pydantic attribute access
+        assert result.score == 0.7
+        assert result.reason == "Decorated reward"
+        assert result.metrics is not None
+        assert "test" in result.metrics
+        metric_test = result.metrics["test"]
+        assert isinstance(metric_test, MetricResult)
+        assert metric_test.score == 0.7
+        assert metric_test.reason == "Test score"
+        assert metric_test.success is True
+
+        # Dictionary-style access (since EvaluateResult is now hybrid)
         assert result['score'] == 0.7
+        assert result['reason'] == "Decorated reward"
+        assert result['metrics'] is not None
         assert "test" in result['metrics']
-        assert result['metrics']['test']['score'] == 0.7
+        metric_test_dict_access = result['metrics']["test"] # This is a MetricResult object
+        assert isinstance(metric_test_dict_access, MetricResult)
+        assert metric_test_dict_access['score'] == 0.7
+        assert metric_test_dict_access['reason'] == "Test score"
+        assert metric_test_dict_access['success'] is True
 
     def test_decorator_deploy_method(self):
         """Test that the new decorator does NOT add a deploy method directly."""

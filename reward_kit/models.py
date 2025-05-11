@@ -1,6 +1,4 @@
 from typing import Dict, List, Optional, Any  # Union, Callable, Literal removed
-from dataclasses import dataclass, field
-from dataclasses_json import dataclass_json
 import json
 from pydantic import BaseModel, Field
 
@@ -40,6 +38,31 @@ class MetricResult(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0)
     reason: str
 
+    def __getitem__(self, key: str) -> Any:
+        if key in self.model_fields:
+            value = getattr(self, key)
+            return value
+        raise KeyError(f"'{key}'")
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.model_fields
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def keys(self):
+        return self.model_fields.keys()
+
+    def values(self):
+        # For consistency with __getitem__ returning raw attribute values (including nested models)
+        return [getattr(self, key) for key in self.model_fields.keys()]
+
+    def items(self):
+        return [(key, getattr(self, key)) for key in self.model_fields.keys()]
+
+    def __iter__(self):
+        return iter(self.model_fields.keys())
+
 
 class EvaluateResult(BaseModel):
     """The complete result of an evaluator with multiple metrics."""
@@ -48,6 +71,35 @@ class EvaluateResult(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0)
     reason: Optional[str] = None
     metrics: Dict[str, MetricResult]
+
+    def __getitem__(self, key: str) -> Any:
+        if key in self.model_fields:
+            value = getattr(self, key)
+            # If the value is a dict of MetricResult, and we want __getitem__ on metrics
+            # to return a dict of dicts (rather than dict of MetricResult objects),
+            # we'd need special handling here.
+            # For now, return the raw attribute value, consistent with MetricResult.__getitem__
+            return value
+        raise KeyError(f"'{key}'")
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.model_fields
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def keys(self):
+        return self.model_fields.keys()
+
+    def values(self):
+        # For consistency with __getitem__ returning raw attribute values
+        return [getattr(self, key) for key in self.model_fields.keys()]
+
+    def items(self):
+        return [(key, getattr(self, key)) for key in self.model_fields.keys()]
+
+    def __iter__(self):
+        return iter(self.model_fields.keys())
 
 
 # Original dataclass-based models for backwards compatibility

@@ -46,85 +46,144 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         gen_msgs = self._create_messages("The correct option is (B).")
         orig_msgs = self._create_messages("The answer is (B).")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["mcq_comparison"]["success"])
-        self.assertIn("Gen: '(B)' (B) vs Orig: '(B)' (B)", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 1.0)
+        self.assertTrue(result.metrics["mcq_comparison"].success)
+        self.assertTrue(result.reason is not None and "Gen: '(B)' (B) vs Orig: '(B)' (B)" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 1.0)
+        self.assertTrue(result['metrics']["mcq_comparison"]['success'])
+        self.assertTrue(result['reason'] is not None and "Gen: '(B)' (B) vs Orig: '(B)' (B)" in result['reason'])
 
     def test_perfect_match_dot(self):
         gen_msgs = self._create_messages("My choice is C.")
         orig_msgs = self._create_messages("C. is the one.")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 1.0)
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 1.0)
+        self.assertEqual(result['score'], 1.0)
 
     def test_mismatch(self):
         gen_msgs = self._create_messages("I think it's (A).")
         orig_msgs = self._create_messages("The answer is definitely (D).")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0)
-        self.assertFalse(result["metrics"]["mcq_comparison"]["success"])
-        self.assertIn("Gen: '(A)' (A) vs Orig: '(D)' (D)", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertFalse(result.metrics["mcq_comparison"].success)
+        self.assertTrue(result.reason is not None and "Gen: '(A)' (A) vs Orig: '(D)' (D)" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertFalse(result['metrics']["mcq_comparison"]['success'])
+        self.assertTrue(result['reason'] is not None and "Gen: '(A)' (A) vs Orig: '(D)' (D)" in result['reason'])
 
     def test_gen_no_mcq_orig_has_mcq(self):
         gen_msgs = self._create_messages("The answer is 42.")
         orig_msgs = self._create_messages("The answer is (A).")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0)
-        self.assertIn("Could not extract MCQ option from generated message", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Could not extract MCQ option from generated message" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Could not extract MCQ option from generated message" in result['reason'])
 
     def test_orig_no_mcq(self):
         gen_msgs = self._create_messages("The answer is (B).")
         orig_msgs = self._create_messages("The answer is two.")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0)
-        self.assertIn("Could not extract MCQ option from original message", result["reason"])
-        self.assertTrue(result["metrics"]["extracted_generated_mcq"]["success"])
-        self.assertFalse(result["metrics"]["extracted_original_mcq"]["success"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Could not extract MCQ option from original message" in result.reason)
+        self.assertTrue(result.metrics["extracted_generated_mcq"].success)
+        self.assertFalse(result.metrics["extracted_original_mcq"].success)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Could not extract MCQ option from original message" in result['reason'])
+        self.assertTrue(result['metrics']["extracted_generated_mcq"]['success'])
+        self.assertFalse(result['metrics']["extracted_original_mcq"]['success'])
         
     def test_ambiguous_generated_answer(self):
         gen_msgs = self._create_messages("It could be (A) or maybe (B).")
         orig_msgs = self._create_messages("The answer is (A).")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0) # Penalized for ambiguity
-        self.assertIn("Generated answer is ambiguous", result["reason"])
-        self.assertTrue(result["metrics"]["ambiguous_generated_mcq"]["success"] == False) # success is False for this metric
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0) # Penalized for ambiguity
+        self.assertTrue(result.reason is not None and "Generated answer is ambiguous" in result.reason)
+        self.assertTrue(result.metrics["ambiguous_generated_mcq"].success == False) # success is False for this metric
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Generated answer is ambiguous" in result['reason'])
+        self.assertTrue(result['metrics']["ambiguous_generated_mcq"]['success'] == False)
 
     def test_ambiguous_original_answer_still_compares_first(self):
         # If original is ambiguous, current logic picks the first and compares.
         gen_msgs = self._create_messages("The answer is (A).")
         orig_msgs = self._create_messages("The options are (A) and (C).")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 1.0) # Matches first extracted from original
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["success"] == False)
-        self.assertIn("Gen: '(A)' (A) vs Orig: '(A)' (A)", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 1.0) # Matches first extracted from original
+        self.assertTrue(result.metrics["ambiguous_original_mcq"].success == False)
+        self.assertTrue(result.reason is not None and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 1.0)
+        self.assertTrue(result['metrics']["ambiguous_original_mcq"]['success'] == False)
+        self.assertTrue(result['reason'] is not None and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result['reason'])
 
     def test_both_ambiguous_compares_first(self):
         gen_msgs = self._create_messages("Let's say (D), or perhaps (E).")
         orig_msgs = self._create_messages("Is it (D) or (A)?")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 1.0) # D vs D
-        self.assertTrue(result["metrics"]["ambiguous_generated_mcq"]["success"] == False)
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["success"] == False)
-        self.assertIn("Gen: '(D)' (D) vs Orig: '(D)' (D)", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 1.0) # D vs D
+        self.assertTrue(result.metrics["ambiguous_generated_mcq"].success == False)
+        self.assertTrue(result.metrics["ambiguous_original_mcq"].success == False)
+        self.assertTrue(result.reason is not None and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 1.0)
+        self.assertTrue(result['metrics']["ambiguous_generated_mcq"]['success'] == False)
+        self.assertTrue(result['metrics']["ambiguous_original_mcq"]['success'] == False)
+        self.assertTrue(result['reason'] is not None and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result['reason'])
 
     def test_empty_messages(self):
         result = multiple_choice_math_reward(messages=[], original_messages=[])
-        self.assertEqual(result["score"], 0.0)
-        self.assertIn("Missing messages", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Missing messages" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Missing messages" in result['reason'])
 
     def test_missing_assistant_message_gen(self):
         gen_msgs = [{"role": "user", "content": "Query"}]
         orig_msgs = self._create_messages("(A)")
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0)
-        self.assertIn("Last generated message not from assistant", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Last generated message not from assistant" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Last generated message not from assistant" in result['reason'])
 
     def test_missing_assistant_message_orig(self):
         gen_msgs = self._create_messages("(A)")
         orig_msgs = [{"role": "user", "content": "Query"}]
         result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
-        self.assertEqual(result["score"], 0.0)
-        self.assertIn("Last original message not from assistant", result["reason"])
+        self.assertIsInstance(result, EvaluateResult)
+        # Attribute access
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Last original message not from assistant" in result.reason)
+        # Dictionary access
+        self.assertEqual(result['score'], 0.0)
+        self.assertTrue(result['reason'] is not None and "Last original message not from assistant" in result['reason'])
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

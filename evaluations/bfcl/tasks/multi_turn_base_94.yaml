@@ -1,0 +1,91 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 15.3
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      remainingUnlockedDoors: 0
+      slopeAngle: 10.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Hello! I''m laying out a detailed
+  plan for an extended road trip and need to verify if my car can endure a stretch
+  of over 300 miles without requiring a pit stop for gas. Check the stats for me,
+  would you? Should the range fall short, go ahead and top off the fuel tank with
+  30 gallons to ensure we''re in the clear."}], [{"role": "user", "content": "Additionally,
+  before hitting the road, do me a favor and verify the tire pressures. Should any
+  tire fall below the 40 PSI mark, kindly pinpoint the nearest tire shop for me and
+  set navigation."}], [{"role": "user", "content": "Finally, I''ve double-checked
+  that all vehicle portals are locked and secure, and the parking brake''s in place.
+  Can you proceed to ignite the engine?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 40.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - estimate_drive_feasibility_by_mileage(distance=300.0)
+    - fillFuelTank(fuelAmount=30.0)
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+messages:
+- content: '[{"role": "user", "content": "Hello! I''m laying out a detailed plan for
+    an extended road trip and need to verify if my car can endure a stretch of over
+    300 miles without requiring a pit stop for gas. Check the stats for me, would
+    you? Should the range fall short, go ahead and top off the fuel tank with 30 gallons
+    to ensure we''re in the clear."}]'
+  role: user
+- content: Additionally, before hitting the road, do me a favor and verify the tire
+    pressures. Should any tire fall below the 40 PSI mark, kindly pinpoint the nearest
+    tire shop for me and set navigation.
+  role: user
+- content: Finally, I've double-checked that all vehicle portals are locked and secure,
+    and the parking brake's in place. Can you proceed to ignite the engine?
+  role: user
+name: multi_turn_base_94
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

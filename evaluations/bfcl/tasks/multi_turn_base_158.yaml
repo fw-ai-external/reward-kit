@@ -1,0 +1,73 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        primary:
+          balance: 8080.0
+          card_number: '4111111111111111'
+          cardholder_name: Theodore Collins
+          cvv: '123'
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Theodore
+      user_last_name: Collins
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m embarking on an adventure
+  to spend some time with my family. Could you confirm my travel details for me? Just
+  a quick rundown: my name is Theodore Collins, born on September 14, 1985; I have
+  a U.S. passport starting with ''US876543''."}], [{"role": "user", "content": "Since
+  that''s all sorted, let''s move ahead and secure a seat for me! I need a first-class
+  seat from New York to Los Angeles for this upcoming Sunday October 15th 2024. Let''s
+  use my credit card with id ''primary'' and access token ''abc123xyz'' stored on
+  record for this transaction."}], [{"role": "user", "content": "Something''s come
+  up, and I won''t be able to make it on this trip as planned. Would you mind canceling
+  the flight reservation I just made?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        primary:
+          balance: 8080.0
+          card_number: '4111111111111111'
+          cardholder_name: Theodore Collins
+          cvv: '123'
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Theodore
+      user_last_name: Collins
+  ground_truth_function_calls:
+  - - verify_traveler_information(first_name='Theodore', last_name='Collins', date_of_birth='1985-09-14',
+      passport_number='US876543')
+  - - get_flight_cost(travel_from='JFK',travel_to='LAX',travel_date='2024-10-15',travel_class='first')
+    - book_flight(access_token='abc123xyz', card_id='primary', travel_date='2024-10-15',
+      travel_from='JFK',travel_to='LAX',travel_class='first',travel_cost=2850.0)
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+messages:
+- content: '[{"role": "user", "content": "I''m embarking on an adventure to spend
+    some time with my family. Could you confirm my travel details for me? Just a quick
+    rundown: my name is Theodore Collins, born on September 14, 1985; I have a U.S.
+    passport starting with ''US876543''."}]'
+  role: user
+- content: Since that's all sorted, let's move ahead and secure a seat for me! I need
+    a first-class seat from New York to Los Angeles for this upcoming Sunday October
+    15th 2024. Let's use my credit card with id 'primary' and access token 'abc123xyz'
+    stored on record for this transaction.
+  role: user
+- content: Something's come up, and I won't be able to make it on this trip as planned.
+    Would you mind canceling the flight reservation I just made?
+  role: user
+name: multi_turn_base_158
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

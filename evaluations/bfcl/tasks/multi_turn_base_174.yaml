@@ -1,0 +1,201 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        booking_001:
+          arrival: "Leonardo da Vinci\u2013Fiumicino Airport"
+          class: Business
+          cost_usd: 5200.0
+          date: '2024-10-10'
+          departure: San Francisco International
+          flight_number: RO1234
+      budget_limit: 3000.0
+      credit_card_list:
+        card_7243:
+          balance: 5000.0
+          card_number: '4751918394027243'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      authenticated: true
+      password: Tr@v3lB00ks2023
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: Excited for the weekend!
+          id: 0
+          mentions: []
+          tags:
+          - '#weekend'
+          - '#excited'
+          - '#fridayvibes'
+          username: bookworm_traveler
+        '1':
+          content: Just finished a great book.
+          id: 1
+          mentions: []
+          tags:
+          - '#reading'
+          - '#bookworm'
+          - '#booklover'
+          username: bookworm_traveler
+        '2':
+          content: Looking forward to my trip to Rome!
+          id: 2
+          mentions: []
+          tags:
+          - '#Rome'
+          - '#travel'
+          - '#wanderlust'
+          - '#Italy'
+          username: bookworm_traveler
+      username: bookworm_traveler
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m organizing a trip from
+  San Francisco to Rome on October 10th 2024 and considering to fly business class.
+  Secure a flight reservation that aligns with my financial constraints using my card
+  with id card_7243 and access token ''abc123xyz''. Be sure to convert the ticket
+  cost to EUR for an accurate currency reference."}], [{"role": "user", "content":
+  "I wish to secure travel insurance for this booking to safeguard against potential
+  unexpected situations. Ensure the insurance is approximately 150 euros and utilize
+  the same card, assuming it has adequate funds. Opt for ''travel'' type insurance."}],
+  [{"role": "user", "content": "Now, consolidate an invoice covering my flight and
+  the insurance costs. This will allow me to verify the comprehensive expense and
+  ensure each detail is accurate within a single document."}], [{"role": "user", "content":
+  "Login twitter with ''bookworm_traveler'' and password of ''Tr@v3lB00ks2023''.\u2019m
+  keen to share the thrilling announcement of my upcoming trip on Twitter, expressing
+  \"Off to Rome! Can''t wait to explore the ancient wonders and dive into Italian
+  cuisine!\"."}], [{"role": "user", "content": "Would you also kindly append a thoughtful
+  comment to the tweet: \"Safe travels and enjoy every moment!\""}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_7243
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 2800.0
+          travel_date: '2024-10-10'
+          travel_from: SFO
+          travel_to: CIA
+        booking_001:
+          arrival: "Leonardo da Vinci\u2013Fiumicino Airport"
+          class: Business
+          cost_usd: 5200.0
+          date: '2024-10-10'
+          departure: San Francisco International
+          flight_number: RO1234
+      budget_limit: 3000.0
+      credit_card_list:
+        card_7243:
+          balance: 2012.5
+          card_number: '4751918394027243'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      authenticated: true
+      comments:
+        10:
+        - content: Safe travels and enjoy every moment!
+          username: bookworm_traveler
+      following_list:
+      - alice
+      - bob
+      password: Tr@v3lB00ks2023
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: Excited for the weekend!
+          id: 0
+          mentions: []
+          tags:
+          - '#weekend'
+          - '#excited'
+          - '#fridayvibes'
+          username: bookworm_traveler
+        1:
+          content: Just finished a great book.
+          id: 1
+          mentions: []
+          tags:
+          - '#reading'
+          - '#bookworm'
+          - '#booklover'
+          username: bookworm_traveler
+        2:
+          content: Looking forward to my trip to Rome!
+          id: 2
+          mentions: []
+          tags:
+          - '#Rome'
+          - '#travel'
+          - '#wanderlust'
+          - '#Italy'
+          username: bookworm_traveler
+        10:
+          content: Off to Rome! Can't wait to explore the ancient wonders and dive
+            into Italian cuisine!
+          id: 10
+          mentions: []
+          tags: []
+          username: bookworm_traveler
+      username: bookworm_traveler
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='CIA', travel_date='2024-10-10',
+      travel_class='business')
+    - compute_exchange_rate(base_currency='USD', target_currency='EUR', value=2800.0)
+    - book_flight(access_token='abc123xyz', card_id='card_7243', travel_date='2024-10-10',
+      travel_from='SFO', travel_to='CIA', travel_class='business', travel_cost=2800.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='travel', insurance_cost=187.5,
+      card_id='card_7243', booking_id='3426812')
+  - - retrieve_invoice(access_token='abc123xyz', booking_id='3426812',insurance_id='498276044')
+  - - authenticate_twitter(username='bookworm_traveler', password='Tr@v3lB00ks2023')
+    - post_tweet(content='Off to Rome! Can\'t wait to explore the ancient wonders
+      and dive into Italian cuisine!')
+  - - comment(tweet_id=10, comment_content='Safe travels and enjoy every moment!')
+messages:
+- content: '[{"role": "user", "content": "I''m organizing a trip from San Francisco
+    to Rome on October 10th 2024 and considering to fly business class. Secure a flight
+    reservation that aligns with my financial constraints using my card with id card_7243
+    and access token ''abc123xyz''. Be sure to convert the ticket cost to EUR for
+    an accurate currency reference."}]'
+  role: user
+- content: I wish to secure travel insurance for this booking to safeguard against
+    potential unexpected situations. Ensure the insurance is approximately 150 euros
+    and utilize the same card, assuming it has adequate funds. Opt for 'travel' type
+    insurance.
+  role: user
+- content: Now, consolidate an invoice covering my flight and the insurance costs.
+    This will allow me to verify the comprehensive expense and ensure each detail
+    is accurate within a single document.
+  role: user
+- content: "Login twitter with 'bookworm_traveler' and password of 'Tr@v3lB00ks2023'.\u2019\
+    m keen to share the thrilling announcement of my upcoming trip on Twitter, expressing\
+    \ \"Off to Rome! Can't wait to explore the ancient wonders and dive into Italian\
+    \ cuisine!\"."
+  role: user
+- content: 'Would you also kindly append a thoughtful comment to the tweet: "Safe
+    travels and enjoy every moment!"'
+  role: user
+name: multi_turn_base_174
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

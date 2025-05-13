@@ -1,0 +1,90 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Using my vehicle''s system,
+  estimate the distance between Rivermist and Stonebrook."}], [{"role": "user", "content":
+  "Assess if my vehicle''s current mileage will suffice for the distance calculated.
+  You don''t need to re-fill, I just want to know."}], [{"role": "user", "content":
+  "Fill the fuel tank to completely full."}], [{"role": "user", "content": "With the
+  vehicle secured, start the engine for our prepared journey."}], [{"role": "user",
+  "content": "Set navigation directly to Crescent Hollow, Spring, TX for a smooth
+  ride without detours."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Crescent Hollow, Spring, TX
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('Rivermist')
+    - get_zipcode_based_on_city('Stonebrook')
+    - estimate_distance(cityA='83214', cityB='74532')
+  - - estimate_drive_feasibility_by_mileage(distance=750.0)
+  - - fillFuelTank(fuelAmount=45.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - set_navigation(destination='Crescent Hollow, Spring, TX')
+messages:
+- content: '[{"role": "user", "content": "Using my vehicle''s system, estimate the
+    distance between Rivermist and Stonebrook."}]'
+  role: user
+- content: Assess if my vehicle's current mileage will suffice for the distance calculated.
+    You don't need to re-fill, I just want to know.
+  role: user
+- content: Fill the fuel tank to completely full.
+  role: user
+- content: With the vehicle secured, start the engine for our prepared journey.
+  role: user
+- content: Set navigation directly to Crescent Hollow, Spring, TX for a smooth ride
+    without detours.
+  role: user
+name: multi_turn_base_71
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

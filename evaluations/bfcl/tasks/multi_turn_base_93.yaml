@@ -1,0 +1,87 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 10.5
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 32.0
+      rearRightTirePressure: 32.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I would like to increase the
+  amount of fuel in my car to completely full, but first I need to ascertain the present
+  level to determine the appropriate amount to add."}], [{"role": "user", "content":
+  "The fuel level is not satisfactory, add it to full and then proceed to activate
+  the engine using the ''START'' function and verify the tire pressure to ensure it
+  is in optimal condition."}], [{"role": "user", "content": "Should I notice that
+  my tire pressure falls below 40 psi, kindly provide me with directions to the nearest
+  tire service center for prompt resolution."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 32.0
+      rearRightTirePressure: 32.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - displayCarStatus(option='fuel')
+  - - fillFuelTank(fuelAmount=39.5)
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - check_tire_pressure()
+  - - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+messages:
+- content: '[{"role": "user", "content": "I would like to increase the amount of fuel
+    in my car to completely full, but first I need to ascertain the present level
+    to determine the appropriate amount to add."}]'
+  role: user
+- content: The fuel level is not satisfactory, add it to full and then proceed to
+    activate the engine using the 'START' function and verify the tire pressure to
+    ensure it is in optimal condition.
+  role: user
+- content: Should I notice that my tire pressure falls below 40 psi, kindly provide
+    me with directions to the nearest tire service center for prompt resolution.
+  role: user
+name: multi_turn_base_93
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,56 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            tmp:
+              contents:
+                file1.txt:
+                  content: This is some important data. Another line of text.
+                  type: file
+                file2.txt:
+                  content: Just some random text. More important data here.
+                  type: file
+                file3.txt:
+                  content: Nothing important here. Yet another line.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Could you kindly navigate
+  to the temporary directory and list all the files available there right in the terminal
+  for me? I would like to quickly skim through them and all the hidden files."}],
+  [{"role": "user", "content": "What''s inside the last file displayed?"}], [{"role":
+  "user", "content": "Create a docx file with the same name as the previosu file but
+  changing the format, they should also have the same content."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''tmp'': <Directory: tmp,
+        Parent: alex, Contents: {''file1.txt'': <<File: file1.txt, Content: This is
+        some important data. Another line of text.>>, ''file2.txt'': <<File: file2.txt,
+        Content: Just some random text. More important data here.>>, ''file3.txt'':
+        <<File: file3.txt, Content: Nothing important here. Yet another line.>>, ''file3.docx'':
+        <<File: file3.docx, Content: Nothing important here. Yet another line.>>}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='tmp')
+    - ls(a=True)
+  - - cat(file_name='file3.txt')
+  - - touch(file_name='file3.docx')
+    - echo(content='Nothing important here. Yet another line.',file_name='file3.docx')
+messages:
+- content: '[{"role": "user", "content": "Could you kindly navigate to the temporary
+    directory and list all the files available there right in the terminal for me?
+    I would like to quickly skim through them and all the hidden files."}]'
+  role: user
+- content: What's inside the last file displayed?
+  role: user
+- content: Create a docx file with the same name as the previosu file but changing
+    the format, they should also have the same content.
+  role: user
+name: multi_turn_base_26
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

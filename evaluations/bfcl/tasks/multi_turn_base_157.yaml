@@ -1,0 +1,70 @@
+base_resource_config:
+  initial_config:
+    MathAPI: {}
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        BR123456:
+          cost: 1200.0
+          flight_number: FL123
+      budget_limit: 3000.0
+      credit_card_list:
+        card9999:
+          balance: 5000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Evelyn Harper
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Evelyn
+      user_last_name: Harper
+  involved_classes:
+  - MathAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "List all international airports
+  currently accessible for travel."}], [{"role": "user", "content": "I''m based in
+  Crescent Hollow. Determine which airport is closest to my location from the previously
+  listed options."}], [{"role": "user", "content": "I''m organizing a trip soon and
+  need the flight cost from my nearest airport to Pinehaven on March 3, 2024, traveling
+  in business class."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        BR123456:
+          cost: 1200.0
+          flight_number: FL123
+      budget_limit: 3000.0
+      credit_card_list:
+        card9999:
+          balance: 5000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Evelyn Harper
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Evelyn
+      user_last_name: Harper
+  ground_truth_function_calls:
+  - - list_all_airports()
+  - - get_nearest_airport_by_city(location='Crescent Hollow')
+  - - get_flight_cost(travel_from='CRH', travel_to='PHV', travel_date='2024-03-03',
+      travel_class='business')
+messages:
+- content: '[{"role": "user", "content": "List all international airports currently
+    accessible for travel."}]'
+  role: user
+- content: I'm based in Crescent Hollow. Determine which airport is closest to my
+    location from the previously listed options.
+  role: user
+- content: I'm organizing a trip soon and need the flight cost from my nearest airport
+    to Pinehaven on March 3, 2024, traveling in business class.
+  role: user
+name: multi_turn_base_157
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

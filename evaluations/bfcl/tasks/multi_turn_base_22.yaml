@@ -1,0 +1,152 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            workspace:
+              contents:
+                old_project_analysis.txt:
+                  content: Old analysis content.
+                  type: file
+                project_analysis.txt:
+                  content: Initial analysis content.
+                  type: file
+                project_archive:
+                  contents: {}
+                  type: directory
+              type: directory
+          type: directory
+    TwitterAPI:
+      password: securePass123
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Excited to share our latest project insights!
+          id: 0
+          mentions: []
+          tags:
+          - '#project'
+          - '#insights'
+          username: tech_guru
+        '1':
+          content: Check out the differences in our project analysis!
+          id: 1
+          mentions: []
+          tags:
+          - '#project'
+          - '#analysis'
+          username: tech_guru
+        '2':
+          content: 'Key members: @team_lead, @data_analyst'
+          id: 2
+          mentions:
+          - '@team_lead'
+          - '@data_analyst'
+          tags: []
+          username: tech_guru
+      username: tech_guru
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "There''s a file I cooked up
+  earlier named ''project_analysis.txt'' in workspace folder, and I''ve just realized
+  it desperately needs some extensive updating. Could you roll the content out for
+  me to have a look-see?"}], [{"role": "user", "content": "Much appreciated! Now,
+  I''m sprucing up my analysis here. Could you whip up a duplicate of ''project_analysis.txt''
+  and shift it over to this folder I''ve named ''project_archive''?"}], [{"role":
+  "user", "content": "Important stuff right there! I need to do a comparative review
+  as my next step; be a champ and compare ''project_analysis.txt'' with ''old_project_analysis.txt''
+  to spotlight any differences."}], [{"role": "user", "content": "In this reflective
+  summary, I''m keen to share some eye-opening insights with my colleagues. Toss a
+  tweet out there about this comparative analysis, mentions @colleagues, and throw
+  in #ProjectInsight to amplify its reach. Here is a the post content I am thinking
+  about:Just completed a comparative analysis between the latest and previous project
+  data. Some insightful findings! My user name is tech_guru and password is securePass123."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''workspace'': <Directory:
+        workspace, Parent: alex, Contents: {''project_analysis.txt'': <<File: project_analysis.txt,
+        Content: Initial analysis content.>>, ''old_project_analysis.txt'': <<File:
+        old_project_analysis.txt, Content: Old analysis content.>>, ''project_archive'':
+        <Directory: project_archive, Parent: workspace, Contents: {''project_analysis.txt'':
+        <<File: project_analysis.txt, Content: Initial analysis content.>>}>}>}>'
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: securePass123
+      retweets: {}
+      tweet_counter: 4
+      tweets:
+        0:
+          content: Excited to share our latest project insights!
+          id: 0
+          mentions: []
+          tags:
+          - '#project'
+          - '#insights'
+          username: tech_guru
+        1:
+          content: Check out the differences in our project analysis!
+          id: 1
+          mentions: []
+          tags:
+          - '#project'
+          - '#analysis'
+          username: tech_guru
+        2:
+          content: 'Key members: @team_lead, @data_analyst'
+          id: 2
+          mentions:
+          - '@team_lead'
+          - '@data_analyst'
+          tags: []
+          username: tech_guru
+        3:
+          content: Just completed a comparative analysis between the latest and previous
+            project data. Some insightful findings!
+          id: 3
+          mentions:
+          - '@colleagues'
+          tags:
+          - '#ProjectInsight'
+          username: tech_guru
+      username: tech_guru
+  ground_truth_function_calls:
+  - - cd(folder='workspace')
+    - cat(file_name='project_analysis.txt')
+  - - cp(source='project_analysis.txt', destination='project_archive')
+  - - diff(file_name1='project_analysis.txt', file_name2='old_project_analysis.txt')
+  - - authenticate_twitter(username='tech_guru', password='securePass123')
+    - post_tweet(content='Just completed a comparative analysis between the latest
+      and previous project data. Some insightful findings!', tags=['#ProjectInsight'],
+      mentions=['@colleagues'])
+messages:
+- content: '[{"role": "user", "content": "There''s a file I cooked up earlier named
+    ''project_analysis.txt'' in workspace folder, and I''ve just realized it desperately
+    needs some extensive updating. Could you roll the content out for me to have a
+    look-see?"}]'
+  role: user
+- content: Much appreciated! Now, I'm sprucing up my analysis here. Could you whip
+    up a duplicate of 'project_analysis.txt' and shift it over to this folder I've
+    named 'project_archive'?
+  role: user
+- content: Important stuff right there! I need to do a comparative review as my next
+    step; be a champ and compare 'project_analysis.txt' with 'old_project_analysis.txt'
+    to spotlight any differences.
+  role: user
+- content: 'In this reflective summary, I''m keen to share some eye-opening insights
+    with my colleagues. Toss a tweet out there about this comparative analysis, mentions
+    @colleagues, and throw in #ProjectInsight to amplify its reach. Here is a the
+    post content I am thinking about:Just completed a comparative analysis between
+    the latest and previous project data. Some insightful findings! My user name is
+    tech_guru and password is securePass123.'
+  role: user
+name: multi_turn_base_22
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

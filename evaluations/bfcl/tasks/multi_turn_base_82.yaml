@@ -1,0 +1,92 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 30.0
+      frontRightTirePressure: 30.0
+      fuelLevel: 15.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 28.0
+      rearRightTirePressure: 28.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "My tires need to be in top-notch
+  condition before embarking on my journey. Could you ensure they have optimum pressure?
+  If any tire falls short of 30.0 psi, it\u2019s off to the nearest service station
+  to remedy it pronto. Let\u2019s also ready the car for navigation if the shop isn''t
+  miles away!"}], [{"role": "user", "content": "Before setting off on our eagerly-awaited
+  road escapade, it would be prudent to fuel up the car entirely. Once it''s brimming
+  with gas, I\u2019d appreciate it if you could translate its capacity from gallons
+  to liters for me. Share the details when it''s sorted."}], [{"role": "user", "content":
+  "With a tank full of fuel and all safety measures addressed, I''d love to ignite
+  the car in pure anticipation."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 30.0
+      frontRightTirePressure: 30.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 28.0
+      rearRightTirePressure: 28.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+  - - fillFuelTank(fuelAmount=35.0)
+    - gallon_to_liter(gallon=50.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+messages:
+- content: '[{"role": "user", "content": "My tires need to be in top-notch condition
+    before embarking on my journey. Could you ensure they have optimum pressure? If
+    any tire falls short of 30.0 psi, it\u2019s off to the nearest service station
+    to remedy it pronto. Let\u2019s also ready the car for navigation if the shop
+    isn''t miles away!"}]'
+  role: user
+- content: "Before setting off on our eagerly-awaited road escapade, it would be prudent\
+    \ to fuel up the car entirely. Once it's brimming with gas, I\u2019d appreciate\
+    \ it if you could translate its capacity from gallons to liters for me. Share\
+    \ the details when it's sorted."
+  role: user
+- content: With a tank full of fuel and all safety measures addressed, I'd love to
+    ignite the car in pure anticipation.
+  role: user
+name: multi_turn_base_82
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

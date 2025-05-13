@@ -1,0 +1,57 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            research:
+              contents:
+                archives:
+                  contents: {}
+                  type: directory
+                research_notes.txt:
+                  content: 'Line 3: Experiment results Line 1: Introduction Line 2:
+                    Methodology'
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "In research directory, there
+  is a file called ''research_notes.txt''. Please make a prioritized backup by moving
+  a copy of it to the folder named ''archives'' within research, labeling the new
+  file as ''2024_research_backup.txt''."}], [{"role": "user", "content": "Now, take
+  the contents of ''2024_research_backup.txt'' that we just created and sort the lines
+  alphabetically."}], [{"role": "user", "content": "Once the list is sorted, find
+  out how many lines are in the sorted ''2024_research_backup.txt'' file."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''research'': <Directory:
+        research, Parent: alex, Contents: {''research_notes.txt'': <<File: research_notes.txt,
+        Content: Line 3: Experiment results Line 1: Introduction Line 2: Methodology>>,
+        ''archives'': <Directory: archives, Parent: research, Contents: {''2024_research_backup.txt'':
+        <<File: 2024_research_backup.txt, Content: Line 3: Experiment results Line
+        1: Introduction Line 2: Methodology>>}>}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='research')
+    - cp(source='research_notes.txt',destination='archives')
+    - cd(folder='archives')
+    - mv(source='research_notes.txt',destination='2024_research_backup.txt')
+  - - sort(file_name='2024_research_backup.txt')
+  - - wc(file_name='2024_research_backup.txt',mode='l')
+messages:
+- content: '[{"role": "user", "content": "In research directory, there is a file called
+    ''research_notes.txt''. Please make a prioritized backup by moving a copy of it
+    to the folder named ''archives'' within research, labeling the new file as ''2024_research_backup.txt''."}]'
+  role: user
+- content: Now, take the contents of '2024_research_backup.txt' that we just created
+    and sort the lines alphabetically.
+  role: user
+- content: Once the list is sorted, find out how many lines are in the sorted '2024_research_backup.txt'
+    file.
+  role: user
+name: multi_turn_base_16
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,112 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      current_user: John
+      ticket_counter: 1001
+      ticket_queue: []
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        credit_9988:
+          balance: 10000.0
+          card_number: 5522-5433-6677-9988
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiration_date: 12/25
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Imagine you''ve meticulously
+  planned a surprise getaway to the Maldives, brimming with excitement to ensure each
+  detail unfolds seamlessly. Your first step is securing your travel account access;
+  kindly authenticate with your credentials. My access token of abc123xyz, a client
+  ID of my_client_id, a client secret of my_client_secret, and a refresh token of
+  my_refresh_token. The grant type should be set to read_write, and the user''s first
+  name is Michael, with the last name being Thompson"}], [{"role": "user", "content":
+  "Fantastic! Now that authentication is successfully completed, let''s move forward
+  with booking your idyllic escape. You opt for your trusted credit card, bearing
+  the id credit_9988, to cover all logistical costs. Book your journey from JFK to
+  MPC for December 25th, 2024, travelling first class, at a cost of 3000.50 dollars."}],
+  [{"role": "user", "content": "Oh dear! Unexpected changes have arisen. Could you
+  please cancel your recent booking as a more urgent matter needs your attention?"}],
+  [{"role": "user", "content": "In light of these new developments, you''d prefer
+  to formally notify your travel agent about the abrupt change in your itinerary.
+  Would you be kind enough to generate a ticket titled ''Urgent Change in Travel Plans\u2019
+  with a detailed explanation outlining the necessity for these adjustments? Details
+  write ''An unexpected change has arisen, and I need to cancel my booking for the
+  trip to the Maldives.'', priority be level 4"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: John
+      ticket_counter: 1002
+      ticket_queue:
+      - created_by: John
+        description: An unexpected change has arisen, and I need to cancel my booking
+          for the trip to the Maldives.
+        id: 1001
+        priority: 4
+        status: Open
+        title: Urgent Change in Travel Plans
+    TravelAPI:
+      access_token: '251675'
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        credit_9988:
+          balance: 10000.0
+          card_number: 5522-5433-6677-9988
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiration_date: 12/25
+      long_context: false
+      token_expires_in: 2
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - authenticate_travel(client_id='my_client_id', client_secret='my_client_secret',
+      refresh_token='my_refresh_token', grant_type='read_write', user_first_name='Michael',
+      user_last_name='Thompson')
+  - - book_flight(access_token='251675', card_id='credit_9988', travel_date='2024-12-25',
+      travel_from='JFK', travel_to='MPC', travel_class='first', travel_cost=3000.5)
+  - - cancel_booking(access_token='251675', booking_id='5431449')
+  - - create_ticket(priority=4, title='Urgent Change in Travel Plans', description='An
+      unexpected change has arisen, and I need to cancel my booking for the trip to
+      the Maldives.')
+messages:
+- content: '[{"role": "user", "content": "Imagine you''ve meticulously planned a surprise
+    getaway to the Maldives, brimming with excitement to ensure each detail unfolds
+    seamlessly. Your first step is securing your travel account access; kindly authenticate
+    with your credentials. My access token of abc123xyz, a client ID of my_client_id,
+    a client secret of my_client_secret, and a refresh token of my_refresh_token.
+    The grant type should be set to read_write, and the user''s first name is Michael,
+    with the last name being Thompson"}]'
+  role: user
+- content: Fantastic! Now that authentication is successfully completed, let's move
+    forward with booking your idyllic escape. You opt for your trusted credit card,
+    bearing the id credit_9988, to cover all logistical costs. Book your journey from
+    JFK to MPC for December 25th, 2024, travelling first class, at a cost of 3000.50
+    dollars.
+  role: user
+- content: Oh dear! Unexpected changes have arisen. Could you please cancel your recent
+    booking as a more urgent matter needs your attention?
+  role: user
+- content: "In light of these new developments, you'd prefer to formally notify your\
+    \ travel agent about the abrupt change in your itinerary. Would you be kind enough\
+    \ to generate a ticket titled 'Urgent Change in Travel Plans\u2019 with a detailed\
+    \ explanation outlining the necessity for these adjustments? Details write 'An\
+    \ unexpected change has arisen, and I need to cancel my booking for the trip to\
+    \ the Maldives.', priority be level 4"
+  role: user
+name: multi_turn_base_193
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any  # Union, Callable, Literal removed
+from typing import Dict, List, Optional, Any
 import json
 from pydantic import BaseModel, Field
 
@@ -122,6 +122,17 @@ class EvaluationCriteriaModel(BaseModel):
         default=None,
         description="A Python lambda string (e.g., 'lambda x: x > 0') to transform and evaluate the query result to a boolean."
     )
+    
+    # Explicit fields for ground truth data for BFCL evaluation
+    ground_truth_function_calls: Optional[List[List[str]]] = Field(
+        default=None,
+        description="Ground truth function calls for BFCL evaluation."
+    )
+    ground_truth_comparable_state: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Ground truth comparable state for BFCL evaluation."
+    )
+
     # Future: Could include other complex evaluation logic or references
 
 class TaskDefinitionModel(BaseModel):
@@ -156,7 +167,11 @@ class TaskDefinitionModel(BaseModel):
     
     initial_user_prompt: Optional[str] = Field(
         default=None,
-        description="The initial prompt or message to start the agent interaction."
+        description="The initial prompt or message to start the agent interaction. Deprecated if 'messages' field is used for multi-turn."
+    )
+    messages: Optional[List[Dict[str, Any]]] = Field( # Explicit field for initial/multi-turn messages
+        default=None,
+        description="A list of messages to start the conversation, can represent multiple user turns for sequential processing."
     )
     
     # PoC / Task specific parameters
@@ -175,9 +190,7 @@ class TaskDefinitionModel(BaseModel):
         extra = "allow" # Allow and capture extra fields not explicitly defined
         # For Pydantic v2, it's model_config = {"extra": "allow"}
         # Assuming Pydantic v1 style for now based on existing file, can update if needed.
-        # If using Pydantic v2, the Config class should be replaced by model_config attribute.
-        # For now, this will work with Pydantic v1.x.
-        # If Pydantic v2 is used, this should be:
+        # If using Pydantic v2, this should be:
         # from pydantic import ConfigDict
         # model_config = ConfigDict(extra='allow')
         # For Pydantic v1, `Config.extra = "allow"` is correct.

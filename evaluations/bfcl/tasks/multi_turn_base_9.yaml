@@ -1,0 +1,56 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            Documentation:
+              contents:
+                Archives:
+                  contents: {}
+                  type: directory
+                FinalReport.txt:
+                  content: This is the final report for the year 2024. It contains
+                    all the necessary details and summaries.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I remember I should have a
+  document called ''FinalReport.txt'' in the ''Documentation'' folder. "}], [{"role":
+  "user", "content": "Make a copy of ''FinalReport.txt'' to the ''Archives'' directory
+  inside the ''Documentation'' folder, while ensuring the duplicate is preserved as
+  ''ArchivedFinalReport2024.txt''."}], [{"role": "user", "content": "Methodically
+  arrange and sort the inaugural line of the ''ArchivedFinalReport2024.txt'' in a
+  seamless alphabetical order to verify clarity and sequence."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''Documentation'': <Directory:
+        Documentation, Parent: alex, Contents: {''FinalReport.txt'': <<File: FinalReport.txt,
+        Content: This is the final report for the year 2024. It contains all the necessary
+        details and summaries.>>, ''Archives'': <Directory: Archives, Parent: Documentation,
+        Contents: {''ArchivedFinalReport2024.txt'': <<File: ArchivedFinalReport2024.txt,
+        Content: This is the final report for the year 2024. It contains all the necessary
+        details and summaries.>>}>}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='Documentation')
+  - - cp(source='FinalReport.txt',destination='Archives')
+    - cd(folder='Archives')
+    - mv(source='FinalReport.txt',destination='ArchivedFinalReport2024.txt')
+  - - sort(file_name='ArchivedFinalReport2024.txt')
+messages:
+- content: '[{"role": "user", "content": "I remember I should have a document called
+    ''FinalReport.txt'' in the ''Documentation'' folder. "}]'
+  role: user
+- content: Make a copy of 'FinalReport.txt' to the 'Archives' directory inside the
+    'Documentation' folder, while ensuring the duplicate is preserved as 'ArchivedFinalReport2024.txt'.
+  role: user
+- content: Methodically arrange and sort the inaugural line of the 'ArchivedFinalReport2024.txt'
+    in a seamless alphabetical order to verify clarity and sequence.
+  role: user
+name: multi_turn_base_9
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

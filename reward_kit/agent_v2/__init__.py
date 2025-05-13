@@ -14,7 +14,6 @@ from .resources import (
     SQLResource,
     FileSystemResource,
     DockerResource,
-    DOCKER_SDK_AVAILABLE,
 )
 
 __all__ = [
@@ -24,5 +23,4 @@ __all__ = [
     "SQLResource",
     "FileSystemResource",
     "DockerResource",
-    "DOCKER_SDK_AVAILABLE",
 ]

@@ -1,0 +1,84 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I just returned to my vehicle,
+  and it dawned on me that I may not have unlocked the doors yet. Would you assist
+  in unlocking them all?"}], [{"role": "user", "content": "With every door now open,
+  please proceed to fire up the engine; I need to ensure everything''s in working
+  order before hitting the road."}], [{"role": "user", "content": "Fantastic! With
+  the engine humming nicely, it\u2019s time for my adventure. Could you adjust the
+  cruise control to 65 mph and make sure we''re keeping a prudent distance (100 meters)
+  from the car in front?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: active
+      destination: None
+      distanceToNextVehicle: 100
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - lockDoors(unlock=True, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - setCruiseControl(speed=65, activate=True, distanceToNextVehicle=100)
+messages:
+- content: '[{"role": "user", "content": "I just returned to my vehicle, and it dawned
+    on me that I may not have unlocked the doors yet. Would you assist in unlocking
+    them all?"}]'
+  role: user
+- content: With every door now open, please proceed to fire up the engine; I need
+    to ensure everything's in working order before hitting the road.
+  role: user
+- content: "Fantastic! With the engine humming nicely, it\u2019s time for my adventure.\
+    \ Could you adjust the cruise control to 65 mph and make sure we're keeping a\
+    \ prudent distance (100 meters) from the car in front?"
+  role: user
+name: multi_turn_base_79
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

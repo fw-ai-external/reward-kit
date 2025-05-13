@@ -1,0 +1,64 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            data:
+              contents:
+                analysis_report.txt:
+                  content: 'Line 1: No error Line 2: Minor error detected Line 3:
+                    All systems operational Line 4: Critical error found'
+                  type: file
+                file3.txt:
+                  content: Zebra Apple Monkey Banana
+                  type: file
+                project_summary.txt:
+                  content: Summary line 1 Summary line 2 Summary line 3 Summary line
+                    4 Summary line 5
+                  type: file
+              type: directory
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Where is my analysis? Locate
+  any file with analysis in it."}], [{"role": "user", "content": "Naviagte to that
+  first analysis and identify any line with error in it."}], [{"role": "user", "content":
+  "Let''s bring some order to the project documents. I want to human readible log
+  the storage usage of the entire current directory to usage.txt file. The content
+  of the file should be the number follwed by the word bytes and nothing else."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''data'': <Directory:
+        data, Parent: workspace, Contents: {''analysis_report.txt'': <<File: analysis_report.txt,
+        Content: Line 1: No error Line 2: Minor error detected Line 3: All systems
+        operational Line 4: Critical error found>>, ''project_summary.txt'': <<File:
+        project_summary.txt, Content: Summary line 1 Summary line 2 Summary line 3
+        Summary line 4 Summary line 5>>, ''file3.txt'': <<File: file3.txt, Content:
+        Zebra Apple Monkey Banana>>, ''usage.txt'': <<File: usage.txt, Content: 205
+        bytes>>}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - find(path='.', name='analysis')
+  - - cd(folder='data')
+    - grep(file_name='analysis_report.txt',pattern='error')
+  - - du(human_readable=True)
+    - touch(file_name='usage.txt')
+    - echo(content='205 bytes',file_name='usage.txt')
+messages:
+- content: '[{"role": "user", "content": "Where is my analysis? Locate any file with
+    analysis in it."}]'
+  role: user
+- content: Naviagte to that first analysis and identify any line with error in it.
+  role: user
+- content: Let's bring some order to the project documents. I want to human readible
+    log the storage usage of the entire current directory to usage.txt file. The content
+    of the file should be the number follwed by the word bytes and nothing else.
+  role: user
+name: multi_turn_base_28
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

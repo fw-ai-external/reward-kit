@@ -1,0 +1,155 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        Quarter1_Reports:
+          contents:
+            Backup:
+              contents: {}
+              type: directory
+            History101.txt:
+              content: Introduction to History. Ancient civilizations.
+              type: file
+            History202.txt:
+              content: Advanced History. Modern world events.
+              type: file
+            MonthlySummary.docx:
+              content: Summary of monthly activities and achievements.
+              type: file
+            report1.txt:
+              content: Quarter 1 financial report.
+              type: file
+            report2.txt:
+              content: Quarter 1 sales report.
+              type: file
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      password: Kj8#mP9$vL2
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Excited to share my latest project!
+          id: 0
+          mentions: []
+          tags:
+          - '#coding'
+          - '#project'
+          - '#excited'
+          username: techie_sarah
+        '1':
+          content: Check out my new blog post!
+          id: 1
+          mentions: []
+          tags:
+          - '#blog'
+          - '#writing'
+          username: techie_sarah
+        '2':
+          content: Just finished a great book on history.
+          id: 2
+          mentions: []
+          tags:
+          - '#reading'
+          - '#history'
+          - '#books'
+          username: techie_sarah
+      username: techie_sarah
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Copy all the text files of
+  the ''Quarter1_Reports'' directory and place it in a new directory naming it ''Archived_Quarter1."}],
+  [{"role": "user", "content": "Within the ''MonthlySummary.docx'' file, display the
+  content and sort it alphabetically by line to organize the information neatly."}],
+  [{"role": "user", "content": "Compare the educational material differences between
+  ''History101.txt'' and ''History202.txt'', then post the differences to my Twitter
+  account for my followers to see, mentioning Jerry."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: Quarter1_Reports, Parent: None, Contents: {''report1.txt'':
+        <<File: report1.txt, Content: Quarter 1 financial report.>>, ''report2.txt'':
+        <<File: report2.txt, Content: Quarter 1 sales report.>>, ''Backup'': <Directory:
+        Backup, Parent: Quarter1_Reports, Contents: {}>, ''MonthlySummary.docx'':
+        <<File: MonthlySummary.docx, Content: Summary of monthly activities and achievements.>>,
+        ''History101.txt'': <<File: History101.txt, Content: Introduction to History.
+        Ancient civilizations.>>, ''History202.txt'': <<File: History202.txt, Content:
+        Advanced History. Modern world events.>>, ''Archived_Quarter1'': <Directory:
+        Archived_Quarter1, Parent: Quarter1_Reports, Contents: {''report1.txt'': <<File:
+        report1.txt, Content: Quarter 1 financial report.>>, ''report2.txt'': <<File:
+        report2.txt, Content: Quarter 1 sales report.>>, ''History101.txt'': <<File:
+        History101.txt, Content: Introduction to History. Ancient civilizations.>>,
+        ''History202.txt'': <<File: History202.txt, Content: Advanced History. Modern
+        world events.>>}>}>'
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Kj8#mP9$vL2
+      retweets: {}
+      tweet_counter: 4
+      tweets:
+        0:
+          content: Excited to share my latest project!
+          id: 0
+          mentions: []
+          tags:
+          - '#coding'
+          - '#project'
+          - '#excited'
+          username: techie_sarah
+        1:
+          content: Check out my new blog post!
+          id: 1
+          mentions: []
+          tags:
+          - '#blog'
+          - '#writing'
+          username: techie_sarah
+        2:
+          content: Just finished a great book on history.
+          id: 2
+          mentions: []
+          tags:
+          - '#reading'
+          - '#history'
+          - '#books'
+          username: techie_sarah
+        3:
+          content: '- Introduction to History. Ancient civilizations.+ Advanced History.
+            Modern world events.'
+          id: 3
+          mentions:
+          - Jerry
+          tags: []
+          username: techie_sarah
+      username: techie_sarah
+  ground_truth_function_calls:
+  - - mkdir(dir_name='Archived_Quarter1')
+    - cp(source='report1.txt',destination='Archived_Quarter1')
+    - cp(source='report2.txt',destination='Archived_Quarter1')
+    - cp(source='History101.txt',destination='Archived_Quarter1')
+    - cp(source='History202.txt',destination='Archived_Quarter1')
+  - - cat(file_name='MonthlySummary.docx')
+    - sort(file_name='MonthlySummary.docx')
+  - - diff(file_name1='History101.txt',file_name2='History202.txt')
+    - post_tweet(content='- Introduction to History. Ancient civilizations.+ Advanced
+      History. Modern world events.',mentions=['Jerry'])
+messages:
+- content: '[{"role": "user", "content": "Copy all the text files of the ''Quarter1_Reports''
+    directory and place it in a new directory naming it ''Archived_Quarter1."}]'
+  role: user
+- content: Within the 'MonthlySummary.docx' file, display the content and sort it
+    alphabetically by line to organize the information neatly.
+  role: user
+- content: Compare the educational material differences between 'History101.txt' and
+    'History202.txt', then post the differences to my Twitter account for my followers
+    to see, mentioning Jerry.
+  role: user
+name: multi_turn_base_18
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

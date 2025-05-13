@@ -1,0 +1,81 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        active_project:
+          contents:
+            ResearchDocs:
+              contents:
+                report.csv:
+                  content: 'Line 1: Introduction Line 2: Quarterly Financial Overview
+                    Line 3: Details Line 4: More Details Line 5: Quarterly Financial
+                    Overview Line 6: Conclusion Line 7: Quarterly Financial Overview
+                    Line 8: Quarter has been successful. Line 9: Quarterly Financial
+                    Overview Line 10: Final Thoughts'
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "First cd within the ''ResearchDocs''
+  directory and then locate any files titled ''report.csv''."}], [{"role": "user",
+  "content": "Once you locate ''report.csv'' in the ''ResearchDocs'' directory, delve
+  into it to find lines that reference the ''Quarterly Financial Overview''."}], [{"role":
+  "user", "content": "Extract and display the last five lines from the ''report.csv''
+  file in the ''ResearchDocs'' directory, as these need to be emphasized for recent
+  updates."}], [{"role": "user", "content": "Logging in as USR001. Lastly, upon completion
+  of our file review, kindly message my colleague, John Levy, add him as new contact,
+  that ''Latest Quarter Performance has been well.''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: active_project, Parent: None, Contents: {''ResearchDocs'':
+        <Directory: ResearchDocs, Parent: active_project, Contents: {''report.csv'':
+        <<File: report.csv, Content: Line 1: Introduction Line 2: Quarterly Financial
+        Overview Line 3: Details Line 4: More Details Line 5: Quarterly Financial
+        Overview Line 6: Conclusion Line 7: Quarterly Financial Overview Line 8: Quarter
+        has been successful. Line 9: Quarterly Financial Overview Line 10: Final Thoughts>>}>}>'
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR005: Latest Quarter Performance has been well.
+      message_count: 4
+      user_count: 5
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+        John Levy: USR005
+  ground_truth_function_calls:
+  - - cd(folder='ResearchDocs')
+    - find(path='.',name='report.csv')
+  - - grep(file_name='report.csv',pattern='Quarterly Financial Overview')
+  - - tail(file_name='report.csv',lines=5)
+  - - message_login(user_id='USR001')
+    - add_contact(user_name='John Levy')
+    - send_message(receiver_id='USR005',message='Latest Quarter Performance has been
+      well.')
+messages:
+- content: '[{"role": "user", "content": "First cd within the ''ResearchDocs'' directory
+    and then locate any files titled ''report.csv''."}]'
+  role: user
+- content: Once you locate 'report.csv' in the 'ResearchDocs' directory, delve into
+    it to find lines that reference the 'Quarterly Financial Overview'.
+  role: user
+- content: Extract and display the last five lines from the 'report.csv' file in the
+    'ResearchDocs' directory, as these need to be emphasized for recent updates.
+  role: user
+- content: Logging in as USR001. Lastly, upon completion of our file review, kindly
+    message my colleague, John Levy, add him as new contact, that 'Latest Quarter
+    Performance has been well.'
+  role: user
+name: multi_turn_base_14
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,252 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR002
+      inbox:
+      - USR001:
+        - My name is John. I want to connect.
+        USR003:
+        - I am busy
+        USR004:
+        - I am on leave
+      message_count: 0
+      user_count: 4
+      user_map:
+        Alice: USR003
+        Bob: USR004
+        Jane: USR002
+        John: USR001
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        ZETA:
+          MA(20): 152.0
+          MA(5): 151.0
+          percent_change: -0.5
+          price: 150.0
+          volume: 1.0
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - ZETA
+  involved_classes:
+  - MessageAPI
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Hi there! I''ve noticed Zeta
+  Corp''s stocks have been slipping more than I''d like. Would you be able to pull
+  up their stock information for a quick review and also make sure it''s no longer
+  on my watchlist?"}], [{"role": "user", "content": "Could you compile a list of all
+  the stocks currently on my watchlist? I''m aiming to get a better grip on my portfolio
+  management."}], [{"role": "user", "content": "I think it would be wise to let my
+  friend know about the changes I''m making, specifically regarding Zeta Corp. Please
+  send a note to my friend''s user ID USR003 stating, ''I''ve decided to drop those
+  dipping stocks from my line-up.'' My user id is ''USR002''."}], [{"role": "user",
+  "content": "Would you mind showing me any recent messages I''ve sent?"}], [{"role":
+  "user", "content": "My friend mentioned something quite irrelevant and outdated
+  in one of the messages. Can you help me by delete message id: 67410?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR002
+      generated_ids: '{67410}'
+      inbox:
+      - USR001:
+        - My name is John. I want to connect.
+        USR003:
+        - I am busy
+        USR004:
+        - I am on leave
+      message_count: 1
+      user_count: 4
+      user_map:
+        Alice: USR003
+        Bob: USR004
+        Jane: USR002
+        John: USR001
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12446
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        ZETA:
+          MA(20): 152.0
+          MA(5): 151.0
+          percent_change: -0.5
+          price: 150.0
+          volume: 1.0
+      transaction_history: []
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - remove_stock_from_watchlist(symbol='ZETA')
+  - - get_watchlist()
+  - - send_message(receiver_id='USR003', message='I\'ve decided to drop those dipping
+      stocks from my line-up.')
+  - - view_messages_sent()
+  - - delete_message(receiver_id='USR003')
+messages:
+- content: '[{"role": "user", "content": "Hi there! I''ve noticed Zeta Corp''s stocks
+    have been slipping more than I''d like. Would you be able to pull up their stock
+    information for a quick review and also make sure it''s no longer on my watchlist?"}]'
+  role: user
+- content: Could you compile a list of all the stocks currently on my watchlist? I'm
+    aiming to get a better grip on my portfolio management.
+  role: user
+- content: I think it would be wise to let my friend know about the changes I'm making,
+    specifically regarding Zeta Corp. Please send a note to my friend's user ID USR003
+    stating, 'I've decided to drop those dipping stocks from my line-up.' My user
+    id is 'USR002'.
+  role: user
+- content: Would you mind showing me any recent messages I've sent?
+  role: user
+- content: 'My friend mentioned something quite irrelevant and outdated in one of
+    the messages. Can you help me by delete message id: 67410?'
+  role: user
+name: multi_turn_base_149
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

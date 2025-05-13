@@ -1,0 +1,71 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            documents:
+              contents:
+                file1.txt:
+                  content: The quick brown fox jumps over the lazy dog.
+                  type: file
+                file2.txt:
+                  content: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                  type: file
+                file3.txt:
+                  content: To be or not to be, that is the question.
+                  type: file
+                file4.txt:
+                  content: All that glitters is not gold.
+                  type: file
+              type: directory
+          type: directory
+    TwitterAPI:
+      tweet_counter: 0
+      tweets: {}
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Go to documents folder in
+  CWD. Next, from the first document in current folder. What does the last line look
+  like?"}], [{"role": "user", "content": "Write the difference of the first two file
+  into a new file call file5.txt."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''documents'': <Directory:
+        documents, Parent: alex, Contents: {''file1.txt'': <<File: file1.txt, Content:
+        The quick brown fox jumps over the lazy dog.>>, ''file2.txt'': <<File: file2.txt,
+        Content: Lorem ipsum dolor sit amet, consectetur adipiscing elit.>>, ''file3.txt'':
+        <<File: file3.txt, Content: To be or not to be, that is the question.>>, ''file4.txt'':
+        <<File: file4.txt, Content: All that glitters is not gold.>>, ''file5.txt'':
+        <<File: file5.txt, Content: - The quick brown fox jumps over the lazy dog.
+
+        + Lorem ipsum dolor sit amet, consectetur adipiscing elit.>>}>}>'
+    TwitterAPI:
+      authenticated: false
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john123
+      retweets: {}
+      tweet_counter: 0
+      tweets: {}
+      username: john
+  ground_truth_function_calls:
+  - - cd(folder='documents')
+    - tail(file_name='file1.txt',lines=1)
+  - - diff(file_name1='file1.txt',file_name2='file2.txt')
+    - echo(content='- The quick brown fox jumps over the lazy dog.\n+ Lorem ipsum
+      dolor sit amet, consectetur adipiscing elit.',file_name='file5.txt')
+messages:
+- content: '[{"role": "user", "content": "Go to documents folder in CWD. Next, from
+    the first document in current folder. What does the last line look like?"}]'
+  role: user
+- content: Write the difference of the first two file into a new file call file5.txt.
+  role: user
+name: multi_turn_base_20
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

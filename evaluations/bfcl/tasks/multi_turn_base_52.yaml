@@ -1,0 +1,159 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr1pP1ng#Safe
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: Just started my road trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#adventure'
+          username: roadtripper2023
+        '1':
+          content: Fuel level and battery status are good.
+          id: 1
+          mentions: []
+          tags:
+          - '#carcare'
+          - '#maintenance'
+          username: roadtripper2023
+        '2':
+          content: Tires checked and engine purring smoothly!
+          id: 2
+          mentions: []
+          tags:
+          - '#carmaintenance'
+          - '#safetyfirst'
+          username: roadtripper2023
+      username: roadtripper2023
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 34.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 32.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I have secured my car by locking
+  all doors and applying the parking brake. Would it be possible to start the engine
+  so I can monitor the fuel level and battery status, ensuring smooth operation?"}],
+  [{"role": "user", "content": "I''ve initiated my vehicle, and I''d greatly appreciate
+  it if you could take a look at the tire pressures. Should any tire display a pressure
+  below 40 PSI, kindly guide me to the nearest tire service facility for a fix."}],
+  [{"role": "user", "content": "Let''s share the updates on tire status. Could you
+  tweet ''Tires checked and engine purring smoothly!'' using the hashtag #RoadTrip
+  while tagging @AutoUpdates?"}], [{"role": "user", "content": "Following the tweet,
+  could you drop a comment saying, ''Safety first! Remember tire checks are crucial.''
+  to emphasize tire care?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Tr1pP1ng#Safe
+      retweets: {}
+      tweet_counter: 10
+      tweets:
+        0:
+          content: Just started my road trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#adventure'
+          username: roadtripper2023
+        1:
+          content: Fuel level and battery status are good.
+          id: 1
+          mentions: []
+          tags:
+          - '#carcare'
+          - '#maintenance'
+          username: roadtripper2023
+        2:
+          content: Tires checked and engine purring smoothly!
+          id: 2
+          mentions: []
+          tags:
+          - '#carmaintenance'
+          - '#safetyfirst'
+          username: roadtripper2023
+      username: roadtripper2023
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 34.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 32.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+  - - post_tweet('Tires checked and engine purring smoothly!', tags=['#RoadTrip'],
+      mentions=['@AutoUpdates'])
+  - - comment(tweet_id = 10, comment_content = 'Safety first! Remember tire checks
+      are crucial.')
+messages:
+- content: '[{"role": "user", "content": "I have secured my car by locking all doors
+    and applying the parking brake. Would it be possible to start the engine so I
+    can monitor the fuel level and battery status, ensuring smooth operation?"}]'
+  role: user
+- content: I've initiated my vehicle, and I'd greatly appreciate it if you could take
+    a look at the tire pressures. Should any tire display a pressure below 40 PSI,
+    kindly guide me to the nearest tire service facility for a fix.
+  role: user
+- content: 'Let''s share the updates on tire status. Could you tweet ''Tires checked
+    and engine purring smoothly!'' using the hashtag #RoadTrip while tagging @AutoUpdates?'
+  role: user
+- content: Following the tweet, could you drop a comment saying, 'Safety first! Remember
+    tire checks are crucial.' to emphasize tire care?
+  role: user
+name: multi_turn_base_52
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

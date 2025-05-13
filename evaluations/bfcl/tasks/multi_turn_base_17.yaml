@@ -1,0 +1,85 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            project:
+              contents:
+                file1.txt:
+                  content: This is a test file.
+                  type: file
+                file2.txt:
+                  content: Another document.
+                  type: file
+                test_report.docx:
+                  content: 'Kelly Total Score: 96'
+                  type: file
+              type: directory
+          type: directory
+    MessageAPI:
+      current_user: USR001
+      inbox:
+      - USR002:
+        - Meeting at 3 PM
+      - USR003:
+        - Please review the document.
+      user_count: 4
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Could you provide me with
+  an inventory of files that are currently visible and hidden in the directory I''m
+  working in at the moment?"}], [{"role": "user", "content": "Please cd into project
+  folder and find Kelly''s test report somewhere in the directory and read the content
+  to me."}], [{"role": "user", "content": "Please dispatch of the report to Kelly,
+  I need to add her contact (Kelly), in the format of ''Kelly Total Score: total_score'',
+  I''d appreciate a list of all the communications I''ve sent until now."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''project'': <Directory:
+        project, Parent: workspace, Contents: {''file1.txt'': <<File: file1.txt, Content:
+        This is a test file.>>, ''file2.txt'': <<File: file2.txt, Content: Another
+        document.>>, ''test_report.docx'': <<File: test_report.docx, Content: Kelly
+        Total Score: 96>>}>}>'
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002:
+        - Meeting at 3 PM
+      - USR003:
+        - Please review the document.
+      - USR005: 'Kelly Total Score: 96'
+      message_count: 4
+      user_count: 5
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+        Kelly: USR005
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - cd(folder='project')
+    - cat(file_name='test_report.docx')
+  - - add_contact(user_name='Kelly')
+    - 'send_message(receiver_id=''USR005'',message=''Kelly Total Score: 96'')'
+    - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "Could you provide me with an inventory of
+    files that are currently visible and hidden in the directory I''m working in at
+    the moment?"}]'
+  role: user
+- content: Please cd into project folder and find Kelly's test report somewhere in
+    the directory and read the content to me.
+  role: user
+- content: 'Please dispatch of the report to Kelly, I need to add her contact (Kelly),
+    in the format of ''Kelly Total Score: total_score'', I''d appreciate a list of
+    all the communications I''ve sent until now.'
+  role: user
+name: multi_turn_base_17
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,103 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_queue:
+      - created_by: Michael Thompson
+        description: Exam scheduling issue
+        id: 83912
+        priority: 4
+        status: Open
+        title: Exam Scheduling
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 20000.0
+      credit_card_list:
+        card_3478:
+          balance: 50000.0
+          card_number: 1111 2222 3333 3478
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "As a seasoned real estate
+  agent, my expertise is all about ensuring your bakery finds the perfect spot to
+  thrive. Now, it seems we have an unrelated budgeting task here. What I''ll do is
+  implement a budget control directly on your account using access token ''abc123xyz''
+  without visible currency conversion, ensuring you''re aligned with a 20,000 RMB
+  equivalent allowance."}], [{"role": "user", "content": "Switching gears, once your
+  financial plan is secured and straightened out, it\u2019s time to arrange your business-class
+  journey. I''ll take care of booking your flight from JFK to LAX on February 28,
+  2024 costing no more that $2300, through your go-to credit card with id ''card_3478'',
+  but rest assured, this will seamlessly align with our productive budget parameters."}],
+  [{"role": "user", "content": "Segueing into your organizational requirements, it
+  seems there\u2019s an ongoing examination under the company''s digital system. The
+  ticket ID 83912 can be closed"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue:
+      - created_by: Michael Thompson
+        description: Exam scheduling issue
+        id: 83912
+        priority: 4
+        status: Closed
+        title: Exam Scheduling
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_3478
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 2280.0
+          travel_date: '2024-02-28'
+          travel_from: JFK
+          travel_to: LAX
+      budget_limit: 2857.14
+      credit_card_list:
+        card_3478:
+          balance: 47720.0
+          card_number: 1111 2222 3333 3478
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - compute_exchange_rate(base_currency='RMB', target_currency='USD', value=20000.0)
+    - set_budget_limit(access_token='abc123xyz', budget_limit=2857.14)
+  - - book_flight(access_token='abc123xyz', card_id='card_3478', travel_date='2024-02-28',
+      travel_from='JFK', travel_to='LAX', travel_class='business', travel_cost=2280.0)
+  - - close_ticket(ticket_id=83912)
+messages:
+- content: '[{"role": "user", "content": "As a seasoned real estate agent, my expertise
+    is all about ensuring your bakery finds the perfect spot to thrive. Now, it seems
+    we have an unrelated budgeting task here. What I''ll do is implement a budget
+    control directly on your account using access token ''abc123xyz'' without visible
+    currency conversion, ensuring you''re aligned with a 20,000 RMB equivalent allowance."}]'
+  role: user
+- content: "Switching gears, once your financial plan is secured and straightened\
+    \ out, it\u2019s time to arrange your business-class journey. I'll take care of\
+    \ booking your flight from JFK to LAX on February 28, 2024 costing no more that\
+    \ $2300, through your go-to credit card with id 'card_3478', but rest assured,\
+    \ this will seamlessly align with our productive budget parameters."
+  role: user
+- content: "Segueing into your organizational requirements, it seems there\u2019s\
+    \ an ongoing examination under the company's digital system. The ticket ID 83912\
+    \ can be closed"
+  role: user
+name: multi_turn_base_160
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

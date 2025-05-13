@@ -1,0 +1,255 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        ZETA:
+          MA(20): 150.2
+          MA(5): 149.5
+          percent_change: 0.05
+          price: 150.0
+          volume: 1.0
+      transaction_history:
+      - num_shares: 10
+        order_id: 12345
+        price: 210.65
+        status: Completed
+        symbol: AAPL
+        timestamp: '2024-10-27 14:10:53'
+      watch_list:
+      - NVDA
+      - ZETA
+  involved_classes:
+  - MessageAPI
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "I have recently come across
+  Zeta Corp and I''m intrigued by their operations. Kindly include their stock in
+  my watchlist so that I can monitor it."}], [{"role": "user", "content": "I''ve been
+  following a few orders and aim to review the specifics of one with a substantial
+  order value I remember initiating. Let''s retrieve the details."}], [{"role": "user",
+  "content": "With the recent market movements, my strategies are up for reevaluation.
+  Proceed by cancelling the specific order we''ve just reviewed, given the uncertainties
+  surrounding its outcome."}], [{"role": "user", "content": "I require some confidence
+  about my current financial positioning. Share a detailed overview of my account,
+  including balances and any associated card numbers. Furthermore, logging in as USR001
+  to notify my financial advisor (user id ''USR003'') promptly about this potential
+  shift in my investment strategy with our latest account details. The message should
+  be like ''My strategy is shifting due to recent market movements and the cancellation
+  of a specific order. Current balance in my account is $10000.''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR003: My strategy is shifting due to recent market movements and the cancellation
+          of a specific order. Current balance in my account is $10000.00.
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12446
+      orders:
+        12345:
+          amount: 10
+          id: 12345
+          order_type: Buy
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        12446:
+          amount: 5
+          id: 12446
+          order_type: Sell
+          price: 2840.56
+          status: Cancelled
+          symbol: GOOG
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        ZETA:
+          MA(20): 150.2
+          MA(5): 149.5
+          percent_change: 0.05
+          price: 150.0
+          volume: 1.0
+      transaction_history:
+      - num_shares: 10
+        order_id: 12345
+        price: 210.65
+        status: Completed
+        symbol: AAPL
+        timestamp: '2024-10-27 14:10:53'
+      watch_list:
+      - NVDA
+      - ZETA
+  ground_truth_function_calls:
+  - - add_to_watchlist(stock='ZETA')
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+  - - message_login(user_id='USR001')
+    - get_account_info()
+    - send_message(receiver_id='USR003',message='My strategy is shifting due to recent
+      market movements and the cancellation of a specific order. Current balance in
+      my account is $10000.00.')
+messages:
+- content: '[{"role": "user", "content": "I have recently come across Zeta Corp and
+    I''m intrigued by their operations. Kindly include their stock in my watchlist
+    so that I can monitor it."}]'
+  role: user
+- content: I've been following a few orders and aim to review the specifics of one
+    with a substantial order value I remember initiating. Let's retrieve the details.
+  role: user
+- content: With the recent market movements, my strategies are up for reevaluation.
+    Proceed by cancelling the specific order we've just reviewed, given the uncertainties
+    surrounding its outcome.
+  role: user
+- content: I require some confidence about my current financial positioning. Share
+    a detailed overview of my account, including balances and any associated card
+    numbers. Furthermore, logging in as USR001 to notify my financial advisor (user
+    id 'USR003') promptly about this potential shift in my investment strategy with
+    our latest account details. The message should be like 'My strategy is shifting
+    due to recent market movements and the cancellation of a specific order. Current
+    balance in my account is $10000.'
+  role: user
+name: multi_turn_base_143
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

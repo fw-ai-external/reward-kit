@@ -1,0 +1,123 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            academic_venture:
+              contents:
+                goals.txt:
+                  content: Research topic selection Literature review Data collection
+                    Data analysis Draft writing Final submission
+                  type: file
+              type: directory
+            reference_goals.txt:
+              content: Data analysis Data collection Draft writing Final submission
+                Literature review Research topic selection
+              type: file
+          type: directory
+    TwitterAPI:
+      password: Kj8#mP2$vL9
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: 'Excited to start our new academic venture! #AcademicProject #ResearchGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#AcademicProject'
+          - '#ResearchGoals'
+          username: academic_researcher
+        '1':
+          content: 'Just completed the literature review. #ResearchProgress #AcademicGoals'
+          id: 1
+          mentions: []
+          tags:
+          - '#ResearchProgress'
+          - '#AcademicGoals'
+          username: academic_researcher
+        '2':
+          content: 'Final submission done! #Success #AcademicAchievement'
+          id: 2
+          mentions: []
+          tags:
+          - '#Success'
+          - '#AcademicAchievement'
+          username: academic_researcher
+      username: academic_researcher
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Directly open the academic_venture
+  folder and employ precise commands to generate a new directory for our upcoming
+  academic venture, ensuring its exact placement in our present work directory. It''s
+  name should be academic_hub"}], [{"role": "user", "content": "Within academic_venture,
+  meticulously list every project that has goal in its file name, ensuring comprehensive
+  coverage."}], [{"role": "user", "content": "For clarity, output the complete content
+  of the first file you fine on the terminal."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''academic_venture'':
+        <Directory: academic_venture, Parent: workspace, Contents: {''goals.txt'':
+        <<File: goals.txt, Content: Research topic selection Literature review Data
+        collection Data analysis Draft writing Final submission>>, ''academic_hub'':
+        <Directory: academic_hub, Parent: academic_venture, Contents: {}>}>, ''reference_goals.txt'':
+        <<File: reference_goals.txt, Content: Data analysis Data collection Draft
+        writing Final submission Literature review Research topic selection>>}>'
+    TwitterAPI:
+      authenticated: false
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Kj8#mP2$vL9
+      retweets: {}
+      tweet_counter: 3
+      tweets:
+        0:
+          content: 'Excited to start our new academic venture! #AcademicProject #ResearchGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#AcademicProject'
+          - '#ResearchGoals'
+          username: academic_researcher
+        1:
+          content: 'Just completed the literature review. #ResearchProgress #AcademicGoals'
+          id: 1
+          mentions: []
+          tags:
+          - '#ResearchProgress'
+          - '#AcademicGoals'
+          username: academic_researcher
+        2:
+          content: 'Final submission done! #Success #AcademicAchievement'
+          id: 2
+          mentions: []
+          tags:
+          - '#Success'
+          - '#AcademicAchievement'
+          username: academic_researcher
+      username: academic_researcher
+  ground_truth_function_calls:
+  - - cd(folder='academic_venture')
+    - mkdir(dir_name='academic_hub')
+  - - find(path='.',name='goal')
+  - - cat(file_name='goals.txt')
+messages:
+- content: '[{"role": "user", "content": "Directly open the academic_venture folder
+    and employ precise commands to generate a new directory for our upcoming academic
+    venture, ensuring its exact placement in our present work directory. It''s name
+    should be academic_hub"}]'
+  role: user
+- content: Within academic_venture, meticulously list every project that has goal
+    in its file name, ensuring comprehensive coverage.
+  role: user
+- content: For clarity, output the complete content of the first file you fine on
+    the terminal.
+  role: user
+name: multi_turn_base_7
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

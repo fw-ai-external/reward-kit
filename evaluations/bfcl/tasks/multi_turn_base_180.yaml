@@ -1,0 +1,104 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_queue: []
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        main_card:
+          balance: 50000.0
+          card_number: 1234-5678-9876-5432
+          cardholder_name: Michael Zhang
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Zhang
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I need to cap my travel expenses
+  at 20,000 RMB. Sort out everything to make sure this limit is correctly set up.
+  Around it to have tenth and hundredth digit. Like 12.34 as the input. My access
+  token is abc123xyz if you need."}], [{"role": "user", "content": "With my budget
+  arranged, I want to book a business class ticket going from LAX to JFK on October
+  12th 2024. Charge it to my main credit card and ensure it stays within my budget
+  plans."}], [{"role": "user", "content": "I''ve had a change of heart regarding my
+  travel itinerary. Go ahead and cancel my previous booking and process any refunds
+  due."}], [{"role": "user", "content": "I''m looking to get my hands on the invoice
+  for the flights I''ve arranged recently. Kindly send me the full details."}], [{"role":
+  "user", "content": "There''s been some confusion with the invoice. Please liaise
+  with customer support for me, explaining the issue and escalate if needed."}], [{"role":
+  "user", "content": "Initiate a new support ticket titled ''Invoice Discrepancy''
+  outlining the problem I encountered with invoicing and prioritize it at level 3.
+  My username is mzhang and password is SecurePass123"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: mzhang
+      ticket_counter: 2
+      ticket_queue:
+      - created_by: mzhang
+        description: Problem encountered with invoicing.
+        id: 1
+        priority: 3
+        status: Open
+        title: Invoice Discrepancy
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 2857.14
+      credit_card_list:
+        main_card:
+          balance: 50000.0
+          card_number: 1234-5678-9876-5432
+          cardholder_name: Michael Zhang
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Zhang
+  ground_truth_function_calls:
+  - - compute_exchange_rate(base_currency='RMB', target_currency='USD', value=20000.0)
+    - set_budget_limit(access_token='abc123xyz', budget_limit=2857.14)
+  - - get_flight_cost(travel_from='LAX', travel_to='JFK', travel_date='2024-10-12',
+      travel_class='business')
+    - book_flight(access_token='abc123xyz', card_id='main_card', travel_date='2024-10-12',
+      travel_from='LAX', travel_to='JFK', travel_class='business', travel_cost=2400.0)
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+  - []
+  - []
+  - - ticket_login(username='mzhang', password='SecurePass123')
+    - create_ticket(priority=3, title='Invoice Discrepancy', description='Problem
+      encountered with invoicing.')
+messages:
+- content: '[{"role": "user", "content": "I need to cap my travel expenses at 20,000
+    RMB. Sort out everything to make sure this limit is correctly set up. Around it
+    to have tenth and hundredth digit. Like 12.34 as the input. My access token is
+    abc123xyz if you need."}]'
+  role: user
+- content: With my budget arranged, I want to book a business class ticket going from
+    LAX to JFK on October 12th 2024. Charge it to my main credit card and ensure it
+    stays within my budget plans.
+  role: user
+- content: I've had a change of heart regarding my travel itinerary. Go ahead and
+    cancel my previous booking and process any refunds due.
+  role: user
+- content: I'm looking to get my hands on the invoice for the flights I've arranged
+    recently. Kindly send me the full details.
+  role: user
+- content: There's been some confusion with the invoice. Please liaise with customer
+    support for me, explaining the issue and escalate if needed.
+  role: user
+- content: Initiate a new support ticket titled 'Invoice Discrepancy' outlining the
+    problem I encountered with invoicing and prioritize it at level 3. My username
+    is mzhang and password is SecurePass123
+  role: user
+name: multi_turn_base_180
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

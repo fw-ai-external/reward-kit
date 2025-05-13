@@ -1,0 +1,104 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      numbers:
+      - 32.0
+      - 32.0
+      - 30.0
+      - 30.0
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 2.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m cruising down a country
+  road in my brand-new convertible, admiring the scenic lavender fields when I notice
+  the fuel gauge creeping towards empty. I''d appreciate it if you could refill with
+  10 liters of gasoline to keep the adventure alive. Use 2 decimal digit of the gallon
+  amount"}], [{"role": "user", "content": "Now that the tank is replenished, let''s
+  fire up the engine with a swift ignition and take a peek at the dashboard stats,
+  particularly the battery voltage and the AC temperature before we continue our picturesque
+  journey."}], [{"role": "user", "content": "Before we venture further into the rolling
+  hills, I''m keen on ensuring the tires'' health is up to standard. Could you check
+  the current tire pressure for each one and let me know?"}], [{"role": "user", "content":
+  "To wrap it up, what''s the average tire pressure? I want to make sure everything''s
+  in tip-top shape."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 4.640000000000001
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - liter_to_gallon(liter=10)
+    - fillFuelTank(fuelAmount=2.64)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - displayCarStatus(option='climate')
+  - - check_tire_pressure()
+  - - mean(numbers=[32.0, 32.0, 30.0, 30.0])
+messages:
+- content: '[{"role": "user", "content": "I''m cruising down a country road in my
+    brand-new convertible, admiring the scenic lavender fields when I notice the fuel
+    gauge creeping towards empty. I''d appreciate it if you could refill with 10 liters
+    of gasoline to keep the adventure alive. Use 2 decimal digit of the gallon amount"}]'
+  role: user
+- content: Now that the tank is replenished, let's fire up the engine with a swift
+    ignition and take a peek at the dashboard stats, particularly the battery voltage
+    and the AC temperature before we continue our picturesque journey.
+  role: user
+- content: Before we venture further into the rolling hills, I'm keen on ensuring
+    the tires' health is up to standard. Could you check the current tire pressure
+    for each one and let me know?
+  role: user
+- content: To wrap it up, what's the average tire pressure? I want to make sure everything's
+    in tip-top shape.
+  role: user
+name: multi_turn_base_81
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

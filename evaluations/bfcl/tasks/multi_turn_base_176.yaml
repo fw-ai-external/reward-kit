@@ -1,0 +1,113 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      current_user: john
+      ticket_queue:
+      - ticket_001:
+          description: Due to unexpected changes in schedule, the flight from JFK
+            to LAX on December 15, 2024, needs to be canceled immediately.
+          priority: 5
+          status: Open
+          subject: Urgent Flight Cancellation
+    TravelAPI:
+      access_token: ABCD1234
+      booking_record:
+        JFK-LAX-20241215:
+          arrival: LAX
+          cost: 4500.0
+          date: '2024-12-15'
+          departure: JFK
+          flight_class: Business
+          passenger_name: Alex Johnson
+      budget_limit: 5000.0
+      credit_card_list:
+        id_1234:
+          balance: 7000.0
+          card_number: '4587123498761234'
+          cardholder_name: Alex Johnson
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Alex
+      user_last_name: Johnson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning a business class
+  trip from JFK in New York to LAX in Los Angeles on December 15, 2024. Alex Johnson
+  will be my traveling companion. I intend to use my credit card with label ''id_1234''
+  to cover the $4500 trip cost. I''ve got my access token here: ABCD1234. Once booked,
+  I''ll need to cancel the trip immediately due to unexpected changes in my schedule."}],
+  [{"role": "user", "content": "Additionally, I must file a priority 5 support ticket
+  concerning the flight cancellation, labeled ''Urgent Flight Cancellation''. The
+  ticket should thoroughly explain the abrupt changes leading to the cancellation
+  and put description as Due to unexpected changes in schedule, the flight from JFK
+  to LAX on December 15, 2023, needs to be canceled immediately."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: john
+      ticket_counter: 2
+      ticket_queue:
+      - ticket_001:
+          description: Due to unexpected changes in schedule, the flight from JFK
+            to LAX on December 15, 2024, needs to be canceled immediately.
+          priority: 5
+          status: Open
+          subject: Urgent Flight Cancellation
+      - created_by: john
+        description: Due to unexpected changes in schedule, the flight from JFK to
+          LAX on December 15, 2023, needs to be canceled immediately.
+        id: 1
+        priority: 5
+        status: Open
+        title: Urgent Flight Cancellation
+    TravelAPI:
+      access_token: ABCD1234
+      booking_record:
+        JFK-LAX-20241215:
+          arrival: LAX
+          cost: 4500.0
+          date: '2024-12-15'
+          departure: JFK
+          flight_class: Business
+          passenger_name: Alex Johnson
+      budget_limit: 5000.0
+      credit_card_list:
+        id_1234:
+          balance: 7000.0
+          card_number: '4587123498761234'
+          cardholder_name: Alex Johnson
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Alex
+      user_last_name: Johnson
+  ground_truth_function_calls:
+  - - book_flight(access_token='ABCD1234', card_id='id_1234', travel_date='2024-12-15',
+      travel_from='JFK', travel_to='LAX', travel_class='business', travel_cost=4500.0)
+    - cancel_booking(access_token='ABCD1234', booking_id='3426812')
+  - - create_ticket(priority=5, title='Urgent Flight Cancellation', description='Due
+      to unexpected changes in schedule, the flight from JFK to LAX on December 15,
+      2023, needs to be canceled immediately.')
+messages:
+- content: '[{"role": "user", "content": "I''m planning a business class trip from
+    JFK in New York to LAX in Los Angeles on December 15, 2024. Alex Johnson will
+    be my traveling companion. I intend to use my credit card with label ''id_1234''
+    to cover the $4500 trip cost. I''ve got my access token here: ABCD1234. Once booked,
+    I''ll need to cancel the trip immediately due to unexpected changes in my schedule."}]'
+  role: user
+- content: Additionally, I must file a priority 5 support ticket concerning the flight
+    cancellation, labeled 'Urgent Flight Cancellation'. The ticket should thoroughly
+    explain the abrupt changes leading to the cancellation and put description as
+    Due to unexpected changes in schedule, the flight from JFK to LAX on December
+    15, 2023, needs to be canceled immediately.
+  role: user
+name: multi_turn_base_176
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

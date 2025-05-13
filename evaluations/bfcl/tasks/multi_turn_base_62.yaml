@@ -1,0 +1,111 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: Jack
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m currently in Rivermist
+  planning a trip to Stonebrook. Could you provide an estimate of the distance and
+  forward this info to my cousin Bob via text, in the format ''The distance from Rivermist
+  to Stonebrook is xxx km.'', where xxx is replaced by the distance value, in one
+  decimal place)?"}], [{"role": "user", "content": "As I set off on my drive, I need
+  you to verify that all the doors on my car are securely locked, please."}], [{"role":
+  "user", "content": "After confirming the security of the vehicle, could you initiate
+  the engine so I can check the fuel level?"}], [{"role": "user", "content": "Also,
+  at your earliest convenience, can you show me all the messages I have send so far?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: Jack
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR002: The distance from Rivermist to Stonebrook is 750.0 km.
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('Rivermist')
+    - get_zipcode_based_on_city('Stonebrook')
+    - estimate_distance(cityA='83214', cityB='74532')
+    - send_message(receiver_id='USR002', message='The distance from Rivermist to Stonebrook
+      is 750.0 km.')
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''m currently in Rivermist planning a trip
+    to Stonebrook. Could you provide an estimate of the distance and forward this
+    info to my cousin Bob via text, in the format ''The distance from Rivermist to
+    Stonebrook is xxx km.'', where xxx is replaced by the distance value, in one decimal
+    place)?"}]'
+  role: user
+- content: As I set off on my drive, I need you to verify that all the doors on my
+    car are securely locked, please.
+  role: user
+- content: After confirming the security of the vehicle, could you initiate the engine
+    so I can check the fuel level?
+  role: user
+- content: Also, at your earliest convenience, can you show me all the messages I
+    have send so far?
+  role: user
+name: multi_turn_base_62
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,232 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  involved_classes:
+  - MessageAPI
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Hey there! So I''m thinking
+  about shaking up my investment game a bit and could really use some insights. Could
+  you let me know which stocks I''ve been tracking lately, so I can delve deeper into
+  their performances and strategize my next moves?"}], [{"role": "user", "content":
+  "Seeing that I have a list of stocks I''m monitoring, let''s act on one that''s
+  making GPUs. Procure 50 shares of this stock and ensure the purchase price is optimal
+  with current market conditions."}], [{"role": "user", "content": "For the stock
+  I''ve just acquired, I''d like a concise breakdown of the transaction details to
+  ensure every component aligns with my expectations before advancing any further."}],
+  [{"role": "user", "content": "I might need a change in direction; would it be possible
+  for you to assist in reversing the transaction we just completed?"}], [{"role":
+  "user", "content": "Finally, I''m contemplating some shifts in my investments, so
+  it''s essential for me to review my account status. Can you provide a detailed summary
+  of my account, reflecting my net balance and the card tied to my account?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 50
+          id: 12446
+          order_type: Buy
+          price: 220.34
+          status: Cancelled
+          symbol: NVDA
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - get_watchlist()
+  - - get_stock_info(symbol='NVDA')
+    - place_order(order_type='Buy',symbol='NVDA',price=220.34,amount=50)
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+  - - get_account_info()
+messages:
+- content: '[{"role": "user", "content": "Hey there! So I''m thinking about shaking
+    up my investment game a bit and could really use some insights. Could you let
+    me know which stocks I''ve been tracking lately, so I can delve deeper into their
+    performances and strategize my next moves?"}]'
+  role: user
+- content: Seeing that I have a list of stocks I'm monitoring, let's act on one that's
+    making GPUs. Procure 50 shares of this stock and ensure the purchase price is
+    optimal with current market conditions.
+  role: user
+- content: For the stock I've just acquired, I'd like a concise breakdown of the transaction
+    details to ensure every component aligns with my expectations before advancing
+    any further.
+  role: user
+- content: I might need a change in direction; would it be possible for you to assist
+    in reversing the transaction we just completed?
+  role: user
+- content: Finally, I'm contemplating some shifts in my investments, so it's essential
+    for me to review my account status. Can you provide a detailed summary of my account,
+    reflecting my net balance and the card tied to my account?
+  role: user
+name: multi_turn_base_108
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

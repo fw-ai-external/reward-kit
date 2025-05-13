@@ -1,0 +1,133 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR003
+      inbox:
+      - USR002: Safe travels!
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR003
+        Emma: USR004
+        Michael: BD732D1888B94DAA
+        Sarah: USR002
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve heard a friend of mine
+  in Rivermist recently visited Stonebrook, and she mentioned the journey felt quite
+  extensive. I''m curious, do you happen to have an idea about the actual distance
+  between the two places?"}], [{"role": "user", "content": "Covering the distance
+  from Rivermist to Stonebrook sure seems like a long trip. I''m a bit worried if
+  my vehicle can endure the journey with the current fuel level. I''m not entirely
+  sure how far my car can travel on the remaining fuel. What do you think?"}], [{"role":
+  "user", "content": "Thanks a lot! Before I embark on this journey, it makes sense
+  to ensure I won''t be left stranded due to an empty tank. Just add to the tank fully."}],
+  [{"role": "user", "content": "Great, with my tank now full, let''s embark on this
+  journey. Once I''m set to go, I''d appreciate it if you could start the car for
+  me."}], [{"role": "user", "content": "By the way, as I travel, there are some updates
+  I need to communicate to my friend Michael. Would you be able to send message ''I
+  am on my way''?"}], [{"role": "user", "content": "Lastly, while I''m on the road,
+  I want to make sure I have informed everyone that should be aware. Could you display
+  what messages I''ve send thus far?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR003
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: Safe travels!
+      - BD732D1888B94DAA: I am on my way.
+      message_count: 2
+      user_count: 4
+      user_map:
+        David: USR003
+        Emma: USR004
+        Michael: BD732D1888B94DAA
+        Sarah: USR002
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city(city='Rivermist')
+    - get_zipcode_based_on_city(city='Stonebrook')
+    - estimate_distance(cityA='83214', cityB='74532')
+  - - estimate_drive_feasibility_by_mileage(distance=750.0)
+  - - fillFuelTank(fuelAmount=45.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - send_message(receiver_id='BD732D1888B94DAA', message='I am on my way.')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''ve heard a friend of mine in Rivermist
+    recently visited Stonebrook, and she mentioned the journey felt quite extensive.
+    I''m curious, do you happen to have an idea about the actual distance between
+    the two places?"}]'
+  role: user
+- content: Covering the distance from Rivermist to Stonebrook sure seems like a long
+    trip. I'm a bit worried if my vehicle can endure the journey with the current
+    fuel level. I'm not entirely sure how far my car can travel on the remaining fuel.
+    What do you think?
+  role: user
+- content: Thanks a lot! Before I embark on this journey, it makes sense to ensure
+    I won't be left stranded due to an empty tank. Just add to the tank fully.
+  role: user
+- content: Great, with my tank now full, let's embark on this journey. Once I'm set
+    to go, I'd appreciate it if you could start the car for me.
+  role: user
+- content: By the way, as I travel, there are some updates I need to communicate to
+    my friend Michael. Would you be able to send message 'I am on my way'?
+  role: user
+- content: Lastly, while I'm on the road, I want to make sure I have informed everyone
+    that should be aware. Could you display what messages I've send thus far?
+  role: user
+name: multi_turn_base_97
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

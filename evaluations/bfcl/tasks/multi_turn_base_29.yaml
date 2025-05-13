@@ -1,0 +1,52 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        Akab:
+          contents:
+            Archives:
+              contents: {}
+              type: directory
+            VisionX:
+              contents:
+                config_main.txt:
+                  content: 'This is the main configuration file. Note: deprecated
+                    features are listed here.'
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Open up ''VisionX'' folder.
+  What''s the human readible disk usage of that folder?"}], [{"role": "user", "content":
+  "Create a file name based on the number of byte used. It should be in ''number.pdf''
+  format."}], [{"role": "user", "content": "Finally, in that file, Write my last question
+  in it."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: Akab, Parent: None, Contents: {''VisionX'': <Directory: VisionX,
+        Parent: Akab, Contents: {''config_main.txt'': <<File: config_main.txt, Content:
+        This is the main configuration file. Note: deprecated features are listed
+        here.>>, ''79.pdf'': <<File: 79.pdf, Content: Create a file name based on
+        the number of byte used. It should be in ''number.pdf'' format.>>}>, ''Archives'':
+        <Directory: Archives, Parent: Akab, Contents: {}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='VisionX')
+    - du(human_readable=True)
+  - - touch(file_name='79.pdf')
+  - - echo(content='Create a file name based on the number of byte used. It should
+      be in \'number.pdf\' format.',file_name='79.pdf')
+messages:
+- content: '[{"role": "user", "content": "Open up ''VisionX'' folder. What''s the
+    human readible disk usage of that folder?"}]'
+  role: user
+- content: Create a file name based on the number of byte used. It should be in 'number.pdf'
+    format.
+  role: user
+- content: Finally, in that file, Write my last question in it.
+  role: user
+name: multi_turn_base_29
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

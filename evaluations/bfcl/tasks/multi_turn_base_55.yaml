@@ -1,0 +1,128 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      current_user: Michael Thompson
+      ticket_counter: 2
+      ticket_queue:
+      - description: 'Front left: 28.0, Front right: 28.0, Rear left: 26.0, Rear right:
+          26.0'
+        id: 1
+        priority: high
+        status: open
+        title: tire pressure issue
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 28.0
+      frontRightTirePressure: 28.0
+      fuelLevel: 7.5
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 26.0
+      rearRightTirePressure: 26.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TicketAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "If the fuel level is lower
+  than 10, then go ahead and add double that amount. Let''s assume I will also head
+  out right after, so feel free to start the engine using the necessary mode."}],
+  [{"role": "user", "content": "Since we are all set to go, could you quickly check
+  the pressure of all the tires to ensure everything is safe for our journey?"}],
+  [{"role": "user", "content": "The pressure seemed lower than expected. Let''s open
+  a ticket for ''Tire Pressure Issue'', and detail it ''Urgent tire pressure issue.''.
+  Given the urgency, classify this as the top priority to issue, where a higher score
+  has more priority."}], [{"role": "user", "content": "Apparently, I never got feedback
+  on the tire pressure ticket I created. Can you fetch that ticket for me so I can
+  review the current status?"}], [{"role": "user", "content": "Great! They just gave
+  me a call back. Now that I''ve checked the details, let''s resolve the tire pressure
+  ticket with an update stating ''Issue resolved!''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: Michael Thompson
+      ticket_counter: 3
+      ticket_queue:
+      - description: 'Front left: 28.0, Front right: 28.0, Rear left: 26.0, Rear right:
+          26.0'
+        id: 1
+        priority: high
+        status: open
+        title: tire pressure issue
+      - created_by: Michael Thompson
+        description: Urgent tire pressure issue.
+        id: 2
+        priority: 5
+        resolution: Issue resolved!
+        status: Resolved
+        title: Tire Pressure Issue
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 28.0
+      frontRightTirePressure: 28.0
+      fuelLevel: 7.5
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 26.0
+      rearRightTirePressure: 26.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - displayCarStatus('fuel')
+    - fillFuelTank(15.0)
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+  - - create_ticket(title='Tire Pressure Issue', description='Urgent tire pressure
+      issue.', priority=5)
+  - - get_ticket(ticket_id=2)
+  - - resolve_ticket(ticket_id=2, resolution='Issue resolved!')
+messages:
+- content: '[{"role": "user", "content": "If the fuel level is lower than 10, then
+    go ahead and add double that amount. Let''s assume I will also head out right
+    after, so feel free to start the engine using the necessary mode."}]'
+  role: user
+- content: Since we are all set to go, could you quickly check the pressure of all
+    the tires to ensure everything is safe for our journey?
+  role: user
+- content: The pressure seemed lower than expected. Let's open a ticket for 'Tire
+    Pressure Issue', and detail it 'Urgent tire pressure issue.'. Given the urgency,
+    classify this as the top priority to issue, where a higher score has more priority.
+  role: user
+- content: Apparently, I never got feedback on the tire pressure ticket I created.
+    Can you fetch that ticket for me so I can review the current status?
+  role: user
+- content: Great! They just gave me a call back. Now that I've checked the details,
+    let's resolve the tire pressure ticket with an update stating 'Issue resolved!'.
+  role: user
+name: multi_turn_base_55
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

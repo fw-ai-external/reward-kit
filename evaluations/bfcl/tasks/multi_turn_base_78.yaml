@@ -1,0 +1,294 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Secure123!@#
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: Just finished a great meeting!
+          id: 0
+          mentions:
+          - '@teamlead'
+          - '@clients'
+          tags:
+          - '#business'
+          - '#meeting'
+          - '#success'
+          username: businesspro
+        '1':
+          content: Heading to the airport.
+          id: 1
+          mentions: []
+          tags:
+          - '#travel'
+          - '#business'
+          - '#onthego'
+          username: businesspro
+        '2':
+          content: Excited for the new project launch!
+          id: 2
+          mentions:
+          - '@projectteam'
+          tags:
+          - '#project'
+          - '#launch'
+          - '#excited'
+          username: businesspro
+        '3':
+          content: Networking is key to success.
+          id: 3
+          mentions: []
+          tags:
+          - '#networking'
+          - '#success'
+          - '#business'
+          username: businesspro
+        '4':
+          content: Always learning and growing.
+          id: 4
+          mentions: []
+          tags:
+          - '#growth'
+          - '#learning'
+          - '#motivation'
+          username: businesspro
+        '5':
+          content: Teamwork makes the dream work.
+          id: 5
+          mentions:
+          - '@team'
+          tags:
+          - '#teamwork'
+          - '#success'
+          - '#collaboration'
+          username: businesspro
+        '6':
+          content: Innovation is the future.
+          id: 6
+          mentions: []
+          tags:
+          - '#innovation'
+          - '#future'
+          - '#tech'
+          username: businesspro
+        '7':
+          content: Stay positive and productive.
+          id: 7
+          mentions: []
+          tags:
+          - '#positive'
+          - '#productive'
+          - '#mindset'
+          username: businesspro
+        '8':
+          content: Grateful for the opportunities.
+          id: 8
+          mentions: []
+          tags:
+          - '#grateful'
+          - '#opportunities'
+          - '#blessed'
+          username: businesspro
+        '9':
+          content: BusinessOnTheMove
+          id: 9
+          mentions: []
+          tags:
+          - '#business'
+          - '#hustle'
+          - '#entrepreneur'
+          username: businesspro
+      username: businesspro
+    VehicleControlAPI:
+      acMode: cool
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: active
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: running
+      fanSpeed: 70
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.5
+      headLightStatus: 'on'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 33.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m gearing up for a quick
+  business getaway and need my ride all set. Would you be able to verify if my tire
+  pressure is in check? If it falls under 37.5 PSI, perhaps we could swing by the
+  nearest tire shop?"}], [{"role": "user", "content": "While we head over to ensure
+  my tires are roadworthy, I''d like to send out a swift update on my business account.
+  Let''s post a tweet: ''Ensuring my wheels are well-maintained. Maintenance is key
+  to success!'' with the hashtag ''BusinessOnTheMove''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Secure123!@#
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: Just finished a great meeting!
+          id: 0
+          mentions:
+          - '@teamlead'
+          - '@clients'
+          tags:
+          - '#business'
+          - '#meeting'
+          - '#success'
+          username: businesspro
+        1:
+          content: Heading to the airport.
+          id: 1
+          mentions: []
+          tags:
+          - '#travel'
+          - '#business'
+          - '#onthego'
+          username: businesspro
+        2:
+          content: Excited for the new project launch!
+          id: 2
+          mentions:
+          - '@projectteam'
+          tags:
+          - '#project'
+          - '#launch'
+          - '#excited'
+          username: businesspro
+        3:
+          content: Networking is key to success.
+          id: 3
+          mentions: []
+          tags:
+          - '#networking'
+          - '#success'
+          - '#business'
+          username: businesspro
+        4:
+          content: Always learning and growing.
+          id: 4
+          mentions: []
+          tags:
+          - '#growth'
+          - '#learning'
+          - '#motivation'
+          username: businesspro
+        5:
+          content: Teamwork makes the dream work.
+          id: 5
+          mentions:
+          - '@team'
+          tags:
+          - '#teamwork'
+          - '#success'
+          - '#collaboration'
+          username: businesspro
+        6:
+          content: Innovation is the future.
+          id: 6
+          mentions: []
+          tags:
+          - '#innovation'
+          - '#future'
+          - '#tech'
+          username: businesspro
+        7:
+          content: Stay positive and productive.
+          id: 7
+          mentions: []
+          tags:
+          - '#positive'
+          - '#productive'
+          - '#mindset'
+          username: businesspro
+        8:
+          content: Grateful for the opportunities.
+          id: 8
+          mentions: []
+          tags:
+          - '#grateful'
+          - '#opportunities'
+          - '#blessed'
+          username: businesspro
+        9:
+          content: BusinessOnTheMove
+          id: 9
+          mentions: []
+          tags:
+          - '#business'
+          - '#hustle'
+          - '#entrepreneur'
+          username: businesspro
+        10:
+          content: Ensuring my wheels are well-maintained. Maintenance is key to success!
+          id: 10
+          mentions:
+          - '#BusinessOnTheMove'
+          tags: []
+          username: businesspro
+      username: businesspro
+    VehicleControlAPI:
+      acMode: cool
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: released
+      cruiseStatus: active
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 70
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.5
+      headLightStatus: 'on'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 33.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+  - - post_tweet(content='Ensuring my wheels are well-maintained. Maintenance is key
+      to success!', mentions=['#BusinessOnTheMove'])
+messages:
+- content: '[{"role": "user", "content": "I''m gearing up for a quick business getaway
+    and need my ride all set. Would you be able to verify if my tire pressure is in
+    check? If it falls under 37.5 PSI, perhaps we could swing by the nearest tire
+    shop?"}]'
+  role: user
+- content: 'While we head over to ensure my tires are roadworthy, I''d like to send
+    out a swift update on my business account. Let''s post a tweet: ''Ensuring my
+    wheels are well-maintained. Maintenance is key to success!'' with the hashtag
+    ''BusinessOnTheMove''.'
+  role: user
+name: multi_turn_base_78
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

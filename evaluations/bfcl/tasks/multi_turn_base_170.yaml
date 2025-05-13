@@ -1,0 +1,147 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: access_token_abc123
+      booking_record:
+        booking123:
+          cost: 350.0
+          date: '2024-11-15'
+          departure: San Francisco
+          destination: Los Angeles
+          flight_number: SF-LA123
+          travel_class: Business
+      budget_limit: 1000.0
+      credit_card_list:
+        card123:
+          balance: 5000.0
+          card_number: 1234-5678-9876-5432
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      - charlie
+      password: michael1234
+      retweets: {}
+      tweet_counter: 0
+      tweets: {}
+      username: michael_smith
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning to jet off and
+  stumbled upon a nifty flight from San Francisco to Los Angeles. Since my budget
+  isn''t too tight, why don''t you go ahead and snag that booking for me? You should
+  know my travel class is ''first'' and travel date is ''2024-11-15''. Oh, and I''ve
+  got my card with id ''card123'' and account token ''access_token_abc123'' all good
+  to go."}], [{"role": "user", "content": "With my flight all set, can you whip up
+  those invoice details for me? I need a nice little record of when I''m traveling,
+  where I''m headed, and how much it''s setting me back."}], [{"role": "user", "content":
+  "If things go south with my itinerary, could you be a champ and get me in touch
+  with customer support? Just mention my confirmed booking when you connect us."}],
+  [{"role": "user", "content": "Thinking I might need to call off this trip. Could
+  you chat with support to cancel my reservation and make sure my account gets the
+  refund? Thanks a bunch!"}], [{"role": "user", "content": "I''ve picked up some nifty
+  travel insights from my adventures, and I''ve got the itch to share them. Could
+  you pen a tweet on my behalf using username ''michael_smith'' and password ''michael1234''
+  if I toss you the points? The tweet should say ''Exploring the world, one city at
+  a time!''. Maybe sprinkle in trendy hashtags ''Travel'' and ''Adventure''."}], [{"role":
+  "user", "content": "Wow, the tweet with the travel tips got a hit! Can you give
+  it a boost by retweeting it for me? Let''s get it out to even more folks."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: access_token_abc123
+      booking_record:
+        booking123:
+          cost: 350.0
+          date: '2024-11-15'
+          departure: San Francisco
+          destination: Los Angeles
+          flight_number: SF-LA123
+          travel_class: Business
+      budget_limit: 1000.0
+      credit_card_list:
+        card123:
+          balance: 5000.0
+          card_number: 1234-5678-9876-5432
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      - charlie
+      password: michael1234
+      retweets:
+        michael_smith:
+        - 0
+      tweet_counter: 1
+      tweets:
+        0:
+          content: Exploring the world, one city at a time!
+          id: 0
+          mentions: []
+          tags:
+          - '#Travel'
+          - '#Adventure'
+          username: michael_smith
+      username: michael_smith
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO',travel_to='LAX',travel_date='2024-11-15',travel_class='first')
+    - book_flight(access_token='access_token_abc123', card_id='card123', travel_date='2024-11-15',
+      travel_from='SFO', travel_to='LAX', travel_class='first', travel_cost=2000.0)
+  - - retrieve_invoice(access_token='access_token_abc123', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Please assist with my
+      confirmed booking.')
+  - - cancel_booking(access_token='access_token_abc123', booking_id='3426812')
+  - - authenticate_twitter(username='michael_smith', password='michael1234')
+    - post_tweet(content='Exploring the world, one city at a time!', tags=['#Travel',
+      '#Adventure'])
+  - - retweet(tweet_id=0)
+messages:
+- content: '[{"role": "user", "content": "I''m planning to jet off and stumbled upon
+    a nifty flight from San Francisco to Los Angeles. Since my budget isn''t too tight,
+    why don''t you go ahead and snag that booking for me? You should know my travel
+    class is ''first'' and travel date is ''2024-11-15''. Oh, and I''ve got my card
+    with id ''card123'' and account token ''access_token_abc123'' all good to go."}]'
+  role: user
+- content: With my flight all set, can you whip up those invoice details for me? I
+    need a nice little record of when I'm traveling, where I'm headed, and how much
+    it's setting me back.
+  role: user
+- content: If things go south with my itinerary, could you be a champ and get me in
+    touch with customer support? Just mention my confirmed booking when you connect
+    us.
+  role: user
+- content: Thinking I might need to call off this trip. Could you chat with support
+    to cancel my reservation and make sure my account gets the refund? Thanks a bunch!
+  role: user
+- content: I've picked up some nifty travel insights from my adventures, and I've
+    got the itch to share them. Could you pen a tweet on my behalf using username
+    'michael_smith' and password 'michael1234' if I toss you the points? The tweet
+    should say 'Exploring the world, one city at a time!'. Maybe sprinkle in trendy
+    hashtags 'Travel' and 'Adventure'.
+  role: user
+- content: Wow, the tweet with the travel tips got a hit! Can you give it a boost
+    by retweeting it for me? Let's get it out to even more folks.
+  role: user
+name: multi_turn_base_170
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

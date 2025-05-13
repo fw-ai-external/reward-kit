@@ -1,0 +1,81 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 28.0
+      frontRightTirePressure: 28.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 28.0
+      rearRightTirePressure: 28.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "My vehicle''s fuel tank is
+  low; please refuel it with 30 gallons. Following that, initiate the engine using
+  ignition mode ''START'', ensuring all doors are secured and the parking brake is
+  set to avoid errors."}], [{"role": "user", "content": "Post-engine start, verify
+  tire pressure. If it''s insufficient (less than 30.0 psi), proceed to the nearest
+  tire shop at 456 Oakwood Avenue, Rivermist, 83214."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 28.0
+      frontRightTirePressure: 28.0
+      fuelLevel: 35.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 28.0
+      rearRightTirePressure: 28.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - fillFuelTank(fuelAmount=30)
+    - activateParkingBrake(mode='engage')
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+messages:
+- content: '[{"role": "user", "content": "My vehicle''s fuel tank is low; please refuel
+    it with 30 gallons. Following that, initiate the engine using ignition mode ''START'',
+    ensuring all doors are secured and the parking brake is set to avoid errors."}]'
+  role: user
+- content: Post-engine start, verify tire pressure. If it's insufficient (less than
+    30.0 psi), proceed to the nearest tire shop at 456 Oakwood Avenue, Rivermist,
+    83214.
+  role: user
+name: multi_turn_base_84
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

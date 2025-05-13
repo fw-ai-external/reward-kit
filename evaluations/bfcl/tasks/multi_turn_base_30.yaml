@@ -1,0 +1,131 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            ProjectApollo:
+              contents: {}
+              type: directory
+            project:
+              contents:
+                test_results.json:
+                  content: '{"experiment": "Apollo Test", "result": "Success", "details":
+                    "All systems operational."}'
+                  type: file
+              type: directory
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      password: Ap0ll0T3st2023!
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Excited to announce the discovery of the Apollo Test results!
+          id: 0
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#Science'
+          - '#Discovery'
+          username: apollo_scientist
+        '1':
+          content: Stay tuned for more updates on Project Apollo!
+          id: 1
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#ProjectApollo'
+          - '#Updates'
+          username: apollo_scientist
+        '2':
+          content: The Apollo Test was a success!
+          id: 2
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#Success'
+          - '#Testing'
+          username: apollo_scientist
+      username: apollo_scientist
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Search for test result of
+  Apollo Project which is supposed to be in the project directory. It''s likely a
+  JSON file. While it''s a secret file, please take a look and tell me what''s inside."}],
+  [{"role": "user", "content": "Craft and broadcast an electrifying tweet on my profile,
+  sharing with the world the thrilling discovery of these previously hidden test result
+  files exactly as it is in the body of the tweet! Share the entire content of the
+  file."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''ProjectApollo'': <Directory:
+        ProjectApollo, Parent: workspace, Contents: {}>, ''project'': <Directory:
+        project, Parent: workspace, Contents: {''test_results.json'': <<File: test_results.json,
+        Content: {"experiment": "Apollo Test", "result": "Success", "details": "All
+        systems operational."}>>}>}>'
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Ap0ll0T3st2023!
+      retweets: {}
+      tweet_counter: 4
+      tweets:
+        0:
+          content: Excited to announce the discovery of the Apollo Test results!
+          id: 0
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#Science'
+          - '#Discovery'
+          username: apollo_scientist
+        1:
+          content: Stay tuned for more updates on Project Apollo!
+          id: 1
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#ProjectApollo'
+          - '#Updates'
+          username: apollo_scientist
+        2:
+          content: The Apollo Test was a success!
+          id: 2
+          mentions: []
+          tags:
+          - '#Apollo'
+          - '#Success'
+          - '#Testing'
+          username: apollo_scientist
+        3:
+          content: '{experiment: Apollo Test, result: Success, details: All systems
+            operational.}'
+          id: 3
+          mentions: []
+          tags: []
+          username: apollo_scientist
+      username: apollo_scientist
+  ground_truth_function_calls:
+  - - cd(folder='project')
+    - cat(file_name='test_results.json')
+  - - 'post_tweet(content=''{experiment: Apollo Test, result: Success, details: All
+      systems operational.}'')'
+messages:
+- content: '[{"role": "user", "content": "Search for test result of Apollo Project
+    which is supposed to be in the project directory. It''s likely a JSON file. While
+    it''s a secret file, please take a look and tell me what''s inside."}]'
+  role: user
+- content: Craft and broadcast an electrifying tweet on my profile, sharing with the
+    world the thrilling discovery of these previously hidden test result files exactly
+    as it is in the body of the tweet! Share the entire content of the file.
+  role: user
+name: multi_turn_base_30
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

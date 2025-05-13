@@ -1,0 +1,96 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_queue:
+      - booking_id: booking_001
+        id: ticket_001
+        issue: Unnecessary ticket
+        status: Open
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        card_1496:
+          balance: 15000.0
+          card_number: '**** **** **** 1496'
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m considering flying from
+  Los Angeles Internationa (LAX) to John F. Kennedy (JFK) in business class on November
+  15, 2024. What would this flight typically cost?"}], [{"role": "user", "content":
+  "Once I know the cost, I need that in pounds sterling \u2014 it''s easier for my
+  budget planning. Let''s base future travel expenses on $10,000 using access token
+  ''abc123xyz''."}], [{"role": "user", "content": "Okay, I''ve sorted out my budget.
+  Let''s go ahead and book the flight as we discussed. Use my card \u2014 it''s the
+  one with id card_1496 \u2014."}], [{"role": "user", "content": "I noticed there''s
+  a ticket linked with this booking that I no longer find necessary. Can you cancel
+  it on my behalf?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue:
+      - booking_id: booking_001
+        id: ticket_001
+        issue: Unnecessary ticket
+        status: Closed
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_1496
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 2400.0
+          travel_date: '2024-11-15'
+          travel_from: LAX
+          travel_to: JFK
+      budget_limit: 10000.0
+      credit_card_list:
+        card_1496:
+          balance: 12600.0
+          card_number: '**** **** **** 1496'
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='LAX', travel_to='JFK', travel_date='2024-11-15',
+      travel_class='business')
+  - - compute_exchange_rate(base_currency='USD', target_currency='GBP', value=2400.0)
+    - set_budget_limit(access_token='abc123xyz', budget_limit=10000.0)
+  - - book_flight(access_token='abc123xyz', card_id='card_1496', travel_date='2024-11-15',
+      travel_from='LAX', travel_to='JFK', travel_class='business', travel_cost=2400.0)
+  - - close_ticket(ticket_id='ticket_001')
+messages:
+- content: '[{"role": "user", "content": "I''m considering flying from Los Angeles
+    Internationa (LAX) to John F. Kennedy (JFK) in business class on November 15,
+    2024. What would this flight typically cost?"}]'
+  role: user
+- content: "Once I know the cost, I need that in pounds sterling \u2014 it's easier\
+    \ for my budget planning. Let's base future travel expenses on $10,000 using access\
+    \ token 'abc123xyz'."
+  role: user
+- content: "Okay, I've sorted out my budget. Let's go ahead and book the flight as\
+    \ we discussed. Use my card \u2014 it's the one with id card_1496 \u2014."
+  role: user
+- content: I noticed there's a ticket linked with this booking that I no longer find
+    necessary. Can you cancel it on my behalf?
+  role: user
+name: multi_turn_base_173
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

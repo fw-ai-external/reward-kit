@@ -1,0 +1,213 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 15000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  involved_classes:
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Let''s envision you suddenly
+  grasp that gauging the stock market''s current state is pivotal before making any
+  trading moves. Enlighten me, is the market open or closed given the time right now?"}],
+  [{"role": "user", "content": "Having established the market scenario, imagine you''re
+  poised to place an order to acquire 150 shares of ''NEPT'' at 25.50 USD per share.
+  Would you initiate this order for me?"}], [{"role": "user", "content": "Once you''ve
+  positioned this order, curiosity strikes about its intricate details. Would you
+  mind fetching those details for me now?"}], [{"role": "user", "content": "After
+  a detailed inspection of the order, a change of heart leads you to rescind the transaction.
+  Would you revoke the placed order?"}], [{"role": "user", "content": "Post cancellation,
+  you''re driven to survey your financial standing. Would you compile and relay a
+  summary of your current account particulars?"}], [{"role": "user", "content": "Armed
+  with the account overview, you''ve resolved to infuse 5000 USD into your trading
+  account for potential ventures ahead. Could you arrange for this deposit to be processed
+  efficiently?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 20000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        order_type: Buy
+        12446:
+          amount: 150
+          id: 12446
+          order_type: Buy
+          price: 25.5
+          status: Cancelled
+          symbol: NEPT
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history:
+      - amount: 5000.0
+        timestamp: '2024-09-02 05:40:15'
+        type: deposit
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - get_current_time()
+    - update_market_status(current_time_str='10:30 AM')
+  - - place_order(order_type='Buy',symbol='NEPT',price=25.5,amount=150)
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+  - - get_account_info()
+  - - fund_account(amount=5000.0)
+messages:
+- content: '[{"role": "user", "content": "Let''s envision you suddenly grasp that
+    gauging the stock market''s current state is pivotal before making any trading
+    moves. Enlighten me, is the market open or closed given the time right now?"}]'
+  role: user
+- content: Having established the market scenario, imagine you're poised to place
+    an order to acquire 150 shares of 'NEPT' at 25.50 USD per share. Would you initiate
+    this order for me?
+  role: user
+- content: Once you've positioned this order, curiosity strikes about its intricate
+    details. Would you mind fetching those details for me now?
+  role: user
+- content: After a detailed inspection of the order, a change of heart leads you to
+    rescind the transaction. Would you revoke the placed order?
+  role: user
+- content: Post cancellation, you're driven to survey your financial standing. Would
+    you compile and relay a summary of your current account particulars?
+  role: user
+- content: Armed with the account overview, you've resolved to infuse 5000 USD into
+    your trading account for potential ventures ahead. Could you arrange for this
+    deposit to be processed efficiently?
+  role: user
+name: multi_turn_base_130
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

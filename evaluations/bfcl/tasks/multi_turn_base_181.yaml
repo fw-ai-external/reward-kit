@@ -1,0 +1,126 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_counter: 1
+      ticket_queue:
+      - ticket001:
+          description: The abrupt cancellation caused significant inconvenience, disrupting
+            my travel plans and causing financial loss.
+          title: Flight Cancellation Experience
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        booking123:
+          cost: 1200.0
+          flight_number: LA123
+          passport_number: '123456'
+      budget_limit: 5000.0
+      credit_card_list:
+        card_3456:
+          balance: 15000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Carlos Martinez
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Carlos
+      user_last_name: Martinez
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve recently retired after
+  spending years poring over electrical blueprints and energy systems across Spain.
+  I''m planning an invigorating journey and wish to ensure all my travel details are
+  meticulously verified. Please confirm my information using the passport number ''123456''
+  I''ve shared with you. The name and DoB are Carlos Martinez and March 23, 1968"}],
+  [{"role": "user", "content": "In verifying this, kindly identify the most convenient
+  airport for me if I''m residing in bustling New York City. Additionally, provide
+  an estimate for a first-class journey to the sun-drenched coast of Los Angeles next
+  week Oct 10 2024."}], [{"role": "user", "content": "With this estimate in hand,
+  arrange the flight using my credentials with id ''card_3456'' and access token ''abc123xyz'',
+  ensuring a seamless payment process and detailing my travel itinerary."}], [{"role":
+  "user", "content": "However, an unexpected situation has prompted me to reconsider.
+  Kindly cancel the flight immediately, sparing no time."}], [{"role": "user", "content":
+  "As I''ve encountered some unexpected issues, I need to submit a formal complaint
+  about the abrupt cancellation. Title it ''Flight Cancellation Experience'' and include
+  in the message: ''The abrupt cancellation caused significant inconvenience, disrupting
+  my travel plans and causing financial loss.''. My username is cmartinez, and password
+  is SecurePass123"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: cmartinez
+      ticket_counter: 2
+      ticket_queue:
+      - ticket001:
+          description: The abrupt cancellation caused significant inconvenience, disrupting
+            my travel plans and causing financial loss.
+          title: Flight Cancellation Experience
+      - created_by: cmartinez
+        description: The abrupt cancellation caused significant inconvenience, disrupting
+          my travel plans and causing financial loss.
+        id: 1
+        priority: 1
+        status: Open
+        title: Flight Cancellation Experience
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        booking123:
+          cost: 1200.0
+          flight_number: LA123
+          passport_number: '123456'
+      budget_limit: 5000.0
+      credit_card_list:
+        card_3456:
+          balance: 15000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Carlos Martinez
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Carlos
+      user_last_name: Martinez
+  ground_truth_function_calls:
+  - - verify_traveler_information(first_name='Carlos', last_name='Martinez', date_of_birth='1968-03-23',
+      passport_number='123456')
+  - - get_flight_cost(travel_from='JFK', travel_to='LAX', travel_date='2024-10-10',
+      travel_class='first')
+  - - book_flight(access_token='abc123xyz', card_id='card_3456', travel_date='2024-10-10',
+      travel_from='JFK', travel_to='LAX', travel_class='first', travel_cost=5700.0)
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+  - - ticket_login(username='cmartinez', password='SecurePass123')
+    - create_ticket(title='Flight Cancellation Experience', description='The abrupt
+      cancellation caused significant inconvenience, disrupting my travel plans and
+      causing financial loss.')
+messages:
+- content: '[{"role": "user", "content": "I''ve recently retired after spending years
+    poring over electrical blueprints and energy systems across Spain. I''m planning
+    an invigorating journey and wish to ensure all my travel details are meticulously
+    verified. Please confirm my information using the passport number ''123456'' I''ve
+    shared with you. The name and DoB are Carlos Martinez and March 23, 1968"}]'
+  role: user
+- content: In verifying this, kindly identify the most convenient airport for me if
+    I'm residing in bustling New York City. Additionally, provide an estimate for
+    a first-class journey to the sun-drenched coast of Los Angeles next week Oct 10
+    2024.
+  role: user
+- content: With this estimate in hand, arrange the flight using my credentials with
+    id 'card_3456' and access token 'abc123xyz', ensuring a seamless payment process
+    and detailing my travel itinerary.
+  role: user
+- content: However, an unexpected situation has prompted me to reconsider. Kindly
+    cancel the flight immediately, sparing no time.
+  role: user
+- content: 'As I''ve encountered some unexpected issues, I need to submit a formal
+    complaint about the abrupt cancellation. Title it ''Flight Cancellation Experience''
+    and include in the message: ''The abrupt cancellation caused significant inconvenience,
+    disrupting my travel plans and causing financial loss.''. My username is cmartinez,
+    and password is SecurePass123'
+  role: user
+name: multi_turn_base_181
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

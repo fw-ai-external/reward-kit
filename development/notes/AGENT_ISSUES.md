@@ -656,3 +656,48 @@ These two tests may require:
 *   Deeper, interactive debugging to inspect the types and attributes of `member` objects as seen by `_get_available_tools` within the `pytest` execution environment.
 *   Investigation into potential subtle interactions between `inspect.getmembers`, `unittest.mock.AsyncMock` (specifically attributes that are mocks themselves), and the `pytest-asyncio` environment.
 *   Consideration of an alternative mocking strategy for `tools_module` in these specific tests if the current approach with `AsyncMock` attributes on a custom object remains problematic for discovery. For example, using a dynamically created actual module with real `async def` functions that are then individually patched for assertion if needed.
+
+After that, we should actually try to test all the models end to end. Right now we have only ran 
+
+```
+export PYTHONPATH="references/verifiers:$PYTHONPATH" && export MODEL_AGENT="test_model" && reward-kit agent-eval-v2 --task-def evaluations/bfcl/tasks/multi_turn_base_0.yaml
+```
+
+Which is overly simplistic, and even for that the result looks really off
+
+```
+(.venv) (base) bchen@dev-modeling:~/home/reward-kit(main)$ export PYTHONPATH="references/verifiers:$PYTHONPATH" && export MODEL_AGENT="test_model" && reward-kit agent-eval-v2 --task-def evaluations/bfcl/tasks/multi_turn_base_0.yaml
+INFO:agent_eval_v2:Starting agent-eval-v2 command.
+INFO:agent_eval_v2:Successfully loaded task definition from YAML: evaluations/bfcl/tasks/multi_turn_base_0.yaml
+INFO:agent_eval_v2:Task definition validated successfully: multi_turn_base_0
+INFO:Orchestrator.multi_turn_base_0:Orchestrator initialized for task: multi_turn_base_0
+INFO:Orchestrator.multi_turn_base_0:No 'tools_module_path' specified. Tools may only come from resource.get_tools_spec().
+INFO:Orchestrator.multi_turn_base_0:Successfully loaded function 'bfcl_reward' from module 'reward_kit.rewards'.
+INFO:Orchestrator.multi_turn_base_0:Attempting to set up base resource of type 'BFCLSimAPIResource'...
+INFO:datasets:PyTorch version 2.6.0 available.
+INFO 05-13 04:01:41 [importing.py:53] Triton module has been replaced with a placeholder.
+INFO 05-13 04:01:42 [__init__.py:239] Automatically detected platform cuda.
+INFO:Orchestrator.multi_turn_base_0:Base resource 'BFCLSimAPIResource' setup complete.
+INFO:Orchestrator.multi_turn_base_0:Starting PoC execution for task 'multi_turn_base_0'...
+INFO:Orchestrator.multi_turn_base_0:Forking base resource for episode...
+INFO:Orchestrator.multi_turn_base_0:Episode resource forked: BFCLSimAPIResource
+INFO:Orchestrator.multi_turn_base_0:Turn 0: Initial Observation: {'TwitterAPI': {'username': 'analyst_pro', 'password': 'Kj8#mP9$vL2', 'authenticated': False, 'tweets': {0: {'content': 'Just finished analyzing the reports!', 'id': 0, 'mentions': [], 'tags': ['#anal...
+INFO:Orchestrator.multi_turn_base_0:Combined available tools: []
+INFO:Orchestrator.multi_turn_base_0:--- Turn 1/3 ---
+INFO:Orchestrator.multi_turn_base_0:No tools available. Ending interaction.
+INFO:Orchestrator.multi_turn_base_0:Evaluating task outcome...
+DEBUG:Orchestrator.multi_turn_base_0:Evaluation criteria object: final_state_query=None expected_query_result_transform=None ground_truth_function_calls=[["cd(folder='document')", "mkdir(dir_name='temp')", "mv(source='final_report.pdf', destination='temp')"], ["cd(folder='temp')", "grep(file_name='final_report.pdf',pattern='budget analysis')"], ["sort('final_report.pdf')"], ["cd(folder='..')", "mv(source='previous_report.pdf',destination='temp')", "cd(folder='temp')", "diff(file_name1='final_report.pdf',file_name2='previous_report.pdf')"]] ground_truth_comparable_state={'GorillaFileSystem': {'long_context': False, 'root': "<Directory: workspace, Parent: None, Contents: {'document': <Directory: document, Parent: workspace, Contents: {'temp': <Directory: temp, Parent: document, Contents: {'final_report.pdf': <<File: final_report.pdf, Content: Year2024 This is the final report content including budget analysis and other sections.>>, 'previous_report.pdf': <<File: previous_report.pdf, Content: Year203 This is the previous report content with different budget analysis.>>}>}>, 'archive': <Directory: archive, Parent: workspace, Contents: {}>}>"}, 'TwitterAPI': {'authenticated': False, 'comments': {}, 'following_list': ['alice', 'bob'], 'password': 'Kj8#mP9$vL2', 'retweets': {}, 'tweet_counter': 3, 'tweets': {0: {'content': 'Just finished analyzing the reports!', 'id': 0, 'mentions': [], 'tags': ['#analysis', '#reports'], 'username': 'analyst_pro'}, 1: {'content': 'Budget analysis insights coming soon!', 'id': 1, 'mentions': [], 'tags': ['#budget', '#analysis', '#insights'], 'username': 'analyst_pro'}, 2: {'content': 'Stay tuned for more updates!', 'id': 2, 'mentions': [], 'tags': ['#updates', '#staytuned'], 'username': 'analyst_pro'}}, 'username': 'analyst_pro'}}
+DEBUG:Orchestrator.multi_turn_base_0:Evaluation criteria ground_truth_function_calls: [["cd(folder='document')", "mkdir(dir_name='temp')", "mv(source='final_report.pdf', destination='temp')"], ["cd(folder='temp')", "grep(file_name='final_report.pdf',pattern='budget analysis')"], ["sort('final_report.pdf')"], ["cd(folder='..')", "mv(source='previous_report.pdf',destination='temp')", "cd(folder='temp')", "diff(file_name1='final_report.pdf',file_name2='previous_report.pdf')"]]
+DEBUG:Orchestrator.multi_turn_base_0:Evaluation criteria ground_truth_comparable_state: {'GorillaFileSystem': {'long_context': False, 'root': "<Directory: workspace, Parent: None, Contents: {'document': <Directory: document, Parent: workspace, Contents: {'temp': <Directory: temp, Parent: document, Contents: {'final_report.pdf': <<File: final_report.pdf, Content: Year2024 This is the final report content including budget analysis and other sections.>>, 'previous_report.pdf': <<File: previous_report.pdf, Content: Year203 This is the previous report content with different budget analysis.>>}>}>, 'archive': <Directory: archive, Parent: workspace, Contents: {}>}>"}, 'TwitterAPI': {'authenticated': False, 'comments': {}, 'following_list': ['alice', 'bob'], 'password': 'Kj8#mP9$vL2', 'retweets': {}, 'tweet_counter': 3, 'tweets': {0: {'content': 'Just finished analyzing the reports!', 'id': 0, 'mentions': [], 'tags': ['#analysis', '#reports'], 'username': 'analyst_pro'}, 1: {'content': 'Budget analysis insights coming soon!', 'id': 1, 'mentions': [], 'tags': ['#budget', '#analysis', '#insights'], 'username': 'analyst_pro'}, 2: {'content': 'Stay tuned for more updates!', 'id': 2, 'mentions': [], 'tags': ['#updates', '#staytuned'], 'username': 'analyst_pro'}}, 'username': 'analyst_pro'}}
+INFO:Orchestrator.multi_turn_base_0:Final tool usage counts from DB: {}
+DEBUG:bfcl_reward:Ground truth function calls received: None
+DEBUG:bfcl_reward:Ground truth comparable state received: None
+INFO:Orchestrator.multi_turn_base_0:Reward function result: error=None score=0.0 reason='Ground truth data not provided for BFCL reward.' metrics={}
+INFO:Orchestrator.multi_turn_base_0:Episode resource closed.
+INFO:Orchestrator.multi_turn_base_0:Base resource closed.
+INFO:Orchestrator.multi_turn_base_0:PoC execution for task 'multi_turn_base_0' finished.
+INFO:agent_eval_v2:Orchestrator PoC execution result: error=None score=0.0 reason='Ground truth data not provided for BFCL reward.' metrics={}
+INFO:agent_eval_v2:agent-eval-v2 command finished successfully.
+```
+
+I think we should just target v2 eval directly running OpenAI latest function calling model.

@@ -1,0 +1,105 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      precision: 10
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I recently moved to San Francisco
+  and I\u2019m planning a trip to Rivermist. How far apart are these places? I''d
+  like to gauge the distance before setting off on this adventure."}], [{"role": "user",
+  "content": "Now that I have the distance sorted, I''m considering the fuel situation.
+  What''s the current level of gasoline I have in liters?"}], [{"role": "user", "content":
+  "With the liters in mind, I''ll need to top up my vehicle\u2019s tank. Please go
+  ahead and fill up the tank before I hit the road."}], [{"role": "user", "content":
+  "As the journey is about to begin, could you kindly engage the ''START'' ignition
+  mode to ready the vehicle? I want to ensure everything''s in perfect working order
+  before I drive off."}], [{"role": "user", "content": "Finally, I''m analyzing mileage
+  statistics and need the logarithm of the distance to the base the previous fuel
+  value, computed to a precision of 10. Use base of 20. This will help with assessing
+  the fuel efficiency patterns."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+  - - displayCarStatus(option='fuel')
+    - gallon_to_liter(gallon=10)
+  - - fillFuelTank(fuelAmount=40)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - logarithm(value=980.0, base=20, precision=10)
+messages:
+- content: '[{"role": "user", "content": "I recently moved to San Francisco and I\u2019m
+    planning a trip to Rivermist. How far apart are these places? I''d like to gauge
+    the distance before setting off on this adventure."}]'
+  role: user
+- content: Now that I have the distance sorted, I'm considering the fuel situation.
+    What's the current level of gasoline I have in liters?
+  role: user
+- content: "With the liters in mind, I'll need to top up my vehicle\u2019s tank. Please\
+    \ go ahead and fill up the tank before I hit the road."
+  role: user
+- content: As the journey is about to begin, could you kindly engage the 'START' ignition
+    mode to ready the vehicle? I want to ensure everything's in perfect working order
+    before I drive off.
+  role: user
+- content: Finally, I'm analyzing mileage statistics and need the logarithm of the
+    distance to the base the previous fuel value, computed to a precision of 10. Use
+    base of 20. This will help with assessing the fuel efficiency patterns.
+  role: user
+name: multi_turn_base_59
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,99 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        tmp:
+          contents:
+            report.txt:
+              content: Initial report content Unsorted data More unsorted data
+              type: file
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      comments:
+        '1':
+        - comment: Excited to share our insights!
+          username: tech_guru
+      following_list:
+      - tech_innovator
+      - future_visionary
+      password: securePass123
+      retweets: {}
+      tweet_counter: 2
+      tweets:
+        '0':
+          content: Our refined findings on tech trends
+          id: 0
+          mentions:
+          - '@InsightfulTeam'
+          tags:
+          - '#TechTrends'
+          - '#InsightfulTeam'
+          username: tech_guru
+      username: tech_guru
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Could you kindly show me the
+  list of files in tmp directory in my file system including the hidden one?"}], [{"role":
+  "user", "content": "There is a report in my current directory. I have noticed the
+  report appears somewhat cluttered; it could benefit from having its lines sorted."}],
+  [{"role": "user", "content": "I would appreciate it if you could share the sorted
+  result as the message body on social media, ensuring to tag ''currenttechtrend''
+  and mention Julia, our insightful team."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: tmp, Parent: None, Contents: {''report.txt'': <<File: report.txt,
+        Content: Initial report content Unsorted data More unsorted data>>}>'
+    TwitterAPI:
+      authenticated: true
+      comments:
+        '1':
+        - comment: Excited to share our insights!
+          username: tech_guru
+      following_list:
+      - tech_innovator
+      - future_visionary
+      password: securePass123
+      retweets: {}
+      tweet_counter: 3
+      tweets:
+        0:
+          content: Our refined findings on tech trends
+          id: 0
+          mentions:
+          - '@InsightfulTeam'
+          tags:
+          - '#TechTrends'
+          - '#InsightfulTeam'
+          username: tech_guru
+        2:
+          content: Initial report content More unsorted data Unsorted data
+          id: 2
+          mentions:
+          - '@Julia'
+          tags:
+          - '#currenttechtrend'
+          username: tech_guru
+      username: tech_guru
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - sort(file_name='report.txt')
+  - - post_tweet(content='Initial report content More unsorted data Unsorted data',
+      mentions=['@Julia'], tags=['#currenttechtrend'])
+messages:
+- content: '[{"role": "user", "content": "Could you kindly show me the list of files
+    in tmp directory in my file system including the hidden one?"}]'
+  role: user
+- content: There is a report in my current directory. I have noticed the report appears
+    somewhat cluttered; it could benefit from having its lines sorted.
+  role: user
+- content: I would appreciate it if you could share the sorted result as the message
+    body on social media, ensuring to tag 'currenttechtrend' and mention Julia, our
+    insightful team.
+  role: user
+name: multi_turn_base_4
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

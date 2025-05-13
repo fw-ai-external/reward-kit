@@ -1,0 +1,58 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            data.txt:
+              content: Q1 results Q2 results Q3 results Q4 financials Q4 financials
+                analysis End of year summary
+              type: file
+            summary.doc:
+              content: This is the summary document content.
+              type: file
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Hey there, I need to set up
+  a directory titled ''Reports'' in my current workspace. Once that''s in place, could
+  you help me locate a file called ''summary.doc'' in this vicinity and transfer it
+  to the new ''Reports'' folder? After that, I''d appreciate if you could find and
+  open up ''data.txt'', then scan through it to identify lines that mention ''Q4 financials''.
+  Also, could you let me know the total number of lines in ''data.txt''?"}], [{"role":
+  "user", "content": "On a different note,Could you get the mean of character number
+  of all files in Reports directory?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''data.txt'': <<File:
+        data.txt, Content: Q1 results Q2 results Q3 results Q4 financials Q4 financials
+        analysis End of year summary>>, ''Reports'': <Directory: Reports, Parent:
+        workspace, Contents: {''summary.doc'': <<File: summary.doc, Content: This
+        is the summary document content.>>}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - mkdir(dir_name='Reports')
+    - mv(source='summary.doc', destination='Reports')
+    - cat(file_name='data.txt')
+    - grep(pattern='Q4 financials', file_name='data.txt')
+    - wc(file_name='data.txt',mode='l')
+  - - cd('Reports')
+    - wc(file_name='summary.doc',mode='c')
+    - mean([37])
+messages:
+- content: '[{"role": "user", "content": "Hey there, I need to set up a directory
+    titled ''Reports'' in my current workspace. Once that''s in place, could you help
+    me locate a file called ''summary.doc'' in this vicinity and transfer it to the
+    new ''Reports'' folder? After that, I''d appreciate if you could find and open
+    up ''data.txt'', then scan through it to identify lines that mention ''Q4 financials''.
+    Also, could you let me know the total number of lines in ''data.txt''?"}]'
+  role: user
+- content: On a different note,Could you get the mean of character number of all files
+    in Reports directory?
+  role: user
+name: multi_turn_base_31
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

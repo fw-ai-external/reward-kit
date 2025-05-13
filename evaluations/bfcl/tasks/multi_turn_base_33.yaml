@@ -1,0 +1,76 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        backup_scripts:
+          contents: {}
+          type: directory
+        project:
+          contents:
+            deploy.py:
+              content: 'def deploy():    # update the system    pass# update the database#
+                update the server# final checks'
+              type: file
+          type: directory
+    MessageAPI:
+      current_user: USR002
+      inbox:
+      - USR003:
+        - Thanks for the update!
+      user_count: 5
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "What''s the name of the python
+  file my current directory? There should be only one and. Do not list hidden files.
+  "}], [{"role": "user", "content": "Use grep to find out the name of the function
+  of the script."}], [{"role": "user", "content": "And while we''re diving into the
+  deployments, let''s pinpoint every mention of ''update'' in this script and jot
+  those lines down for scrutiny."}], [{"role": "user", "content": "Once that''s sewn
+  up, it''d be helpful to buzz Catherine with the first update you have found, with
+  message ''update the system''. If you need, my user_id is ''USR002''"}], [{"role":
+  "user", "content": "Could you double check if the message is sent?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: project, Parent: None, Contents: {''deploy.py'': <<File:
+        deploy.py, Content: def deploy():    # update the system    pass# update the
+        database# update the server# final checks>>}>'
+    MessageAPI:
+      current_user: USR002
+      generated_ids: '{67410}'
+      inbox:
+      - USR003:
+        - Thanks for the update!
+      - USR003: update the system
+      message_count: 4
+      user_count: 5
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - ls()
+  - - grep(file_name='deploy.py', pattern='def')
+  - - grep(file_name='deploy.py', pattern='update')
+  - - send_message(receiver_id='USR003', message='update the system')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "What''s the name of the python file my current
+    directory? There should be only one and. Do not list hidden files. "}]'
+  role: user
+- content: Use grep to find out the name of the function of the script.
+  role: user
+- content: And while we're diving into the deployments, let's pinpoint every mention
+    of 'update' in this script and jot those lines down for scrutiny.
+  role: user
+- content: Once that's sewn up, it'd be helpful to buzz Catherine with the first update
+    you have found, with message 'update the system'. If you need, my user_id is 'USR002'
+  role: user
+- content: Could you double check if the message is sent?
+  role: user
+name: multi_turn_base_33
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

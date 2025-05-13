@@ -1,0 +1,142 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr@vel2023Secure
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Excited for my trip from San Francisco to Rivermist! @TravelBuddy
+            #JourneyAhead'
+          id: 0
+          mentions:
+          - '@TravelBuddy'
+          tags:
+          - '#JourneyAhead'
+          username: wanderlust_emma
+      username: wanderlust_emma
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I need to fill 150 liters
+  of gasoline into my vehicle for today''s trip and then start the engine using the
+  standard start mode to ensure everything is operational before departure. How much
+  is that in gallon? Round it to the nearest integer and fill that amount."}], [{"role":
+  "user", "content": "Find out the distance from San Francisco to Rivermist for my
+  travel plans to determine fuel consumption and travel time."}], [{"role": "user",
+  "content": "Also, on Twitter, let everyone know about my upcoming trip from San
+  Francisco to Rivermist, with content ''Excited for my trip from San Francisco to
+  Rivermist!'', mentioning @TravelBuddy and using the hashtag #JourneyAhead."}], [{"role":
+  "user", "content": "After posting, make sure to add a mention of @RoadsideAssistance
+  to the tweet we just created to ensure everyone is covered for emergencies."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Tr@vel2023Secure
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Excited for my trip from San Francisco to Rivermist! @TravelBuddy
+            #JourneyAhead'
+          id: 0
+          mentions:
+          - '@TravelBuddy'
+          tags:
+          - '#JourneyAhead'
+          username: wanderlust_emma
+        10:
+          content: Excited for my trip from San Francisco to Rivermist!
+          id: 10
+          mentions:
+          - '@TravelBuddy'
+          - '@RoadsideAssistance'
+          tags:
+          - '#JourneyAhead'
+          username: wanderlust_emma
+      username: wanderlust_emma
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 45.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - liter_to_gallon(liter=150.0)
+    - fillFuelTank(fuelAmount=40.0)
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - get_zipcode_based_on_city(city='San Francisco')
+    - get_zipcode_based_on_city(city='Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+  - - post_tweet(content='Excited for my trip from San Francisco to Rivermist!', tags
+      = ['#JourneyAhead'], mentions=['@TravelBuddy'])
+  - - mention(tweet_id=10, mentioned_usernames=['@RoadsideAssistance'])
+messages:
+- content: '[{"role": "user", "content": "I need to fill 150 liters of gasoline into
+    my vehicle for today''s trip and then start the engine using the standard start
+    mode to ensure everything is operational before departure. How much is that in
+    gallon? Round it to the nearest integer and fill that amount."}]'
+  role: user
+- content: Find out the distance from San Francisco to Rivermist for my travel plans
+    to determine fuel consumption and travel time.
+  role: user
+- content: 'Also, on Twitter, let everyone know about my upcoming trip from San Francisco
+    to Rivermist, with content ''Excited for my trip from San Francisco to Rivermist!'',
+    mentioning @TravelBuddy and using the hashtag #JourneyAhead.'
+  role: user
+- content: After posting, make sure to add a mention of @RoadsideAssistance to the
+    tweet we just created to ensure everyone is covered for emergencies.
+  role: user
+name: multi_turn_base_90
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

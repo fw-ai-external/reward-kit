@@ -1,0 +1,86 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: auth_token_987654321
+      booking_record: {}
+      budget_limit: 3000.0
+      credit_card_list:
+        card_9012:
+          balance: 5000.0
+          card_number: 8796-1234-5678-9012
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: booking_management
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Hello, I''ve just come upon
+  a remarkable opportunity to explore some new places, and it''s crucial that my documents
+  are up-to-date before I depart. Would you be able to verify my personal details?
+  I''m Michael Thompson, with a birth date of 1995-08-15, and my passport number is
+  ''US1234''."}], [{"role": "user", "content": "Wonderful news has reached me\u2014it
+  turns out everything is verified accurately! Now, to facilitate a smooth departure
+  from LAX, I must quickly locate the nearest airport in San Francisco."}], [{"role":
+  "user", "content": "Having affirmed the specifics of my journey, I''m now curious
+  to determine the cost of a first-class flight on December 15th 2024 from LAX to
+  the San Francisco airport."}], [{"role": "user", "content": "Splendid, all arrangements
+  are in place! Might you finalize the booking for my flight on December 15th utilizing
+  my funds available through card ID ''card_9012''? I''m equipped with my authorization
+  token ''auth_token_987654321'' for any verification needed."}], [{"role": "user",
+  "content": "Alas, circumstances have altered! I urgently need to reverse the reservation
+  I just completed. Please apply the same authorization token to manage the cancellation."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: auth_token_987654321
+      booking_record: {}
+      budget_limit: 3000.0
+      credit_card_list:
+        card_9012:
+          balance: 5000.0
+          card_number: 8796-1234-5678-9012
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking_management
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - verify_traveler_information(first_name='Michael', last_name='Thompson', date_of_birth='1995-08-15',
+      passport_number='US1234')
+  - - get_nearest_airport_by_city(location='San Francisco')
+  - - get_flight_cost(travel_from='LAX', travel_to='SFO', travel_date='2024-12-15',
+      travel_class='first')
+  - - book_flight(access_token='auth_token_987654321', card_id='card_9012', travel_date='2024-12-15',
+      travel_from='LAX', travel_to='SFO', travel_class='first', travel_cost=500.0)
+  - - cancel_booking(access_token='auth_token_987654321', booking_id='3426812')
+messages:
+- content: '[{"role": "user", "content": "Hello, I''ve just come upon a remarkable
+    opportunity to explore some new places, and it''s crucial that my documents are
+    up-to-date before I depart. Would you be able to verify my personal details? I''m
+    Michael Thompson, with a birth date of 1995-08-15, and my passport number is ''US1234''."}]'
+  role: user
+- content: "Wonderful news has reached me\u2014it turns out everything is verified\
+    \ accurately! Now, to facilitate a smooth departure from LAX, I must quickly locate\
+    \ the nearest airport in San Francisco."
+  role: user
+- content: Having affirmed the specifics of my journey, I'm now curious to determine
+    the cost of a first-class flight on December 15th 2024 from LAX to the San Francisco
+    airport.
+  role: user
+- content: Splendid, all arrangements are in place! Might you finalize the booking
+    for my flight on December 15th utilizing my funds available through card ID 'card_9012'?
+    I'm equipped with my authorization token 'auth_token_987654321' for any verification
+    needed.
+  role: user
+- content: Alas, circumstances have altered! I urgently need to reverse the reservation
+    I just completed. Please apply the same authorization token to manage the cancellation.
+  role: user
+name: multi_turn_base_191
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

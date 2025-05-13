@@ -1,0 +1,72 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        temp:
+          contents:
+            file1.txt:
+              content: Sample content of file1
+              type: file
+            file2.txt:
+              content: Sample content of file2
+              type: file
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - charlie
+      - diana
+      password: michaelSecurePass123
+      retweets: {}
+      tweet_counter: 1
+      tweets: {}
+      username: michael
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Display all the available
+  files located within the ''/temp'' directory including hidden one using the terminal
+  interface ."}], [{"role": "user", "content": "With the information presented on
+  the terminal, draft a post on Twitter mentioning only the file names seperated them
+  by comma and space, and include the hashtag ''#fileshowcase'' to spread the word."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: temp, Parent: None, Contents: {''file1.txt'': <<File: file1.txt,
+        Content: Sample content of file1>>, ''file2.txt'': <<File: file2.txt, Content:
+        Sample content of file2>>}>'
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - charlie
+      - diana
+      password: michaelSecurePass123
+      retweets: {}
+      tweet_counter: 2
+      tweets:
+        1:
+          content: file1.txt, file2.txt
+          id: 1
+          mentions: []
+          tags:
+          - '#fileshowcase'
+          username: michael
+      username: michael
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - post_tweet(content='file1.txt, file2.txt',tags=['#fileshowcase'])
+messages:
+- content: '[{"role": "user", "content": "Display all the available files located
+    within the ''/temp'' directory including hidden one using the terminal interface
+    ."}]'
+  role: user
+- content: With the information presented on the terminal, draft a post on Twitter
+    mentioning only the file names seperated them by comma and space, and include
+    the hashtag '#fileshowcase' to spread the word.
+  role: user
+name: multi_turn_base_11
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

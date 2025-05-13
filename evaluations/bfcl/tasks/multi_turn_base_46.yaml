@@ -1,0 +1,53 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        dylan:
+          contents:
+            ArchivedProjects:
+              contents: {}
+              type: directory
+            Drafts:
+              contents:
+                DylanProject.txt:
+                  content: Initial outline of the Dylan project.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Delete all the files in the
+  ''Drafts'' directory including the directory."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: dylan, Parent: None, Contents: {''ArchivedProjects'': <Directory:
+        ArchivedProjects, Parent: dylan, Contents: {}>}>'
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - cd(folder='Drafts')
+    - rm(file_name='DylanProject.txt')
+    - cd(folder='..')
+    - rmdir(dir_name='Drafts')
+messages:
+- content: '[{"role": "user", "content": "Delete all the files in the ''Drafts'' directory
+    including the directory."}]'
+  role: user
+name: multi_turn_base_46
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

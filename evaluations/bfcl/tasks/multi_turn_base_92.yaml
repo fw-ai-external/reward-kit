@@ -1,0 +1,97 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Greenway
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 10.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 32.0
+      rearRightTirePressure: 32.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Could you provide me with
+  a rough distance from Rivermist (zip 83214) to Greenway (zip 74532)? I''m eager
+  to plan a visit and need to know the travel distance."}], [{"role": "user", "content":
+  "In light of this trip, I''m concerned about whether my vehicle''s fuel level and
+  car mileage are adequate for the journey. Could you evaluate this for me?"}], [{"role":
+  "user", "content": "Given this apprehension, can you fill up the fuel completely?"}],
+  [{"role": "user", "content": "Before I set off, I want to check if the engine will
+  indeed start and ensure that everything is prepped for a safe departure. Could you
+  initiate the engine to confirm this?"}], [{"role": "user", "content": "Lastly, I
+  must verify that my vehicle is in excellent shape. If any tire pressure is under
+  35 PSI, could you direct me to the closest tire shop to rectify this promptly?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 32.0
+      rearRightTirePressure: 32.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - estimate_distance(cityA='83214', cityB='74532')
+  - - estimate_drive_feasibility_by_mileage(distance=750.0)
+  - - fillFuelTank(fuelAmount=39.5)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+messages:
+- content: '[{"role": "user", "content": "Could you provide me with a rough distance
+    from Rivermist (zip 83214) to Greenway (zip 74532)? I''m eager to plan a visit
+    and need to know the travel distance."}]'
+  role: user
+- content: In light of this trip, I'm concerned about whether my vehicle's fuel level
+    and car mileage are adequate for the journey. Could you evaluate this for me?
+  role: user
+- content: Given this apprehension, can you fill up the fuel completely?
+  role: user
+- content: Before I set off, I want to check if the engine will indeed start and ensure
+    that everything is prepped for a safe departure. Could you initiate the engine
+    to confirm this?
+  role: user
+- content: Lastly, I must verify that my vehicle is in excellent shape. If any tire
+    pressure is under 35 PSI, could you direct me to the closest tire shop to rectify
+    this promptly?
+  role: user
+name: multi_turn_base_92
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

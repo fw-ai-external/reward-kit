@@ -1,0 +1,43 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        project_directory:
+          contents:
+            student_record.txt:
+              content: 'John: 100 Jane: 95 Alice: 85 Bob: 90 Tom: 88 Olivia: 92'
+              type: file
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I have a list of student record
+  in this directory, could you find me where is it by telling me its name and using
+  ''find''?"}], [{"role": "user", "content": "Look at the student_record.txt and tell
+  me the average score."}], [{"role": "user", "content": "What about the standard
+  deviation?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: project_directory, Parent: None, Contents: {''student_record.txt'':
+        <<File: student_record.txt, Content: John: 100 Jane: 95 Alice: 85 Bob: 90
+        Tom: 88 Olivia: 92>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - find(path='.')
+  - - cat(file_name='student_record.txt')
+    - mean(numbers=[100, 95, 85, 90, 88, 92])
+  - - standard_deviation(numbers=[100, 95, 85, 90, 88, 92])
+messages:
+- content: '[{"role": "user", "content": "I have a list of student record in this
+    directory, could you find me where is it by telling me its name and using ''find''?"}]'
+  role: user
+- content: Look at the student_record.txt and tell me the average score.
+  role: user
+- content: What about the standard deviation?
+  role: user
+name: multi_turn_base_47
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

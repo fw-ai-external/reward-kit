@@ -1,0 +1,162 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr@v3l2023Secure!
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Excited for the journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#journey'
+          - '#excited'
+          - '#travel'
+          username: travelbug
+        '1':
+          content: Packing up for the trip.
+          id: 1
+          mentions: []
+          tags:
+          - '#packing'
+          - '#trip'
+          - '#travel'
+          username: travelbug
+        '2':
+          content: Can't wait to hit the road!
+          id: 2
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#adventure'
+          - '#travel'
+          username: travelbug
+      username: travelbug
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Estimate the distance between
+  San Francisco and Rivermist. Afterwards, fill the tank with 40 additional liters
+  of gasoline for my quick trip. Round the fill amount to two decimal places"}], [{"role":
+  "user", "content": "Preparations are complete. Start the engine and help me tweet
+  about this journey containing message ''Just started my journey!'' with #RoadTrip
+  and @carenthusiast."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Tr@v3l2023Secure!
+      retweets: {}
+      tweet_counter: 4
+      tweets:
+        0:
+          content: Excited for the journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#journey'
+          - '#excited'
+          - '#travel'
+          username: travelbug
+        1:
+          content: Packing up for the trip.
+          id: 1
+          mentions: []
+          tags:
+          - '#packing'
+          - '#trip'
+          - '#travel'
+          username: travelbug
+        2:
+          content: Can't wait to hit the road!
+          id: 2
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#adventure'
+          - '#travel'
+          username: travelbug
+        3:
+          content: Just started my journey!
+          id: 3
+          mentions:
+          - '@carenthusiast'
+          tags:
+          - '#RoadTrip'
+          username: travelbug
+      username: travelbug
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 20.57
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+    - liter_to_gallon(liter=40)
+    - fillFuelTank(fuelAmount=10.57)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - post_tweet(content='Just started my journey!', tags=['#RoadTrip'], mentions=['@carenthusiast'])
+messages:
+- content: '[{"role": "user", "content": "Estimate the distance between San Francisco
+    and Rivermist. Afterwards, fill the tank with 40 additional liters of gasoline
+    for my quick trip. Round the fill amount to two decimal places"}]'
+  role: user
+- content: 'Preparations are complete. Start the engine and help me tweet about this
+    journey containing message ''Just started my journey!'' with #RoadTrip and @carenthusiast.'
+  role: user
+name: multi_turn_base_69
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,129 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR005
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll be there soon.
+      - USR008:
+        - Got the snacks!
+      message_count: 0
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Would you be able to increase
+  my current fuel reserve to twice its size?"}], [{"role": "user", "content": "Since
+  we''ve topped up the fuel, let''s ignite the engine and assess the battery''s condition
+  for our journey."}], [{"role": "user", "content": "Verify the tire pressure to guarantee
+  they''re accurately inflated for our lengthy expedition."}], [{"role": "user", "content":
+  "I need to inform my friend David about the road trip itinerary; please dispatch
+  them a note saying ''Road trip itinerary update.''. If that helps, my user id is
+  ''USR005''."}], [{"role": "user", "content": "Simultaneously, might you show me
+  all the messages I have send so far? I want to make sure I notified all the folks
+  I want to contact."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR005
+      generated_ids: '{67410}'
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll be there soon.
+      - USR008:
+        - Got the snacks!
+      - USR007: Road trip itinerary update.
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 20.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - fillFuelTank(fuelAmount=10.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+  - - message_login(user_id='USR005')
+    - send_message(receiver_id='USR007', message='Road trip itinerary update.')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "Would you be able to increase my current
+    fuel reserve to twice its size?"}]'
+  role: user
+- content: Since we've topped up the fuel, let's ignite the engine and assess the
+    battery's condition for our journey.
+  role: user
+- content: Verify the tire pressure to guarantee they're accurately inflated for our
+    lengthy expedition.
+  role: user
+- content: I need to inform my friend David about the road trip itinerary; please
+    dispatch them a note saying 'Road trip itinerary update.'. If that helps, my user
+    id is 'USR005'.
+  role: user
+- content: Simultaneously, might you show me all the messages I have send so far?
+    I want to make sure I notified all the folks I want to contact.
+  role: user
+name: multi_turn_base_72
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

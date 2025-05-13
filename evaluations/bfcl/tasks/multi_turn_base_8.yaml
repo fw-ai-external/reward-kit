@@ -1,0 +1,101 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        scientific_data:
+          contents:
+            experiment_log.txt:
+              content: 'Observation 1: Normal Observation 2: Anomaly detected Observation
+                3: Normal Observation 4: Anomaly detected '
+              type: file
+            previous_study_log.txt:
+              content: 'Observation A: Normal Observation B: Normal Observation C:
+                Anomaly detected'
+              type: file
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - researcher_jane
+      - professor_lee
+      password: securePass123
+      retweets: {}
+      tweet_counter: 1
+      tweets: {}
+      username: dr_smith
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I''ve recently compiled an
+  extensive log of outcomes from my latest scientific experiment into a file titled
+  ''experiment_log.txt''. Your task is to extract any line that features the term
+  ''Anomaly'' from this document, as these could potentially indicate critical observations
+  that need our attention."}], [{"role": "user", "content": "Following this, I need
+  you to draw a comparison between ''experiment_log.txt'' and ''previous_study_log.txt''
+  to pinpoint any deviations or novel discoveries that could potentially influence
+  our hypothesis."}], [{"role": "user", "content": "Please share the verbatim results
+  of diff as the body of the post by posting a summary on my Twitter account so it
+  can be reviewed by my fellow researchers. My user name is dr_smith, and my password
+  is securePass123"}], [{"role": "user", "content": "When you post the tweet, add
+  a supportive comment ''Cheers!''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: scientific_data, Parent: None, Contents: {''experiment_log.txt'':
+        <<File: experiment_log.txt, Content: Observation 1: Normal Observation 2:
+        Anomaly detected Observation 3: Normal Observation 4: Anomaly detected >>,
+        ''previous_study_log.txt'': <<File: previous_study_log.txt, Content: Observation
+        A: Normal Observation B: Normal Observation C: Anomaly detected>>}>'
+    TwitterAPI:
+      authenticated: true
+      comments:
+        1:
+        - content: Cheers!
+          username: dr_smith
+      following_list:
+      - researcher_jane
+      - professor_lee
+      password: securePass123
+      retweets: {}
+      tweet_counter: 2
+      tweets:
+        1:
+          content: '- Research topic selection+ Data analysis- Literature review+
+            Data collection- Data collection+ Draft writing- Data analysis+ Final
+            submission- Draft writing+ Literature review- Final submission+ Research
+            topic selection'
+          id: 1
+          mentions: []
+          tags: []
+          username: dr_smith
+      username: dr_smith
+  ground_truth_function_calls:
+  - - grep(file_name='experiment_log.txt',pattern='Anomaly')
+  - - diff(file_name1='experiment_log.txt', file_name2='previous_study_log.txt')
+  - - authenticate_twitter(username='dr_smith', password='securePass123')
+    - post_tweet(content='- Research topic selection+ Data analysis- Literature review+
+      Data collection- Data collection+ Draft writing- Data analysis+ Final submission-
+      Draft writing+ Literature review- Final submission+ Research topic selection')
+  - - comment(tweet_id=1,comment_content='Cheers!')
+messages:
+- content: '[{"role": "user", "content": "I''ve recently compiled an extensive log
+    of outcomes from my latest scientific experiment into a file titled ''experiment_log.txt''.
+    Your task is to extract any line that features the term ''Anomaly'' from this
+    document, as these could potentially indicate critical observations that need
+    our attention."}]'
+  role: user
+- content: Following this, I need you to draw a comparison between 'experiment_log.txt'
+    and 'previous_study_log.txt' to pinpoint any deviations or novel discoveries that
+    could potentially influence our hypothesis.
+  role: user
+- content: Please share the verbatim results of diff as the body of the post by posting
+    a summary on my Twitter account so it can be reviewed by my fellow researchers.
+    My user name is dr_smith, and my password is securePass123
+  role: user
+- content: When you post the tweet, add a supportive comment 'Cheers!'
+  role: user
+name: multi_turn_base_8
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

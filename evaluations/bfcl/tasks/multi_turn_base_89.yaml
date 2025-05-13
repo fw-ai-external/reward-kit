@@ -1,0 +1,88 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning a road trip
+  from Rivermist to Stonebrook and would love an estimate on how far this journey
+  will take me."}], [{"role": "user", "content": "Great, now that I know the distance,
+  please check if my current fuel level can handle the journey or if I need a refill."}],
+  [{"role": "user", "content": "Ah, it looks like I might need some fuel. Could you
+  go ahead and fill up the tank with 30 gallons of fuel so that I end with 40 gallons?"}],
+  [{"role": "user", "content": "Let''s get the vehicle ready by starting the engine,
+  please make sure everything''s in place."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Stonebrook
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 40.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city(city='Rivermist')
+    - get_zipcode_based_on_city(city='Stonebrook')
+    - estimate_distance(cityA='83214', cityB='74532')
+  - - estimate_drive_feasibility_by_mileage(distance=750.0)
+  - - fillFuelTank(fuelAmount=30.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+messages:
+- content: '[{"role": "user", "content": "I''m planning a road trip from Rivermist
+    to Stonebrook and would love an estimate on how far this journey will take me."}]'
+  role: user
+- content: Great, now that I know the distance, please check if my current fuel level
+    can handle the journey or if I need a refill.
+  role: user
+- content: Ah, it looks like I might need some fuel. Could you go ahead and fill up
+    the tank with 30 gallons of fuel so that I end with 40 gallons?
+  role: user
+- content: Let's get the vehicle ready by starting the engine, please make sure everything's
+    in place.
+  role: user
+name: multi_turn_base_89
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

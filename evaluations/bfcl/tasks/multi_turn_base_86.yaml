@@ -1,0 +1,173 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr@v3l2023Secure
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Just started our journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#journey'
+          - '#adventure'
+          - '#travel'
+          username: traveler123
+        '1':
+          content: Loving the smooth ride!
+          id: 1
+          mentions: []
+          tags:
+          - '#smoothride'
+          - '#travel'
+          - '#comfort'
+          username: traveler123
+        '2':
+          content: Thankful for the great service!
+          id: 2
+          mentions:
+          - '@serviceTeam'
+          tags:
+          - '#grateful'
+          - '#service'
+          - '#happy'
+          username: traveler123
+      username: traveler123
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 22.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Lock all doors and engage
+  the parking brake, then start the vehicle''s engine in preparation for a trip. Afterward,
+  check if our tire pressure condition is safe to proceed."}], [{"role": "user", "content":
+  "The tire pressure seems worrying, kindly find the nearest tire shop to address
+  the issue and set our navigation to that location."}], [{"role": "user", "content":
+  "I have the tire issue fixed. Thinking aloud, since it''s been a successful start
+  to this journey, I''d like to send a thank you tweet ''Thank you to our vehicle
+  for a smooth start!'' about our vehicle with a few hashtags ''#Journey, #SmoothRide,
+  #Grateful'' added."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Tr@v3l2023Secure
+      retweets: {}
+      tweet_counter: 4
+      tweets:
+        0:
+          content: Just started our journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#journey'
+          - '#adventure'
+          - '#travel'
+          username: traveler123
+        1:
+          content: Loving the smooth ride!
+          id: 1
+          mentions: []
+          tags:
+          - '#smoothride'
+          - '#travel'
+          - '#comfort'
+          username: traveler123
+        2:
+          content: Thankful for the great service!
+          id: 2
+          mentions:
+          - '@serviceTeam'
+          tags:
+          - '#grateful'
+          - '#service'
+          - '#happy'
+          username: traveler123
+        3:
+          content: Thank you to our vehicle for a smooth start!
+          id: 3
+          mentions: []
+          tags:
+          - '#Journey'
+          - '#SmoothRide'
+          - '#Grateful'
+          username: traveler123
+      username: traveler123
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 22.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - activateParkingBrake(mode='engage')
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - check_tire_pressure()
+  - - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+  - - post_tweet(content='Thank you to our vehicle for a smooth start!', tags=['#Journey',
+      '#SmoothRide', '#Grateful'])
+messages:
+- content: '[{"role": "user", "content": "Lock all doors and engage the parking brake,
+    then start the vehicle''s engine in preparation for a trip. Afterward, check if
+    our tire pressure condition is safe to proceed."}]'
+  role: user
+- content: The tire pressure seems worrying, kindly find the nearest tire shop to
+    address the issue and set our navigation to that location.
+  role: user
+- content: 'I have the tire issue fixed. Thinking aloud, since it''s been a successful
+    start to this journey, I''d like to send a thank you tweet ''Thank you to our
+    vehicle for a smooth start!'' about our vehicle with a few hashtags ''#Journey,
+    #SmoothRide, #Grateful'' added.'
+  role: user
+name: multi_turn_base_86
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

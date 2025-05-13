@@ -1,0 +1,90 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      current_location: San Francisco
+      destination: Los Angeles
+      estimated_distance: 380.0
+      estimated_time: 6.5
+      traffic_conditions: moderate
+      travel_mode: driving
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 13.2
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 70
+      frontLeftTirePressure: 33.0
+      frontRightTirePressure: 33.0
+      fuelLevel: 15.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 31.0
+      rearRightTirePressure: 31.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Just acquired a stunning electric
+  vehicle, and it''s like a canvas waiting to be explored. Let''s lock all those doors,
+  and then let''s bring the engine to life to navigate through this journey of mine.
+  How does this whole process work in detail? Please ensure all is set for our voyage
+  ahead."}], [{"role": "user", "content": "I''m curating a road trip from the vibrant
+  hues of San Francisco to the golden light of Rivermist. Could you craft an estimate
+  of the travel distance and time? I''m keen to envision the extent of this journey."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 13.2
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 70
+      frontLeftTirePressure: 33.0
+      frontRightTirePressure: 33.0
+      fuelLevel: 15.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 31.0
+      rearRightTirePressure: 31.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - get_zipcode_based_on_city(city='San Francisco')
+    - get_zipcode_based_on_city(city='Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+messages:
+- content: '[{"role": "user", "content": "Just acquired a stunning electric vehicle,
+    and it''s like a canvas waiting to be explored. Let''s lock all those doors, and
+    then let''s bring the engine to life to navigate through this journey of mine.
+    How does this whole process work in detail? Please ensure all is set for our voyage
+    ahead."}]'
+  role: user
+- content: I'm curating a road trip from the vibrant hues of San Francisco to the
+    golden light of Rivermist. Could you craft an estimate of the travel distance
+    and time? I'm keen to envision the extent of this journey.
+  role: user
+name: multi_turn_base_96
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

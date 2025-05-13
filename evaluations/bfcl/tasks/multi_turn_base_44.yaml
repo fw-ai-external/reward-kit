@@ -1,0 +1,52 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            documents:
+              contents:
+                annual_report.txt:
+                  content: ''
+                  type: file
+              type: directory
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Could you populate ''annual_report.txt''
+  with data on quarterly revenue: ''Q1: $5000, Q2: $7000, Q3: $6000, Q4: $8000''?
+  I only want to store the quoted text in my file. The file is somehwhere inside the
+  file system."}], [{"role": "user", "content": "What''s the mean of the quarterly
+  revenue?"}], [{"role": "user", "content": "Can you write the answer rounded in nearest
+  integer into a new file named ''MeanRevenue.txt''? Just the number and nothing"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''documents'': <Directory:
+        documents, Parent: alex, Contents: {''annual_report.txt'': <<File: annual_report.txt,
+        Content: Q1: $5000, Q2: $7000, Q3: $6000, Q4: $8000>>, ''MeanRevenue.txt'':
+        <<File: MeanRevenue.txt, Content: 6500>>}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - cd(folder='documents')
+    - 'echo(content=''Q1: $5000, Q2: $7000, Q3: $6000, Q4: $8000'',file_name=''annual_report.txt'')'
+  - - mean(numbers=[5000,7000,6000,8000])
+  - - touch(file_name='MeanRevenue.txt')
+    - echo(content='6500',file_name='MeanRevenue.txt')
+messages:
+- content: '[{"role": "user", "content": "Could you populate ''annual_report.txt''
+    with data on quarterly revenue: ''Q1: $5000, Q2: $7000, Q3: $6000, Q4: $8000''?
+    I only want to store the quoted text in my file. The file is somehwhere inside
+    the file system."}]'
+  role: user
+- content: What's the mean of the quarterly revenue?
+  role: user
+- content: Can you write the answer rounded in nearest integer into a new file named
+    'MeanRevenue.txt'? Just the number and nothing
+  role: user
+name: multi_turn_base_44
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

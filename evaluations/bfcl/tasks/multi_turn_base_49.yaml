@@ -1,0 +1,291 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        temp:
+          contents:
+            file1.txt:
+              content: 'Line 1
+
+                Line 2
+
+                Line 3
+
+                Line 4
+
+                Line 5
+
+                Line 6
+
+                Line 7
+
+                Line 8
+
+                Line 9
+
+                Line 10
+
+                Line 11
+
+                Line 12
+
+                Line 13
+
+                Line 14
+
+                Line 15
+
+                Line 16
+
+                Line 17
+
+                Line 18
+
+                Line 19
+
+                Line 20'
+              type: file
+            file2.txt:
+              content: 'Alpha
+
+                Beta
+
+                Gamma
+
+                Delta
+
+                Epsilon
+
+                Zeta
+
+                Eta
+
+                Theta
+
+                Iota
+
+                Kappa
+
+                Lambda
+
+                Mu
+
+                Nu
+
+                Xi
+
+                Omicron
+
+                Pi
+
+                Rho
+
+                Sigma
+
+                Tau
+
+                Upsilon'
+              type: file
+            file3.txt:
+              content: 'Zebra
+
+                Apple
+
+                Orange
+
+                Banana
+
+                Grape
+
+                Cherry
+
+                Mango
+
+                Peach
+
+                Lemon
+
+                Lime
+
+                Kiwi
+
+                Plum
+
+                Pear
+
+                Fig
+
+                Date
+
+                Coconut
+
+                Pineapple
+
+                Papaya
+
+                Guava
+
+                Lychee'
+              type: file
+          type: directory
+    MathAPI:
+      complex_value: 123456789.98765433
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Within the temp directory,
+  could you list all the current files directly in the terminal including all the
+  hidden files, ensuring we maintain the present directory structure intact and refrain
+  from generating any additional directories or files?"}], [{"role": "user", "content":
+  "Select the third file displayed in that directory and meticulously reorder its
+  contents alphabetically. Proceed to display only the last 10 lines once you''ve
+  done this."}], [{"role": "user", "content": "For that same third file, could you
+  determine the total number of lines it holds?"}], [{"role": "user", "content": "In
+  your experience, could you perform a precise computation of 2 to determine the base
+  10 logarithm for the number of line?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: temp, Parent: None, Contents: {''file1.txt'': <<File: file1.txt,
+        Content: Line 1
+
+        Line 2
+
+        Line 3
+
+        Line 4
+
+        Line 5
+
+        Line 6
+
+        Line 7
+
+        Line 8
+
+        Line 9
+
+        Line 10
+
+        Line 11
+
+        Line 12
+
+        Line 13
+
+        Line 14
+
+        Line 15
+
+        Line 16
+
+        Line 17
+
+        Line 18
+
+        Line 19
+
+        Line 20>>, ''file2.txt'': <<File: file2.txt, Content: Alpha
+
+        Beta
+
+        Gamma
+
+        Delta
+
+        Epsilon
+
+        Zeta
+
+        Eta
+
+        Theta
+
+        Iota
+
+        Kappa
+
+        Lambda
+
+        Mu
+
+        Nu
+
+        Xi
+
+        Omicron
+
+        Pi
+
+        Rho
+
+        Sigma
+
+        Tau
+
+        Upsilon>>, ''file3.txt'': <<File: file3.txt, Content: Zebra
+
+        Apple
+
+        Orange
+
+        Banana
+
+        Grape
+
+        Cherry
+
+        Mango
+
+        Peach
+
+        Lemon
+
+        Lime
+
+        Kiwi
+
+        Plum
+
+        Pear
+
+        Fig
+
+        Date
+
+        Coconut
+
+        Pineapple
+
+        Papaya
+
+        Guava
+
+        Lychee>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - sort(file_name='file3.txt')
+    - tail(file_name='file3.txt')
+  - - wc(file_name='file3.txt',mode='l')
+  - - logarithm(value=20,base=10,precision=2)
+messages:
+- content: '[{"role": "user", "content": "Within the temp directory, could you list
+    all the current files directly in the terminal including all the hidden files,
+    ensuring we maintain the present directory structure intact and refrain from generating
+    any additional directories or files?"}]'
+  role: user
+- content: Select the third file displayed in that directory and meticulously reorder
+    its contents alphabetically. Proceed to display only the last 10 lines once you've
+    done this.
+  role: user
+- content: For that same third file, could you determine the total number of lines
+    it holds?
+  role: user
+- content: In your experience, could you perform a precise computation of 2 to determine
+    the base 10 logarithm for the number of line?
+  role: user
+name: multi_turn_base_49
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

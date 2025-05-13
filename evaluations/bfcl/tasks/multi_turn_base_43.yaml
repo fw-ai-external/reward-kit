@@ -1,0 +1,85 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            Documents:
+              contents:
+                Q4_summary.doc:
+                  content: The Q4 summary concludes with a positive outlook for the
+                    next fiscal year.
+                  type: file
+                annual_report.txt:
+                  content: This is the annual report. It includes Q4 results and other
+                    financial data.
+                  type: file
+              type: directory
+            Reports:
+              contents:
+                Archives:
+                  contents: {}
+                  type: directory
+              type: directory
+          type: directory
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Arrange a complete listing
+  of all files and directories presently located here, making sure you don''t overlook
+  the hidden ones too."}], [{"role": "user", "content": "Locate any document titled
+  ''annual_report.txt'' wherever it might be within this directory or its subdirectories."}],
+  [{"role": "user", "content": "What''s inside?"}], [{"role": "user", "content": "Log
+  my user id USR001 in, and relay a message to the ID ''USR002'', updating them with
+  what''s inside verbatim as the body of the message."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''Documents'': <Directory:
+        Documents, Parent: alex, Contents: {''annual_report.txt'': <<File: annual_report.txt,
+        Content: This is the annual report. It includes Q4 results and other financial
+        data.>>, ''Q4_summary.doc'': <<File: Q4_summary.doc, Content: The Q4 summary
+        concludes with a positive outlook for the next fiscal year.>>}>, ''Reports'':
+        <Directory: Reports, Parent: alex, Contents: {''Archives'': <Directory: Archives,
+        Parent: Reports, Contents: {}>}>}>'
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR002: This is the annual report. It includes Q4 results and other financial
+          data.
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - find(path='.',name='annual_report.txt')
+  - - cd(folder='Documents')
+    - cat(file_name='annual_report.txt')
+  - - message_login(user_id='USR001')
+    - send_message(receiver_id='USR002', message='This is the annual report. It includes
+      Q4 results and other financial data.')
+messages:
+- content: '[{"role": "user", "content": "Arrange a complete listing of all files
+    and directories presently located here, making sure you don''t overlook the hidden
+    ones too."}]'
+  role: user
+- content: Locate any document titled 'annual_report.txt' wherever it might be within
+    this directory or its subdirectories.
+  role: user
+- content: What's inside?
+  role: user
+- content: Log my user id USR001 in, and relay a message to the ID 'USR002', updating
+    them with what's inside verbatim as the body of the message.
+  role: user
+name: multi_turn_base_43
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

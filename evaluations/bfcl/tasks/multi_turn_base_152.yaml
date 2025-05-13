@@ -1,0 +1,92 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_queue: []
+    TravelAPI:
+      access_token: secureAccessToken12345
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        '144756014165':
+          balance: 10000.0
+          card_number: '9356074812347623'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m in the process of scheduling
+  a journey from San Francisco to Chicago on the 15th of the year 2024''s eleventh
+  month. It''s important the travel is in first class. I''ll be settling the fare
+  with my credit card with id 144756014165 and access token ''secureAccessToken12345'',
+  and would like my personal details integrated into the reservation. I''ve secured
+  my confidential access token for authentication, which will be used during this
+  booking."}], [{"role": "user", "content": "After reconsideration, the flight planned
+  for London on the 15th is no longer necessary. I require the cancellation of this
+  booking immediately."}], [{"role": "user", "content": "Concerning the flight cancellation,
+  it is crucial to alert customer service without delay. Kindly generate a high-priority
+  ticket named ''Flight Cancellation Alert,'' detailing the reservation specifics
+  ''Request to cancel.''. My ticket username is `mthompson` and password is `securePass123"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: mthompson
+      ticket_counter: 2
+      ticket_queue:
+      - created_by: mthompson
+        description: Request to cancel.
+        id: 1
+        priority: 5
+        status: Open
+        title: Flight Cancellation Alert
+    TravelAPI:
+      access_token: secureAccessToken12345
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        '144756014165':
+          balance: 10000.0
+          card_number: '9356074812347623'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='ORD', travel_date='2024-11-15',
+      travel_class='first')
+    - book_flight(access_token='secureAccessToken12345',card_id='144756014165', travel_date='2024-11-15',
+      travel_from='SFO', travel_to='ORD', travel_cost=4000.0, travel_class='first')
+  - - cancel_booking(access_token='secureAccessToken12345', booking_id='3426812')
+  - - ticket_login(username='mthompson', password='securePass123')
+    - create_ticket(title='Flight Cancellation Alert', description='Request to cancel.',priority=5)
+messages:
+- content: '[{"role": "user", "content": "I''m in the process of scheduling a journey
+    from San Francisco to Chicago on the 15th of the year 2024''s eleventh month.
+    It''s important the travel is in first class. I''ll be settling the fare with
+    my credit card with id 144756014165 and access token ''secureAccessToken12345'',
+    and would like my personal details integrated into the reservation. I''ve secured
+    my confidential access token for authentication, which will be used during this
+    booking."}]'
+  role: user
+- content: After reconsideration, the flight planned for London on the 15th is no
+    longer necessary. I require the cancellation of this booking immediately.
+  role: user
+- content: Concerning the flight cancellation, it is crucial to alert customer service
+    without delay. Kindly generate a high-priority ticket named 'Flight Cancellation
+    Alert,' detailing the reservation specifics 'Request to cancel.'. My ticket username
+    is `mthompson` and password is `securePass123
+  role: user
+name: multi_turn_base_152
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

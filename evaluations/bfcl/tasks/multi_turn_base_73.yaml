@@ -1,0 +1,87 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve noticed my car is nearing
+  empty, and I could really use some extra fuel in the tank. I''m gearing up for a
+  long drive, and I need to make sure I''m set with a full tank before hitting the
+  road."}], [{"role": "user", "content": "While I''m at it, let''s make sure the car''s
+  ready for the adventure. Start up the engine for me, and confirm everything is good
+  to go, like the doors being locked and the handbrake engaged."}], [{"role": "user",
+  "content": "Finally, I''m plotting a trip through San Francisco, specifically aiming
+  for 123 Pine St, San Francisco, CA 94016. Set the GPS for a seamless ride to that
+  location. Anticipating a smooth drive ahead!"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 123 Pine St, San Francisco, CA 94016
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - fillFuelTank(fuelAmount=45.0)
+  - - activateParkingBrake(mode='engage')
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - set_navigation(destination='123 Pine St, San Francisco, CA 94016')
+messages:
+- content: '[{"role": "user", "content": "I''ve noticed my car is nearing empty, and
+    I could really use some extra fuel in the tank. I''m gearing up for a long drive,
+    and I need to make sure I''m set with a full tank before hitting the road."}]'
+  role: user
+- content: While I'm at it, let's make sure the car's ready for the adventure. Start
+    up the engine for me, and confirm everything is good to go, like the doors being
+    locked and the handbrake engaged.
+  role: user
+- content: Finally, I'm plotting a trip through San Francisco, specifically aiming
+    for 123 Pine St, San Francisco, CA 94016. Set the GPS for a seamless ride to that
+    location. Anticipating a smooth drive ahead!
+  role: user
+name: multi_turn_base_73
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

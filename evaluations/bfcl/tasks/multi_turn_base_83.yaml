@@ -1,0 +1,88 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 0.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I am at the gas station and
+  ready to fill up my car with gasoline. I would appreciate it if you could manage
+  filling 30 liters into my vehicle to ensure it''s properly fueled for the journey
+  ahead. Use 2 decimal digit of the gallon amount"}], [{"role": "user", "content":
+  "With the fuel tank now filled with some gas, let''s proceed to start the car engine.
+  I''d be grateful if you could initiate the engine in ''START'' mode for me."}],
+  [{"role": "user", "content": "After starting the engine, there was a slight vibration
+  while I was driving. Would you mind checking the tire pressure to confirm everything''s
+  in good working order?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 7.93
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - liter_to_gallon(liter=30)
+    - fillFuelTank(fuelAmount=7.93)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+messages:
+- content: '[{"role": "user", "content": "I am at the gas station and ready to fill
+    up my car with gasoline. I would appreciate it if you could manage filling 30
+    liters into my vehicle to ensure it''s properly fueled for the journey ahead.
+    Use 2 decimal digit of the gallon amount"}]'
+  role: user
+- content: With the fuel tank now filled with some gas, let's proceed to start the
+    car engine. I'd be grateful if you could initiate the engine in 'START' mode for
+    me.
+  role: user
+- content: After starting the engine, there was a slight vibration while I was driving.
+    Would you mind checking the tire pressure to confirm everything's in good working
+    order?
+  role: user
+name: multi_turn_base_83
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

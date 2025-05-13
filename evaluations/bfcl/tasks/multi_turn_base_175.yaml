@@ -1,0 +1,137 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: '1293'
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        card_3487:
+          balance: 4000.0
+          card_number: 0789 1234 5678 3487
+          cardholder_name: Robert Trenton
+          cvv: '129'
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Robert
+      user_last_name: Trenton
+    TwitterAPI:
+      password: john1234
+      retweets: {}
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Just landed in LA! #TravelDiaries'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelDiaries'
+          username: john
+        '1':
+          content: 'Loved my flight journey! #TravelDiaries'
+          id: 1
+          mentions: []
+          tags:
+          - '#TravelDiaries'
+          username: john
+      username: john
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I need to arrange a business
+  class flight for Robert Trenton from San Francisco to Los Angeles on November 25th
+  2024. The reservation should be made using his travel card with id card_3487 and
+  access code 1293. Following the booking, I have to ensure an invoice is issued to
+  verify the charges."}], [{"role": "user", "content": "Robert Trenton wants to convey
+  his satisfaction with his recent flight on Twitter. I need to compose a tweet saying
+  ''Loved my flight journey!'' accompanied by the hashtag #TravelDiaries. If you need
+  to log in, here''s my username ''john'' and password ''john1234''. Afterward, the
+  post should be retweeted from his travel account to maximize visibility among his
+  followers."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: '1293'
+      booking_record:
+        '3426812':
+          card_id: card_3487
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 400.0
+          travel_date: '2024-11-25'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 1000.0
+      credit_card_list:
+        card_3487:
+          balance: 3600.0
+          card_number: 0789 1234 5678 3487
+          cardholder_name: Robert Trenton
+          cvv: '129'
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Robert
+      user_last_name: Trenton
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john1234
+      retweets:
+        john:
+        - 10
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Just landed in LA! #TravelDiaries'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelDiaries'
+          username: john
+        1:
+          content: 'Loved my flight journey! #TravelDiaries'
+          id: 1
+          mentions: []
+          tags:
+          - '#TravelDiaries'
+          username: john
+        10:
+          content: Loved my flight journey!
+          id: 10
+          mentions: []
+          tags:
+          - '#TravelDiaries'
+          username: john
+      username: john
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='LAX', travel_date='2024-11-25',
+      travel_class='business')
+    - book_flight(access_token='1293', card_id='card_3487', travel_date='2024-11-25',
+      travel_from='SFO', travel_to='LAX', travel_class='business', travel_cost=400.0)
+    - retrieve_invoice(access_token='1293', booking_id='3426812')
+  - - authenticate_twitter(username='john', password='john1234')
+    - post_tweet(content='Loved my flight journey!',tags=['#TravelDiaries'])
+    - retweet(tweet_id=10)
+messages:
+- content: '[{"role": "user", "content": "I need to arrange a business class flight
+    for Robert Trenton from San Francisco to Los Angeles on November 25th 2024. The
+    reservation should be made using his travel card with id card_3487 and access
+    code 1293. Following the booking, I have to ensure an invoice is issued to verify
+    the charges."}]'
+  role: user
+- content: 'Robert Trenton wants to convey his satisfaction with his recent flight
+    on Twitter. I need to compose a tweet saying ''Loved my flight journey!'' accompanied
+    by the hashtag #TravelDiaries. If you need to log in, here''s my username ''john''
+    and password ''john1234''. Afterward, the post should be retweeted from his travel
+    account to maximize visibility among his followers.'
+  role: user
+name: multi_turn_base_175
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

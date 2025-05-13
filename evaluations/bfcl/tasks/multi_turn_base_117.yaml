@@ -1,0 +1,223 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 15000.0
+        binding_card: 1987654321098765
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - ZETA
+  involved_classes:
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "I''d like some assistance
+  today with my investment portfolio. If Zeta Corp is part of my watchlist, please
+  remove it for me. The market trends for their extractions are concerning me recently."}],
+  [{"role": "user", "content": "With my watchlist refreshed, please retrieve the current
+  stocks still listed. I need a clear view of what remains on my radar."}], [{"role":
+  "user", "content": "I''m intrigued by the recent advancements in technology and
+  wish to explore investment opportunities there. Could you provide a list of available
+  technology stock symbols?"}], [{"role": "user", "content": "I''ve been observing
+  Microsoft''s stock performance and I find it quite compelling. Could you give me
+  a detailed update on its current status and trends?"}], [{"role": "user", "content":
+  "I''m ready to act on my analysis. Please purchase 50 shares of Microsoft at $320
+  each, given today''s indicators."}], [{"role": "user", "content": "Finally, before
+  the end of the trading day, I intend to deposit 10 times the prices of OMEG rounded
+  to nearest thousands into my trading account to secure liquidity for forthcoming
+  ventures."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 20000.0
+        binding_card: 1987654321098765
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 50
+          id: 12446
+          order_type: Buy
+          price: 320.0
+          status: Open
+          symbol: MSFT
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history:
+      - amount: 5000
+        timestamp: '2024-09-02 05:40:15'
+        type: deposit
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - remove_stock_from_watchlist(symbol='ZETA')
+  - - get_watchlist()
+  - - get_available_stocks(sector='Technology')
+  - - get_stock_info(symbol='MSFT')
+  - - place_order(order_type='Buy',symbol='MSFT',price=320,amount=50)
+  - - fund_account(amount=5000)
+messages:
+- content: '[{"role": "user", "content": "I''d like some assistance today with my
+    investment portfolio. If Zeta Corp is part of my watchlist, please remove it for
+    me. The market trends for their extractions are concerning me recently."}]'
+  role: user
+- content: With my watchlist refreshed, please retrieve the current stocks still listed.
+    I need a clear view of what remains on my radar.
+  role: user
+- content: I'm intrigued by the recent advancements in technology and wish to explore
+    investment opportunities there. Could you provide a list of available technology
+    stock symbols?
+  role: user
+- content: I've been observing Microsoft's stock performance and I find it quite compelling.
+    Could you give me a detailed update on its current status and trends?
+  role: user
+- content: I'm ready to act on my analysis. Please purchase 50 shares of Microsoft
+    at $320 each, given today's indicators.
+  role: user
+- content: Finally, before the end of the trading day, I intend to deposit 10 times
+    the prices of OMEG rounded to nearest thousands into my trading account to secure
+    liquidity for forthcoming ventures.
+  role: user
+name: multi_turn_base_117
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

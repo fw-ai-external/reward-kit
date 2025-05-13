@@ -1,0 +1,62 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            workspace:
+              contents:
+                .hidden_file:
+                  content: This is a hidden file.
+                  type: file
+                archive:
+                  contents: {}
+                  type: directory
+                log.txt:
+                  content: 'This is a log file. No errors found. Another line. Yet
+                    another line. Error: Something went wrong. Final line.'
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I am alex. Check if the current
+  directory is under my name and list all the visible and hidden contents in the current
+  directory now, please."}], [{"role": "user", "content": "Go to workspace directory
+  and move one of the ''log.txt'' files into a new directory ''archive''."}], [{"role":
+  "user", "content": "Investigate within ''log.txt'' for the occurrence of the keyword
+  ''Error''."}], [{"role": "user", "content": "Finally, show the last 20 lines the
+  file."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''workspace'': <Directory:
+        workspace, Parent: alex, Contents: {''archive'': <Directory: archive, Parent:
+        workspace, Contents: {''log.txt'': <<File: log.txt, Content: This is a log
+        file. No errors found. Another line. Yet another line. Error: Something went
+        wrong. Final line.>>}>, ''.hidden_file'': <<File: .hidden_file, Content: This
+        is a hidden file.>>}>}>'
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - cd(folder='workspace')
+    - mv(source='log.txt',destination='archive')
+  - - cd(folder='archive')
+    - grep(file_name='log.txt',pattern='Error')
+  - - tail(file_name='log.txt',lines=20)
+messages:
+- content: '[{"role": "user", "content": "I am alex. Check if the current directory
+    is under my name and list all the visible and hidden contents in the current directory
+    now, please."}]'
+  role: user
+- content: Go to workspace directory and move one of the 'log.txt' files into a new
+    directory 'archive'.
+  role: user
+- content: Investigate within 'log.txt' for the occurrence of the keyword 'Error'.
+  role: user
+- content: Finally, show the last 20 lines the file.
+  role: user
+name: multi_turn_base_1
+poc_max_turns: 5
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

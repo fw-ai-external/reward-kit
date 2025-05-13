@@ -1,0 +1,41 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        Lectures:
+          contents: {}
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "In my existing folder called
+  ''Lectures'', I''d like to set up a new file called ''Notes2023.txt''."}], [{"role":
+  "user", "content": "Inside ''Notes2023.txt'', I shall jot down some pivotal reminders:
+  ''Study diligently, practice programming, master algorithms.''"}], [{"role": "user",
+  "content": "Ascertain for me how many characters of text remain in this alphabetically
+  sorted version of ''Notes2023.txt''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: Lectures, Parent: None, Contents: {''Notes2023.txt'': <<File:
+        Notes2023.txt, Content: Study diligently, practice programming, master algorithms.>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - touch(file_name='Notes2023.txt')
+  - - echo(content='Study diligently, practice programming, master algorithms.',file_name='Notes2023.txt')
+  - - wc(file_name='Notes2023.txt',mode='c')
+messages:
+- content: '[{"role": "user", "content": "In my existing folder called ''Lectures'',
+    I''d like to set up a new file called ''Notes2023.txt''."}]'
+  role: user
+- content: 'Inside ''Notes2023.txt'', I shall jot down some pivotal reminders: ''Study
+    diligently, practice programming, master algorithms.'''
+  role: user
+- content: Ascertain for me how many characters of text remain in this alphabetically
+    sorted version of 'Notes2023.txt'.
+  role: user
+name: multi_turn_base_42
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

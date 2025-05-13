@@ -1,0 +1,67 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 2000.0
+      credit_card_list:
+        AMEX123456789:
+          balance: 15000.0
+          card_number: '378282246310005'
+          card_type: American Express
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I have to arrange a flight
+  from San Francisco to Los Angeles for my journey next month November on two days
+  after close of the 14th day in the year 2024. I''ll be flying business class, and
+  I''ll be settling the payment using my American Express card with id ''AMEX123456789''.
+  Would you be able to take care of this reservation using access token ''abc123xyz''
+  for me?"}], [{"role": "user", "content": "Regrettably, unexpected situations have
+  come up, and I''ve had to alter my plans. Would you kindly cancel the flight booking
+  that I made previously?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 2000.0
+      credit_card_list:
+        AMEX123456789:
+          balance: 15000.0
+          card_number: '378282246310005'
+          card_type: American Express
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='LAX', travel_date='2024-11-16',
+      travel_class='business')
+    - book_flight(access_token='abc123xyz', card_id='AMEX123456789', travel_date='2024-11-16',
+      travel_from='SFO', travel_to='LAX', travel_class='business', travel_cost=400.0)
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+messages:
+- content: '[{"role": "user", "content": "I have to arrange a flight from San Francisco
+    to Los Angeles for my journey next month November on two days after close of the
+    14th day in the year 2024. I''ll be flying business class, and I''ll be settling
+    the payment using my American Express card with id ''AMEX123456789''. Would you
+    be able to take care of this reservation using access token ''abc123xyz'' for
+    me?"}]'
+  role: user
+- content: Regrettably, unexpected situations have come up, and I've had to alter
+    my plans. Would you kindly cancel the flight booking that I made previously?
+  role: user
+name: multi_turn_base_163
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

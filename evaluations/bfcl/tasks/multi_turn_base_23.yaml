@@ -1,0 +1,61 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alpha:
+          contents:
+            Project_Guide.md:
+              content: Comprehensive guide for the new initiative.
+              type: file
+          type: directory
+    TicketAPI:
+      ticket_queue:
+      - description: Minor snag in the ticketing system.
+        id: 7423
+        status: unresolved
+  involved_classes:
+  - TicketAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I need you to draft a comprehensive
+  guide for our new initiative, and let''s name it ''Project_Guide_1.md''. Put ''Comprehensive
+  guide for the new initiative.'' in it."}], [{"role": "user", "content": "I would
+  love to get the human-readable disk usage of the current working directory."}],
+  [{"role": "user", "content": "There''s a minor snag in our ticketing system. Ticket
+  #7423 is still unresolved, but with our recent brainstorming feedback, just go ahead
+  and check it off as resolved. Leave it empty for resolve description."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alpha, Parent: None, Contents: {''Project_Guide.md'': <<File:
+        Project_Guide.md, Content: Comprehensive guide for the new initiative.>>,
+        ''Project_Guide_1.md'': <<File: Project_Guide_1.md, Content: Comprehensive
+        guide for the new initiative.>>}>'
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue:
+      - description: Minor snag in the ticketing system.
+        id: 7423
+        resolution: ''
+        status: Resolved
+  ground_truth_function_calls:
+  - - touch(file_name='Project_Guide_1.md')
+    - echo(content='Comprehensive guide for the new initiative.',file_name='Project_Guide_1.md')
+  - - du(human_readable=True)
+  - - resolve_ticket(ticket_id=7423,resolution='')
+messages:
+- content: '[{"role": "user", "content": "I need you to draft a comprehensive guide
+    for our new initiative, and let''s name it ''Project_Guide_1.md''. Put ''Comprehensive
+    guide for the new initiative.'' in it."}]'
+  role: user
+- content: I would love to get the human-readable disk usage of the current working
+    directory.
+  role: user
+- content: 'There''s a minor snag in our ticketing system. Ticket #7423 is still unresolved,
+    but with our recent brainstorming feedback, just go ahead and check it off as
+    resolved. Leave it empty for resolve description.'
+  role: user
+name: multi_turn_base_23
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

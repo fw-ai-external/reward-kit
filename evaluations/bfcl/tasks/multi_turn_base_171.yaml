@@ -1,0 +1,139 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR001
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll  be there soon.
+      - USR008:
+        - Got the snacks!
+      - USR006:
+        - Can you bring the maps?
+      message_count: 0
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: travel_agent
+        Michael: USR001
+        Sarah: USR006
+    TravelAPI:
+      access_token: '897362'
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        card_8283:
+          balance: 15000.0
+          card_number: '5829301674328283'
+          card_type: Visa
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning an expedition
+  to Beijing and I want to ensure my financial strategy is well-prepared for the adventure.
+  Budget me sufficiently to meet the target of 10000 RMB? Thanks! Now, let''s arrange
+  for a luxurious first-class flight from JFK to Beijing Capital Airport for June
+  15th 2024 utilizing my primary card with id ''card_8283''. Oh, and here''s my access
+  code 897362."}], [{"role": "user", "content": "I''ve successfully confirmed my passage
+  to Beijing. Let''s secure a travel insurance plan worth $250 on the same card. Next
+  steps: Can you retrieve the invoice for this booking for my records? Your assistance
+  in maintaining these important documents is invaluable."}], [{"role": "user", "content":
+  "Switching gears, could you draft a quick note to my travel agent (id: ''travel_agent'')
+  expressing gratitude for their efficient handling of this booking? Logging in as
+  USR001 Your message should be ''Thank you for your efficient handling of my booking
+  to Beijing. My trip is confirmed for June 15th from JFK to PEK in first class''.Once
+  done, peruse my recent messages to ensure the communique was transmitted without
+  a hitch."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll  be there soon.
+      - USR008:
+        - Got the snacks!
+      - USR006:
+        - Can you bring the maps?
+      - travel_agent: Thank you for your efficient handling of my booking to Beijing.
+          My trip is confirmed for June 15th from JFK to PEK in first class.
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: travel_agent
+        Michael: USR001
+        Sarah: USR006
+    TravelAPI:
+      access_token: '897362'
+      booking_record:
+        '3426812':
+          card_id: card_8283
+          transaction_id: '45451592'
+          travel_class: first
+          travel_cost: 10000.0
+          travel_date: '2024-06-15'
+          travel_from: JFK
+          travel_to: PEK
+      budget_limit: 1428.57
+      credit_card_list:
+        card_8283:
+          balance: 4750.0
+          card_number: '5829301674328283'
+          card_type: Visa
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - compute_exchange_rate(base_currency='RMB', target_currency='USD', value=10000.0)
+    - set_budget_limit(access_token='897362', budget_limit=1428.57)
+    - get_flight_cost(travel_from='JFK',travel_to='PEK',travel_date='2024-06-15',travel_class='first')
+    - book_flight(access_token='897362', card_id='card_8283', travel_date='2024-06-15',
+      travel_from='JFK', travel_to='PEK', travel_class='first', travel_cost=10000.0)
+  - - purchase_insurance(access_token='897362', insurance_type='comprehensive', insurance_cost=250.0,
+      booking_id='3426812', card_id='card_8283')
+    - retrieve_invoice(access_token='897362', booking_id='3426812')
+  - - message_login(user_id='USR001')
+    - send_message(receiver_id='travel_agent', message='Thank you for your efficient
+      handling of my booking to Beijing. My trip is confirmed for June 15th from JFK
+      to PEK in first class.')
+    - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''m planning an expedition to Beijing and
+    I want to ensure my financial strategy is well-prepared for the adventure. Budget
+    me sufficiently to meet the target of 10000 RMB? Thanks! Now, let''s arrange for
+    a luxurious first-class flight from JFK to Beijing Capital Airport for June 15th
+    2024 utilizing my primary card with id ''card_8283''. Oh, and here''s my access
+    code 897362."}]'
+  role: user
+- content: 'I''ve successfully confirmed my passage to Beijing. Let''s secure a travel
+    insurance plan worth $250 on the same card. Next steps: Can you retrieve the invoice
+    for this booking for my records? Your assistance in maintaining these important
+    documents is invaluable.'
+  role: user
+- content: 'Switching gears, could you draft a quick note to my travel agent (id:
+    ''travel_agent'') expressing gratitude for their efficient handling of this booking?
+    Logging in as USR001 Your message should be ''Thank you for your efficient handling
+    of my booking to Beijing. My trip is confirmed for June 15th from JFK to PEK in
+    first class''.Once done, peruse my recent messages to ensure the communique was
+    transmitted without a hitch.'
+  role: user
+name: multi_turn_base_171
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

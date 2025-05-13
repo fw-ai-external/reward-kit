@@ -1,0 +1,155 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: xK9#mP2$vL5
+      tweet_counter: 5
+      tweets:
+        '0':
+          content: 'Just filled up the tank! #CarMaintenance @VehicleGuru'
+          id: 0
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+        '1':
+          content: 'Engine started smoothly after refueling. #CarMaintenance @VehicleGuru'
+          id: 1
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+        '2':
+          content: 'Tire pressures are optimal! #CarMaintenance @VehicleGuru'
+          id: 2
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+      username: CarEnthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 30.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "First, you need to know how
+  much gasoline you added to your car, expressed in liters. You''ve just filled up
+  with 30 gallons, so how many liters of fuel does that equate to?"}], [{"role": "user",
+  "content": "Let''s take the initiative to start the engine in start mode. We want
+  to ascertain that it operates smoothly with the increased fuel level."}], [{"role":
+  "user", "content": "Inspect each tire''s condition and confirm they are in optimal
+  shape."}], [{"role": "user", "content": "Upon verifying the tire pressure, we should
+  share our findings on Twitter to keep everyone informed. Post the tweet message
+  ''Tire pressures are optimal!''. Utilize hashtags #CarMaintenance and tag @VehicleGuru
+  for professional insights."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: xK9#mP2$vL5
+      retweets: {}
+      tweet_counter: 5
+      tweets:
+        0:
+          content: 'Just filled up the tank! #CarMaintenance @VehicleGuru'
+          id: 0
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+        1:
+          content: 'Engine started smoothly after refueling. #CarMaintenance @VehicleGuru'
+          id: 1
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+        2:
+          content: 'Tire pressures are optimal! #CarMaintenance @VehicleGuru'
+          id: 2
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: CarEnthusiast
+      username: CarEnthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 30.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - gallon_to_liter(gallon=30.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+  - - post_tweet('Tire pressures are optimal!', tags=['#CarMaintenance'], mentions=['@VehicleGuru'])
+messages:
+- content: '[{"role": "user", "content": "First, you need to know how much gasoline
+    you added to your car, expressed in liters. You''ve just filled up with 30 gallons,
+    so how many liters of fuel does that equate to?"}]'
+  role: user
+- content: Let's take the initiative to start the engine in start mode. We want to
+    ascertain that it operates smoothly with the increased fuel level.
+  role: user
+- content: Inspect each tire's condition and confirm they are in optimal shape.
+  role: user
+- content: 'Upon verifying the tire pressure, we should share our findings on Twitter
+    to keep everyone informed. Post the tweet message ''Tire pressures are optimal!''.
+    Utilize hashtags #CarMaintenance and tag @VehicleGuru for professional insights.'
+  role: user
+name: multi_turn_base_53
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

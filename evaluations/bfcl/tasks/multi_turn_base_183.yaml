@@ -1,0 +1,170 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        card_2023:
+          balance: 5000.0
+          card_number: '**** **** **** 2023'
+          cardholder_name: Matt Bradley
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Matt
+      user_last_name: Bradley
+    TwitterAPI:
+      password: john1234
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Just booked a flight to LA! #TravelSuccess #RivermistJourney'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelSuccess'
+          - '#RivermistJourney'
+          username: john
+        '1':
+          content: 'Exploring new destinations! #AdventureAwaits'
+          id: 1
+          mentions: []
+          tags:
+          - '#AdventureAwaits'
+          username: john
+        '2':
+          content: 'Can''t wait for my trip to Los Angeles! #Excited'
+          id: 2
+          mentions: []
+          tags:
+          - '#Excited'
+          username: john
+      username: john
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Please confirm the details
+  for traveler Matt Bradley. His birth date is April 23, 1995, and his passport starts
+  with ''US'', numbered 9148817941. We need to make sure everything checks out before
+  proceeding with the booking."}], [{"role": "user", "content": "Wonderful! Next step
+  is identifying the closest airport to Rivermist so I can arrange flights to Los
+  Angeles for the upcoming month at 2024, 11/15. Let''s handle the booking using the
+  travel details provided, utilizing my go-to credit card with id ''card_2023'' and
+  the accompanying access token ''abc123xyz456'' to complete the processing."}], [{"role":
+  "user", "content": "The booking''s in place, and I''d love to review the invoice
+  details. Can you fetch the invoice from the latest booking to ensure every cost
+  is properly listed?"}], [{"role": "user", "content": "I''ve got a few questions
+  regarding the booking. Could you reach out on my behalf to customer support to saying
+  ''Requesting clarification on booking details''?"}], [{"role": "user", "content":
+  "I''m thinking about adjusting my travel plans shortly. When you get a chance, please
+  cancel my prior booking and ensure the charge is refunded to my card."}], [{"role":
+  "user", "content": "To share the experience with my buddies, I''d like to craft
+  a tweet about my recent travel escapades and tag the airline for extra visibility.
+  Let''s throw in some hashtags #TravelSuccess #RivermistJourney. Here''s my information,
+  username is ''john'' and password ''john1234''. The message to send is ''Just booked
+  a flight to LA!'' "}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        card_2023:
+          balance: 5000.0
+          card_number: '**** **** **** 2023'
+          cardholder_name: Matt Bradley
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Matt
+      user_last_name: Bradley
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john1234
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Just booked a flight to LA! #TravelSuccess #RivermistJourney'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelSuccess'
+          - '#RivermistJourney'
+          username: john
+        1:
+          content: 'Exploring new destinations! #AdventureAwaits'
+          id: 1
+          mentions: []
+          tags:
+          - '#AdventureAwaits'
+          username: john
+        2:
+          content: 'Can''t wait for my trip to Los Angeles! #Excited'
+          id: 2
+          mentions: []
+          tags:
+          - '#Excited'
+          username: john
+        10:
+          content: Just booked a flight to LA!
+          id: 10
+          mentions: []
+          tags:
+          - '#TravelSuccess'
+          - '#RivermistJourney'
+          username: john
+      username: john
+  ground_truth_function_calls:
+  - - verify_traveler_information(first_name='Matt', last_name='Bradley', date_of_birth='1995-04-23',
+      passport_number='US9148817941')
+  - - get_flight_cost(travel_from='RMS', travel_to='LAX', travel_date='2024-11-15',
+      travel_class='economy')
+    - book_flight(access_token='abc123xyz456', card_id='card_2023', travel_date='2024-11-15',
+      travel_from='RMS', travel_to='LAX', travel_class='economy', travel_cost=660.0)
+  - - retrieve_invoice(access_token='abc123xyz456', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Requesting clarification
+      on booking details')
+  - - cancel_booking(access_token='abc123xyz456', booking_id='3426812')
+  - - authenticate_twitter(username='john', password='john1234')
+    - post_tweet(content='Just booked a flight to LA!', tags=['#TravelSuccess', '#RivermistJourney'])
+messages:
+- content: '[{"role": "user", "content": "Please confirm the details for traveler
+    Matt Bradley. His birth date is April 23, 1995, and his passport starts with ''US'',
+    numbered 9148817941. We need to make sure everything checks out before proceeding
+    with the booking."}]'
+  role: user
+- content: Wonderful! Next step is identifying the closest airport to Rivermist so
+    I can arrange flights to Los Angeles for the upcoming month at 2024, 11/15. Let's
+    handle the booking using the travel details provided, utilizing my go-to credit
+    card with id 'card_2023' and the accompanying access token 'abc123xyz456' to complete
+    the processing.
+  role: user
+- content: The booking's in place, and I'd love to review the invoice details. Can
+    you fetch the invoice from the latest booking to ensure every cost is properly
+    listed?
+  role: user
+- content: I've got a few questions regarding the booking. Could you reach out on
+    my behalf to customer support to saying 'Requesting clarification on booking details'?
+  role: user
+- content: I'm thinking about adjusting my travel plans shortly. When you get a chance,
+    please cancel my prior booking and ensure the charge is refunded to my card.
+  role: user
+- content: 'To share the experience with my buddies, I''d like to craft a tweet about
+    my recent travel escapades and tag the airline for extra visibility. Let''s throw
+    in some hashtags #TravelSuccess #RivermistJourney. Here''s my information, username
+    is ''john'' and password ''john1234''. The message to send is ''Just booked a
+    flight to LA!'' '
+  role: user
+name: multi_turn_base_183
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,132 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR100145
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll be there soon.
+      - USR008:
+        - Got the snacks!
+      message_count: 0
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: travel_advisor
+        Michael: USR100145
+        Sarah: USR006
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        card5638:
+          balance: 10000.0
+          card_number: '4859622179045638'
+          card_type: Visa
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Calculate the exchange rate
+  for 1500 USD to EUR for me, I have some funds to convert quickly."}], [{"role":
+  "user", "content": "Now that I have the converted amount, orchestrate the reservation
+  of a flight this weekend July 1st 2024 from San Francisco to Boston in the business
+  class category, utilizing my access token ''abc123xyz456'', and ensure it is billed
+  to my primary credit card logged with id ''card5638''."}], [{"role": "user", "content":
+  "Once the flight arrangement has been secured, retrieve the invoice particulars
+  so I can log them for my budgetary purposes."}], [{"role": "user", "content": "To
+  resolve some complications I encountered during my booking, kindly reach out to
+  customer support and convey that I ''Require assistance with the transaction particulars''."}],
+  [{"role": "user", "content": "Upon reaching out to customer support, dispatch a
+  concise message through my account with id ''USR100145'' to my advisor with id ''travel_advisor'',
+  conveying the specifics of the problems I faced. They are anticipating this communication
+  promptly. The message you send should be ''Details regarding problems faced with
+  the flight booking transaction.''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR100145
+      generated_ids: '{67410}'
+      inbox:
+      - USR005:
+        - Hey Sarah, are you ready for the trip?
+      - USR007:
+        - I'll be there soon.
+      - USR008:
+        - Got the snacks!
+      - travel_advisor: Details regarding problems faced with the flight booking transaction.
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: travel_advisor
+        Michael: USR100145
+        Sarah: USR006
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record:
+        '3426812':
+          card_id: card5638
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 1800.0
+          travel_date: '2024-07-01'
+          travel_from: SFO
+          travel_to: BOS
+      budget_limit: 5000.0
+      credit_card_list:
+        card5638:
+          balance: 8200.0
+          card_number: '4859622179045638'
+          card_type: Visa
+          cardholder_name: Michael Thompson
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - compute_exchange_rate(base_currency='USD', target_currency='EUR', value=1500.0)
+  - - book_flight(access_token='abc123xyz456', card_id='card5638', travel_date='2024-07-01',
+      travel_from='SFO', travel_to='BOS', travel_class='business', travel_cost=1800.0)
+  - - retrieve_invoice(access_token='abc123xyz456', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Require assistance with
+      transaction particulars')
+  - - message_login(user_id='USR100145')
+    - send_message(receiver_id='travel_advisor', message='Details regarding problems
+      faced with the flight booking transaction.')
+messages:
+- content: '[{"role": "user", "content": "Calculate the exchange rate for 1500 USD
+    to EUR for me, I have some funds to convert quickly."}]'
+  role: user
+- content: Now that I have the converted amount, orchestrate the reservation of a
+    flight this weekend July 1st 2024 from San Francisco to Boston in the business
+    class category, utilizing my access token 'abc123xyz456', and ensure it is billed
+    to my primary credit card logged with id 'card5638'.
+  role: user
+- content: Once the flight arrangement has been secured, retrieve the invoice particulars
+    so I can log them for my budgetary purposes.
+  role: user
+- content: To resolve some complications I encountered during my booking, kindly reach
+    out to customer support and convey that I 'Require assistance with the transaction
+    particulars'.
+  role: user
+- content: Upon reaching out to customer support, dispatch a concise message through
+    my account with id 'USR100145' to my advisor with id 'travel_advisor', conveying
+    the specifics of the problems I faced. They are anticipating this communication
+    promptly. The message you send should be 'Details regarding problems faced with
+    the flight booking transaction.'
+  role: user
+name: multi_turn_base_168
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,140 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            archive:
+              contents: {}
+              type: directory
+            document:
+              contents:
+                final_report.pdf:
+                  content: Year2024 This is the final report content including budget
+                    analysis and other sections.
+                  type: file
+                previous_report.pdf:
+                  content: Year203 This is the previous report content with different
+                    budget analysis.
+                  type: file
+              type: directory
+          type: directory
+    TwitterAPI:
+      password: Kj8#mP9$vL2
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Just finished analyzing the reports!
+          id: 0
+          mentions: []
+          tags:
+          - '#analysis'
+          - '#reports'
+          username: analyst_pro
+        '1':
+          content: Budget analysis insights coming soon!
+          id: 1
+          mentions: []
+          tags:
+          - '#budget'
+          - '#analysis'
+          - '#insights'
+          username: analyst_pro
+        '2':
+          content: Stay tuned for more updates!
+          id: 2
+          mentions: []
+          tags:
+          - '#updates'
+          - '#staytuned'
+          username: analyst_pro
+      username: analyst_pro
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Move ''final_report.pdf''
+  within document directory to ''temp'' directory in document. Make sure to create
+  the directory"}], [{"role": "user", "content": "Perform a detailed search using
+  grep to identify sections in the file pertaining to ''budget analysis''."}], [{"role":
+  "user", "content": "Upon identifying the requisite ''budget analysis'' content,
+  sort the ''final_report.pdf'' by line for improved clarity and comprehension."}],
+  [{"role": "user", "content": "Move ''previous_report.pdf'' in document directory
+  to temp as well and having final report also there, proceed to juxtapose it with
+  ''previous_report.pdf'' to detect any critical alterations."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''document'': <Directory:
+        document, Parent: workspace, Contents: {''temp'': <Directory: temp, Parent:
+        document, Contents: {''final_report.pdf'': <<File: final_report.pdf, Content:
+        Year2024 This is the final report content including budget analysis and other
+        sections.>>, ''previous_report.pdf'': <<File: previous_report.pdf, Content:
+        Year203 This is the previous report content with different budget analysis.>>}>}>,
+        ''archive'': <Directory: archive, Parent: workspace, Contents: {}>}>'
+    TwitterAPI:
+      authenticated: false
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Kj8#mP9$vL2
+      retweets: {}
+      tweet_counter: 3
+      tweets:
+        0:
+          content: Just finished analyzing the reports!
+          id: 0
+          mentions: []
+          tags:
+          - '#analysis'
+          - '#reports'
+          username: analyst_pro
+        1:
+          content: Budget analysis insights coming soon!
+          id: 1
+          mentions: []
+          tags:
+          - '#budget'
+          - '#analysis'
+          - '#insights'
+          username: analyst_pro
+        2:
+          content: Stay tuned for more updates!
+          id: 2
+          mentions: []
+          tags:
+          - '#updates'
+          - '#staytuned'
+          username: analyst_pro
+      username: analyst_pro
+  ground_truth_function_calls:
+  - - cd(folder='document')
+    - mkdir(dir_name='temp')
+    - mv(source='final_report.pdf', destination='temp')
+  - - cd(folder='temp')
+    - grep(file_name='final_report.pdf',pattern='budget analysis')
+  - - sort('final_report.pdf')
+  - - cd(folder='..')
+    - mv(source='previous_report.pdf',destination='temp')
+    - cd(folder='temp')
+    - diff(file_name1='final_report.pdf',file_name2='previous_report.pdf')
+messages:
+- content: '[{"role": "user", "content": "Move ''final_report.pdf'' within document
+    directory to ''temp'' directory in document. Make sure to create the directory"}]'
+  role: user
+- content: '[{"role": "user", "content": "Perform a detailed search using grep to
+    identify sections in the file pertaining to ''budget analysis''."}]'
+  role: user
+- content: '[{"role": "user", "content": "Upon identifying the requisite ''budget
+    analysis'' content, sort the ''final_report.pdf'' by line for improved clarity
+    and comprehension."}]'
+  role: user
+- content: '[{"role": "user", "content": "Move ''previous_report.pdf'' in document
+    directory to temp as well and having final report also there, proceed to juxtapose
+    it with ''previous_report.pdf'' to detect any critical alterations."}]'
+  role: user
+name: multi_turn_base_0
+poc_max_turns: 5
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

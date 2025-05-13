@@ -1,0 +1,106 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record:
+        insurance_12345:
+          transaction_id: '12345'
+          travel_class: economy
+          travel_cost: 9500.0
+          travel_date: '2024-12-24'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list: {}
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I have a fabulous universal
+  travel credit card that I want to register. The number is 1432-7890-6543-9876 with
+  a CVV of 321 and expiration date ''12/25''. Oh, and save the name under ''Michael
+  Thompson''. Register with access token ''abc123xyz456''. Additionally, I need you
+  to set it up and then procure travel insurance worth $2000 for my family vacation,
+  which should comprehensively cover the journey from Munich all the way to Guangzhou.
+  We start off at the remarkable Munich Massive Megatrip on December 24, 2024. Fingers
+  crossed for a seamless experience! booking id is insurance_12345"}], [{"role": "user",
+  "content": "Once the travel insurance is successfully procured, I am at a loss remembering
+  the aggregated expense involved. Could you retrieve an invoice for this insurance
+  to ensure my financial records are precise?"}], [{"role": "user", "content": "During
+  this adventure, an unexpected hiccup arose. Kindly notify the customer support service
+  about this incident to guarantee that our case receives immediate attention, ahead
+  of others."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record:
+        insurance_12345:
+          transaction_id: '12345'
+          travel_class: economy
+          travel_cost: 9500.0
+          travel_date: '2024-12-24'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list:
+        '262919693687':
+          balance: 42620.0
+          card_number: 1432-7890-6543-9876
+          card_verification_number: 321
+          cardholder_name: Michael Thompson
+          expiration_date: 12/2025
+      long_context: false
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - register_credit_card(access_token='abc123xyz456', card_number='1432-7890-6543-9876',
+      expiration_date='12/2025', card_verification_number=321, cardholder_name='Michael
+      Thompson')
+    - purchase_insurance(access_token='abc123xyz456', insurance_type='comprehensive',
+      insurance_cost=2000.0, booking_id='insurance_12345',card_id='262919693687')
+  - - retrieve_invoice(access_token='abc123xyz456', booking_id='insurance_12345')
+  - - contact_customer_support(booking_id='insurance_12345', message='Unexpected hiccup
+      during travel. Please prioritize our case for immediate attention.')
+messages:
+- content: '[{"role": "user", "content": "I have a fabulous universal travel credit
+    card that I want to register. The number is 1432-7890-6543-9876 with a CVV of
+    321 and expiration date ''12/25''. Oh, and save the name under ''Michael Thompson''.
+    Register with access token ''abc123xyz456''. Additionally, I need you to set it
+    up and then procure travel insurance worth $2000 for my family vacation, which
+    should comprehensively cover the journey from Munich all the way to Guangzhou.
+    We start off at the remarkable Munich Massive Megatrip on December 24, 2024. Fingers
+    crossed for a seamless experience! booking id is insurance_12345"}]'
+  role: user
+- content: Once the travel insurance is successfully procured, I am at a loss remembering
+    the aggregated expense involved. Could you retrieve an invoice for this insurance
+    to ensure my financial records are precise?
+  role: user
+- content: During this adventure, an unexpected hiccup arose. Kindly notify the customer
+    support service about this incident to guarantee that our case receives immediate
+    attention, ahead of others.
+  role: user
+name: multi_turn_base_197
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,66 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            documents:
+              contents:
+                archive:
+                  contents: {}
+                  type: directory
+                project.txt:
+                  content: Project progress is on track. The team has completed the
+                    initial phase. Progress is being monitored closely. Final adjustments
+                    are underway.The project is nearing completion.
+                  type: file
+                reports:
+                  contents: {}
+                  type: directory
+              type: directory
+          type: directory
+    MathAPI:
+      base: 10
+      value: 1000
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Kindly draft a document titled
+  ''project_summary.txt'' right here in documents directory. Yield an error if it
+  already exists."}], [{"role": "user", "content": " I need it archived. Replicate
+  it into the archive folder, but rename it to ''summary_2024.txt''."}], [{"role":
+  "user", "content": "In the contents of ''summary_2024.txt'', please fish out and
+  highlight any lines featuring the term ''Progress''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''documents'': <Directory:
+        documents, Parent: alex, Contents: {''project.txt'': <<File: project.txt,
+        Content: Project progress is on track. The team has completed the initial
+        phase. Progress is being monitored closely. Final adjustments are underway.The
+        project is nearing completion.>>, ''archive'': <Directory: archive, Parent:
+        documents, Contents: {''summary_2024.txt'': <<File: summary_2024.txt, Content:
+        >>}>, ''reports'': <Directory: reports, Parent: documents, Contents: {}>,
+        ''project_summary.txt'': <<File: project_summary.txt, Content: >>}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - cd(folder='documents')
+    - touch(file_name='project_summary.txt')
+  - - cp(source='project_summary.txt', destination='archive')
+    - cd(folder='archive')
+    - mv(source='project_summary.txt', destination='summary_2024.txt')
+  - - grep(file_name='summary_2024.txt',pattern='Progress')
+messages:
+- content: '[{"role": "user", "content": "Kindly draft a document titled ''project_summary.txt''
+    right here in documents directory. Yield an error if it already exists."}]'
+  role: user
+- content: ' I need it archived. Replicate it into the archive folder, but rename
+    it to ''summary_2024.txt''.'
+  role: user
+- content: In the contents of 'summary_2024.txt', please fish out and highlight any
+    lines featuring the term 'Progress'.
+  role: user
+name: multi_turn_base_36
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

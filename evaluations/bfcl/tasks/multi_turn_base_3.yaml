@@ -1,0 +1,61 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            projects:
+              contents:
+                photography:
+                  contents:
+                    backup_tests:
+                      contents: {}
+                      type: directory
+                    test_document.txt:
+                      content: Document data
+                      type: file
+                    test_image1.jpg:
+                      content: Image data 1
+                      type: file
+                  type: directory
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "As part of my latest photography
+  project, I need to gather files that have ''test'' in their name from any folder
+  in my current directory. Could you help me locate those?"}], [{"role": "user", "content":
+  "After identifying them, the next step is to ensure the images and text files are
+  safely copied into a ''backup_tests'' folder right within the same directory. Could
+  that be arranged?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''projects'': <Directory:
+        projects, Parent: alex, Contents: {''photography'': <Directory: photography,
+        Parent: projects, Contents: {''test_image1.jpg'': <<File: test_image1.jpg,
+        Content: Image data 1>>, ''test_document.txt'': <<File: test_document.txt,
+        Content: Document data>>, ''backup_tests'': <Directory: backup_tests, Parent:
+        photography, Contents: {''test_image1.jpg'': <<File: test_image1.jpg, Content:
+        Image data 1>>, ''test_document.txt'': <<File: test_document.txt, Content:
+        Document data>>}>}>}>}>'
+  ground_truth_function_calls:
+  - - find(path='.',name='test')
+  - - cd(folder='projects')
+    - cd(folder='photography')
+    - cp(source='test_image1.jpg',destination='backup_tests')
+    - cp(source='test_document.txt',destination='backup_tests')
+messages:
+- content: '[{"role": "user", "content": "As part of my latest photography project,
+    I need to gather files that have ''test'' in their name from any folder in my
+    current directory. Could you help me locate those?"}]'
+  role: user
+- content: After identifying them, the next step is to ensure the images and text
+    files are safely copied into a 'backup_tests' folder right within the same directory.
+    Could that be arranged?
+  role: user
+name: multi_turn_base_3
+poc_max_turns: 3
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

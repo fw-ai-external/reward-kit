@@ -1,0 +1,219 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 67890
+        balance: 15000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - OMEG
+      - ZETA
+  involved_classes:
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Could you peruse my stock
+  watchlist and share what''s on my radar right now, please?"}], [{"role": "user",
+  "content": "I''m inclined to shake things up a bit. Let''s take Zeta Corp out of
+  the equation from my watchlist, shall we?"}], [{"role": "user", "content": "I have
+  a keen interest in Omega Industries at the moment. Let''s delve into the latest
+  stock details to see what they hold."}], [{"role": "user", "content": "Word is,
+  the Technology sector is buzzing. Catalogue the stocks in this field for me, as
+  I''m scouting for new investment potential."}], [{"role": "user", "content": "I
+  feel it''s time to inject some capital into my portfolio\u2014let''s allocate an
+  extra $10,000 to my trading funds."}], [{"role": "user", "content": "With the account
+  bolstered, execute a purchase for ''AAPL''-a fair target seems $150 per share, and
+  I''m thinking 50 shares will do the trick."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TradingBot:
+      account_info:
+        account_id: 67890
+        balance: 25000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 50
+          id: 12446
+          order_type: Buy
+          price: 150.0
+          status: Open
+          symbol: AAPL
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history:
+      - amount: 10000
+        timestamp: '2024-09-02 05:40:15'
+        type: deposit
+      watch_list:
+      - NVDA
+      - OMEG
+  ground_truth_function_calls:
+  - - get_watchlist()
+  - - remove_stock_from_watchlist(symbol='ZETA')
+  - - get_stock_info(symbol='OMEG')
+  - - get_available_stocks(sector='Technology')
+  - - fund_account(amount=10000)
+  - - place_order(order_type='Buy', symbol='AAPL', price=150.0, amount=50)
+messages:
+- content: '[{"role": "user", "content": "Could you peruse my stock watchlist and
+    share what''s on my radar right now, please?"}]'
+  role: user
+- content: I'm inclined to shake things up a bit. Let's take Zeta Corp out of the
+    equation from my watchlist, shall we?
+  role: user
+- content: I have a keen interest in Omega Industries at the moment. Let's delve into
+    the latest stock details to see what they hold.
+  role: user
+- content: Word is, the Technology sector is buzzing. Catalogue the stocks in this
+    field for me, as I'm scouting for new investment potential.
+  role: user
+- content: "I feel it's time to inject some capital into my portfolio\u2014let's allocate\
+    \ an extra $10,000 to my trading funds."
+  role: user
+- content: With the account bolstered, execute a purchase for 'AAPL'-a fair target
+    seems $150 per share, and I'm thinking 50 shares will do the trick.
+  role: user
+name: multi_turn_base_116
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,62 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            initial_directory:
+              contents:
+                notes:
+                  content: Meeting notes and project details.
+                  type: file
+                other_file.txt:
+                  content: Some other content.
+                  type: file
+              type: directory
+          type: directory
+    MessageAPI: {}
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Where is my notes? Forward
+  it exactly to Bob please. I am USR001."}], [{"role": "user", "content": "After Bob
+  has received the details, would you mind removing it since there are some errors?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''initial_directory'':
+        <Directory: initial_directory, Parent: workspace, Contents: {''notes'': <<File:
+        notes, Content: Meeting notes and project details.>>, ''other_file.txt'':
+        <<File: other_file.txt, Content: Some other content.>>}>}>'
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - cd(folder='initial_directory')
+    - cat(file_name='notes')
+    - get_user_id(user='Bob')
+    - message_login(user_id='USR001')
+    - send_message(receiver_id='USR002',message='Meeting notes and project details.')
+  - - delete_message(receiver_id='USR002')
+messages:
+- content: '[{"role": "user", "content": "Where is my notes? Forward it exactly to
+    Bob please. I am USR001."}]'
+  role: user
+- content: After Bob has received the details, would you mind removing it since there
+    are some errors?
+  role: user
+name: multi_turn_base_41
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

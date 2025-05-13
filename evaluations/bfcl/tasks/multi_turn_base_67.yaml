@@ -1,0 +1,98 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Silverpine
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Will you estimate the distance
+  between San Francisco and Silverpine for me?"}], [{"role": "user", "content": "I
+  need that info to check if my vehicle can cover the distance without refueling."}],
+  [{"role": "user", "content": "In case it can''t, just fill out the fuel tank completely."}],
+  [{"role": "user", "content": "Turn on my vehicle''s engine in ''START'' mode."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Silverpine
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Silverpine')
+    - estimate_distance(cityA='94016', cityB='62947')
+  - - estimate_drive_feasibility_by_mileage(distance=780.0)
+  - - fillFuelTank(fuelAmount=39.5)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+messages:
+- content: '[{"role": "user", "content": "Will you estimate the distance between San
+    Francisco and Silverpine for me?"}]'
+  role: user
+- content: I need that info to check if my vehicle can cover the distance without
+    refueling.
+  role: user
+- content: In case it can't, just fill out the fuel tank completely.
+  role: user
+- content: Turn on my vehicle's engine in 'START' mode.
+  role: user
+name: multi_turn_base_67
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,196 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr@ff1cJ@m2023
+      tweet_counter: 5
+      tweets:
+        '0':
+          content: Just filled up the tank and checked the tire pressures. Ready for
+            the next adventure!
+          id: 0
+          mentions: []
+          tags:
+          - '#RoadTrip'
+          - '#CarMaintenance'
+          - '#Adventure'
+          username: roadtripper_123
+        '1':
+          content: tweet2
+          id: 1
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        '2':
+          content: tweet3
+          id: 2
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        '3':
+          content: tweet4
+          id: 3
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        '4':
+          content: tweet5
+          id: 4
+          mentions: []
+          tags: []
+          username: roadtripper_123
+      username: roadtripper_123
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Imagine I just embarked on
+  a lovely road trip and had to make a stop at the gas station. Would you be so kind
+  as to assist me in filling up my car with 15 liters of gasoline? Fill with the second
+  decimal digit precision in gallon. Once that''s done, it would be fantastic if you
+  could check the tire pressures as well\u2014I''d love to share my impressive car
+  maintenance skills with my Twitter followers with the message ''Just filled up the
+  tank and checked the tire pressures. Ready for the next adventure!''. If you could
+  also start up the engine and let me know the battery voltage and fuel level, that
+  would be incredibly helpful."}], [{"role": "user", "content": "I''ve shared the
+  details about my tire pressures and engine''s stellar condition on Twitter, but
+  I''d like to give that tweet a bit more visibility. Could you possibly amplify its
+  reach by retweeting it? And if you could add a comment saying, ''Ready for the next
+  adventure!'' that would be splendid."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments:
+        5:
+        - content: Ready for the next adventure!
+          username: roadtripper_123
+      following_list:
+      - alice
+      - bob
+      password: Tr@ff1cJ@m2023
+      retweets:
+        roadtripper_123:
+        - 5
+      tweet_counter: 6
+      tweets:
+        0:
+          content: Just filled up the tank and checked the tire pressures. Ready for
+            the next adventure!
+          id: 0
+          mentions: []
+          tags:
+          - '#RoadTrip'
+          - '#CarMaintenance'
+          - '#Adventure'
+          username: roadtripper_123
+        1:
+          content: tweet2
+          id: 1
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        2:
+          content: tweet3
+          id: 2
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        3:
+          content: tweet4
+          id: 3
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        4:
+          content: tweet5
+          id: 4
+          mentions: []
+          tags: []
+          username: roadtripper_123
+        5:
+          content: Just filled up the tank and checked the tire pressures. Ready for
+            the next adventure!
+          id: 5
+          mentions: []
+          tags: []
+          username: roadtripper_123
+      username: roadtripper_123
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 13.96
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - liter_to_gallon(liter=15)
+    - fillFuelTank(fuelAmount=3.96)
+    - check_tire_pressure()
+    - post_tweet(content='Just filled up the tank and checked the tire pressures.
+      Ready for the next adventure!')
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - retweet(tweet_id=5)
+    - comment(tweet_id=5, comment_content='Ready for the next adventure!')
+messages:
+- content: '[{"role": "user", "content": "Imagine I just embarked on a lovely road
+    trip and had to make a stop at the gas station. Would you be so kind as to assist
+    me in filling up my car with 15 liters of gasoline? Fill with the second decimal
+    digit precision in gallon. Once that''s done, it would be fantastic if you could
+    check the tire pressures as well\u2014I''d love to share my impressive car maintenance
+    skills with my Twitter followers with the message ''Just filled up the tank and
+    checked the tire pressures. Ready for the next adventure!''. If you could also
+    start up the engine and let me know the battery voltage and fuel level, that would
+    be incredibly helpful."}]'
+  role: user
+- content: I've shared the details about my tire pressures and engine's stellar condition
+    on Twitter, but I'd like to give that tweet a bit more visibility. Could you possibly
+    amplify its reach by retweeting it? And if you could add a comment saying, 'Ready
+    for the next adventure!' that would be splendid.
+  role: user
+name: multi_turn_base_65
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

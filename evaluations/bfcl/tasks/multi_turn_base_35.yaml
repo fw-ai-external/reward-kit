@@ -1,0 +1,67 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            projects:
+              contents:
+                deep_folder:
+                  contents:
+                    config.py:
+                      content: Initialization of the system Error in module Setup
+                        complete Initialization successful Error detected
+                      type: file
+                    real_config.py:
+                      content: Real Config.
+                      type: file
+                  type: directory
+              type: directory
+            temp:
+              contents: {}
+              type: directory
+          type: directory
+    MathAPI:
+      precision: 8
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Find a file named ''config.py''
+  somewhere deep in the file system and once you have located it, display the last
+  line of the first occuring file."}], [{"role": "user", "content": "This is actually
+  not what I want. Could you display the entire content of the second file found."}],
+  [{"role": "user", "content": "Store the differences of the two file in a new file
+  call diff.txt."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''projects'': <Directory:
+        projects, Parent: alex, Contents: {''deep_folder'': <Directory: deep_folder,
+        Parent: projects, Contents: {''config.py'': <<File: config.py, Content: Initialization
+        of the system Error in module Setup complete Initialization successful Error
+        detected>>, ''real_config.py'': <<File: real_config.py, Content: Real Config.>>,
+        ''diff.txt'': <<File: diff.txt, Content: - Initialization of the system+ Real
+        Config.>>}>}>, ''temp'': <Directory: temp, Parent: alex, Contents: {}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - cd(folder='projects')
+    - cd(folder='deep_folder')
+    - tail(file_name='config.py',lines=1)
+  - - cat(file_name='real_config.py')
+  - - diff(file_name1='config.py',file_name2='real_config.py')
+    - touch(file_name='diff.txt')
+    - echo(content='- Initialization of the system+ Real Config.',file_name='diff.txt')
+messages:
+- content: '[{"role": "user", "content": "Find a file named ''config.py'' somewhere
+    deep in the file system and once you have located it, display the last line of
+    the first occuring file."}]'
+  role: user
+- content: This is actually not what I want. Could you display the entire content
+    of the second file found.
+  role: user
+- content: Store the differences of the two file in a new file call diff.txt.
+  role: user
+name: multi_turn_base_35
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

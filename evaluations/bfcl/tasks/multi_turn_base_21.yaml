@@ -1,0 +1,85 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            Backups:
+              contents: {}
+              type: directory
+            Draft.txt:
+              content: Old draft content.
+              type: file
+            ProjectOverview.txt:
+              content: 'Initial summary of the project. '
+              type: file
+          type: directory
+    TwitterAPI:
+      password: securePass123
+      tweet_counter: 0
+      tweets: {}
+      username: tech_guru
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I''ve just put together a
+  file named ''ProjectOverview.txt'' into my working directory where I''ve laid out
+  an initial summary of the project. But as I foresee possible modifications down
+  the line, I''d like to modify the file content by putting ''To be discussed'' in
+  it."}], [{"role": "user", "content": "For peace of mind, let''s ensure both ''ProjectOverview.txt''
+  and ''Draft.txt'' are identical."}], [{"role": "user", "content": "Lastly, I''d
+  like to broadcast my recent documentation progress on Twitter. Please draft a tweet
+  announcing a brief project update, as ''Initial summary of the project. To be discussed.'',
+  tagging it with ''ProjectUpdate'' and mentioning @manager and @team_lead to keep
+  everyone in the loop. My user name is tech_guru and password is securePass123."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''ProjectOverview.txt'':
+        <<File: ProjectOverview.txt, Content: To be discussed>>, ''Draft.txt'': <<File:
+        Draft.txt, Content: Old draft content.>>, ''Backups'': <Directory: Backups,
+        Parent: workspace, Contents: {}>}>'
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: securePass123
+      retweets: {}
+      tweet_counter: 1
+      tweets:
+        0:
+          content: Initial summary of the project. To be discussed
+          id: 0
+          mentions:
+          - '@manager'
+          - '@team_lead'
+          tags:
+          - '#ProjectUpdate'
+          username: tech_guru
+      username: tech_guru
+  ground_truth_function_calls:
+  - - echo(content='To be discussed',file_name='ProjectOverview.txt')
+  - - diff(file_name1='ProjectOverview.txt',file_name2='Draft.txt')
+  - - authenticate_twitter(username='tech_guru', password='securePass123')
+    - post_tweet(content='Initial summary of the project. To be discussed', tags=['#ProjectUpdate'],mentions=['@manager','@team_lead'])
+messages:
+- content: '[{"role": "user", "content": "I''ve just put together a file named ''ProjectOverview.txt''
+    into my working directory where I''ve laid out an initial summary of the project.
+    But as I foresee possible modifications down the line, I''d like to modify the
+    file content by putting ''To be discussed'' in it."}]'
+  role: user
+- content: For peace of mind, let's ensure both 'ProjectOverview.txt' and 'Draft.txt'
+    are identical.
+  role: user
+- content: Lastly, I'd like to broadcast my recent documentation progress on Twitter.
+    Please draft a tweet announcing a brief project update, as 'Initial summary of
+    the project. To be discussed.', tagging it with 'ProjectUpdate' and mentioning
+    @manager and @team_lead to keep everyone in the loop. My user name is tech_guru
+    and password is securePass123.
+  role: user
+name: multi_turn_base_21
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

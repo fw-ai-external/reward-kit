@@ -1,0 +1,81 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        project:
+          contents:
+            archives:
+              contents: {}
+              type: directory
+            report_draft.txt:
+              content: Initial draft content for the report.
+              type: file
+            report_final.txt:
+              content: Finalized content for the report.
+              type: file
+            temp_notes.txt:
+              content: Temporary notes for the project.
+              type: file
+          type: directory
+    TicketAPI:
+      ticket_queue:
+      - description: Issue with workstation not booting properly.
+        id: 987654
+        resolution: ''
+        status: open
+  involved_classes:
+  - TicketAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Look for draft and final report
+  in my current directory. Compare the content difference of both."}], [{"role": "user",
+  "content": "Transfer ''temp_notes.txt'' into the ''archives'' directory and rename
+  it to ''notes_2024.txt''."}], [{"role": "user", "content": "I recently documented
+  a support ticket due to an issue with my workstation, and I recall the ticket number
+  was 987654, though the precise number eludes me. Retrieve the details of that ticket
+  for me, please."}], [{"role": "user", "content": "With the information from the
+  ticket at hand, resolve it for me since I''ve already addressed the core problem
+  independently. Summarize the resolution as: ''Fixed through manual troubleshooting
+  techniques.''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: project, Parent: None, Contents: {''report_draft.txt'': <<File:
+        report_draft.txt, Content: Initial draft content for the report.>>, ''report_final.txt'':
+        <<File: report_final.txt, Content: Finalized content for the report.>>, ''archives'':
+        <Directory: archives, Parent: project, Contents: {''temp_notes.txt'': <<File:
+        temp_notes.txt, Content: Temporary notes for the project.>>}>}>'
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue:
+      - description: Issue with workstation not booting properly.
+        id: 987654
+        resolution: Fixed through manual troubleshooting techniques.
+        status: Resolved
+  ground_truth_function_calls:
+  - - diff(file_name1='report_draft.txt', file_name2='report_final.txt')
+  - - mv(source='temp_notes.txt', destination='archives')
+    - cd('archives')
+    - mv(source='temp_notes.txt',destination='notes_2024.txt')
+  - - get_ticket(ticket_id=987654)
+  - - resolve_ticket(ticket_id=987654, resolution='Fixed through manual troubleshooting
+      techniques.')
+messages:
+- content: '[{"role": "user", "content": "Look for draft and final report in my current
+    directory. Compare the content difference of both."}]'
+  role: user
+- content: Transfer 'temp_notes.txt' into the 'archives' directory and rename it to
+    'notes_2024.txt'.
+  role: user
+- content: I recently documented a support ticket due to an issue with my workstation,
+    and I recall the ticket number was 987654, though the precise number eludes me.
+    Retrieve the details of that ticket for me, please.
+  role: user
+- content: 'With the information from the ticket at hand, resolve it for me since
+    I''ve already addressed the core problem independently. Summarize the resolution
+    as: ''Fixed through manual troubleshooting techniques.'''
+  role: user
+name: multi_turn_base_24
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

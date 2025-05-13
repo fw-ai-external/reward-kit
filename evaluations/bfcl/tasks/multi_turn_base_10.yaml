@@ -1,0 +1,68 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            workspace:
+              contents:
+                notes.md:
+                  content: Meeting highlights and notes.
+                  type: file
+                proposal.docx:
+                  content: Initial project proposal document content.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Hey, can you set up a new
+  directory named ''Projects'' right in workspace folder?"}], [{"role": "user", "content":
+  "Let''s move over the project''s proposal document into this ''Projects'' folder,
+  but we''ll go ahead and rename it to ''final_proposal_2024''."}], [{"role": "user",
+  "content": "Inside this directory, get cracking on a new file, call it ''notes.md'',
+  to capture all the highlights from our meetings."}], [{"role": "user", "content":
+  "Also, create a file named ''summary.txt'' and write ''Hello'' into it. After that,
+  do a quick comparison between this one and ''notes.md'' to spot any disparities
+  in information."}], [{"role": "user", "content": "Finally, tally up the number of
+  characters in ''summary.txt''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''workspace'': <Directory:
+        workspace, Parent: alex, Contents: {''notes.md'': <<File: notes.md, Content:
+        Meeting highlights and notes.>>, ''Projects'': <Directory: Projects, Parent:
+        workspace, Contents: {''final_proposal_2024'': <<File: final_proposal_2024,
+        Content: Initial project proposal document content.>>, ''note.md'': <<File:
+        note.md, Content: >>, ''summary.txt'': <<File: summary.txt, Content: Hello>>}>}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='workspace')
+    - mkdir(dir_name='Projects')
+  - - mv(source='proposal.docx',destination='Projects')
+    - cd(folder='Projects')
+    - mv(source='proposal.docx',destination='final_proposal_2024')
+  - - touch(file_name='note.md')
+  - - touch(file_name='summary.txt')
+    - echo(content='Hello',file_name='summary.txt')
+    - diff(file_name1='note.md',file_name2='summary.txt')
+  - - wc(file_name='summary.txt',mode='c')
+messages:
+- content: '[{"role": "user", "content": "Hey, can you set up a new directory named
+    ''Projects'' right in workspace folder?"}]'
+  role: user
+- content: Let's move over the project's proposal document into this 'Projects' folder,
+    but we'll go ahead and rename it to 'final_proposal_2024'.
+  role: user
+- content: Inside this directory, get cracking on a new file, call it 'notes.md',
+    to capture all the highlights from our meetings.
+  role: user
+- content: Also, create a file named 'summary.txt' and write 'Hello' into it. After
+    that, do a quick comparison between this one and 'notes.md' to spot any disparities
+    in information.
+  role: user
+- content: Finally, tally up the number of characters in 'summary.txt'.
+  role: user
+name: multi_turn_base_10
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

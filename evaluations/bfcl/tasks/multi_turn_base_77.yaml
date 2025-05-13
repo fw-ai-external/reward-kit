@@ -1,0 +1,294 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Fh7#mK9$pL2&vN4
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: Excited to start my genealogy journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#familyhistory'
+          - '#beginnings'
+          username: genealogy_enthusiast
+        '1':
+          content: Researching family history is so rewarding.
+          id: 1
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#research'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+        '2':
+          content: Can't wait to uncover new stories about my ancestors.
+          id: 2
+          mentions: []
+          tags:
+          - '#ancestors'
+          - '#familystories'
+          - '#discovery'
+          username: genealogy_enthusiast
+        '3':
+          content: Genealogy is like a puzzle waiting to be solved.
+          id: 3
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#puzzle'
+          - '#research'
+          username: genealogy_enthusiast
+        '4':
+          content: Every family has a story worth telling.
+          id: 4
+          mentions: []
+          tags:
+          - '#familystories'
+          - '#heritage'
+          - '#genealogy'
+          username: genealogy_enthusiast
+        '5':
+          content: Exploring my roots is a journey of self-discovery.
+          id: 5
+          mentions: []
+          tags:
+          - '#roots'
+          - '#selfdiscovery'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+        '6':
+          content: Family history is a treasure trove of stories.
+          id: 6
+          mentions: []
+          tags:
+          - '#familyhistory'
+          - '#stories'
+          - '#heritage'
+          username: genealogy_enthusiast
+        '7':
+          content: Connecting with my past to understand my present.
+          id: 7
+          mentions: []
+          tags:
+          - '#connection'
+          - '#pastpresent'
+          - '#genealogy'
+          username: genealogy_enthusiast
+        '8':
+          content: 'Genealogy: where history meets personal stories.'
+          id: 8
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#history'
+          - '#personalstories'
+          username: genealogy_enthusiast
+        '9':
+          content: Uncovering the past, one ancestor at a time.
+          id: 9
+          mentions: []
+          tags:
+          - '#ancestors'
+          - '#research'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+      username: genealogy_enthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Before I set off for Stonebrook
+  to uncover family history, I need to determine the road distance between San Francisco
+  and Stonebrook for my genealogy exploration."}], [{"role": "user", "content": "Buzzing
+  with anticipation for this family roots journey, I want to tweet: ''Setting forth
+  on an exciting quest from San Francisco to Stonebrook to uncover ancestral stories!''
+  #GenealogyAdventure #FamilyHistory."}], [{"role": "user", "content": "Once the tweet
+  is live, I should retweet it to widen the circle of those who might share in this
+  genealogy fervor!"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Fh7#mK9$pL2&vN4
+      retweets:
+        genealogy_enthusiast:
+        - 10
+      tweet_counter: 11
+      tweets:
+        0:
+          content: Excited to start my genealogy journey!
+          id: 0
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#familyhistory'
+          - '#beginnings'
+          username: genealogy_enthusiast
+        1:
+          content: Researching family history is so rewarding.
+          id: 1
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#research'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+        2:
+          content: Can't wait to uncover new stories about my ancestors.
+          id: 2
+          mentions: []
+          tags:
+          - '#ancestors'
+          - '#familystories'
+          - '#discovery'
+          username: genealogy_enthusiast
+        3:
+          content: Genealogy is like a puzzle waiting to be solved.
+          id: 3
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#puzzle'
+          - '#research'
+          username: genealogy_enthusiast
+        4:
+          content: Every family has a story worth telling.
+          id: 4
+          mentions: []
+          tags:
+          - '#familystories'
+          - '#heritage'
+          - '#genealogy'
+          username: genealogy_enthusiast
+        5:
+          content: Exploring my roots is a journey of self-discovery.
+          id: 5
+          mentions: []
+          tags:
+          - '#roots'
+          - '#selfdiscovery'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+        6:
+          content: Family history is a treasure trove of stories.
+          id: 6
+          mentions: []
+          tags:
+          - '#familyhistory'
+          - '#stories'
+          - '#heritage'
+          username: genealogy_enthusiast
+        7:
+          content: Connecting with my past to understand my present.
+          id: 7
+          mentions: []
+          tags:
+          - '#connection'
+          - '#pastpresent'
+          - '#genealogy'
+          username: genealogy_enthusiast
+        8:
+          content: 'Genealogy: where history meets personal stories.'
+          id: 8
+          mentions: []
+          tags:
+          - '#genealogy'
+          - '#history'
+          - '#personalstories'
+          username: genealogy_enthusiast
+        9:
+          content: Uncovering the past, one ancestor at a time.
+          id: 9
+          mentions: []
+          tags:
+          - '#ancestors'
+          - '#research'
+          - '#familyhistory'
+          username: genealogy_enthusiast
+        10:
+          content: Setting forth on an exciting quest from San Francisco to Stonebrook
+            to uncover ancestral stories!
+          id: 10
+          mentions: []
+          tags:
+          - '#GenealogyAdventure'
+          - '#FamilyHistory'
+          username: genealogy_enthusiast
+      username: genealogy_enthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: released
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engine_state: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 4
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Stonebrook')
+    - estimate_distance(cityA='94016', cityB='74532')
+  - - post_tweet(content='Setting forth on an exciting quest from San Francisco to
+      Stonebrook to uncover ancestral stories!', tags=['#GenealogyAdventure', '#FamilyHistory'])
+  - - retweet(tweet_id=10)
+messages:
+- content: '[{"role": "user", "content": "Before I set off for Stonebrook to uncover
+    family history, I need to determine the road distance between San Francisco and
+    Stonebrook for my genealogy exploration."}]'
+  role: user
+- content: 'Buzzing with anticipation for this family roots journey, I want to tweet:
+    ''Setting forth on an exciting quest from San Francisco to Stonebrook to uncover
+    ancestral stories!'' #GenealogyAdventure #FamilyHistory.'
+  role: user
+- content: Once the tweet is live, I should retweet it to widen the circle of those
+    who might share in this genealogy fervor!
+  role: user
+name: multi_turn_base_77
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

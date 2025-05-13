@@ -1,0 +1,86 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            Documents:
+              contents:
+                Q4_summary.doc:
+                  content: 'Summary of Q4 results. Conclusion: Profits increased.'
+                  type: file
+                Reports:
+                  contents:
+                    Archives:
+                      contents: {}
+                      type: directory
+                  type: directory
+                annual_report.txt:
+                  content: Annual report content with Q4 results.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Arrange a complete listing
+  of all files and directories presently located here, making sure you don''t overlook
+  the hidden ones too."}], [{"role": "user", "content": "Transfer the ''annual_report.txt''
+  in Documents directory to the ''Reports'' directory that''s in Documents directory,
+  but also make sure it remains available in its current spot."}], [{"role": "user",
+  "content": "Reveal the last lines of ''Q4_summary.doc'' so we can ascertain how
+  the report wraps up."}], [{"role": "user", "content": "Attempt to relay a message
+  to the individual with ID ''USR002'' by logging in as USR001, updating them on the
+  finalization of the report saying ''The report has been finalized.''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''Documents'': <Directory:
+        Documents, Parent: alex, Contents: {''annual_report.txt'': <<File: annual_report.txt,
+        Content: Annual report content with Q4 results.>>, ''Q4_summary.doc'': <<File:
+        Q4_summary.doc, Content: Summary of Q4 results. Conclusion: Profits increased.>>,
+        ''Reports'': <Directory: Reports, Parent: Documents, Contents: {''Archives'':
+        <Directory: Archives, Parent: Reports, Contents: {}>, ''annual_report.txt'':
+        <<File: annual_report.txt, Content: Annual report content with Q4 results.>>}>}>}>'
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR002: The report has been finalized.
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - ls(a=True)
+  - - cd(folder='Documents')
+    - cp(source='annual_report.txt', destination='Reports')
+  - - tail(file_name='Q4_summary.doc',lines=1)
+  - - message_login(user_id='USR001')
+    - send_message(receiver_id='USR002', message='The report has been finalized.')
+messages:
+- content: '[{"role": "user", "content": "Arrange a complete listing of all files
+    and directories presently located here, making sure you don''t overlook the hidden
+    ones too."}]'
+  role: user
+- content: Transfer the 'annual_report.txt' in Documents directory to the 'Reports'
+    directory that's in Documents directory, but also make sure it remains available
+    in its current spot.
+  role: user
+- content: Reveal the last lines of 'Q4_summary.doc' so we can ascertain how the report
+    wraps up.
+  role: user
+- content: Attempt to relay a message to the individual with ID 'USR002' by logging
+    in as USR001, updating them on the finalization of the report saying 'The report
+    has been finalized.'.
+  role: user
+name: multi_turn_base_40
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

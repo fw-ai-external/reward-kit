@@ -1,0 +1,98 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Alright, I''ve been thinking
+  about a road trip and I want to use my own car for the journey. That''s quite a
+  stretch\u2014450 miles in one go today. Is this something I could realistically
+  pull off? I just want to know a answer; you don''t need to refill if it''s not reachable.
+  If it is reachable, set navigation to ''1914 7th St, Apt B, Berkeley, CA 94710''."}],
+  [{"role": "user", "content": "Given that the trip isn''t looking too likely with
+  what I have at the moment, I''ll need to refuel. I think 40 gallons in total in
+  my tank should do the trick to get me enough mileage. Can you handle the gas top-up
+  for me?"}], [{"role": "user", "content": "Everything''s all set now, and I''m ready
+  to get going. Could you get the engine started for me? Make sure you do it in START
+  mode, with all doors securely locked and the brake properly engaged."}], [{"role":
+  "user", "content": "I''m planning on visiting this gorgeous little spot in Berkeley,
+  California. Would you be so kind as to set up the navigation system to take me to
+  2107 Channing Way, Berkeley, CA?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 2107 Channing Way, Berkeley, CA
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 40.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - estimate_drive_feasibility_by_mileage(distance=450.0)
+  - - fillFuelTank(fuelAmount=30)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - set_navigation(destination='2107 Channing Way, Berkeley, CA')
+messages:
+- content: '[{"role": "user", "content": "Alright, I''ve been thinking about a road
+    trip and I want to use my own car for the journey. That''s quite a stretch\u2014450
+    miles in one go today. Is this something I could realistically pull off? I just
+    want to know a answer; you don''t need to refill if it''s not reachable. If it
+    is reachable, set navigation to ''1914 7th St, Apt B, Berkeley, CA 94710''."}]'
+  role: user
+- content: Given that the trip isn't looking too likely with what I have at the moment,
+    I'll need to refuel. I think 40 gallons in total in my tank should do the trick
+    to get me enough mileage. Can you handle the gas top-up for me?
+  role: user
+- content: Everything's all set now, and I'm ready to get going. Could you get the
+    engine started for me? Make sure you do it in START mode, with all doors securely
+    locked and the brake properly engaged.
+  role: user
+- content: I'm planning on visiting this gorgeous little spot in Berkeley, California.
+    Would you be so kind as to set up the navigation system to take me to 2107 Channing
+    Way, Berkeley, CA?
+  role: user
+name: multi_turn_base_66
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

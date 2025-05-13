@@ -1,0 +1,138 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_queue:
+      - ticket_001:
+          description: The response from customer support didn't resolve my issues,
+            and I'm quite frustrated with the assistance I received.
+          status: open
+          title: Unsatisfactory Customer Support
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        flight_001:
+          card_id: '12345'
+          insurance: none
+          transaction_id: '12345'
+          travel_class: Business
+          travel_cost: 1200.5
+          travel_date: '2024-08-08'
+          travel_from: New York
+          travel_to: Rome
+      budget_limit: 5000.0
+      credit_card_list:
+        '12345':
+          balance: 50000.0
+          card_number: '123456'
+          card_verification_number: 465
+          cardholder_name: Michael Smith
+          expiration_date: 12/2028
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "It seems I booked my flight
+  from Rome to New York without considering travel protection, especially given the
+  uncertainties of winter travel. Would you assist in registering my new credit card,
+  with access token ''abc123xyz'' and card number 4012888888881881, expiring in December
+  2028 and a CVV of 465, to facilitate the purchase of a comprehensive travel insurance
+  at the price $200 for this journey? My last name is Smith, first name is Michael."}],
+  [{"role": "user", "content": "I need to verify the specifics and total costs of
+  the travel insurance and booking I recently arranged, as the details escape me at
+  the moment. Is it possible for you to provide me with the invoice linked to the
+  insurance purchase?"}], [{"role": "user", "content": "I\u2019ve encountered some
+  problems requiring immediate help regarding my upcoming trip to New York. Could
+  you facilitate fast contact with customer support to address these insurance-related
+  issues that haven\u2019t been resolved?"}], [{"role": "user", "content": "The response
+  from customer support didn''t resolve my issues, and I''m quite frustrated with
+  the assistance I received. Would you mind drafting a formal complaint titled ''Unsatisfactory
+  Customer Support'' outlining the shortcomings of their service? My ticket username
+  is msmith, password is SecurePass123. Left ticket description as empty string."}],
+  [{"role": "user", "content": "I\u2019ve reached the decision to cancel my New York
+  trip due to unforeseen personal circumstances. Could you proceed with the cancellation
+  process as soon as possible?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: msmith
+      ticket_counter: 2
+      ticket_queue:
+      - ticket_001:
+          description: The response from customer support didn't resolve my issues,
+            and I'm quite frustrated with the assistance I received.
+          status: open
+          title: Unsatisfactory Customer Support
+      - created_by: msmith
+        description: ''
+        id: 1
+        priority: 4
+        status: Open
+        title: Unsatisfactory Customer Support
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        '12345':
+          balance: 51200.5
+          card_number: '123456'
+          card_verification_number: 465
+          cardholder_name: Michael Smith
+          expiration_date: 12/2028
+        '262919693687':
+          balance: 44420.0
+          card_number: '4012888888881881'
+          card_verification_number: 465
+          cardholder_name: Michael Smith
+          expiration_date: 12/2028
+      long_context: false
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  ground_truth_function_calls:
+  - - register_credit_card(access_token='abc123xyz', card_number='4012888888881881',
+      expiration_date='12/2028', card_verification_number=465, cardholder_name='Michael
+      Smith')
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive',
+      booking_id='flight_001', insurance_cost=200.0, card_id='262919693687')
+    - retrieve_invoice(access_token='abc123xyz', booking_id='flight_001')
+  - - contact_customer_support(booking_id='flight_001', message='Insurance-related
+      issues that need resolution')
+  - - ticket_login(username='msmith', password='SecurePass123')
+    - create_ticket(priority=4, title='Unsatisfactory Customer Support', description='')
+  - - cancel_booking(access_token='abc123xyz', booking_id='flight_001')
+messages:
+- content: '[{"role": "user", "content": "It seems I booked my flight from Rome to
+    New York without considering travel protection, especially given the uncertainties
+    of winter travel. Would you assist in registering my new credit card, with access
+    token ''abc123xyz'' and card number 4012888888881881, expiring in December 2028
+    and a CVV of 465, to facilitate the purchase of a comprehensive travel insurance
+    at the price $200 for this journey? My last name is Smith, first name is Michael."}]'
+  role: user
+- content: I need to verify the specifics and total costs of the travel insurance
+    and booking I recently arranged, as the details escape me at the moment. Is it
+    possible for you to provide me with the invoice linked to the insurance purchase?
+  role: user
+- content: "I\u2019ve encountered some problems requiring immediate help regarding\
+    \ my upcoming trip to New York. Could you facilitate fast contact with customer\
+    \ support to address these insurance-related issues that haven\u2019t been resolved?"
+  role: user
+- content: The response from customer support didn't resolve my issues, and I'm quite
+    frustrated with the assistance I received. Would you mind drafting a formal complaint
+    titled 'Unsatisfactory Customer Support' outlining the shortcomings of their service?
+    My ticket username is msmith, password is SecurePass123. Left ticket description
+    as empty string.
+  role: user
+- content: "I\u2019ve reached the decision to cancel my New York trip due to unforeseen\
+    \ personal circumstances. Could you proceed with the cancellation process as soon\
+    \ as possible?"
+  role: user
+name: multi_turn_base_178
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

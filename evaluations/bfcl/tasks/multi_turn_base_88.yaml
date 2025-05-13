@@ -1,0 +1,114 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      tweet_counter: 0
+      tweets: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 13.2
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Hey, I''ve just filled my
+  car up with 13.2 gallons of fuel. How much is that in liters?"}], [{"role": "user",
+  "content": "Once you''ve converted it to liters, please guide me in filling the
+  tank to the max limit. After that''s sorted, I need to ensure that all the doors
+  are securely locked and the parking brake is firmly set."}], [{"role": "user", "content":
+  "With the car prepped, I need to gear up for a drive from San Francisco to Rivermist.
+  I''ll be checking the fuel level once the engine is on in ''START'' mode. Then,
+  help me post a tweet, ''Embarking on an exciting road trip from SF to Rivermist!''
+  and please throw in hashtags #RoadTrip #Adventure #Exploring."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john123
+      retweets: {}
+      tweet_counter: 1
+      tweets:
+        0:
+          content: Embarking on an exciting road trip from SF to Rivermist!
+          id: 0
+          mentions: []
+          tags:
+          - '#RoadTrip'
+          - '#Adventure'
+          - '#Exploring'
+          username: john
+      username: john
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - gallon_to_liter(gallon=13.2)
+  - - fillFuelTank(fuelAmount=36.8)
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - activateParkingBrake(mode='engage')
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - post_tweet(content='Embarking on an exciting road trip from SF to Rivermist!',
+      tags=['#RoadTrip', '#Adventure', '#Exploring'])
+messages:
+- content: '[{"role": "user", "content": "Hey, I''ve just filled my car up with 13.2
+    gallons of fuel. How much is that in liters?"}]'
+  role: user
+- content: Once you've converted it to liters, please guide me in filling the tank
+    to the max limit. After that's sorted, I need to ensure that all the doors are
+    securely locked and the parking brake is firmly set.
+  role: user
+- content: 'With the car prepped, I need to gear up for a drive from San Francisco
+    to Rivermist. I''ll be checking the fuel level once the engine is on in ''START''
+    mode. Then, help me post a tweet, ''Embarking on an exciting road trip from SF
+    to Rivermist!'' and please throw in hashtags #RoadTrip #Adventure #Exploring.'
+  role: user
+name: multi_turn_base_88
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

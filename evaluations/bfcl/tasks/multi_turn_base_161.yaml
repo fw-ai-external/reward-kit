@@ -1,0 +1,80 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      numbers:
+      - 45.99
+      - 78.25
+      - 102.5
+      - 38.75
+      - 92.1
+    TravelAPI:
+      access_token: '251675'
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        card_4455:
+          balance: 1500.75
+          card_number: 2378 8753 9012 4455
+          cardholder_name: Michael Thompson
+          expiry_date: '2024'
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - MathAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "In attempting to log into
+  my travel account using both my established client id ''client_520'', secret ''rise_to_sky''
+  and refresh token ''token990125'', I seem to be at a bit of an impasse, allow for
+  read_write. My first name is Michael, last name Thompson. Assistance with the authentication
+  process would be immensely appreciated."}], [{"role": "user", "content": "I''ve
+  recently linked a newly registered credit card with the ID ''card_4455'', set to
+  expire in 2024, and it''s under my name. Accessing my account to ascertain my current
+  balance is my next goal. Could this information be retrieved for me?"}], [{"role":
+  "user", "content": "Having reviewed my financial standing, I now need to compute
+  the average amount spent in my last quintet of purchases, which are 45.99, 78.25,
+  102.50, 38.75, and 92.10. Guidance in deriving this mean value would be beneficial."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    TravelAPI:
+      access_token: '251675'
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        card_4455:
+          balance: 1500.75
+          card_number: 2378 8753 9012 4455
+          cardholder_name: Michael Thompson
+          expiry_date: '2024'
+      long_context: false
+      token_expires_in: 2
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - authenticate_travel(client_id='client_520', client_secret='rise_to_sky', refresh_token='token990125',
+      grant_type='read_write', user_first_name='Michael', user_last_name='Thompson')
+  - - get_credit_card_balance(access_token='251675', card_id='card_4455')
+  - - mean(numbers=[45.99, 78.25, 102.5, 38.75, 92.1])
+messages:
+- content: '[{"role": "user", "content": "In attempting to log into my travel account
+    using both my established client id ''client_520'', secret ''rise_to_sky'' and
+    refresh token ''token990125'', I seem to be at a bit of an impasse, allow for
+    read_write. My first name is Michael, last name Thompson. Assistance with the
+    authentication process would be immensely appreciated."}]'
+  role: user
+- content: I've recently linked a newly registered credit card with the ID 'card_4455',
+    set to expire in 2024, and it's under my name. Accessing my account to ascertain
+    my current balance is my next goal. Could this information be retrieved for me?
+  role: user
+- content: Having reviewed my financial standing, I now need to compute the average
+    amount spent in my last quintet of purchases, which are 45.99, 78.25, 102.50,
+    38.75, and 92.10. Guidance in deriving this mean value would be beneficial.
+  role: user
+name: multi_turn_base_161
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

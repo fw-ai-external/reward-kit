@@ -1,0 +1,46 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            Documents:
+              contents: {}
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Pop on over to the ''Documents''
+  directory and craft a new file dubbed ''summary.txt'', would you? If it already
+  exists, return an error"}], [{"role": "user", "content": "In ''Documents'', let''s
+  capture some profound topic ''quantum computing'' and jot them down in the ''summary.txt''.
+  The file should only contain ''quantum computing'' in its contents."}], [{"role":
+  "user", "content": "It would be great to get a sense of how comprehensive this file
+  has become. Mind tallying up the words in ''summary.txt'' for me?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''Documents'': <Directory:
+        Documents, Parent: alex, Contents: {''summary.txt'': <<File: summary.txt,
+        Content: quantum computing>>}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='Documents')
+    - touch(file_name='summary.txt')
+  - - echo(content='quantum computing',file_name='summary.txt')
+  - - wc(file_name='summary.txt',mode='w')
+messages:
+- content: '[{"role": "user", "content": "Pop on over to the ''Documents'' directory
+    and craft a new file dubbed ''summary.txt'', would you? If it already exists,
+    return an error"}]'
+  role: user
+- content: In 'Documents', let's capture some profound topic 'quantum computing' and
+    jot them down in the 'summary.txt'. The file should only contain 'quantum computing'
+    in its contents.
+  role: user
+- content: It would be great to get a sense of how comprehensive this file has become.
+    Mind tallying up the words in 'summary.txt' for me?
+  role: user
+name: multi_turn_base_12
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

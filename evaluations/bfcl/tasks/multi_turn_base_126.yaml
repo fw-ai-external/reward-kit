@@ -1,0 +1,151 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 15000.0
+        binding_card: 1987654321098765
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        XYZ:
+          MA(20): 150.2
+          MA(5): 149.5
+          percent_change: 0.1
+          price: 150.0
+          volume: 1.5
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - XYZ
+  involved_classes:
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Oh man, I''ve just logged
+  into my trading account and I''m super keen to take a look at the stocks I''m keeping
+  an eye on. Could I get you to pull up the latest stock symbols from my watchlist?"}],
+  [{"role": "user", "content": "So, I was scrolling through the stocks I''m following
+  and spotted this symbol XYZ. I''d really like to snag 100 shares right now at the
+  current market price. Mind placing that order for me?"}], [{"role": "user", "content":
+  "By the way, can I get the lowdown on that order I just put in? I want to double-check
+  how it''s cooking\u2014need to see the status and any terms clinging to it."}],
+  [{"role": "user", "content": "I''ve been thinking and I might need to pull the plug
+  on that last order I made. Can you nix it for me, please? I''m having second thoughts!"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TradingBot:
+      account_info:
+        account_id: 98765
+        balance: 15000.0
+        binding_card: 1987654321098765
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        order_type: Buy
+        12446:
+          amount: 100
+          id: 12446
+          order_type: Buy
+          price: 150.0
+          status: Cancelled
+          symbol: XYZ
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+        XYZ:
+          MA(20): 150.2
+          MA(5): 149.5
+          percent_change: 0.1
+          price: 150.0
+          volume: 1.5
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - XYZ
+  ground_truth_function_calls:
+  - - get_watchlist()
+  - - get_stock_info(symbol='XYZ')
+    - place_order(order_type='Buy',symbol='XYZ',price=150.0,amount=100)
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+messages:
+- content: '[{"role": "user", "content": "Oh man, I''ve just logged into my trading
+    account and I''m super keen to take a look at the stocks I''m keeping an eye on.
+    Could I get you to pull up the latest stock symbols from my watchlist?"}]'
+  role: user
+- content: So, I was scrolling through the stocks I'm following and spotted this symbol
+    XYZ. I'd really like to snag 100 shares right now at the current market price.
+    Mind placing that order for me?
+  role: user
+- content: "By the way, can I get the lowdown on that order I just put in? I want\
+    \ to double-check how it's cooking\u2014need to see the status and any terms clinging\
+    \ to it."
+  role: user
+- content: I've been thinking and I might need to pull the plug on that last order
+    I made. Can you nix it for me, please? I'm having second thoughts!
+  role: user
+name: multi_turn_base_126
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

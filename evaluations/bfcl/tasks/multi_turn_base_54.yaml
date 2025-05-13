@@ -1,0 +1,203 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: aX9#mK2$pL5
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: Just filled up the tank!
+          id: 0
+          mentions: []
+          tags:
+          - '#CarMaintenance'
+          - '#FuelUp'
+          username: carEnthusiast
+        '1':
+          content: Engine started smoothly!
+          id: 1
+          mentions: []
+          tags:
+          - '#CarLife'
+          - '#EngineHealth'
+          username: carEnthusiast
+        '2':
+          content: Checking tire pressure now!
+          id: 2
+          mentions: []
+          tags:
+          - '#TireMaintenance'
+          - '#CarCare'
+          username: carEnthusiast
+        '3':
+          content: Ideal tire pressure achieved!
+          id: 3
+          mentions:
+          - '@TireShop'
+          tags:
+          - '#TirePressure'
+          - '#SafeDriving'
+          username: carEnthusiast
+        '4':
+          content: Retweeting tire maintenance tips!
+          id: 4
+          mentions:
+          - '@TireExpert'
+          - '@CarTips'
+          tags:
+          - '#TireTips'
+          - '#CarMaintenance'
+          username: carEnthusiast
+      username: carEnthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 20.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Would you be able to convert
+  20 liters of gasoline into gallons for me? Afterwards, starting the engine to check
+  for smooth operation would be appreciated."}], [{"role": "user", "content": "With
+  the engine happily purring, I find myself pondering over the tire pressure now.
+  Might you check that for me? And if you can, share the tire pressure status (with
+  message content ''healthy'' or ''not healthy'', nothing else) with tag ''#CarMaintenance''
+  and mention ''@VehicleGuru''? Healthy is deinfed as all tire pressure between 32
+  and 35, inclusive."}], [{"role": "user", "content": "Wonderful! I''d really appreciate
+  it if you could assist in retweeting that fantastic post about tire maintenance."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: aX9#mK2$pL5
+      retweets:
+        carEnthusiast:
+        - 10
+      tweet_counter: 11
+      tweets:
+        0:
+          content: Just filled up the tank!
+          id: 0
+          mentions: []
+          tags:
+          - '#CarMaintenance'
+          - '#FuelUp'
+          username: carEnthusiast
+        1:
+          content: Engine started smoothly!
+          id: 1
+          mentions: []
+          tags:
+          - '#CarLife'
+          - '#EngineHealth'
+          username: carEnthusiast
+        2:
+          content: Checking tire pressure now!
+          id: 2
+          mentions: []
+          tags:
+          - '#TireMaintenance'
+          - '#CarCare'
+          username: carEnthusiast
+        3:
+          content: Ideal tire pressure achieved!
+          id: 3
+          mentions:
+          - '@TireShop'
+          tags:
+          - '#TirePressure'
+          - '#SafeDriving'
+          username: carEnthusiast
+        4:
+          content: Retweeting tire maintenance tips!
+          id: 4
+          mentions:
+          - '@TireExpert'
+          - '@CarTips'
+          tags:
+          - '#TireTips'
+          - '#CarMaintenance'
+          username: carEnthusiast
+        10:
+          content: not healthy
+          id: 10
+          mentions:
+          - '@VehicleGuru'
+          tags:
+          - '#CarMaintenance'
+          username: carEnthusiast
+      username: carEnthusiast
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 20.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - liter_to_gallon(liter=20.0)
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - post_tweet(content='not healthy', tags=['#CarMaintenance'], mentions=['@VehicleGuru'])
+  - - retweet(tweet_id=10)
+messages:
+- content: '[{"role": "user", "content": "Would you be able to convert 20 liters of
+    gasoline into gallons for me? Afterwards, starting the engine to check for smooth
+    operation would be appreciated."}]'
+  role: user
+- content: With the engine happily purring, I find myself pondering over the tire
+    pressure now. Might you check that for me? And if you can, share the tire pressure
+    status (with message content 'healthy' or 'not healthy', nothing else) with tag
+    '#CarMaintenance' and mention '@VehicleGuru'? Healthy is deinfed as all tire pressure
+    between 32 and 35, inclusive.
+  role: user
+- content: Wonderful! I'd really appreciate it if you could assist in retweeting that
+    fantastic post about tire maintenance.
+  role: user
+name: multi_turn_base_54
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

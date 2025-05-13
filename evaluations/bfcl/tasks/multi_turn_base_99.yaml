@@ -1,0 +1,98 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: Grand Canyon
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      remainingUnlockedDoors: 0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning a road trip
+  to the Grand Canyon and need to drive a distance of 380 miles. You could assist
+  me in determining whether my vehicle has sufficient fuel for this journey, please?
+  If it is not sufficient, fill the fuel tank completely."}], [{"role": "user", "content":
+  "Now that I trust the fuel level is sufficient, let''s engage the vehicle''s ''START''
+  ignition mode so that the engine kicks into action. Hoping the battery retains full
+  charge and every door is securely locked. Could we verify the current engine status,
+  AC temperature, and fan speed?"}], [{"role": "user", "content": "Before embarking
+  on this adventure, double-check that all the tires have been properly inflated."}],
+  [{"role": "user", "content": "If you notice any of them with a pressure below 37,
+  then the tire might have potential issue, and we should take a quick detour to the
+  nearest tire facility. Your help is much appreciated!"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - estimate_drive_feasibility_by_mileage(distance=380.0)
+    - fillFuelTank(fuelAmount=35.0)
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+    - displayCarStatus(option='climate')
+  - - check_tire_pressure()
+  - - find_nearest_tire_shop()
+    - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+messages:
+- content: '[{"role": "user", "content": "I''m planning a road trip to the Grand Canyon
+    and need to drive a distance of 380 miles. You could assist me in determining
+    whether my vehicle has sufficient fuel for this journey, please? If it is not
+    sufficient, fill the fuel tank completely."}]'
+  role: user
+- content: Now that I trust the fuel level is sufficient, let's engage the vehicle's
+    'START' ignition mode so that the engine kicks into action. Hoping the battery
+    retains full charge and every door is securely locked. Could we verify the current
+    engine status, AC temperature, and fan speed?
+  role: user
+- content: Before embarking on this adventure, double-check that all the tires have
+    been properly inflated.
+  role: user
+- content: If you notice any of them with a pressure below 37, then the tire might
+    have potential issue, and we should take a quick detour to the nearest tire facility.
+    Your help is much appreciated!
+  role: user
+name: multi_turn_base_99
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

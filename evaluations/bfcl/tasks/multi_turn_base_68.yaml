@@ -1,0 +1,215 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: Tr1pP1ng2023!
+      tweet_counter: 5
+      tweets:
+        '0':
+          content: Excited for the road trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#excited'
+          username: roadtripper23
+        '1':
+          content: Can't wait to hit the road!
+          id: 1
+          mentions: []
+          tags:
+          - '#roadlife'
+          - '#adventure'
+          username: roadtripper23
+        '2':
+          content: Adventure awaits!
+          id: 2
+          mentions: []
+          tags:
+          - '#adventure'
+          - '#wanderlust'
+          username: roadtripper23
+        '3':
+          content: Road trip ready!
+          id: 3
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#ready'
+          username: roadtripper23
+        '4':
+          content: Let's go explore!
+          id: 4
+          mentions: []
+          tags:
+          - '#explore'
+          - '#adventure'
+          - '#travel'
+          username: roadtripper23
+      username: roadtripper23
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m about to embark on a
+  road trip adventure and I want my car to be in peak condition. Could you make sure
+  to increase the current fuel level to ensure that my tank is full, so I don''t have
+  to keep stopping to refuel along the way?"}], [{"role": "user", "content": "Before
+  I hit the open road, I need to get the engine running smoothly. Can you confirm
+  there''s enough fuel, and ensure the engine''s primed for a seamless start?"}],
+  [{"role": "user", "content": "I want to make certain my tires are roadworthy before
+  setting off. If any of my car''s tires are showing pressure below 40, point me in
+  the direction of the closest tire service station, because I definitely don''t want
+  to run into tire trouble."}], [{"role": "user", "content": "Moreover, could you
+  set up the GPS to guide me directly to the nearest shop if my tires aren''t up to
+  the mark, so I''m not wandering off course?"}], [{"role": "user", "content": "Once
+  my car is ready for the journey, it would be fantastic to let my friends know about
+  my travel plans. Could you draft a tweet that says: \"Starting my road trip with
+  a car that is fully prepared and raring to go!\" with hashtags #Roadtrip #Adventure?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Tr1pP1ng2023!
+      retweets: {}
+      tweet_counter: 6
+      tweets:
+        0:
+          content: Excited for the road trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#excited'
+          username: roadtripper23
+        1:
+          content: Can't wait to hit the road!
+          id: 1
+          mentions: []
+          tags:
+          - '#roadlife'
+          - '#adventure'
+          username: roadtripper23
+        2:
+          content: Adventure awaits!
+          id: 2
+          mentions: []
+          tags:
+          - '#adventure'
+          - '#wanderlust'
+          username: roadtripper23
+        3:
+          content: Road trip ready!
+          id: 3
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#ready'
+          username: roadtripper23
+        4:
+          content: Let's go explore!
+          id: 4
+          mentions: []
+          tags:
+          - '#explore'
+          - '#adventure'
+          - '#travel'
+          username: roadtripper23
+        5:
+          content: Starting my road trip with a car that is fully prepared and raring
+            to go!
+          id: 5
+          mentions: []
+          tags:
+          - '#Roadtrip'
+          - '#Adventure'
+          username: roadtripper23
+      username: roadtripper23
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: 456 Oakwood Avenue, Rivermist, 83214
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 35.0
+      rearRightTirePressure: 35.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - fillFuelTank(fuelAmount=35.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+  - - set_navigation(destination='456 Oakwood Avenue, Rivermist, 83214')
+  - - post_tweet(content='Starting my road trip with a car that is fully prepared
+      and raring to go!', tags=['#Roadtrip', '#Adventure'])
+messages:
+- content: '[{"role": "user", "content": "I''m about to embark on a road trip adventure
+    and I want my car to be in peak condition. Could you make sure to increase the
+    current fuel level to ensure that my tank is full, so I don''t have to keep stopping
+    to refuel along the way?"}]'
+  role: user
+- content: Before I hit the open road, I need to get the engine running smoothly.
+    Can you confirm there's enough fuel, and ensure the engine's primed for a seamless
+    start?
+  role: user
+- content: I want to make certain my tires are roadworthy before setting off. If any
+    of my car's tires are showing pressure below 40, point me in the direction of
+    the closest tire service station, because I definitely don't want to run into
+    tire trouble.
+  role: user
+- content: Moreover, could you set up the GPS to guide me directly to the nearest
+    shop if my tires aren't up to the mark, so I'm not wandering off course?
+  role: user
+- content: 'Once my car is ready for the journey, it would be fantastic to let my
+    friends know about my travel plans. Could you draft a tweet that says: "Starting
+    my road trip with a car that is fully prepared and raring to go!" with hashtags
+    #Roadtrip #Adventure?'
+  role: user
+name: multi_turn_base_68
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

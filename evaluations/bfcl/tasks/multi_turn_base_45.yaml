@@ -1,0 +1,55 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        shared_workspace:
+          contents:
+            ResearchDocs:
+              contents:
+                draft_notes.txt:
+                  content: This is a draft document for research purposes. It contains
+                    preliminary findings and notes.
+                  type: file
+                final_report.pdf:
+                  content: This is the final report of the research project.
+                  type: file
+                summary_draft.docx:
+                  content: Draft summary of the research project.
+                  type: file
+              type: directory
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "Explore ''ResearchDocs'' to
+  find second files or subdirectories that contain the keyword ''draft''."}], [{"role":
+  "user", "content": "Make a copy of summary_draft.docx, name it ultimate_draft.docx
+  and put it in ResearchDocs directory"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: shared_workspace, Parent: None, Contents: {''ResearchDocs'':
+        <Directory: ResearchDocs, Parent: shared_workspace, Contents: {''draft_notes.txt'':
+        <<File: draft_notes.txt, Content: This is a draft document for research purposes.
+        It contains preliminary findings and notes.>>, ''summary_draft.docx'': <<File:
+        summary_draft.docx, Content: Draft summary of the research project.>>, ''final_report.pdf'':
+        <<File: final_report.pdf, Content: This is the final report of the research
+        project.>>, ''ultimate_draft.docx'': <<File: ultimate_draft.docx, Content:
+        Draft summary of the research project.>>}>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - find(path='ResearchDocs', name='draft')
+  - - cd(folder='ResearchDocs')
+    - cp(source='summary_draft.docx', destination='ultimate_draft.docx')
+messages:
+- content: '[{"role": "user", "content": "Explore ''ResearchDocs'' to find second
+    files or subdirectories that contain the keyword ''draft''."}]'
+  role: user
+- content: Make a copy of summary_draft.docx, name it ultimate_draft.docx and put
+    it in ResearchDocs directory
+  role: user
+name: multi_turn_base_45
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

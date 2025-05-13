@@ -1,0 +1,164 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 10000.0
+      credit_card_list:
+        card_5678:
+          balance: 50000.0
+          card_number: 4321-5678-9876-5678
+          cardholder_name: Michael Thompson
+          cvv: 456
+          expiry_date: 12/23
+          type: business
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      password: john1234
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Just booked an amazing trip from NYC to Tokyo! #TravelGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelGoals'
+          username: john
+        '1':
+          content: 'Flexibility is key! Plans changed, but the adventure continues.
+            @TravelBlog #Spontaneity'
+          id: 1
+          mentions:
+          - '@TravelBlog'
+          tags:
+          - '#Spontaneity'
+          username: john
+        '2':
+          content: 'Retweeting my latest travel adventure! #TravelLovers'
+          id: 2
+          mentions: []
+          tags:
+          - '#TravelLovers'
+          username: john
+      username: john
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Planning an incredible journey
+  from NYC to Tokyo on December 24th 2024 in first class! I have my credit card ready
+  with the id card_5678, which is expiring soon, and I''d like to allocate business
+  expenses wisely. The cardholder''s name matches mine, Michael Thompson, and I can
+  provide the CVV when needed, which is 456. Could you make the booking using access
+  token ''abc123xyz''?"}], [{"role": "user", "content": "After sorting out my travel
+  plans, draft a tweet about how flexible and adaptable my itinerary turned out to
+  be, including a tag to my favorite travel blog ''#TravelBlog'' and mention my adventure-loving
+  friend ''@Spontaneity''. You may use my account with username ''john'' and password
+  ''john1234''. The tweet should read ''Flexibility is key! Plans changed, but the
+  adventure continues.''"}], [{"role": "user", "content": "Can you amplify the message
+  by retweeting my recent post about the itinerary that you just posted, highlighting
+  our spontaneity with travel plans to reach a larger audience?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_5678
+          transaction_id: '45451592'
+          travel_class: first
+          travel_cost: 4000.0
+          travel_date: '2024-12-24'
+          travel_from: JFK
+          travel_to: HND
+      budget_limit: 10000.0
+      credit_card_list:
+        card_5678:
+          balance: 46000.0
+          card_number: 4321-5678-9876-5678
+          cardholder_name: Michael Thompson
+          cvv: 456
+          expiry_date: 12/23
+          type: business
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john1234
+      retweets:
+        john:
+        - 10
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Just booked an amazing trip from NYC to Tokyo! #TravelGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelGoals'
+          username: john
+        1:
+          content: 'Flexibility is key! Plans changed, but the adventure continues.
+            @TravelBlog #Spontaneity'
+          id: 1
+          mentions:
+          - '@TravelBlog'
+          tags:
+          - '#Spontaneity'
+          username: john
+        2:
+          content: 'Retweeting my latest travel adventure! #TravelLovers'
+          id: 2
+          mentions: []
+          tags:
+          - '#TravelLovers'
+          username: john
+        10:
+          content: Flexibility is key! Plans changed, but the adventure continues.
+          id: 10
+          mentions:
+          - '@Spontaneity'
+          tags:
+          - '#TravelBlog'
+          username: john
+      username: john
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='JFK',travel_to='HND',travel_date='2024-12-24',travel_class='first')
+    - book_flight(access_token='abc123xyz', card_id='card_5678', travel_date='2024-12-24',
+      travel_from='JFK', travel_to='HND', travel_class='first', travel_cost=4000.0)
+  - - authenticate_twitter(username='john', password='john1234')
+    - post_tweet(content='Flexibility is key! Plans changed, but the adventure continues.',
+      tags=['#TravelBlog'], mentions=['@Spontaneity'])
+  - - retweet(tweet_id=10)
+messages:
+- content: '[{"role": "user", "content": "Planning an incredible journey from NYC
+    to Tokyo on December 24th 2024 in first class! I have my credit card ready with
+    the id card_5678, which is expiring soon, and I''d like to allocate business expenses
+    wisely. The cardholder''s name matches mine, Michael Thompson, and I can provide
+    the CVV when needed, which is 456. Could you make the booking using access token
+    ''abc123xyz''?"}]'
+  role: user
+- content: After sorting out my travel plans, draft a tweet about how flexible and
+    adaptable my itinerary turned out to be, including a tag to my favorite travel
+    blog '#TravelBlog' and mention my adventure-loving friend '@Spontaneity'. You
+    may use my account with username 'john' and password 'john1234'. The tweet should
+    read 'Flexibility is key! Plans changed, but the adventure continues.'
+  role: user
+- content: Can you amplify the message by retweeting my recent post about the itinerary
+    that you just posted, highlighting our spontaneity with travel plans to reach
+    a larger audience?
+  role: user
+name: multi_turn_base_189
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

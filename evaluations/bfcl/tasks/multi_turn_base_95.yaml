@@ -1,0 +1,130 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR005
+      inbox:
+      - USR006:
+        - Got it, thanks!
+      - USR007:
+        - Sure, see you then.
+      - USR005:
+        - Please review the attached document.
+      message_count: 0
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 100.0
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+      slopeAngle: 20.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve just secured all doors
+  and engaged the parking brake in my vehicle, please start the engine with the ignition
+  on START mode."}], [{"role": "user", "content": "What is the postal code for the
+  area called Rivermist?"}], [{"role": "user", "content": "I would like to determine
+  the distance from Rivermist to San Francisco."}], [{"role": "user", "content": "Please
+  relay the estimated distance from Rivermist to San Francisco to my colleague Emma.
+  If it helps, my id is ''USR005''. The message should be in the format ''The estimated
+  distance from Rivermist to San Francisco is X miles.'', where X is replaced by the
+  actual integer value you computed earlier."}], [{"role": "user", "content": "Since
+  we\u2019ve organized those details, display all the messages we have send."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR005
+      generated_ids: '{67410}'
+      inbox:
+      - USR006:
+        - Got it, thanks!
+      - USR007:
+        - Sure, see you then.
+      - USR005:
+        - Please review the attached document.
+      - USR008: The estimated distance from Rivermist to San Francisco is 980 miles.
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: engaged
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - get_zipcode_based_on_city(city='Rivermist')
+  - - get_zipcode_based_on_city(city='San Francisco')
+    - estimate_distance(cityA='83214', cityB='94016')
+  - - send_message(receiver_id='USR008', message='The estimated distance from Rivermist
+      to San Francisco is 980 miles.')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''ve just secured all doors and engaged
+    the parking brake in my vehicle, please start the engine with the ignition on
+    START mode."}]'
+  role: user
+- content: What is the postal code for the area called Rivermist?
+  role: user
+- content: I would like to determine the distance from Rivermist to San Francisco.
+  role: user
+- content: Please relay the estimated distance from Rivermist to San Francisco to
+    my colleague Emma. If it helps, my id is 'USR005'. The message should be in the
+    format 'The estimated distance from Rivermist to San Francisco is X miles.', where
+    X is replaced by the actual integer value you computed earlier.
+  role: user
+- content: "Since we\u2019ve organized those details, display all the messages we\
+    \ have send."
+  role: user
+name: multi_turn_base_95
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

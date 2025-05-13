@@ -1,0 +1,239 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR005
+      inbox:
+      - USR005:
+        - The trading venture was successful.
+      message_count: 1
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    TradingBot:
+      account_info:
+        account_id: 67890
+        balance: 15000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  involved_classes:
+  - MessageAPI
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "I just tracked down an intriguing
+  company named Synex Solutions, and I''m eager to delve into its financial performance.
+  Would you mind providing a comprehensive analysis of its latest stock status?"}],
+  [{"role": "user", "content": "Upon evaluating the stock information, I''m considering
+  taking action. Could you assist me in executing a purchase order for 150 shares
+  of Synex Solutions at the prevailing market rate?"}], [{"role": "user", "content":
+  "Once the order is successfully placed, could you update me on the progress of the
+  transaction? How is it advancing currently?"}], [{"role": "user", "content": "Would
+  you be able to notify a colleague of mine named Sarah that our trading venture has
+  been fruitful? Kindly send the message ''Order for purchasing SYNX is completed.''
+  to confirm the order was completed without a hitch. I am Michael."}], [{"role":
+  "user", "content": "It seems there was a minor error in the message communicated.
+  Could you retract that specific message from their inbox, please?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR005
+      generated_ids: '{67410}'
+      inbox:
+      - USR005:
+        - The trading venture was successful.
+      message_count: 2
+      user_count: 4
+      user_map:
+        David: USR007
+        Emma: USR008
+        Michael: USR005
+        Sarah: USR006
+    TradingBot:
+      account_info:
+        account_id: 67890
+        balance: 15000.0
+        binding_card: 9876543210123456
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 150
+          id: 12446
+          order_type: Buy
+          price: 345.67
+          status: Open
+          symbol: SYNX
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - get_stock_info(symbol='SYNX')
+  - - place_order(order_type='Buy',symbol='SYNX',price=345.67,amount=150)
+  - - get_order_details(order_id=12446)
+  - - send_message(receiver_id='USR006',message='Order for purchasing SYNX is completed.')
+  - - delete_message(receiver_id='USR006')
+messages:
+- content: '[{"role": "user", "content": "I just tracked down an intriguing company
+    named Synex Solutions, and I''m eager to delve into its financial performance.
+    Would you mind providing a comprehensive analysis of its latest stock status?"}]'
+  role: user
+- content: Upon evaluating the stock information, I'm considering taking action. Could
+    you assist me in executing a purchase order for 150 shares of Synex Solutions
+    at the prevailing market rate?
+  role: user
+- content: Once the order is successfully placed, could you update me on the progress
+    of the transaction? How is it advancing currently?
+  role: user
+- content: Would you be able to notify a colleague of mine named Sarah that our trading
+    venture has been fruitful? Kindly send the message 'Order for purchasing SYNX
+    is completed.' to confirm the order was completed without a hitch. I am Michael.
+  role: user
+- content: It seems there was a minor error in the message communicated. Could you
+    retract that specific message from their inbox, please?
+  role: user
+name: multi_turn_base_138
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,86 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        simona:
+          contents:
+            documents:
+              contents:
+                Archived:
+                  contents: {}
+                  type: directory
+                ideas.txt:
+                  content: Collaboration leads to success. Innovation ignites growth.
+                  type: file
+                past_projects:
+                  contents: {}
+                  type: directory
+              type: directory
+          type: directory
+  involved_classes:
+  - TicketAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Go into document folder and
+  Could you draft up a create a document titled ''TeamNotes.txt'' for keeping track
+  of all the fresh ideas?"}], [{"role": "user", "content": "We''ve gathered a couple
+  of wise insights from Simona, so could you jot down ''Collaboration leads to success.
+  Innovation ignites growth.'' into the previous file?"}], [{"role": "user", "content":
+  "There seems to be some differences noted by Simona between the ''ideas.txt'' file
+  and our ''TeamNotes.txt''. Could you delve into these files to identify and explain
+  the line-by-line distinctions for her?"}], [{"role": "user", "content": "Simona
+  thinks it''s a smart move to secure ''TeamNotes.txt''. How about we copy it over
+  to the archive directory under the name IdeasArchive.txt while keeping the original
+  intact? Make sure the Archived directory exists in document folder. I remembered
+  I put it there."}], [{"role": "user", "content": "Before Simona signs off for the
+  day, she''d like to take a peek at what''s been stored in ''IdeasArchive.txt''.
+  Could you arrange for her to view its contents?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: simona, Parent: None, Contents: {''documents'': <Directory:
+        documents, Parent: simona, Contents: {''ideas.txt'': <<File: ideas.txt, Content:
+        Collaboration leads to success. Innovation ignites growth.>>, ''Archived'':
+        <Directory: Archived, Parent: documents, Contents: {''IdeasArchive.txt'':
+        <<File: IdeasArchive.txt, Content: Collaboration leads to success. Innovation
+        ignites growth.>>}>, ''past_projects'': <Directory: past_projects, Parent:
+        documents, Contents: {}>, ''TeamNotes.txt'': <<File: TeamNotes.txt, Content:
+        Collaboration leads to success. Innovation ignites growth.>>}>}>'
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue: []
+  ground_truth_function_calls:
+  - - cd(folder='documents')
+    - touch(file_name='TeamNotes.txt')
+  - - echo(content='Collaboration leads to success. Innovation ignites growth.',file_name='TeamNotes.txt')
+  - - diff(file_name1='ideas.txt', file_name2='TeamNotes.txt')
+  - - cp(source='TeamNotes.txt',destination='Archived')
+    - cd(folder='Archived')
+    - mv(source='TeamNotes.txt',destination='IdeasArchive.txt')
+  - - cat(file_name='IdeasArchive.txt')
+messages:
+- content: '[{"role": "user", "content": "Go into document folder and Could you draft
+    up a create a document titled ''TeamNotes.txt'' for keeping track of all the fresh
+    ideas?"}]'
+  role: user
+- content: We've gathered a couple of wise insights from Simona, so could you jot
+    down 'Collaboration leads to success. Innovation ignites growth.' into the previous
+    file?
+  role: user
+- content: There seems to be some differences noted by Simona between the 'ideas.txt'
+    file and our 'TeamNotes.txt'. Could you delve into these files to identify and
+    explain the line-by-line distinctions for her?
+  role: user
+- content: Simona thinks it's a smart move to secure 'TeamNotes.txt'. How about we
+    copy it over to the archive directory under the name IdeasArchive.txt while keeping
+    the original intact? Make sure the Archived directory exists in document folder.
+    I remembered I put it there.
+  role: user
+- content: Before Simona signs off for the day, she'd like to take a peek at what's
+    been stored in 'IdeasArchive.txt'. Could you arrange for her to view its contents?
+  role: user
+name: multi_turn_base_2
+poc_max_turns: 6
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,49 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        current_working_directory:
+          contents: {}
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I need you to set up a fresh
+  folder named ''WebDevProjects'' wherever you''re currently working."}], [{"role":
+  "user", "content": "Populate the ''WebDevProjects'' folder with 3 files:, ''styles.css'',  ''index.html'',
+  and ''script.js'' with content ''Hello World!'',''Hi World!'', ''Halo World!'' in
+  each."}], [{"role": "user", "content": "What''s the second file name by system order?
+  Don''t list out hidden files."}], [{"role": "user", "content": "Can you display
+  the content of the first file by system order?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: current_working_directory, Parent: None, Contents: {''WebDevProjects'':
+        <Directory: WebDevProjects, Parent: current_working_directory, Contents: {''styles.css'':
+        <<File: styles.css, Content: Hello World!>>, ''index.html'': <<File: index.html,
+        Content: Hi World!>>, ''script.js'': <<File: script.js, Content: Halo World!>>}>}>'
+  ground_truth_function_calls:
+  - - mkdir(dir_name='WebDevProjects')
+  - - cd(folder='WebDevProjects')
+    - touch(file_name='styles.css')
+    - echo(content='Hello World!', file_name='styles.css')
+    - touch(file_name='index.html')
+    - echo(content='Hi World!', file_name='index.html')
+    - touch(file_name='script.js')
+    - echo(content='Halo World!', file_name='script.js')
+  - - ls()
+  - - cat(file_name='styles.css')
+messages:
+- content: '[{"role": "user", "content": "I need you to set up a fresh folder named
+    ''WebDevProjects'' wherever you''re currently working."}]'
+  role: user
+- content: Populate the 'WebDevProjects' folder with 3 files:, 'styles.css',  'index.html',
+    and 'script.js' with content 'Hello World!','Hi World!', 'Halo World!' in each.
+  role: user
+- content: What's the second file name by system order? Don't list out hidden files.
+  role: user
+- content: Can you display the content of the first file by system order?
+  role: user
+name: multi_turn_base_39
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

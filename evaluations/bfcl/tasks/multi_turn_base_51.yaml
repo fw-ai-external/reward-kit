@@ -1,0 +1,107 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 33.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve noticed that some of
+  my car doors are slightly ajar while others seem to be securely locked. Would you
+  be able to verify and make sure all doors are properly locked for safety?"}], [{"role":
+  "user", "content": "I''m all set to start my drive. Would you initiate the engine''s
+  ignition in START mode?"}], [{"role": "user", "content": "Before setting off, I''m
+  keen to ensure my tire pressures are as they should be. Could you provide an update
+  on the current tire pressure status? If it''s below 40, point me to nearest tire
+  shop."}], [{"role": "user", "content": "I''d appreciate it if you could send a quick
+  message ''I am on my way to your place.'' to my cousin (user id USR002), updating
+  them my status. If you need, my user id is USR001."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 35.0
+      frontRightTirePressure: 35.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 33.0
+      rearRightTirePressure: 33.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+    - find_nearest_tire_shop()
+  - - message_login('USR001')
+    - send_message(receiver_id='USR002', message='I am on my way to your place.')
+messages:
+- content: '[{"role": "user", "content": "I''ve noticed that some of my car doors
+    are slightly ajar while others seem to be securely locked. Would you be able to
+    verify and make sure all doors are properly locked for safety?"}]'
+  role: user
+- content: I'm all set to start my drive. Would you initiate the engine's ignition
+    in START mode?
+  role: user
+- content: Before setting off, I'm keen to ensure my tire pressures are as they should
+    be. Could you provide an update on the current tire pressure status? If it's below
+    40, point me to nearest tire shop.
+  role: user
+- content: I'd appreciate it if you could send a quick message 'I am on my way to
+    your place.' to my cousin (user id USR002), updating them my status. If you need,
+    my user id is USR001.
+  role: user
+name: multi_turn_base_51
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

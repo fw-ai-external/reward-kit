@@ -21,6 +21,7 @@ from . import lean_prover
 from . import deepcoder_reward # Added import
 from . import multiple_choice_math_reward
 from . import list_comparison_math_reward
+from . import bfcl_reward # Import bfcl_reward
 
 # Directly import specific reward functions for easy access
 from .code_execution import fractional_code_reward
@@ -34,6 +35,7 @@ from .lean_prover import (
 )
 from .multiple_choice_math_reward import multiple_choice_math_reward
 from .list_comparison_math_reward import list_comparison_math_reward
+from .bfcl_reward import bfcl_reward # Import bfcl_reward function
 
 __all__ = [
     "function_calling",
@@ -64,4 +66,5 @@ __all__ = [
     "lean_prover_reward",
     "deepseek_prover_v2_reward",
     "deepseek_huggingface_prover_benchmark",
+    "bfcl_reward", # Add bfcl_reward to __all__
 ]

@@ -1,0 +1,101 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        archive:
+          contents: {}
+          type: directory
+        data:
+          contents:
+            project:
+              contents:
+                analysis_report.csv:
+                  content: Data analysis results...
+                  type: file
+                archive:
+                  contents: {}
+                  type: directory
+                archive_summary.txt:
+                  content: 'Summary of archived files: analysis_report.csv'
+                  type: file
+              type: directory
+          type: directory
+    TwitterAPI:
+      authenticated: true
+      password: securePass123
+      tweet_counter: 0
+      tweets: {}
+      username: dr_smith
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Find analysis_report.csv and
+  upon locating it, ensure you move it to the ''archive'' directory in the same directory
+  of analysis report for safekeeping."}], [{"role": "user", "content": "After the
+  file transfer, display the contents of ''archive_summary.txt'' in the current working
+  directory. Sort the contents alphabetically for easy review and analysis."}], [{"role":
+  "user", "content": "Help me maintain a social media presence by crafting a tweet
+  that states, ''Managed to archive important data files!'' using the hashtags #DataManagement
+  and #Efficiency. my user name is dr_smith and password is securePass123."}], [{"role":
+  "user", "content": "Once the tweet is live, reinforce the achievement by commenting
+  underneath with a phrase like ''Another successful task completed today!'' to highlight
+  our team''s continued success."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: data, Parent: None, Contents: {''project'': <Directory: project,
+        Parent: data, Contents: {''archive'': <Directory: archive, Parent: project,
+        Contents: {''analysis_report.csv'': <<File: analysis_report.csv, Content:
+        Data analysis results...>>}>, ''archive_summary.txt'': <<File: archive_summary.txt,
+        Content: Summary of archived files: analysis_report.csv>>}>}>'
+    TwitterAPI:
+      authenticated: true
+      comments:
+        0:
+        - content: Another successful task completed today!
+          username: dr_smith
+      following_list:
+      - alice
+      - bob
+      password: securePass123
+      retweets: {}
+      tweet_counter: 1
+      tweets:
+        0:
+          content: Managed to archive important data files!
+          id: 0
+          mentions: []
+          tags:
+          - '#DataManagement'
+          - '#Efficiency'
+          username: dr_smith
+      username: dr_smith
+  ground_truth_function_calls:
+  - - cd(folder='project')
+    - mv(source='analysis_report.csv',destination='archive')
+  - - cat(file_name='archive_summary.txt')
+    - sort(file_name='archive_summary.txt')
+  - - authenticate_twitter(username='dr_smith', password='securePass123')
+    - post_tweet(content='Managed to archive important data files!',tags=['#DataManagement','#Efficiency'])
+  - - comment(tweet_id=0,comment_content='Another successful task completed today!')
+messages:
+- content: '[{"role": "user", "content": "Find analysis_report.csv and upon locating
+    it, ensure you move it to the ''archive'' directory in the same directory of analysis
+    report for safekeeping."}]'
+  role: user
+- content: After the file transfer, display the contents of 'archive_summary.txt'
+    in the current working directory. Sort the contents alphabetically for easy review
+    and analysis.
+  role: user
+- content: 'Help me maintain a social media presence by crafting a tweet that states,
+    ''Managed to archive important data files!'' using the hashtags #DataManagement
+    and #Efficiency. my user name is dr_smith and password is securePass123.'
+  role: user
+- content: Once the tweet is live, reinforce the achievement by commenting underneath
+    with a phrase like 'Another successful task completed today!' to highlight our
+    team's continued success.
+  role: user
+name: multi_turn_base_5
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

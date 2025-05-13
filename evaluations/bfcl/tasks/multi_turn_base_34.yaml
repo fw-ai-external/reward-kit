@@ -1,0 +1,54 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            archive:
+              contents: {}
+              type: directory
+            finance_report.txt:
+              content: 'Revenue: $5000Expenses: $3000Profit: $2000Deadline: Q1Deadline:
+                Q2Deadline: Q3Deadline: Q4Deadline: Q1Deadline: Q2Deadline: Q3Deadline:
+                Q4'
+              type: file
+            notes:
+              contents: {}
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''d like to take a look at
+  the finance_report.txt. Would you send me the content of the last line."}], [{"role":
+  "user", "content": "According to the financial report, what''s the mean of revenue
+  and expense and profit. Round to nearest integer and write it in a new file called
+  statistics.txt. Note that only write the integer and nothing else to the text file"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''notes'': <Directory:
+        notes, Parent: workspace, Contents: {}>, ''archive'': <Directory: archive,
+        Parent: workspace, Contents: {}>, ''finance_report.txt'': <<File: finance_report.txt,
+        Content: Revenue: $5000Expenses: $3000Profit: $2000Deadline: Q1Deadline: Q2Deadline:
+        Q3Deadline: Q4Deadline: Q1Deadline: Q2Deadline: Q3Deadline: Q4>>, ''statistics.txt'':
+        <<File: statistics.txt, Content: 3333>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - tail(file_name='finance_report.txt',lines=1)
+  - - cat(file_name='finance_report.txt')
+    - mean(numbers=[5000,3000,2000])
+    - touch(file_name='statistics.txt')
+    - echo(content='3333',file_name='statistics.txt')
+messages:
+- content: '[{"role": "user", "content": "I''d like to take a look at the finance_report.txt.
+    Would you send me the content of the last line."}]'
+  role: user
+- content: According to the financial report, what's the mean of revenue and expense
+    and profit. Round to nearest integer and write it in a new file called statistics.txt.
+    Note that only write the integer and nothing else to the text file
+  role: user
+name: multi_turn_base_34
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

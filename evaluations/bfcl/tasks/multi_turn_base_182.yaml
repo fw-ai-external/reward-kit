@@ -1,0 +1,73 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record:
+        booking001:
+          arrival_city: London
+          class: Business
+          cost: 1500.0
+          departure_city: New York
+      budget_limit: 20000.0
+      credit_card_list:
+        card123:
+          balance: 50000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Michael Smith
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "As I''m in the process of
+  planning an upcoming journey, I have specific departure and arrival cities in mind.
+  Could you assist in estimating the airfare between ORD and SVP from the comprehensive
+  list available through the system? Please note, I am considering traveling next
+  weekend July 14th, 2024 with a preference for a business class seat."}], [{"role":
+  "user", "content": "In pursuit of a cost-effective travel experience, I seek your
+  guidance to manage my expenditure effectively. Could you help establish a budget
+  limit of 20,000 USD using my currently active account? The access token is ''abc123xyz456''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz456
+      booking_record:
+        booking001:
+          arrival_city: London
+          class: Business
+          cost: 1500.0
+          departure_city: New York
+      budget_limit: 20000.0
+      credit_card_list:
+        card123:
+          balance: 50000.0
+          card_number: 1234-5678-9012-3456
+          cardholder_name: Michael Smith
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='ORD', travel_to='SVP', travel_date='2024-07-14',
+      travel_class='business')
+  - - set_budget_limit(access_token='abc123xyz456', budget_limit=20000.0)
+messages:
+- content: '[{"role": "user", "content": "As I''m in the process of planning an upcoming
+    journey, I have specific departure and arrival cities in mind. Could you assist
+    in estimating the airfare between ORD and SVP from the comprehensive list available
+    through the system? Please note, I am considering traveling next weekend July
+    14th, 2024 with a preference for a business class seat."}]'
+  role: user
+- content: In pursuit of a cost-effective travel experience, I seek your guidance
+    to manage my expenditure effectively. Could you help establish a budget limit
+    of 20,000 USD using my currently active account? The access token is 'abc123xyz456'.
+  role: user
+name: multi_turn_base_182
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,188 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123token
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        '6789':
+          balance: 5000.0
+          card_number: '**** **** **** 6789'
+          cardholder_name: Carlina Yates
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Carlina
+      user_last_name: Yates
+    TwitterAPI:
+      password: john1234
+      tweet_counter: 5
+      tweets:
+        '0':
+          content: Just booked a first-class ticket!
+          id: 0
+          mentions: []
+          tags:
+          - '#firstclass'
+          - '#travel'
+          - '#luxury'
+          username: john
+        '1':
+          content: Excited for my trip to LA!
+          id: 1
+          mentions: []
+          tags:
+          - '#LA'
+          - '#California'
+          - '#vacation'
+          username: john
+        '2':
+          content: Can't wait to see the sights!
+          id: 2
+          mentions: []
+          tags:
+          - '#sightseeing'
+          - '#tourism'
+          - '#adventure'
+          username: john
+        '3':
+          content: Travel plans are the best plans!
+          id: 3
+          mentions: []
+          tags:
+          - '#travellife'
+          - '#wanderlust'
+          - '#journey'
+          username: john
+        '4':
+          content: Looking forward to my flight!
+          id: 4
+          mentions: []
+          tags:
+          - '#flying'
+          - '#airport'
+          - '#vacation'
+          username: john
+      username: john
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''d like to arrange a first-class
+  ticket for a trip from San Francisco to Los Angeles on December 25th this year 2024.
+  Please make sure it processes through my credit account using the ID ''6789'' and
+  access token ''abc123token''. The booking should be made under the name Carlina
+  Yates, so ensure all details align with this information.\n\nHowever, I just realized
+  I''m unable to travel on that specified date anymore. I need the booking for that
+  flight to be canceled.\n\nLastly, given that the trip to Los Angeles can''t happen,
+  I''d like to share a tweet expressing disappointment over the canceled plans, content
+  can be ''Disappointed over my canceled plans.'' authenticate using username ''john''
+  and password ''john1234''. Also, add the hashtag #TravelWoes and tag @CarlinaYates.
+  Could you prepare that for me?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123token
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        '6789':
+          balance: 5000.0
+          card_number: '**** **** **** 6789'
+          cardholder_name: Carlina Yates
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Carlina
+      user_last_name: Yates
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john1234
+      retweets: {}
+      tweet_counter: 6
+      tweets:
+        0:
+          content: Just booked a first-class ticket!
+          id: 0
+          mentions: []
+          tags:
+          - '#firstclass'
+          - '#travel'
+          - '#luxury'
+          username: john
+        1:
+          content: Excited for my trip to LA!
+          id: 1
+          mentions: []
+          tags:
+          - '#LA'
+          - '#California'
+          - '#vacation'
+          username: john
+        2:
+          content: Can't wait to see the sights!
+          id: 2
+          mentions: []
+          tags:
+          - '#sightseeing'
+          - '#tourism'
+          - '#adventure'
+          username: john
+        3:
+          content: Travel plans are the best plans!
+          id: 3
+          mentions: []
+          tags:
+          - '#travellife'
+          - '#wanderlust'
+          - '#journey'
+          username: john
+        4:
+          content: Looking forward to my flight!
+          id: 4
+          mentions: []
+          tags:
+          - '#flying'
+          - '#airport'
+          - '#vacation'
+          username: john
+        5:
+          content: Disappointed over my canceled plans.
+          id: 5
+          mentions:
+          - '@CarlinaYates'
+          tags:
+          - '#TravelWoes'
+          username: john
+      username: john
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='LAX', travel_date='2024-12-25',
+      travel_class='first')
+    - book_flight(access_token='abc123token', card_id='6789', travel_date='2024-12-25',
+      travel_from='SFO', travel_to='LAX', travel_class='first', travel_cost=2000.0)
+    - cancel_booking(access_token='abc123token', booking_id='3426812')
+    - authenticate_twitter(username='john', password='john1234')
+    - post_tweet(content='Disappointed over my canceled plans.', tags=['#TravelWoes'],
+      mentions=['@CarlinaYates'])
+messages:
+- content: '[{"role": "user", "content": "I''d like to arrange a first-class ticket
+    for a trip from San Francisco to Los Angeles on December 25th this year 2024.
+    Please make sure it processes through my credit account using the ID ''6789''
+    and access token ''abc123token''. The booking should be made under the name Carlina
+    Yates, so ensure all details align with this information.\n\nHowever, I just realized
+    I''m unable to travel on that specified date anymore. I need the booking for that
+    flight to be canceled.\n\nLastly, given that the trip to Los Angeles can''t happen,
+    I''d like to share a tweet expressing disappointment over the canceled plans,
+    content can be ''Disappointed over my canceled plans.'' authenticate using username
+    ''john'' and password ''john1234''. Also, add the hashtag #TravelWoes and tag
+    @CarlinaYates. Could you prepare that for me?"}]'
+  role: user
+name: multi_turn_base_198
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

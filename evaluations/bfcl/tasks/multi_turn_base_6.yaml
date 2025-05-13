@@ -1,0 +1,69 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        gorilla:
+          contents:
+            archives:
+              contents: {}
+              type: directory
+            communal:
+              contents: {}
+              type: directory
+            reserve:
+              contents: {}
+              type: directory
+            shared:
+              contents: {}
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "It''s getting late here, and
+  I''m wrapping up my notes for the day. Please initiate a file creation in our communal
+  folder, labeling it as ''Annual_Report_2023.docx''."}], [{"role": "user", "content":
+  "Hi, I want to put some statistics in the annual report. Here are the things I want
+  to put ''Company Earning: 2000 Company Expenditure: 500 Company Name: Gorilla''."}],
+  [{"role": "user", "content": "May I have a look at what''s inside ''Annual_Report_2023.docx''?"}],
+  [{"role": "user", "content": "Let''s delve into ''Annual_Report_2023.docx''. How
+  many words does it contain?"}], [{"role": "user", "content": "To conclude, store
+  the number of words in a new file report_word_count in the existing shared directory."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: gorilla, Parent: None, Contents: {''communal'': <Directory:
+        communal, Parent: gorilla, Contents: {''Annual_Report_2023.docx'': <<File:
+        Annual_Report_2023.docx, Content: Company Earning: 2000 Company Expenditure:
+        500 Company Name: Gorilla>>}>, ''reserve'': <Directory: reserve, Parent: gorilla,
+        Contents: {}>, ''shared'': <Directory: shared, Parent: gorilla, Contents:
+        {''report_word_count'': <<File: report_word_count, Content: 9>>}>, ''archives'':
+        <Directory: archives, Parent: gorilla, Contents: {}>}>'
+  ground_truth_function_calls:
+  - - cd(folder='communal')
+    - touch(file_name='Annual_Report_2023.docx')
+  - - 'echo(content=''Company Earning: 2000 Company Expenditure: 500 Company Name:
+      Gorilla'',file_name=''Annual_Report_2023.docx'')'
+  - - cat(file_name='Annual_Report_2023.docx')
+  - - wc(file_name='Annual_Report_2023.docx',mode='w')
+  - - cd(folder='..')
+    - cd(folder='shared')
+    - echo(content='9',file_name='report_word_count')
+messages:
+- content: '[{"role": "user", "content": "It''s getting late here, and I''m wrapping
+    up my notes for the day. Please initiate a file creation in our communal folder,
+    labeling it as ''Annual_Report_2023.docx''."}]'
+  role: user
+- content: 'Hi, I want to put some statistics in the annual report. Here are the things
+    I want to put ''Company Earning: 2000 Company Expenditure: 500 Company Name: Gorilla''.'
+  role: user
+- content: May I have a look at what's inside 'Annual_Report_2023.docx'?
+  role: user
+- content: Let's delve into 'Annual_Report_2023.docx'. How many words does it contain?
+  role: user
+- content: To conclude, store the number of words in a new file report_word_count
+    in the existing shared directory.
+  role: user
+name: multi_turn_base_6
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

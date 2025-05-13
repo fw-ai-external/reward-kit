@@ -1,0 +1,149 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      current_user: john
+      ticket_queue:
+      - ticket_001:
+          description: Detailed exchange with customer support regarding unexpected
+            charge.
+          priority: priority-2
+          title: Billing Concern
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        flight_001:
+          class: business
+          cost: 200.0
+          departure_date: 15th of next month
+          destination: Los Angeles
+          insurance:
+            cost: 50.0
+            plan: comprehensive protection
+      budget_limit: 1000.0
+      credit_card_list:
+        crd6789:
+          balance: 5000
+          card_holder_name: Michael Thompson
+          card_number: 3957928750236789
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m on a quest to escape
+  my quaint hometown of Oakendale for the dynamic allure of Los Angeles! Eagerly anticipating
+  this journey, I need to arrange a flight on the 15th of next month, which is November
+  of 2024. I\u2019ll be using my reliable credit card represented by ''crd6789'' and
+  token ''abc123xyz'', to reserve a seat in business class. Could someone handle these
+  travel arrangements for me, please?"}], [{"role": "user", "content": "With the excitement
+  of my flight secured, I''d feel more at ease by getting travel insurance for $50
+  under the ''comprehensive protection'' plan. How about using the same credit card
+  and token for this? And, hopefully, we can link it to the flight booking?"}], [{"role":
+  "user", "content": "My notorious forgetfulness strikes again! I cannot recall all
+  the specifics about the flight and insurance I just organized. Would be great if
+  someone could retrieve the invoice from my latest transaction to ensure everything
+  is lined up properly."}], [{"role": "user", "content": "An unexpected charge popped
+  up on the invoice that I retrieved. If at all possible, could someone contact customer
+  support with the details to hopefully solve this issue with the message ''Unexpected
+  charge found on the invoice.''?"}], [{"role": "user", "content": "Customer support
+  didn''t quite resolve my concerns, and now I''m a bit frustrated. It would be appreciated
+  if a priority-2 ticket titled ''Billing Concern'' could be initiated, incorporating
+  the detailed exchange with customer support, so we can escalate this appropriately.
+  Details be ''Detailed exchange with customer support regarding unexpected charge.''"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: john
+      ticket_counter: 2
+      ticket_queue:
+      - ticket_001:
+          description: Detailed exchange with customer support regarding unexpected
+            charge.
+          priority: priority-2
+          title: Billing Concern
+      - created_by: john
+        description: Detailed exchange with customer support regarding unexpected
+          charge.
+        id: 1
+        priority: 2
+        status: Open
+        title: Billing Concern
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: crd6789
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 880.0
+          travel_date: '2024-11-15'
+          travel_from: OKD
+          travel_to: LAX
+        flight_001:
+          class: business
+          cost: 200.0
+          departure_date: 15th of next month
+          destination: Los Angeles
+          insurance:
+            cost: 50.0
+            plan: comprehensive protection
+      budget_limit: 1000.0
+      credit_card_list:
+        crd6789:
+          balance: 4070.0
+          card_holder_name: Michael Thompson
+          card_number: 3957928750236789
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - book_flight(access_token='abc123xyz', card_id='crd6789', travel_date='2024-11-15',
+      travel_from='OKD', travel_to='LAX', travel_class='business', travel_cost=880.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive protection',
+      booking_id='3426812', insurance_cost=50.0, card_id='crd6789')
+  - - retrieve_invoice(access_token='abc123xyz', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Unexpected charge found
+      on the invoice.')
+  - - create_ticket(priority=2, title='Billing Concern', description='Detailed exchange
+      with customer support regarding unexpected charge.')
+messages:
+- content: '[{"role": "user", "content": "I''m on a quest to escape my quaint hometown
+    of Oakendale for the dynamic allure of Los Angeles! Eagerly anticipating this
+    journey, I need to arrange a flight on the 15th of next month, which is November
+    of 2024. I\u2019ll be using my reliable credit card represented by ''crd6789''
+    and token ''abc123xyz'', to reserve a seat in business class. Could someone handle
+    these travel arrangements for me, please?"}]'
+  role: user
+- content: With the excitement of my flight secured, I'd feel more at ease by getting
+    travel insurance for $50 under the 'comprehensive protection' plan. How about
+    using the same credit card and token for this? And, hopefully, we can link it
+    to the flight booking?
+  role: user
+- content: My notorious forgetfulness strikes again! I cannot recall all the specifics
+    about the flight and insurance I just organized. Would be great if someone could
+    retrieve the invoice from my latest transaction to ensure everything is lined
+    up properly.
+  role: user
+- content: An unexpected charge popped up on the invoice that I retrieved. If at all
+    possible, could someone contact customer support with the details to hopefully
+    solve this issue with the message 'Unexpected charge found on the invoice.'?
+  role: user
+- content: Customer support didn't quite resolve my concerns, and now I'm a bit frustrated.
+    It would be appreciated if a priority-2 ticket titled 'Billing Concern' could
+    be initiated, incorporating the detailed exchange with customer support, so we
+    can escalate this appropriately. Details be 'Detailed exchange with customer support
+    regarding unexpected charge.'
+  role: user
+name: multi_turn_base_190
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

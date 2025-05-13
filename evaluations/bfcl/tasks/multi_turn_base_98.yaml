@@ -1,0 +1,91 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      base: 10
+      value: 1000
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: unlocked
+        rear_right: locked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "It''s a lazy Sunday morning
+  and I''m getting ready for a drive. Before setting off, I want to make sure all
+  the car doors are locked tight. Would you be able to check the door locks and ensure
+  they''re secured if any are unlocked?"}], [{"role": "user", "content": "I''m feeling
+  a bit adventurous today, so I''ve decided to start the engine and hit the road.
+  Can you confirm everything''s all set and start the car?"}], [{"role": "user", "content":
+  "I''m curious about the distance from Silverpine to Oakendale before I head out.
+  Would you mind estimating how far I''ll be traveling?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - displayCarStatus(option='doors')
+    - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+  - - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - get_zipcode_based_on_city(city='Silverpine')
+    - get_zipcode_based_on_city(city='Oakendale')
+    - estimate_distance(cityA='62947', cityB='47329')
+messages:
+- content: '[{"role": "user", "content": "It''s a lazy Sunday morning and I''m getting
+    ready for a drive. Before setting off, I want to make sure all the car doors are
+    locked tight. Would you be able to check the door locks and ensure they''re secured
+    if any are unlocked?"}]'
+  role: user
+- content: I'm feeling a bit adventurous today, so I've decided to start the engine
+    and hit the road. Can you confirm everything's all set and start the car?
+  role: user
+- content: I'm curious about the distance from Silverpine to Oakendale before I head
+    out. Would you mind estimating how far I'll be traveling?
+  role: user
+name: multi_turn_base_98
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

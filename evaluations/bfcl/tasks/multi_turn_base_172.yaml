@@ -1,0 +1,115 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR005
+      inbox:
+      - m0llyTr@vel2k24:
+        - Looking forward to our trip!
+      user_count: 5
+      user_map:
+        Maxwell: USR005
+        Molly: m0llyTr@vel2k24
+    TravelAPI:
+      access_token: '485485239806'
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list: {}
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Maxwell
+      user_last_name: Edison
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve recently joined this
+  travel application which promises premium access to some fantastic deals. To get
+  started, I need to access my account. My credentials are ready for you: the client
+  ID is ''trav3lMaxID2023'', the client secret is ''M@xSecret!'', and the refresh
+  token ''r3freshM3n0w''. If you could handle the authentication, I would like to
+  set it up for both reading and writing. My first name is Maxwell, last name Edison"}],
+  [{"role": "user", "content": "Excellent! Now that we''re all authenticated, could
+  we proceed with registering my credit card? We''ll use card number 2345-6789-1234-5678,
+  set to expire in 08/2025, listed under Maxwell Edison with the CVV 567. After that,
+  I need a favor\u2014book me a business class ticket from SFO to LAX for December
+  15, 2024. All travel details should be under my name, Maxwell Edison."}], [{"role":
+  "user", "content": "Next, I need to inform my travel companion of our plans. Could
+  you reach out to my traveling partner with the user ID  m0llyTr@vel2k24 and share
+  the itinerary details? Just a friendly note that ''Everything for our trip is sorted
+  and ready!''"}], [{"role": "user", "content": "Appreciate the help! Before I forget,
+  I\u2019d love to check what I sent previously. Could you check what\u2019s sent
+  by me lately?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR005
+      generated_ids: '{67410}'
+      inbox:
+      - m0llyTr@vel2k24:
+        - Looking forward to our trip!
+      - m0llyTr@vel2k24: Everything for our trip is sorted and ready!
+      message_count: 4
+      user_count: 5
+      user_map:
+        Maxwell: USR005
+        Molly: m0llyTr@vel2k24
+    TravelAPI:
+      access_token: '251675'
+      booking_record:
+        '4191922':
+          card_id: '391310425148'
+          transaction_id: '56121276'
+          travel_class: business
+          travel_cost: 400.0
+          travel_date: '2024-12-15'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list:
+        '391310425148':
+          balance: 58217.0
+          card_number: 2345-6789-1234-5678
+          card_verification_number: 567
+          cardholder_name: Maxwell Edison
+          expiration_date: 08/2025
+      long_context: false
+      token_expires_in: 2
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Maxwell
+      user_last_name: Edison
+  ground_truth_function_calls:
+  - - authenticate_travel(client_id='trav3lMaxID2023', client_secret='M@xSecret!',
+      refresh_token='r3freshM3n0w', grant_type='read_write', user_first_name='Maxwell',
+      user_last_name='Edison')
+  - - register_credit_card(access_token='251675', card_number='2345-6789-1234-5678',
+      expiration_date='08/2025', cardholder_name='Maxwell Edison', card_verification_number=567)
+    - book_flight(access_token='251675', card_id='391310425148', travel_date='2024-12-15',
+      travel_from='SFO', travel_to='LAX', travel_class='business', travel_cost=400.0)
+  - - send_message(receiver_id='m0llyTr@vel2k24', message='Everything for our trip
+      is sorted and ready!')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''ve recently joined this travel application
+    which promises premium access to some fantastic deals. To get started, I need
+    to access my account. My credentials are ready for you: the client ID is ''trav3lMaxID2023'',
+    the client secret is ''M@xSecret!'', and the refresh token ''r3freshM3n0w''. If
+    you could handle the authentication, I would like to set it up for both reading
+    and writing. My first name is Maxwell, last name Edison"}]'
+  role: user
+- content: "Excellent! Now that we're all authenticated, could we proceed with registering\
+    \ my credit card? We'll use card number 2345-6789-1234-5678, set to expire in\
+    \ 08/2025, listed under Maxwell Edison with the CVV 567. After that, I need a\
+    \ favor\u2014book me a business class ticket from SFO to LAX for December 15,\
+    \ 2024. All travel details should be under my name, Maxwell Edison."
+  role: user
+- content: Next, I need to inform my travel companion of our plans. Could you reach
+    out to my traveling partner with the user ID  m0llyTr@vel2k24 and share the itinerary
+    details? Just a friendly note that 'Everything for our trip is sorted and ready!'
+  role: user
+- content: "Appreciate the help! Before I forget, I\u2019d love to check what I sent\
+    \ previously. Could you check what\u2019s sent by me lately?"
+  role: user
+name: multi_turn_base_172
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

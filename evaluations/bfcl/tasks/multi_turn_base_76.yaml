@@ -1,0 +1,187 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      password: x8K#mP9$vL2
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Just finished a great workout! #FitnessGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#FitnessGoals'
+          username: fitness_reader
+        '1':
+          content: 'Loving the new book I''m reading. #Bookworm'
+          id: 1
+          mentions: []
+          tags:
+          - '#Bookworm'
+          username: fitness_reader
+        '2':
+          content: 'Had an amazing dinner at the new restaurant in town. #Foodie'
+          id: 2
+          mentions: []
+          tags:
+          - '#Foodie'
+          username: fitness_reader
+        '3':
+          content: 'Excited for the weekend getaway! #Travel'
+          id: 3
+          mentions: []
+          tags:
+          - '#Travel'
+          username: fitness_reader
+        '4':
+          content: 'My car is in top shape after maintenance! #CarCare #TireHealth
+            @Mike'
+          id: 4
+          mentions:
+          - '@Mike'
+          tags:
+          - '#CarCare'
+          - '#TireHealth'
+          username: fitness_reader
+      username: fitness_reader
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve completed the maintenance
+  on my car and ensured the doors are unlocked. Everything, especially the tires,
+  seems in good condition. Would you kindly assist in securing the remaining doors
+  and initiate the engine in START mode? I want everything primed before I set off."}],
+  [{"role": "user", "content": "Also, let''s not forget to boast a little online.
+  Could you post an update regarding my impeccable tire condition on Twitter like
+  ''Tire pressure is perfect!''? Don''t forget to use the hashtags #CarCare and #TireHealth
+  and be sure to give my friend Mike a mention as well. I think his user handle is
+  ''mike53''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: x8K#mP9$vL2
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Just finished a great workout! #FitnessGoals'
+          id: 0
+          mentions: []
+          tags:
+          - '#FitnessGoals'
+          username: fitness_reader
+        1:
+          content: 'Loving the new book I''m reading. #Bookworm'
+          id: 1
+          mentions: []
+          tags:
+          - '#Bookworm'
+          username: fitness_reader
+        2:
+          content: 'Had an amazing dinner at the new restaurant in town. #Foodie'
+          id: 2
+          mentions: []
+          tags:
+          - '#Foodie'
+          username: fitness_reader
+        3:
+          content: 'Excited for the weekend getaway! #Travel'
+          id: 3
+          mentions: []
+          tags:
+          - '#Travel'
+          username: fitness_reader
+        4:
+          content: 'My car is in top shape after maintenance! #CarCare #TireHealth
+            @Mike'
+          id: 4
+          mentions:
+          - '@Mike'
+          tags:
+          - '#CarCare'
+          - '#TireHealth'
+          username: fitness_reader
+        10:
+          content: Tire pressure is perfect!
+          id: 10
+          mentions:
+          - '@mike53'
+          tags:
+          - '#CarCare'
+          - '#TireHealth'
+          username: fitness_reader
+      username: fitness_reader
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 60
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 15.5
+      headLightStatus: 'off'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - post_tweet(content='Tire pressure is perfect!', tags=['#CarCare', '#TireHealth'],
+      mentions=['@mike53'])
+messages:
+- content: '[{"role": "user", "content": "I''ve completed the maintenance on my car
+    and ensured the doors are unlocked. Everything, especially the tires, seems in
+    good condition. Would you kindly assist in securing the remaining doors and initiate
+    the engine in START mode? I want everything primed before I set off."}]'
+  role: user
+- content: 'Also, let''s not forget to boast a little online. Could you post an update
+    regarding my impeccable tire condition on Twitter like ''Tire pressure is perfect!''?
+    Don''t forget to use the hashtags #CarCare and #TireHealth and be sure to give
+    my friend Mike a mention as well. I think his user handle is ''mike53''.'
+  role: user
+name: multi_turn_base_76
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

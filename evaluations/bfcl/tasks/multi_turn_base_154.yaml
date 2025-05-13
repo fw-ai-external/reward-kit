@@ -1,0 +1,110 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR001
+      user_count: 4
+    TravelAPI:
+      access_token: token_ABC123XYZ
+      booking_record: {}
+      budget_limit: 1500.0
+      credit_card_list:
+        card1:
+          balance: 12400
+          card_number: 1234-5678-9012-3456
+          cvv: 123
+          expiry: 12/25
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I need you to verify my travel
+  documents before I embark on this journey. Confirm if my personal details match
+  the required criteria. Once all checks are done, I''ll proceed. For reference, my
+  birthdate is February 14st 1962 ans passport number is P87654321, my first name
+  is Michael and last name is Smith"}], [{"role": "user", "content": "I''m considering
+  flying but need to know the cost of traveling from here. Let''s identify the nearest
+  airport to Chicago first, then we''ll continue to check airfare from there to Los
+  Angeles for Aug 10th 2024."}], [{"role": "user", "content": "Now that I have the
+  flight cost, please set a budget of $1500 for my trip using my account token ''token_ABC123XYZ''
+  to make sure everything''s in order."}], [{"role": "user", "content": "Book this
+  flight for me, please. I am flexible with travel classes but would prefer to keep
+  it within my budget. I''ll promptly handle the payment using my saved card details
+  with id ''card1''."}], [{"role": "user", "content": "If any details are overlooked,
+  please retrieve any recent messages I sent concerning this trip."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR001
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TravelAPI:
+      access_token: token_ABC123XYZ
+      booking_record:
+        '3426812':
+          card_id: card1
+          transaction_id: '45451592'
+          travel_class: economy
+          travel_cost: 180.0
+          travel_date: '2024-08-10'
+          travel_from: ORD
+          travel_to: LAX
+      budget_limit: 1500.0
+      credit_card_list:
+        card1:
+          balance: 12220.0
+          card_number: 1234-5678-9012-3456
+          cvv: 123
+          expiry: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Smith
+  ground_truth_function_calls:
+  - - verify_traveler_information(first_name='Michael', last_name='Smith', date_of_birth='1962-02-14',
+      passport_number='P87654321')
+  - - get_flight_cost(travel_from='ORD', travel_to='LAX', travel_date='2024-08-10',
+      travel_class='economy')
+  - - set_budget_limit(access_token='token_ABC123XYZ', budget_limit=1500)
+  - - book_flight(access_token='token_ABC123XYZ', card_id='card1', travel_date='2024-08-10',
+      travel_from='ORD', travel_to='LAX', travel_class='economy', travel_cost=180.0)
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I need you to verify my travel documents
+    before I embark on this journey. Confirm if my personal details match the required
+    criteria. Once all checks are done, I''ll proceed. For reference, my birthdate
+    is February 14st 1962 ans passport number is P87654321, my first name is Michael
+    and last name is Smith"}]'
+  role: user
+- content: I'm considering flying but need to know the cost of traveling from here.
+    Let's identify the nearest airport to Chicago first, then we'll continue to check
+    airfare from there to Los Angeles for Aug 10th 2024.
+  role: user
+- content: Now that I have the flight cost, please set a budget of $1500 for my trip
+    using my account token 'token_ABC123XYZ' to make sure everything's in order.
+  role: user
+- content: Book this flight for me, please. I am flexible with travel classes but
+    would prefer to keep it within my budget. I'll promptly handle the payment using
+    my saved card details with id 'card1'.
+  role: user
+- content: If any details are overlooked, please retrieve any recent messages I sent
+    concerning this trip.
+  role: user
+name: multi_turn_base_154
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

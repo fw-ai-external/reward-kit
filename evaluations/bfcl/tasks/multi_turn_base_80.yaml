@@ -1,0 +1,106 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      numbers:
+      - 750.0
+      - 320.0
+      - 450.0
+      - 290.0
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: San Francisco
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 5.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "You''re planning an extended
+  expedition from Rivermist to San Francisco. Could you determine the travel distance
+  between these two locations for me?"}], [{"role": "user", "content": "Next, I need
+  to verify if my car''s mileage capacity suffices for the journey. Can you assess
+  if the vehicle can handle the calculated travel distance?"}], [{"role": "user",
+  "content": "It seems I''ve discovered the tank isn''t full. Could you be so kind
+  as to facilitate refueling the vehicle fully for such a lengthy trip?"}], [{"role":
+  "user", "content": "With the tank now replenished, let''s confirm our readiness
+  for departure. Please secure all doors and initiate the engine for me."}], [{"role":
+  "user", "content": "As the vehicle''s prepared, let''s delve into evaluating some
+  fuel efficiency statistics via the mean of these travel distances: 750.0 km, 320.0
+  km, 450.0 km, and 290.0 km."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: San Francisco
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Rivermist')
+    - estimate_distance(cityA='83214', cityB='94016')
+  - - estimate_drive_feasibility_by_mileage(distance=980.0)
+  - - fillFuelTank(fuelAmount=45.0)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - mean(numbers=[750.0, 320.0, 450.0, 290.0])
+messages:
+- content: '[{"role": "user", "content": "You''re planning an extended expedition
+    from Rivermist to San Francisco. Could you determine the travel distance between
+    these two locations for me?"}]'
+  role: user
+- content: Next, I need to verify if my car's mileage capacity suffices for the journey.
+    Can you assess if the vehicle can handle the calculated travel distance?
+  role: user
+- content: It seems I've discovered the tank isn't full. Could you be so kind as to
+    facilitate refueling the vehicle fully for such a lengthy trip?
+  role: user
+- content: With the tank now replenished, let's confirm our readiness for departure.
+    Please secure all doors and initiate the engine for me.
+  role: user
+- content: 'As the vehicle''s prepared, let''s delve into evaluating some fuel efficiency
+    statistics via the mean of these travel distances: 750.0 km, 320.0 km, 450.0 km,
+    and 290.0 km.'
+  role: user
+name: multi_turn_base_80
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

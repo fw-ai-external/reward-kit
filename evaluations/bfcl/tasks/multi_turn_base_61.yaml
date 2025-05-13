@@ -1,0 +1,109 @@
+base_resource_config:
+  initial_config:
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 42.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - MessageAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "Could you map out the precise
+  mileage from San Francisco to Rivermist for me, along with an assessment of whether
+  my current fuel should suffice the journey?"}], [{"role": "user", "content": "Fill
+  the fuel tank until we are able to reach Rivermist. Oil costs money so I just need
+  the minimum oil (to integer value) to reach there so I don''t need full tank."}],
+  [{"role": "user", "content": "I''d appreciate it if you could ignite the engine
+  and verify that the battery voltage is at its optimal level, ensuring everything''s
+  in fine working order before our departure."}], [{"role": "user", "content": "For
+  added assurance, please check our tire pressure to confirm optimal conditions for
+  our ride."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 49.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+    - estimate_drive_feasibility_by_mileage(distance=980.0)
+  - - fillFuelTank(fuelAmount=7)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - check_tire_pressure()
+messages:
+- content: '[{"role": "user", "content": "Could you map out the precise mileage from
+    San Francisco to Rivermist for me, along with an assessment of whether my current
+    fuel should suffice the journey?"}]'
+  role: user
+- content: Fill the fuel tank until we are able to reach Rivermist. Oil costs money
+    so I just need the minimum oil (to integer value) to reach there so I don't need
+    full tank.
+  role: user
+- content: I'd appreciate it if you could ignite the engine and verify that the battery
+    voltage is at its optimal level, ensuring everything's in fine working order before
+    our departure.
+  role: user
+- content: For added assurance, please check our tire pressure to confirm optimal
+    conditions for our ride.
+  role: user
+name: multi_turn_base_61
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

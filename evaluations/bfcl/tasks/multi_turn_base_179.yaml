@@ -1,0 +1,89 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 2000.0
+      credit_card_list:
+        card_6789:
+          balance: 17890
+          card_number: 4938 5639 9827 6789
+          cardholder_name: Ethan Hawke
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Ethan
+      user_last_name: Hawke
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I plan to book a flight from
+  Crescent Hollow to New York, aimed at a business endeavor. Utilize my typical credit
+  card (ID=card_6789) and access token ''abc123xyz'' for the payment. Schedule it
+  for economy class on November 12th 2024, making sure my frequent flyer discount
+  is applied, ensuring the total fee is $850."}], [{"role": "user", "content": "Post-booking,
+  pondering added precautions, getting travel insurance seems wise, aiming for a 100
+  insurance. Proceed with organizing this with identical travel specifics, and the
+  previously mentioned credit card should facilitate payment."}], [{"role": "user",
+  "content": "For clarity on financial allocations, I need to gather the invoice that
+  details my recently acquired flight and insurance."}], [{"role": "user", "content":
+  "Given sudden itinerary conflicts, there''s a pivot. Inform customer support of
+  my potential adjustments or explore full refund possibilities because of a family
+  emergency."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_6789
+          transaction_id: '45451592'
+          travel_class: economy
+          travel_cost: 850.0
+          travel_date: '2024-11-12'
+          travel_from: CRH
+          travel_to: JFK
+      budget_limit: 2000.0
+      credit_card_list:
+        card_6789:
+          balance: 16940.0
+          card_number: 4938 5639 9827 6789
+          cardholder_name: Ethan Hawke
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Ethan
+      user_last_name: Hawke
+  ground_truth_function_calls:
+  - - book_flight(access_token='abc123xyz', card_id='card_6789', travel_date='2024-11-12',
+      travel_from='CRH', travel_to='JFK', travel_class='economy', travel_cost=850.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive',
+      booking_id='3426812', insurance_cost=100.0, card_id='card_6789')
+  - - retrieve_invoice(access_token='abc123xyz', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Request for itinerary
+      adjustments or refund due to family emergency.')
+messages:
+- content: '[{"role": "user", "content": "I plan to book a flight from Crescent Hollow
+    to New York, aimed at a business endeavor. Utilize my typical credit card (ID=card_6789)
+    and access token ''abc123xyz'' for the payment. Schedule it for economy class
+    on November 12th 2024, making sure my frequent flyer discount is applied, ensuring
+    the total fee is $850."}]'
+  role: user
+- content: Post-booking, pondering added precautions, getting travel insurance seems
+    wise, aiming for a 100 insurance. Proceed with organizing this with identical
+    travel specifics, and the previously mentioned credit card should facilitate payment.
+  role: user
+- content: For clarity on financial allocations, I need to gather the invoice that
+    details my recently acquired flight and insurance.
+  role: user
+- content: Given sudden itinerary conflicts, there's a pivot. Inform customer support
+    of my potential adjustments or explore full refund possibilities because of a
+    family emergency.
+  role: user
+name: multi_turn_base_179
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,253 @@
+base_resource_config:
+  initial_config:
+    MessageAPI:
+      current_user: USR001
+      inbox:
+      - USR001: {}
+      - 37e232f7-dcb5-48a2-ba6e-9a12f245ced4:
+          USR001:
+          - The latest stock price of XTC is $150.75.
+      message_count: 1
+      user_count: 5
+      user_map:
+        Alice: USR003
+        Bob: USR004
+        Colleague: 37e232f7-dcb5-48a2-ba6e-9a12f245ced4
+        Jane: USR002
+        John: USR001
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - OMEG
+  involved_classes:
+  - MessageAPI
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "Integrate stock for ''Omega
+  Industries'' into my watchlist effectively."}], [{"role": "user", "content": "Alright,
+  now that ''Omega Industries'' is on there, furnish me with the current watchlist
+  contents."}], [{"role": "user", "content": "Let''s proceed with an order. Execute
+  a transaction for 150 shares at the present market value for the stock we just added."}],
+  [{"role": "user", "content": "Please provide a comprehensive breakdown of this new
+  order."}], [{"role": "user", "content": "At last, draft a note to customer service
+  to affirm the order''s success, including all relevant information. The note should
+  contain the message ''Dear Customer Service, please confirm the successful execution
+  of my order for 150 shares of Omega Industries at the current market price, and
+  verify the order details under reference ID USR002. Thank you.''. Reference id ''USR002''.
+  My user id is ''USR001'' and send to Jane. She is the one."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR001: {}
+      - 37e232f7-dcb5-48a2-ba6e-9a12f245ced4:
+          USR001:
+          - The latest stock price of XTC is $150.75.
+      - USR002: Dear Customer Service, please confirm the successful execution of
+          my order for 150 shares of Omega Industries at the current market price,
+          and verify the order details under reference ID USR002. Thank you.
+      message_count: 2
+      user_count: 5
+      user_map:
+        Alice: USR003
+        Bob: USR004
+        Colleague: 37e232f7-dcb5-48a2-ba6e-9a12f245ced4
+        Jane: USR002
+        John: USR001
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 150
+          id: 12446
+          order_type: Buy
+          price: 457.23
+          status: Open
+          symbol: OMEG
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - OMEG
+  ground_truth_function_calls:
+  - - add_to_watchlist(stock='OMEG')
+  - - get_watchlist()
+  - - get_stock_info('OMEG')
+    - place_order(order_type='Buy',symbol='OMEG',price=457.23,amount=150)
+  - - get_order_details(order_id=12446)
+  - - send_message(receiver_id='USR002', message='Dear Customer Service, please confirm
+      the successful execution of my order for 150 shares of Omega Industries at the
+      current market price, and verify the order details under reference ID USR002.
+      Thank you.')
+messages:
+- content: '[{"role": "user", "content": "Integrate stock for ''Omega Industries''
+    into my watchlist effectively."}]'
+  role: user
+- content: Alright, now that 'Omega Industries' is on there, furnish me with the current
+    watchlist contents.
+  role: user
+- content: Let's proceed with an order. Execute a transaction for 150 shares at the
+    present market value for the stock we just added.
+  role: user
+- content: Please provide a comprehensive breakdown of this new order.
+  role: user
+- content: At last, draft a note to customer service to affirm the order's success,
+    including all relevant information. The note should contain the message 'Dear
+    Customer Service, please confirm the successful execution of my order for 150
+    shares of Omega Industries at the current market price, and verify the order details
+    under reference ID USR002. Thank you.'. Reference id 'USR002'. My user id is 'USR001'
+    and send to Jane. She is the one.
+  role: user
+name: multi_turn_base_103
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

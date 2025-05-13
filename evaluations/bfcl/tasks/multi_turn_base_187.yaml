@@ -1,0 +1,123 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_counter: 0
+      ticket_queue: []
+    TravelAPI:
+      access_token: token_abc123
+      booking_record:
+        insurance_12345:
+          transaction_id: '12345'
+          travel_class: economy
+          travel_cost: 9500.0
+          travel_date: '2024-12-24'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list:
+        card_4893:
+          balance: 8000
+          card_number: 4876-6834-6732-4893
+          cardholder_name: Michael Thompson
+          credit_limit: 10000.0
+          expiry_date: 2024-12
+      token_expires_in: 86400
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TicketAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve been issued a new credit
+  card with id ''card_4893'', and it''s set to expire sometime the next calendar year.
+  I''m quite eager to use this card to purchase comprehensive travel insurance for
+  an upcoming journey. I believe my access privileges remain active as I recently
+  acquired the token labeled ''token_abc123'' yesterday. It''s important that the
+  coverage amounts to $1,500 which is what it will cost. Could we expedite this and
+  use my booking record for booking_id, as I have an impending meeting?"}], [{"role":
+  "user", "content": "After finally carving out a moment in my schedule, I''ve noticed
+  I''m unable to recall the expenses associated with the insurance I previously purchased.
+  Would you be so kind as to locate and provide the invoice for that specific insurance
+  transaction from my personal records?"}], [{"role": "user", "content": "It seems
+  there might be an error with my recent trip expenses, as they don''t appear to be
+  recorded correctly. Could you lend a hand by drafting a communication to customer
+  support, highlighting these discrepancies in my travel-related costs?"}], [{"role":
+  "user", "content": "The reply I received from customer support was less than satisfactory.
+  Let''s take this a step further by submitting a high-priority ticket. The ticket
+  should be titled ''Discrepancy in Travel Costs'' and the description ought to include
+  the feedback we got from customer support. My ticket username is ''mthompson'' and
+  password is ''SecurePass123"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: mthompson
+      ticket_counter: 1
+      ticket_queue:
+      - created_by: mthompson
+        description: Feedback from customer support was unsatisfactory regarding discrepancies
+          in travel costs.
+        id: 0
+        priority: 4
+        status: Open
+        title: Discrepancy in Travel Costs
+    TravelAPI:
+      access_token: token_abc123
+      booking_record:
+        insurance_12345:
+          transaction_id: '12345'
+          travel_class: economy
+          travel_cost: 9500.0
+          travel_date: '2024-12-24'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list:
+        card_4893:
+          balance: 6500.0
+          card_number: 4876-6834-6732-4893
+          cardholder_name: Michael Thompson
+          credit_limit: 10000.0
+          expiry_date: 2024-12
+      long_context: false
+      token_expires_in: 86400
+      token_scope: full_access
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - purchase_insurance(access_token='token_abc123', insurance_type='comprehensive',
+      booking_id='insurance_12345', insurance_cost=1500.0, card_id='card_4893')
+  - - retrieve_invoice(access_token='token_abc123', booking_id='insurance_12345')
+  - - contact_customer_support(booking_id='insurance_12345', message='There are discrepancies
+      in my travel-related costs. Please assist.')
+  - - ticket_login(username='mthompson', password='SecurePass123')
+    - create_ticket(priority=4, title='Discrepancy in Travel Costs', description='Feedback
+      from customer support was unsatisfactory regarding discrepancies in travel costs.')
+messages:
+- content: '[{"role": "user", "content": "I''ve been issued a new credit card with
+    id ''card_4893'', and it''s set to expire sometime the next calendar year. I''m
+    quite eager to use this card to purchase comprehensive travel insurance for an
+    upcoming journey. I believe my access privileges remain active as I recently acquired
+    the token labeled ''token_abc123'' yesterday. It''s important that the coverage
+    amounts to $1,500 which is what it will cost. Could we expedite this and use my
+    booking record for booking_id, as I have an impending meeting?"}]'
+  role: user
+- content: After finally carving out a moment in my schedule, I've noticed I'm unable
+    to recall the expenses associated with the insurance I previously purchased. Would
+    you be so kind as to locate and provide the invoice for that specific insurance
+    transaction from my personal records?
+  role: user
+- content: It seems there might be an error with my recent trip expenses, as they
+    don't appear to be recorded correctly. Could you lend a hand by drafting a communication
+    to customer support, highlighting these discrepancies in my travel-related costs?
+  role: user
+- content: The reply I received from customer support was less than satisfactory.
+    Let's take this a step further by submitting a high-priority ticket. The ticket
+    should be titled 'Discrepancy in Travel Costs' and the description ought to include
+    the feedback we got from customer support. My ticket username is 'mthompson' and
+    password is 'SecurePass123
+  role: user
+name: multi_turn_base_187
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

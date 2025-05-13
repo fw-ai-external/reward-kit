@@ -1,0 +1,149 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: michael2023
+      retweets: {}
+      tweet_counter: 2
+      tweets:
+        '0':
+          content: Checking tire pressures before the big trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#safety'
+          - '#carcare'
+          username: michael_smith
+      username: michael_smith
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 10.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning ahead for our
+  big trip and realized our car''s fuel tank is running low. It would be great if
+  you could top it up with an additional 30 gallons before I turn on the ignition
+  using the ''START'' mode."}], [{"role": "user", "content": "As part of our travel
+  prep, I''m keeping tabs on the tires as well. I''d appreciate it if you could share
+  a quick update about the tire pressures on Twitter, using the format ''Front Left
+  Tire: XXX PSI, Front Right Tire: XXX PSI, Rear Left Tire: XXX PSI, Rear Right Tire:
+  XXX PSI'', where ''XXX'' is the actual values for the tire pressure."}], [{"role":
+  "user", "content": "Speaking of which, I noticed that tweets about tire pressures
+  usually gets lots of view. Would you mind retweeting it for me?"}], [{"role": "user",
+  "content": "While you''re at it, it''d be awesome if you could comment on that tweet,
+  something like ''Is this pressue too low? Should I take any action?'' would be perfect."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments:
+        2:
+        - content: Is this pressue too low? Should I take any action?
+          username: michael_smith
+      following_list:
+      - alice
+      - bob
+      password: michael2023
+      retweets:
+        michael_smith:
+        - 2
+      tweet_counter: 3
+      tweets:
+        0:
+          content: Checking tire pressures before the big trip!
+          id: 0
+          mentions: []
+          tags:
+          - '#roadtrip'
+          - '#safety'
+          - '#carcare'
+          username: michael_smith
+        2:
+          content: 'Front Left Tire: 32 PSI, Front Right Tire: 32 PSI, Rear Left Tire:
+            30 PSI, Rear Right Tire: 30 PSI'
+          id: 2
+          mentions: []
+          tags: []
+          username: michael_smith
+      username: michael_smith
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: released
+      cruiseStatus: inactive
+      destination: None
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engine_state: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 40.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 4
+  ground_truth_function_calls:
+  - - fillFuelTank(fuelAmount=30.0)
+  - - check_tire_pressure()
+    - 'post_tweet(content=''Front Left Tire: 32 PSI, Front Right Tire: 32 PSI, Rear
+      Left Tire: 30 PSI, Rear Right Tire: 30 PSI'')'
+  - - retweet(tweet_id=2)
+  - - comment(tweet_id=2, comment_content='Is this pressue too low? Should I take
+      any action?')
+messages:
+- content: '[{"role": "user", "content": "I''m planning ahead for our big trip and
+    realized our car''s fuel tank is running low. It would be great if you could top
+    it up with an additional 30 gallons before I turn on the ignition using the ''START''
+    mode."}]'
+  role: user
+- content: 'As part of our travel prep, I''m keeping tabs on the tires as well. I''d
+    appreciate it if you could share a quick update about the tire pressures on Twitter,
+    using the format ''Front Left Tire: XXX PSI, Front Right Tire: XXX PSI, Rear Left
+    Tire: XXX PSI, Rear Right Tire: XXX PSI'', where ''XXX'' is the actual values
+    for the tire pressure.'
+  role: user
+- content: Speaking of which, I noticed that tweets about tire pressures usually gets
+    lots of view. Would you mind retweeting it for me?
+  role: user
+- content: While you're at it, it'd be awesome if you could comment on that tweet,
+    something like 'Is this pressue too low? Should I take any action?' would be perfect.
+  role: user
+name: multi_turn_base_75
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

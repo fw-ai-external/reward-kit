@@ -1,0 +1,109 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: access_token_abc123
+      booking_record: {}
+      budget_limit: 2000.0
+      credit_card_list:
+        card7320:
+          balance: 14000.0
+          card_number: '4916735048297320'
+          cardholder_name: Samuel Fisher
+          cvv: 123
+          expiry_date: 2025-12
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Samuel
+      user_last_name: Fisher
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m setting sail on an adventure
+  from Crescent Hollow to Rivermist and need the scoop on flight costs for my journey.
+  My takeoff is scheduled for 2022-07-15, and luxury''s the name of the game, so I''ll
+  be in business class."}], [{"role": "user", "content": "Before diving into booking
+  details, I need to establish my spending limits. Utilizing my access token ''access_token_abc123'',
+  I''ll cap my budget at 2000 USD for the impending journey."}], [{"role": "user",
+  "content": "With the budget firmly in place, let''s seal the deal! Employing my
+  access token, book the flight using my credit card, identified with card7320, covering
+  all associated flight expenses. I''ll be traveling under Samuel Fisher, using my
+  seasoned traveler number."}], [{"role": "user", "content": "Once everything''s set,
+  I''d appreciate an invoice reflecting my recent flight procurement, giving me peace
+  of mind about the particulars and expense."}], [{"role": "user", "content": "I''ve
+  hit a snag with the reservation process and would appreciate if you contacted customer
+  support. Use my booking ID to express my ''Concerns regarding seating arrangements''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TravelAPI:
+      access_token: access_token_abc123
+      booking_record:
+        '3426812':
+          card_id: card7320
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 560.0
+          travel_date: '2022-07-15'
+          travel_from: CRH
+          travel_to: RMS
+      budget_limit: 2000.0
+      credit_card_list:
+        card7320:
+          balance: 13440.0
+          card_number: '4916735048297320'
+          cardholder_name: Samuel Fisher
+          cvv: 123
+          expiry_date: 2025-12
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking
+      token_type: Bearer
+      user_first_name: Samuel
+      user_last_name: Fisher
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='CRH',travel_to='RMS',travel_date='2022-07-15',travel_class='business')
+  - - set_budget_limit(access_token='access_token_abc123', budget_limit=2000.0)
+  - - book_flight(access_token='access_token_abc123', card_id='card7320', travel_date='2022-07-15',travel_from='CRH',travel_to='RMS',
+      travel_class='business',travel_cost=560.0)
+  - - retrieve_invoice(access_token='access_token_abc123', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Concern regarding seating
+      arrangements')
+messages:
+- content: '[{"role": "user", "content": "I''m setting sail on an adventure from Crescent
+    Hollow to Rivermist and need the scoop on flight costs for my journey. My takeoff
+    is scheduled for 2022-07-15, and luxury''s the name of the game, so I''ll be in
+    business class."}]'
+  role: user
+- content: Before diving into booking details, I need to establish my spending limits.
+    Utilizing my access token 'access_token_abc123', I'll cap my budget at 2000 USD
+    for the impending journey.
+  role: user
+- content: With the budget firmly in place, let's seal the deal! Employing my access
+    token, book the flight using my credit card, identified with card7320, covering
+    all associated flight expenses. I'll be traveling under Samuel Fisher, using my
+    seasoned traveler number.
+  role: user
+- content: Once everything's set, I'd appreciate an invoice reflecting my recent flight
+    procurement, giving me peace of mind about the particulars and expense.
+  role: user
+- content: I've hit a snag with the reservation process and would appreciate if you
+    contacted customer support. Use my booking ID to express my 'Concerns regarding
+    seating arrangements'.
+  role: user
+name: multi_turn_base_166
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

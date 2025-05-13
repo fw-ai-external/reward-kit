@@ -1,0 +1,95 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        main1234:
+          balance: 20000.0
+          budget_limit: 2000.0
+          card_number: 7812-3451-5678-1234
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I need to schedule a flight
+  soon on booking id 1234 and want to examine different alternatives. Calculate the
+  cost of a business class ticket for the first airport on the available list to the
+  last airport on the same list, on the last day of October 2024. Provide the estimated
+  total payable amount for me."}], [{"role": "user", "content": "After determining
+  the flight prices, arrange to reserve a business class seat with those specifics
+  using my card with id main1234 and authorization token ''abc123xyz'', once you''ve
+  gotten full approval."}], [{"role": "user", "content": "Security matters to me,
+  therefore purchase a comprehensive $769 travel insurance policy for this trip using
+  my card immediately after the booking is confirmed."}], [{"role": "user", "content":
+  "Following the insurance purchase, send me a detailed bill for this reservation
+  and outline its incurred charges."}], [{"role": "user", "content": "There''s an
+  urgent matter I need solved. Reach out to customer service for me and relay my booking-related
+  query."}], [{"role": "user", "content": "However, I''ve opted to annul the trip.
+  Conduct the requisite steps to cancel the booking and make sure my card receives
+  a refund."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        main1234:
+          balance: 19231.0
+          budget_limit: 2000.0
+          card_number: 7812-3451-5678-1234
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - list_all_airports()
+    - get_flight_cost(travel_from='RMS', travel_to='BOS', travel_date='2024-10-31',
+      travel_class='business')
+  - - book_flight(access_token='abc123xyz', card_id='main1234', travel_date='2024-10-31',
+      travel_from='RMS', travel_to='BOS', travel_class='business', travel_cost=400.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive',
+      booking_id='3426812', insurance_cost=769.0, card_id='main1234')
+  - - retrieve_invoice(access_token='abc123xyz', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='Booking-related query.')
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+messages:
+- content: '[{"role": "user", "content": "I need to schedule a flight soon on booking
+    id 1234 and want to examine different alternatives. Calculate the cost of a business
+    class ticket for the first airport on the available list to the last airport on
+    the same list, on the last day of October 2024. Provide the estimated total payable
+    amount for me."}]'
+  role: user
+- content: After determining the flight prices, arrange to reserve a business class
+    seat with those specifics using my card with id main1234 and authorization token
+    'abc123xyz', once you've gotten full approval.
+  role: user
+- content: Security matters to me, therefore purchase a comprehensive $769 travel
+    insurance policy for this trip using my card immediately after the booking is
+    confirmed.
+  role: user
+- content: Following the insurance purchase, send me a detailed bill for this reservation
+    and outline its incurred charges.
+  role: user
+- content: There's an urgent matter I need solved. Reach out to customer service for
+    me and relay my booking-related query.
+  role: user
+- content: However, I've opted to annul the trip. Conduct the requisite steps to cancel
+    the booking and make sure my card receives a refund.
+  role: user
+name: multi_turn_base_194
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

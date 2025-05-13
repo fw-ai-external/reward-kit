@@ -1,0 +1,77 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      budget_limit: 600.0
+      credit_card_list:
+        id15583:
+          balance: 15000.0
+          card_number: 4920-1539-8456-3890
+          card_type: Mastercard
+          cardholder_name: Michael Thompson
+          cvv: 768
+          expiration_date: 09/2024
+      token_expires_in: 3600
+      token_scope: booking insurance
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning to fly from
+  LAX to JFK on November 15th 2024 and aim to travel in business class with a budget
+  of $2400. Could you please book a seat for this flight? I''ll be using my access
+  token ''abc123xyz'' and Mastercard with id ''id15583'' for payment."}], [{"role":
+  "user", "content": "After booking my flight, I''d like to cover myself against any
+  unforeseen issues. Can you purchase comprehensive travel insurance for $120, using
+  the same credit card I used for the flight booking, to ensure I''m protected throughout
+  my journey?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: id15583
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 2400.0
+          travel_date: '2024-11-15'
+          travel_from: LAX
+          travel_to: JFK
+      budget_limit: 600.0
+      credit_card_list:
+        id15583:
+          balance: 12480.0
+          card_number: 4920-1539-8456-3890
+          card_type: Mastercard
+          cardholder_name: Michael Thompson
+          cvv: 768
+          expiration_date: 09/2024
+      long_context: false
+      token_expires_in: 3600
+      token_scope: booking insurance
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='LAX', travel_to='JFK', travel_date='2024-11-15',
+      travel_class='business')
+    - book_flight(access_token='abc123xyz', card_id='id15583', travel_date='2024-11-15',
+      travel_from='LAX', travel_to='JFK', travel_class='business', travel_cost=2400.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive',
+      insurance_cost=120.0, booking_id='3426812', card_id='id15583')
+messages:
+- content: '[{"role": "user", "content": "I''m planning to fly from LAX to JFK on
+    November 15th 2024 and aim to travel in business class with a budget of $2400.
+    Could you please book a seat for this flight? I''ll be using my access token ''abc123xyz''
+    and Mastercard with id ''id15583'' for payment."}]'
+  role: user
+- content: After booking my flight, I'd like to cover myself against any unforeseen
+    issues. Can you purchase comprehensive travel insurance for $120, using the same
+    credit card I used for the flight booking, to ensure I'm protected throughout
+    my journey?
+  role: user
+name: multi_turn_base_155
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

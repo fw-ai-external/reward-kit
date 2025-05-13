@@ -1,0 +1,255 @@
+base_resource_config:
+  initial_config:
+    TicketAPI:
+      ticket_counter: 0
+      ticket_queue: []
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - AAPL
+  involved_classes:
+  - TradingBot
+  - TicketAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m currently exploring the
+  StockView platform and wish to take a peek at the assortment in my stock watchlist.
+  I''d appreciate it if you could display the stocks I''m monitoring right now."}],
+  [{"role": "user", "content": "I observed that among the stocks listed, the last
+  one is showing promising movement. I''m contemplating acquiring 100 shares at the
+  prevailing market rate. Accompanying this thought, I''d kindly request you to proceed
+  with placing the buy order for me."}], [{"role": "user", "content": "In light of
+  the order placement, I''d be grateful if you could furnish me with the specifics
+  of the trade I just entered, ensuring everything aligns perfectly as intended."}],
+  [{"role": "user", "content": "Reflecting my revised financial direction, I''ve decided
+  to retract the recent order. I''d be thankful for your assistance in carrying out
+  the cancellation and confirming it."}], [{"role": "user", "content": "Engaging in
+  these market maneuvers, I''m eager to maintain a comprehensive grasp on my financial
+  wellbeing. A summary of my present account balance along with pertinent data would
+  be highly beneficial."}], [{"role": "user", "content": "Regrettably, I''ve stumbled
+  upon a complication related to one of my recent transactions. I''d appreciate your
+  help in initiating a priority level 3 support ticket labeled ''Urgent: Transaction
+  Issue'' with the description ''There is an issue with a recent transaction involving
+  a canceled buy order for 100 shares of AAPL and I am requesting confirmation of
+  the cancellation along with an account summary. My username is user123 and password
+  is 12345 for the ticket login."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TicketAPI:
+      current_user: user123
+      ticket_counter: 1
+      ticket_queue:
+      - created_by: user123
+        description: There is an issue with a recent transaction involving a canceled
+          buy order for 100 shares of AAPL and I am requesting confirmation of the
+          cancellation along with an account summary.
+        id: 0
+        priority: 3
+        status: Open
+        title: 'Urgent: Transaction Issue'
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 100
+          id: 12446
+          order_type: Buy
+          price: 227.16
+          status: Cancelled
+          symbol: AAPL
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+      - AAPL
+  ground_truth_function_calls:
+  - - get_watchlist()
+  - - get_stock_info(symbol='AAPL')
+    - place_order(order_type='Buy',symbol='AAPL',price=227.16,amount=100)
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+  - - get_account_info()
+  - - ticket_login(username='user123', password='12345')
+    - 'create_ticket(title=''Urgent: Transaction Issue'',description=''There is an
+      issue with a recent transaction involving a canceled buy order for 100 shares
+      of AAPL and I am requesting confirmation of the cancellation along with an account
+      summary.'',priority=3)'
+messages:
+- content: '[{"role": "user", "content": "I''m currently exploring the StockView platform
+    and wish to take a peek at the assortment in my stock watchlist. I''d appreciate
+    it if you could display the stocks I''m monitoring right now."}]'
+  role: user
+- content: I observed that among the stocks listed, the last one is showing promising
+    movement. I'm contemplating acquiring 100 shares at the prevailing market rate.
+    Accompanying this thought, I'd kindly request you to proceed with placing the
+    buy order for me.
+  role: user
+- content: In light of the order placement, I'd be grateful if you could furnish me
+    with the specifics of the trade I just entered, ensuring everything aligns perfectly
+    as intended.
+  role: user
+- content: Reflecting my revised financial direction, I've decided to retract the
+    recent order. I'd be thankful for your assistance in carrying out the cancellation
+    and confirming it.
+  role: user
+- content: Engaging in these market maneuvers, I'm eager to maintain a comprehensive
+    grasp on my financial wellbeing. A summary of my present account balance along
+    with pertinent data would be highly beneficial.
+  role: user
+- content: 'Regrettably, I''ve stumbled upon a complication related to one of my recent
+    transactions. I''d appreciate your help in initiating a priority level 3 support
+    ticket labeled ''Urgent: Transaction Issue'' with the description ''There is an
+    issue with a recent transaction involving a canceled buy order for 100 shares
+    of AAPL and I am requesting confirmation of the cancellation along with an account
+    summary. My username is user123 and password is 12345 for the ticket login.'
+  role: user
+name: multi_turn_base_110
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

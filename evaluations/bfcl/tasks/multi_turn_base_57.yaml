@@ -1,0 +1,85 @@
+base_resource_config:
+  initial_config:
+    MathAPI:
+      base: 10
+      precision: 5
+    VehicleControlAPI:
+      acMode: cool
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: unlocked
+        rear_left: locked
+        rear_right: unlocked
+      engineState: running
+      fanSpeed: 70
+      frontLeftTirePressure: 33.0
+      frontRightTirePressure: 33.0
+      fuelLevel: 15.5
+      headLightStatus: 'on'
+      humidityLevel: 45.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 31.0
+      rearRightTirePressure: 31.0
+      slopeAngle: 0.0
+  involved_classes:
+  - VehicleControlAPI
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''ve been thinking of visiting
+  Autumnville for a while now, but I''m not sure how far it is from here in Crescent
+  Hollow. Can you help me figure this out so I can plan my trip accordingly?"}], [{"role":
+  "user", "content": "Oh, and by the way, there''s something else I need help with.
+  I want to calculate the logarithm of the distance you''ve just told me about, considering
+  a base 10 with a precision of 5 digits. Could you provide me with this value as
+  well?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MathAPI: {}
+    VehicleControlAPI:
+      acMode: cool
+      acTemperature: 22.0
+      batteryVoltage: 12.8
+      brakePedalStatus: released
+      cruiseStatus: inactive
+      destination: Rivermist
+      distanceToNextVehicle: 100.0
+      doorStatus:
+        driver: locked
+        passenger: unlocked
+        rear_left: locked
+        rear_right: unlocked
+      engine_state: running
+      fanSpeed: 70
+      frontLeftTirePressure: 33.0
+      frontRightTirePressure: 33.0
+      fuelLevel: 15.5
+      headLightStatus: 'on'
+      humidityLevel: 45.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 31.0
+      rearRightTirePressure: 31.0
+      remainingUnlockedDoors: 2
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('Crescent Hollow')
+    - get_zipcode_based_on_city('Autumnville')
+    - estimate_distance(cityA='69238', cityB='51479')
+  - - logarithm(value=630.0, base=10, precision=5)
+messages:
+- content: '[{"role": "user", "content": "I''ve been thinking of visiting Autumnville
+    for a while now, but I''m not sure how far it is from here in Crescent Hollow.
+    Can you help me figure this out so I can plan my trip accordingly?"}]'
+  role: user
+- content: Oh, and by the way, there's something else I need help with. I want to
+    calculate the logarithm of the distance you've just told me about, considering
+    a base 10 with a precision of 5 digits. Could you provide me with this value as
+    well?
+  role: user
+name: multi_turn_base_57
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

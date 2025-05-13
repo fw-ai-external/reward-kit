@@ -1,0 +1,213 @@
+base_resource_config:
+  initial_config:
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: true
+      market_status: Open
+      order_counter: 12446
+      orders:
+        '12345':
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  involved_classes:
+  - TradingBot
+description: 'BFCL task: [[{"role": "user", "content": "I just arrived at the office
+  and want to know the current market status to plan my trading activities for the
+  day. Update the market status with the current time so I can adjust my strategy
+  accordingly."}], [{"role": "user", "content": "I noticed some promising trends and
+  want to proceed with a ''Buy'' order for 100 shares of AAPL at a price of $150 each.
+  Let''s ensure the order is placed correctly."}], [{"role": "user", "content": "I
+  received a notification about the order placement but want a detailed look at the
+  transaction. Provide me with the full details of my recent order."}], [{"role":
+  "user", "content": "Upon further consideration, I think it''s better to hold off
+  on this purchase. Please cancel my recent order for the AAPL shares."}], [{"role":
+  "user", "content": "I''ve handled all necessary trading decisions for today, and
+  I want to make sure my account is securely logged out. Confirm my logout from the
+  trading system."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TradingBot:
+      account_info:
+        account_id: 12345
+        balance: 10000.0
+        binding_card: 1974202140965533
+      authenticated: false
+      long_context: false
+      market_status: Open
+      order_counter: 12447
+      orders:
+        12345:
+          num_shares: 10
+          price: 210.65
+          status: Completed
+          symbol: AAPL
+        order_type: Buy
+        12446:
+          amount: 100
+          id: 12446
+          order_type: Buy
+          price: 150.0
+          status: Cancelled
+          symbol: AAPL
+      stocks:
+        AAPL:
+          MA(20): 227.09
+          MA(5): 227.11
+          percent_change: 0.17
+          price: 227.16
+          volume: 2.552
+        ALPH:
+          MA(20): 1325.78
+          MA(5): 1321.12
+          percent_change: -0.08
+          price: 1320.45
+          volume: 1.567
+        GOOG:
+          MA(20): 2842.15
+          MA(5): 2835.67
+          percent_change: 0.24
+          price: 2840.34
+          volume: 1.123
+        MSFT:
+          MA(20): 310.11
+          MA(5): 309.88
+          percent_change: 0.09
+          price: 310.23
+          volume: 3.234
+        NEPT:
+          MA(20): 88.67
+          MA(5): 88.21
+          percent_change: 0.19
+          price: 88.34
+          volume: 0.654
+        NVDA:
+          MA(20): 220.67
+          MA(5): 220.45
+          percent_change: 0.34
+          price: 220.34
+          volume: 1.234
+        OMEG:
+          MA(20): 458.12
+          MA(5): 456.78
+          percent_change: 0.12
+          price: 457.23
+          volume: 2.345
+        QUAS:
+          MA(20): 728.0
+          MA(5): 726.45
+          percent_change: -0.03
+          price: 725.89
+          volume: 1.789
+        SYNX:
+          MA(20): 346.12
+          MA(5): 345.34
+          percent_change: 0.11
+          price: 345.67
+          volume: 2.112
+        TSLA:
+          MA(20): 668.2
+          MA(5): 671.15
+          percent_change: -0.12
+          price: 667.92
+          volume: 1.654
+      transaction_history: []
+      watch_list:
+      - NVDA
+  ground_truth_function_calls:
+  - - get_current_time()
+    - update_market_status(current_time_str='10:30 AM')
+  - - place_order(order_type='Buy',symbol='AAPL',price=150,amount=100)
+  - - get_order_details(order_id=12446)
+  - - cancel_order(order_id=12446)
+  - - trading_logout()
+messages:
+- content: '[{"role": "user", "content": "I just arrived at the office and want to
+    know the current market status to plan my trading activities for the day. Update
+    the market status with the current time so I can adjust my strategy accordingly."}]'
+  role: user
+- content: I noticed some promising trends and want to proceed with a 'Buy' order
+    for 100 shares of AAPL at a price of $150 each. Let's ensure the order is placed
+    correctly.
+  role: user
+- content: I received a notification about the order placement but want a detailed
+    look at the transaction. Provide me with the full details of my recent order.
+  role: user
+- content: Upon further consideration, I think it's better to hold off on this purchase.
+    Please cancel my recent order for the AAPL shares.
+  role: user
+- content: I've handled all necessary trading decisions for today, and I want to make
+    sure my account is securely logged out. Confirm my logout from the trading system.
+  role: user
+name: multi_turn_base_122
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,42 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        researcher:
+          contents:
+            SuperResearch:
+              contents:
+                findings_report:
+                  content: This document contains a breakthrough in our research.
+                    Further analysis is required to understand the full implications
+                    of this breakthrough.
+                  type: file
+              type: directory
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "I''ve misplaced a vital document
+  inclusive of extensive research. Assist in locating a file named ''findings_report''
+  within this ''SuperResearch''. Could you remove it and the directory."}], [{"role":
+  "user", "content": "What''s left in the current directory including the hidden files?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: researcher, Parent: None, Contents: {}>'
+  ground_truth_function_calls:
+  - - cd(folder='SuperResearch')
+    - rm(file_name='findings_report')
+    - cd(folder='..')
+    - rmdir(dir_name='SuperResearch')
+  - - ls(a=True)
+messages:
+- content: '[{"role": "user", "content": "I''ve misplaced a vital document inclusive
+    of extensive research. Assist in locating a file named ''findings_report'' within
+    this ''SuperResearch''. Could you remove it and the directory."}]'
+  role: user
+- content: What's left in the current directory including the hidden files?
+  role: user
+name: multi_turn_base_38
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,114 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            documents:
+              contents:
+                report.txt:
+                  content: Zebra Apple Orange
+                  type: file
+                summary.txt:
+                  content: Banana Grape Lemon
+                  type: file
+              type: directory
+          type: directory
+    TwitterAPI:
+      password: Kj8#mP9$vL2
+      tweet_counter: 3
+      tweets:
+        '0':
+          content: Exciting news about our latest project!
+          id: 0
+          mentions: []
+          tags:
+          - '#exciting'
+          - '#project'
+          - '#news'
+          username: techpro_dev
+        '1':
+          content: Check out this amazing comparison!
+          id: 1
+          mentions: []
+          tags:
+          - '#amazing'
+          - '#comparison'
+          username: techpro_dev
+        '2':
+          content: Retweeting to spread the word!
+          id: 2
+          mentions: []
+          tags:
+          - '#retweet'
+          - '#spreadtheword'
+          username: techpro_dev
+      username: techpro_dev
+  involved_classes:
+  - TwitterAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "In documents directory, there''s
+  a file that piques my curiosity regarding its contents. It''s alphabetically first
+  file in that directory. Could you display the last line of that file for me?"}],
+  [{"role": "user", "content": "I''ve lately stored some work that parallels another
+  document on my system. Might you review both files in this directory and articulate
+  the distinctions"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''documents'': <Directory:
+        documents, Parent: alex, Contents: {''report.txt'': <<File: report.txt, Content:
+        Zebra Apple Orange>>, ''summary.txt'': <<File: summary.txt, Content: Banana
+        Grape Lemon>>}>}>'
+    TwitterAPI:
+      authenticated: false
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: Kj8#mP9$vL2
+      retweets: {}
+      tweet_counter: 3
+      tweets:
+        0:
+          content: Exciting news about our latest project!
+          id: 0
+          mentions: []
+          tags:
+          - '#exciting'
+          - '#project'
+          - '#news'
+          username: techpro_dev
+        1:
+          content: Check out this amazing comparison!
+          id: 1
+          mentions: []
+          tags:
+          - '#amazing'
+          - '#comparison'
+          username: techpro_dev
+        2:
+          content: Retweeting to spread the word!
+          id: 2
+          mentions: []
+          tags:
+          - '#retweet'
+          - '#spreadtheword'
+          username: techpro_dev
+      username: techpro_dev
+  ground_truth_function_calls:
+  - - cd(folder='documents')
+    - tail(file_name='report.txt',lines=1)
+  - - diff(file_name1='report.txt',file_name2='summary.txt')
+messages:
+- content: '[{"role": "user", "content": "In documents directory, there''s a file
+    that piques my curiosity regarding its contents. It''s alphabetically first file
+    in that directory. Could you display the last line of that file for me?"}]'
+  role: user
+- content: I've lately stored some work that parallels another document on my system.
+    Might you review both files in this directory and articulate the distinctions
+  role: user
+name: multi_turn_base_13
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

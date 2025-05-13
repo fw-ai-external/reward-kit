@@ -1,0 +1,49 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        project:
+          contents:
+            PastSeasons:
+              contents: {}
+              type: directory
+            Spring2023Draft:
+              content: These are the notes for Spring 2023.
+              type: file
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I would like to peek the content
+  of ''Spring2023Draft'' for review, and could you also provide a comprehensive character
+  count of that same file for thorough assessment?"}], [{"role": "user", "content":
+  "While analyzing my project''s numerical data, determine the logarithm of the character
+  count to the base 6 with precision up to four decimal places. And write the answer
+  only into result.txt which you should create"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: project, Parent: None, Contents: {''Spring2023Draft'': <<File:
+        Spring2023Draft, Content: These are the notes for Spring 2023.>>, ''PastSeasons'':
+        <Directory: PastSeasons, Parent: project, Contents: {}>, ''result.txt'': <<File:
+        result.txt, Content: 2.0>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - cat(file_name='Spring2023Draft')
+    - wc(file_name='Spring2023Draft', mode='c')
+  - - logarithm(value=36.0,base=6.0,precision=4)
+    - touch('result.txt')
+    - echo(content='2.0',file_name='result.txt')
+messages:
+- content: '[{"role": "user", "content": "I would like to peek the content of ''Spring2023Draft''
+    for review, and could you also provide a comprehensive character count of that
+    same file for thorough assessment?"}]'
+  role: user
+- content: While analyzing my project's numerical data, determine the logarithm of
+    the character count to the base 6 with precision up to four decimal places. And
+    write the answer only into result.txt which you should create
+  role: user
+name: multi_turn_base_32
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

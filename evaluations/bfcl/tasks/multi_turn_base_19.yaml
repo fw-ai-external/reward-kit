@@ -1,0 +1,61 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        work:
+          contents:
+            archives:
+              contents: {}
+              type: directory
+            test_document.txt:
+              content: This is a draft version of the document.
+              type: file
+          type: directory
+  involved_classes:
+  - MessageAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Find every file with the name
+  ''test_document.txt'' nestled within the current directory."}], [{"role": "user",
+  "content": "Transfer a duplicate of ''test_document.txt'' over to the archives folder
+  and rename it ''final_document.txt''."}], [{"role": "user", "content": "Reveal the
+  contents of ''final_document.txt'' located in the archives."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: work, Parent: None, Contents: {''test_document.txt'': <<File:
+        test_document.txt, Content: This is a draft version of the document.>>, ''archives'':
+        <Directory: archives, Parent: work, Contents: {''final_document.txt'': <<File:
+        final_document.txt, Content: This is a draft version of the document.>>}>}>'
+    MessageAPI:
+      current_user: null
+      generated_ids: set()
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      message_count: 3
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+  ground_truth_function_calls:
+  - - find(path='.',name='test_document.txt')
+  - - cp(source='test_document.txt',destination='archives')
+    - cd(folder='archives')
+    - mv(source='test_document.txt',destination='final_document.txt')
+  - - cat(file_name='final_document.txt')
+messages:
+- content: '[{"role": "user", "content": "Find every file with the name ''test_document.txt''
+    nestled within the current directory."}]'
+  role: user
+- content: Transfer a duplicate of 'test_document.txt' over to the archives folder
+    and rename it 'final_document.txt'.
+  role: user
+- content: Reveal the contents of 'final_document.txt' located in the archives.
+  role: user
+name: multi_turn_base_19
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,66 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        project:
+          contents: {}
+          type: directory
+    MathAPI: {}
+  involved_classes:
+  - GorillaFileSystem
+  - MathAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m embarking on a new data
+  analysis project that''s as thrilling as scripting the next great story. Let''s
+  start by producing a file named ''DataSet1.csv'' to hold all our initial bursts
+  of raw data."}], [{"role": "user", "content": "Infuse ''DataSet1.csv'' with some
+  preliminary numbers for our initial analytical exploration, just like adding depth
+  to a character''s backstory. Here are the data ''Student | Math | Computer Science
+  Alice | 5 | 9 Bob | 10 | 7''. You should copy as it is and split by line each each
+  row"}], [{"role": "user", "content": "Picture this: you''re reading the last entries
+  of ''DataSet1.csv'' could you give me a glimpse to gauge the data''s current health?"}],
+  [{"role": "user", "content": "Provide a summary of the lines, words, and characters
+  in the previous file. It''s crucial, like measuring the script''s length, to grasp
+  the scope of our data narrative."}], [{"role": "user", "content": "Could you compute
+  the average of the three numerical value obtained? Just for my personal use."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: project, Parent: None, Contents: {''DataSet1.csv'': <<File:
+        DataSet1.csv, Content: Student | Math | Computer Science
+
+        Alice | 5 | 9
+
+        Bob | 10 | 7>>}>'
+    MathAPI: {}
+  ground_truth_function_calls:
+  - - touch(file_name='DataSet1.csv')
+  - - echo(content='Student | Math | Computer Science\nAlice | 5 | 9\nBob | 10 | 7',file_name='DataSet1.csv')
+  - - tail(file_name='DataSet1.csv',lines=1)
+  - - wc(file_name='DataSet1.csv',mode='l')
+    - wc(file_name='DataSet1.csv',mode='w')
+    - wc(file_name='DataSet1.csv',mode='c')
+  - - mean(numbers=[3,16,60])
+messages:
+- content: '[{"role": "user", "content": "I''m embarking on a new data analysis project
+    that''s as thrilling as scripting the next great story. Let''s start by producing
+    a file named ''DataSet1.csv'' to hold all our initial bursts of raw data."}]'
+  role: user
+- content: Infuse 'DataSet1.csv' with some preliminary numbers for our initial analytical
+    exploration, just like adding depth to a character's backstory. Here are the data
+    'Student | Math | Computer Science Alice | 5 | 9 Bob | 10 | 7'. You should copy
+    as it is and split by line each each row
+  role: user
+- content: 'Picture this: you''re reading the last entries of ''DataSet1.csv'' could
+    you give me a glimpse to gauge the data''s current health?'
+  role: user
+- content: Provide a summary of the lines, words, and characters in the previous file.
+    It's crucial, like measuring the script's length, to grasp the scope of our data
+    narrative.
+  role: user
+- content: Could you compute the average of the three numerical value obtained? Just
+    for my personal use.
+  role: user
+name: multi_turn_base_15
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

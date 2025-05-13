@@ -1,0 +1,125 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        booking_987654321:
+          class: Business
+          cost: 1200.0
+          date: '2024-04-15'
+          departure: Los Angeles
+          destination: New York
+          flight_number: LA1234
+      budget_limit: 3000.0
+      credit_card_list:
+        card_123456789:
+          balance: 5000.0
+          card_number: 1234-5678-9876-5432
+          cardholder_name: Michael Thompson
+          currency: EUR
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  involved_classes:
+  - MessageAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "I''m planning a journey from
+  Los Angeles to New York on the morning of April 15th 2024, preferring to fly business
+  class. Arrange this flight using my pre-linked credit card with id ''card_123456789''
+  and access token ''abc123xyz''."}], [{"role": "user", "content": "With my flight
+  now secured, I need to review the invoice outlining the costs involved. Retrieve
+  that invoice for me, please."}], [{"role": "user", "content": "There were hiccups
+  during the booking process. Reach out to customer support and detail the challenges
+  I faced."}], [{"role": "user", "content": "Loggin in as USR001 for messaging. Once
+  you''ve reached out to them, please brief my colleague Catherine (id=''USR003'')
+  on the situation using my sender id ''MichaelTpss'', message to send be ''Update
+  on flight issue and customer support contact.''."}], [{"role": "user", "content":
+  "Finally, compile and present all the responses sent following the communications
+  regarding the flight issue."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    MessageAPI:
+      current_user: USR001
+      generated_ids: '{67410}'
+      inbox:
+      - USR002: My name is Alice. I want to connect.
+      - USR003: Could you upload the file?
+      - USR004: Could you upload the file?
+      - USR003: Update on flight issue and customer support contact.
+      message_count: 4
+      user_count: 4
+      user_map:
+        Alice: USR001
+        Bob: USR002
+        Catherine: USR003
+        Daniel: USR004
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_123456789
+          transaction_id: '45451592'
+          travel_class: business
+          travel_cost: 2400.0
+          travel_date: '2024-04-15'
+          travel_from: LAX
+          travel_to: JFK
+        booking_987654321:
+          class: Business
+          cost: 1200.0
+          date: '2024-04-15'
+          departure: Los Angeles
+          destination: New York
+          flight_number: LA1234
+      budget_limit: 3000.0
+      credit_card_list:
+        card_123456789:
+          balance: 2600.0
+          card_number: 1234-5678-9876-5432
+          cardholder_name: Michael Thompson
+          currency: EUR
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='LAX', travel_to='JFK', travel_date='2024-04-15',
+      travel_class='business')
+    - book_flight(access_token='abc123xyz', card_id='card_123456789', travel_date='2024-04-15',
+      travel_from='LAX', travel_to='JFK', travel_class='business', travel_cost=2400.0)
+  - - retrieve_invoice(access_token='abc123xyz', booking_id='3426812')
+  - - contact_customer_support(booking_id='3426812', message='There were hiccups during
+      the booking process. Please assist.')
+  - - message_login(user_id='USR001')
+    - send_message(receiver_id='USR003', message='Update on flight issue and customer
+      support contact.')
+  - - view_messages_sent()
+messages:
+- content: '[{"role": "user", "content": "I''m planning a journey from Los Angeles
+    to New York on the morning of April 15th 2024, preferring to fly business class.
+    Arrange this flight using my pre-linked credit card with id ''card_123456789''
+    and access token ''abc123xyz''."}]'
+  role: user
+- content: With my flight now secured, I need to review the invoice outlining the
+    costs involved. Retrieve that invoice for me, please.
+  role: user
+- content: There were hiccups during the booking process. Reach out to customer support
+    and detail the challenges I faced.
+  role: user
+- content: Loggin in as USR001 for messaging. Once you've reached out to them, please
+    brief my colleague Catherine (id='USR003') on the situation using my sender id
+    'MichaelTpss', message to send be 'Update on flight issue and customer support
+    contact.'.
+  role: user
+- content: Finally, compile and present all the responses sent following the communications
+    regarding the flight issue.
+  role: user
+name: multi_turn_base_199
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

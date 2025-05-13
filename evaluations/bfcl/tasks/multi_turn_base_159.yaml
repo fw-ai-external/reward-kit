@@ -1,0 +1,86 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 5000.0
+      credit_card_list:
+        card_3456:
+          balance: 15000.0
+          card_number: 6754 9823 6519 3456
+          cardholder_name: Elizabeth Montgomery
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Theodore
+      user_last_name: Collins
+  involved_classes:
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "Imagine planning a trip and
+  you''re curious about the flight costs between various airports. Opt to fly from
+  the first airport to the second one in the system''s list. Could you provide the
+  expected fare for an economy class ticket on the date 2024-11-15?"}], [{"role":
+  "user", "content": "Good news! You''ve discovered a fare that won''t break the bank.
+  Next, let''s arrange a flight from San Francisco International (SFO) to Los Angeles
+  International (LAX). Utilize a distinctive access token ''abc123xyz'', the credit
+  card with id ''card_3456'', and the traveler details of our intrepid voyager, Elizabeth
+  Montgomery."}], [{"role": "user", "content": "Finally, Elizabeth seeks some tranquility
+  during her adventure. Please acquire travel insurance for this booked flight, selecting
+  a plan that offers up to $500 coverage. You are welcome to use the same credit card
+  and access token for this purchase."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record:
+        '3426812':
+          card_id: card_3456
+          transaction_id: '45451592'
+          travel_class: economy
+          travel_cost: 400.0
+          travel_date: '2024-11-15'
+          travel_from: SFO
+          travel_to: LAX
+      budget_limit: 5000.0
+      credit_card_list:
+        card_3456:
+          balance: 14100.0
+          card_number: 6754 9823 6519 3456
+          cardholder_name: Elizabeth Montgomery
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Theodore
+      user_last_name: Collins
+  ground_truth_function_calls:
+  - - list_all_airports()
+    - get_flight_cost(travel_from='RMS', travel_to='SBK', travel_date='2024-11-15',
+      travel_class='economy')
+  - - book_flight(access_token='abc123xyz', card_id='card_3456', travel_date='2024-11-15',
+      travel_from='SFO', travel_to='LAX', travel_class='economy', travel_cost=400.0)
+  - - purchase_insurance(access_token='abc123xyz', insurance_type='comprehensive',
+      booking_id='3426812', insurance_cost=500.0, card_id='card_3456')
+messages:
+- content: '[{"role": "user", "content": "Imagine planning a trip and you''re curious
+    about the flight costs between various airports. Opt to fly from the first airport
+    to the second one in the system''s list. Could you provide the expected fare for
+    an economy class ticket on the date 2024-11-15?"}]'
+  role: user
+- content: Good news! You've discovered a fare that won't break the bank. Next, let's
+    arrange a flight from San Francisco International (SFO) to Los Angeles International
+    (LAX). Utilize a distinctive access token 'abc123xyz', the credit card with id
+    'card_3456', and the traveler details of our intrepid voyager, Elizabeth Montgomery.
+  role: user
+- content: Finally, Elizabeth seeks some tranquility during her adventure. Please
+    acquire travel insurance for this booked flight, selecting a plan that offers
+    up to $500 coverage. You are welcome to use the same credit card and access token
+    for this purchase.
+  role: user
+name: multi_turn_base_159
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

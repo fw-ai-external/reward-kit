@@ -1,0 +1,85 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        alex:
+          contents:
+            workspace:
+              contents:
+                project_plan.md:
+                  content: Initial project plan details.
+                  type: file
+              type: directory
+          type: directory
+    TicketAPI:
+      ticket_queue:
+      - description: Servers are down unexpectedly.
+        id: 12
+        priority: 3
+  involved_classes:
+  - TicketAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Hey there, I constructed a
+  file titled ''project_plan.md'' that resides happily in my workspace directory.
+  Could you be so kind as to rename it to project_overview.md."}], [{"role": "user",
+  "content": "In light of new developments with respect to file management, I''ve
+  come across an urgent conundrum: servers are down unexpectedly. Draft a support
+  ticket, with description ''Initial project plan details.'' highlighting this dilemma
+  and assign it a priority level of 3 to hasten the response rate. Title ''emergency''
+  and use the previous file content as description. Here is my credential. Please
+  use it user name tech_guru, password securePass123"}], [{"role": "user", "content":
+  "We''ve unearthed additional insights concerning the server issue. Please create
+  a new ticket with same title and description ''Additional insights.'' but now with
+  priority to a level 5, ensuring it''s handled promptly."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: alex, Parent: None, Contents: {''workspace'': <Directory:
+        workspace, Parent: alex, Contents: {''project_overview.md'': <<File: project_overview.md,
+        Content: Initial project plan details.>>}>}>'
+    TicketAPI:
+      current_user: tech_guru
+      ticket_counter: 3
+      ticket_queue:
+      - description: Servers are down unexpectedly.
+        id: 12
+        priority: 3
+      - created_by: tech_guru
+        description: Initial project plan details.
+        id: 1
+        priority: 3
+        status: Open
+        title: emergency
+      - created_by: tech_guru
+        description: Additional insights.
+        id: 2
+        priority: 5
+        status: Open
+        title: emergency
+  ground_truth_function_calls:
+  - - cd(folder='workspace')
+    - mv(source='project_plan.md',destination='project_overview.md')
+  - - ticket_login(username='tech_guru', password='securePass123')
+    - create_ticket(title='emergency',description='Initial project plan details.',
+      priority=3)
+  - - create_ticket(title='emergency',description='Additional insights.', priority=5)
+messages:
+- content: '[{"role": "user", "content": "Hey there, I constructed a file titled ''project_plan.md''
+    that resides happily in my workspace directory. Could you be so kind as to rename
+    it to project_overview.md."}]'
+  role: user
+- content: 'In light of new developments with respect to file management, I''ve come
+    across an urgent conundrum: servers are down unexpectedly. Draft a support ticket,
+    with description ''Initial project plan details.'' highlighting this dilemma and
+    assign it a priority level of 3 to hasten the response rate. Title ''emergency''
+    and use the previous file content as description. Here is my credential. Please
+    use it user name tech_guru, password securePass123'
+  role: user
+- content: We've unearthed additional insights concerning the server issue. Please
+    create a new ticket with same title and description 'Additional insights.' but
+    now with priority to a level 5, ensuring it's handled promptly.
+  role: user
+name: multi_turn_base_27
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,119 @@
+base_resource_config:
+  initial_config:
+    TwitterAPI:
+      authenticated: true
+      tweet_counter: 0
+      tweets: {}
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      cruiseStatus: inactive
+      destination: San Francisco
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: unlocked
+        passenger: unlocked
+        rear_left: unlocked
+        rear_right: unlocked
+      engineState: stopped
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 0.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      parkingBrakeForce: 0.0
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      slopeAngle: 0.0
+  involved_classes:
+  - TwitterAPI
+  - VehicleControlAPI
+description: 'BFCL task: [[{"role": "user", "content": "I am planning a road trip
+  from Rivermist to San Francisco, and I need to know how far I will be traveling.
+  This would help me ensure that my car is sufficiently fueled for the journey."}],
+  [{"role": "user", "content": "Given that the trip spans almost a thousand kilometers,
+  could you help me make sure the fuel tank is full? Btw, I have a 30-gallon drum
+  handy. How much is that in liters?"}], [{"role": "user", "content": "Now that the
+  tank is completely filled, I''m keen on ensuring that the engine starts without
+  a hitch. Could you help me get the engine running, ensuring it''s all set for the
+  long journey ahead?"}], [{"role": "user", "content": "Before I set off, I want to
+  share my travel excitement with friends on Twitter by describing the wonderful places
+  I''ll be exploring during this adventure. Would you be able to post a tweet saying
+  ''Excited for the trip!''?"}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john123
+      retweets: {}
+      tweet_counter: 1
+      tweets:
+        0:
+          content: Excited for the trip!
+          id: 0
+          mentions: []
+          tags: []
+          username: john
+      username: john
+    VehicleControlAPI:
+      acMode: auto
+      acTemperature: 25.0
+      batteryVoltage: 12.6
+      brakePedalStatus: pressed
+      cruiseStatus: inactive
+      destination: San Francisco
+      distanceToNextVehicle: 50.0
+      doorStatus:
+        driver: locked
+        passenger: locked
+        rear_left: locked
+        rear_right: locked
+      engine_state: running
+      fanSpeed: 50
+      frontLeftTirePressure: 32.0
+      frontRightTirePressure: 32.0
+      fuelLevel: 50.0
+      headLightStatus: 'off'
+      humidityLevel: 50.0
+      long_context: false
+      parkingBrakeStatus: released
+      rearLeftTirePressure: 30.0
+      rearRightTirePressure: 30.0
+      remainingUnlockedDoors: 0
+  ground_truth_function_calls:
+  - - get_zipcode_based_on_city('San Francisco')
+    - get_zipcode_based_on_city('Rivermist')
+    - estimate_distance(cityA='94016', cityB='83214')
+  - - gallon_to_liter(gallon=30)
+    - fillFuelTank(fuelAmount=50)
+  - - lockDoors(unlock=False, door=['driver', 'passenger', 'rear_left', 'rear_right'])
+    - pressBrakePedal(pedalPosition=1.0)
+    - startEngine(ignitionMode='START')
+  - - post_tweet(content='Excited for the trip!')
+messages:
+- content: '[{"role": "user", "content": "I am planning a road trip from Rivermist
+    to San Francisco, and I need to know how far I will be traveling. This would help
+    me ensure that my car is sufficiently fueled for the journey."}]'
+  role: user
+- content: Given that the trip spans almost a thousand kilometers, could you help
+    me make sure the fuel tank is full? Btw, I have a 30-gallon drum handy. How much
+    is that in liters?
+  role: user
+- content: Now that the tank is completely filled, I'm keen on ensuring that the engine
+    starts without a hitch. Could you help me get the engine running, ensuring it's
+    all set for the long journey ahead?
+  role: user
+- content: Before I set off, I want to share my travel excitement with friends on
+    Twitter by describing the wonderful places I'll be exploring during this adventure.
+    Would you be able to post a tweet saying 'Excited for the trip!'?
+  role: user
+name: multi_turn_base_58
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

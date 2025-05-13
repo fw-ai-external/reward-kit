@@ -1,0 +1,142 @@
+base_resource_config:
+  initial_config:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        '144756014165':
+          balance: 3200
+          card_number: '4731612987456207'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      password: john1234
+      tweet_counter: 10
+      tweets:
+        '0':
+          content: 'Just canceled my trip to LA. #TravelUpdate #BusinessTrip'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelUpdate'
+          - '#BusinessTrip'
+          username: john
+        '1':
+          content: 'Looking forward to new opportunities! #Networking #Business'
+          id: 1
+          mentions: []
+          tags:
+          - '#Networking'
+          - '#Business'
+          username: john
+      username: john
+  involved_classes:
+  - TwitterAPI
+  - TravelAPI
+description: 'BFCL task: [[{"role": "user", "content": "A complex decision awaits
+  me. I''m planning an upcoming trip with limited resources and reevaluating my options.
+  Is there an available estimate for a business class flight from San Francisco International
+  to Los Angeles next Friday November 10th 2024 for an essential business engagement?
+  Could the system book it for me using the secured credit card id 144756014165 and
+  access token abc123xyz, and exchange the estimated cost from USD to EUR for budgeting
+  purposes?"}], [{"role": "user", "content": "Due to unforeseen circumstances, I''m
+  unable to proceed with my journey to Los Angeles next week. Could the system initiate
+  a cancellation process for the flight booking made earlier?"}], [{"role": "user",
+  "content": "I believe it would be strategic to communicate these adjustments to
+  my extended network. Construct a tweet highlighting the cancellation of my travel
+  plans, and ensure to add relevant hashtags ''TravelUpdate'' and ''BusinessTrip''
+  relating to travel and business updates, for message, just tell that ''Just cancelled
+  my trip to LA''. Be sure to authenticate using my username ''john'' and password
+  ''john1234''."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    TravelAPI:
+      access_token: abc123xyz
+      booking_record: {}
+      budget_limit: 1000.0
+      credit_card_list:
+        '144756014165':
+          balance: 3200.0
+          card_number: '4731612987456207'
+          cardholder_name: Michael Thompson
+          cvv: 123
+          expiry_date: 12/25
+      long_context: false
+      token_expires_in: 3600
+      token_scope: read_write
+      token_type: Bearer
+      user_first_name: Michael
+      user_last_name: Thompson
+    TwitterAPI:
+      authenticated: true
+      comments: {}
+      following_list:
+      - alice
+      - bob
+      password: john1234
+      retweets: {}
+      tweet_counter: 11
+      tweets:
+        0:
+          content: 'Just canceled my trip to LA. #TravelUpdate #BusinessTrip'
+          id: 0
+          mentions: []
+          tags:
+          - '#TravelUpdate'
+          - '#BusinessTrip'
+          username: john
+        1:
+          content: 'Looking forward to new opportunities! #Networking #Business'
+          id: 1
+          mentions: []
+          tags:
+          - '#Networking'
+          - '#Business'
+          username: john
+        10:
+          content: Just cancelled my trip to LA
+          id: 10
+          mentions: []
+          tags:
+          - '#TravelUpdate'
+          - '#BusinessTrip'
+          username: john
+      username: john
+  ground_truth_function_calls:
+  - - get_flight_cost(travel_from='SFO', travel_to='LAX', travel_date='2024-11-10',
+      travel_class='business')
+    - compute_exchange_rate(base_currency='USD', target_currency='EUR', value=400.0)
+    - book_flight(access_token='abc123xyz', card_id='144756014165', travel_date='2024-11-10',
+      travel_from='SFO', travel_to='LAX', travel_class='business', travel_cost=400.0)
+  - - cancel_booking(access_token='abc123xyz', booking_id='3426812')
+  - - authenticate_twitter(username='john',password='john1234')
+    - post_tweet(content='Just cancelled my trip to LA',tags=['#TravelUpdate','#BusinessTrip'])
+messages:
+- content: '[{"role": "user", "content": "A complex decision awaits me. I''m planning
+    an upcoming trip with limited resources and reevaluating my options. Is there
+    an available estimate for a business class flight from San Francisco International
+    to Los Angeles next Friday November 10th 2024 for an essential business engagement?
+    Could the system book it for me using the secured credit card id 144756014165
+    and access token abc123xyz, and exchange the estimated cost from USD to EUR for
+    budgeting purposes?"}]'
+  role: user
+- content: Due to unforeseen circumstances, I'm unable to proceed with my journey
+    to Los Angeles next week. Could the system initiate a cancellation process for
+    the flight booking made earlier?
+  role: user
+- content: I believe it would be strategic to communicate these adjustments to my
+    extended network. Construct a tweet highlighting the cancellation of my travel
+    plans, and ensure to add relevant hashtags 'TravelUpdate' and 'BusinessTrip' relating
+    to travel and business updates, for message, just tell that 'Just cancelled my
+    trip to LA'. Be sure to authenticate using my username 'john' and password 'john1234'.
+  role: user
+name: multi_turn_base_151
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

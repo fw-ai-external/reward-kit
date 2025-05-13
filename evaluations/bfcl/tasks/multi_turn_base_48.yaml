@@ -1,0 +1,95 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            assignment.docx:
+              content: This is the assignment document content.
+              type: file
+            completed_tasks:
+              contents: {}
+              type: directory
+            submissions:
+              contents: {}
+              type: directory
+            test:
+              contents:
+                test_file1.txt:
+                  content: This is a test file.
+                  type: file
+                test_file2.txt:
+                  content: Another test file.
+                  type: file
+              type: directory
+          type: directory
+    TicketAPI:
+      ticket_queue:
+      - description: There is a critical system error that needs immediate attention.
+        id: 123456
+        priority: High
+        status: Open
+        title: System Error
+      - description: Request for a new feature in the application.
+        id: 654321
+        priority: Medium
+        status: In Progress
+        title: Feature Request
+  involved_classes:
+  - TicketAPI
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "In my workspace folder, direct
+  your attention to the initial directory we have access to and list out the files
+  present including the hidden files. Should you stumble upon a directory named ''test'',
+  go into there, dive deep and identify any files with ''test'' in their names using
+  ''ls''. Keeping tabs on details is key."}], [{"role": "user", "content": "Subsequently,What''s
+  the character count of the file all text file with test?"}], [{"role": "user", "content":
+  "Open up ticket 654321. If the character count of any file is greater than 20, Set
+  the priority to 3. Else, set to 2."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''assignment.docx'':
+        <<File: assignment.docx, Content: This is the assignment document content.>>,
+        ''test'': <Directory: test, Parent: workspace, Contents: {''test_file1.txt'':
+        <<File: test_file1.txt, Content: This is a test file.>>, ''test_file2.txt'':
+        <<File: test_file2.txt, Content: Another test file.>>}>, ''submissions'':
+        <Directory: submissions, Parent: workspace, Contents: {}>, ''completed_tasks'':
+        <Directory: completed_tasks, Parent: workspace, Contents: {}>}>'
+    TicketAPI:
+      current_user: null
+      ticket_counter: 1
+      ticket_queue:
+      - description: There is a critical system error that needs immediate attention.
+        id: 123456
+        priority: High
+        status: Open
+        title: System Error
+      - description: Request for a new feature in the application.
+        id: 654321
+        priority: 2
+        status: In Progress
+        title: Feature Request
+  ground_truth_function_calls:
+  - - ls(a=True)
+    - cd(folder='test')
+  - - wc(file_name='test_file1.txt',mode='c')
+    - wc(file_name='test_file2.txt',mode='c')
+  - - edit_ticket(ticket_id=654321, updates={'priority':2})
+messages:
+- content: '[{"role": "user", "content": "In my workspace folder, direct your attention
+    to the initial directory we have access to and list out the files present including
+    the hidden files. Should you stumble upon a directory named ''test'', go into
+    there, dive deep and identify any files with ''test'' in their names using ''ls''.
+    Keeping tabs on details is key."}]'
+  role: user
+- content: Subsequently,What's the character count of the file all text file with
+    test?
+  role: user
+- content: Open up ticket 654321. If the character count of any file is greater than
+    20, Set the priority to 3. Else, set to 2.
+  role: user
+name: multi_turn_base_48
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

@@ -1,0 +1,52 @@
+base_resource_config:
+  initial_config:
+    GorillaFileSystem:
+      root:
+        workspace:
+          contents:
+            Research2023:
+              contents: {}
+              type: directory
+            summary.txt:
+              content: This is the summary of the project. It includes various findings
+                and conclusions. Further analysis is required.
+              type: file
+          type: directory
+  involved_classes:
+  - GorillaFileSystem
+description: 'BFCL task: [[{"role": "user", "content": "Examine current directory
+  for any presence of the file named ''summary.txt''. If there is one, What''s inside?"}],
+  [{"role": "user", "content": "Copy it into ''Research2023''."}], [{"role": "user",
+  "content": "Post review, organize the lines in ''summary.txt'' alphabetically."}],
+  [{"role": "user", "content": "Conclude by calculating the total lines in the sorted
+  ''summary.txt'' to verify that everything is meticulously arranged."}]]'
+evaluation_criteria:
+  ground_truth_comparable_state:
+    GorillaFileSystem:
+      long_context: false
+      root: '<Directory: workspace, Parent: None, Contents: {''Research2023'': <Directory:
+        Research2023, Parent: workspace, Contents: {''summary.txt'': <<File: summary.txt,
+        Content: This is the summary of the project. It includes various findings
+        and conclusions. Further analysis is required.>>}>, ''summary.txt'': <<File:
+        summary.txt, Content: This is the summary of the project. It includes various
+        findings and conclusions. Further analysis is required.>>}>'
+  ground_truth_function_calls:
+  - - cat(file_name='summary.txt')
+  - - cp(source='summary.txt',destination='Research2023')
+  - - cd(folder='Research2023')
+    - sort(file_name='summary.txt')
+  - - wc(file_name='summary.txt',mode='l')
+messages:
+- content: '[{"role": "user", "content": "Examine current directory for any presence
+    of the file named ''summary.txt''. If there is one, What''s inside?"}]'
+  role: user
+- content: Copy it into 'Research2023'.
+  role: user
+- content: Post review, organize the lines in 'summary.txt' alphabetically.
+  role: user
+- content: Conclude by calculating the total lines in the sorted 'summary.txt' to
+    verify that everything is meticulously arranged.
+  role: user
+name: multi_turn_base_25
+resource_type: BFCLSimAPIResource
+reward_function_path: reward_kit.rewards.bfcl_reward

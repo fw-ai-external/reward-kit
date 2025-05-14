@@ -40,8 +40,7 @@ def test_cli_agent_eval_help():
 
     # Check that the help message includes essential parameters
     help_text = result.stdout
-    assert "--task-dir" in help_text or "--dataset" in help_text
-    assert "--test-mode" in help_text
+    assert "--task-def" in help_text # Updated for new agent-eval command
 
 
 def setup_minimal_task_bundle():

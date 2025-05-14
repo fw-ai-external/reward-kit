@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Union, Optional, Tuple
 
 from reward_kit.typed_interface import reward_function
 from reward_kit.models import EvaluateResult, MetricResult
-from reward_kit.agent_v2.resources.bfcl_sim_api_resource import BFCLSimAPIResource
+from reward_kit.agent.resources.bfcl_sim_api_resource import BFCLSimAPIResource
 
 # Get logger for bfcl_reward
 logger = logging.getLogger("bfcl_reward")

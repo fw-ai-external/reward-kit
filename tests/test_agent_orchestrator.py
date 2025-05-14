@@ -7,11 +7,11 @@ import types # Added import
 from unittest.mock import patch, MagicMock, mock_open, AsyncMock
 
 from reward_kit.models import TaskDefinitionModel, EvaluationCriteriaModel
-from reward_kit.agent_v2.orchestrator import Orchestrator
-from reward_kit.agent_v2.resource_abc import ForkableResource
+from reward_kit.agent.orchestrator import Orchestrator
+from reward_kit.agent.resource_abc import ForkableResource
 
 # Import actual resource classes for some tests
-from reward_kit.agent_v2.resources import (
+from reward_kit.agent.resources import (
     PythonStateResource, 
     SQLResource, 
     FileSystemResource, 
@@ -73,9 +73,9 @@ class TestOrchestratorComponentLoading:
         def import_side_effect(module_path):
             if module_path == minimal_task_def.tools_module_path:
                 return mock_tools_mod
-            elif module_path == minimal_task_def.reward_function_path.rsplit('.', 1)[0]:
+            elif module_path == str(minimal_task_def.reward_function_path).rsplit('.', 1)[0]:
                 reward_module = MagicMock()
-                setattr(reward_module, minimal_task_def.reward_function_path.rsplit('.', 1)[1], mock_reward_func)
+                setattr(reward_module, str(minimal_task_def.reward_function_path).rsplit('.', 1)[1], mock_reward_func)
                 return reward_module
             raise ImportError(f"Module not found by mock: {module_path}")
 
@@ -94,7 +94,7 @@ class TestOrchestratorComponentLoading:
         task_def_no_tools = TaskDefinitionModel(**task_dict)
 
         mock_reward_func = MagicMock(return_value=0.5)
-        reward_module_path, reward_func_name = task_def_no_tools.reward_function_path.rsplit('.', 1)
+        reward_module_path, reward_func_name = str(task_def_no_tools.reward_function_path).rsplit('.', 1)
         
         def import_side_effect(module_path):
             if module_path == reward_module_path:
@@ -135,7 +135,7 @@ class TestOrchestratorComponentLoading:
     @patch("importlib.import_module")
     async def test_load_task_components_reward_func_attribute_error(self, mock_import_module, minimal_task_def):
         mock_tools_mod = MagicMock()
-        reward_module_path, reward_func_name = minimal_task_def.reward_function_path.rsplit('.',1)
+        reward_module_path, reward_func_name = str(minimal_task_def.reward_function_path).rsplit('.',1)
         def import_side_effect(module_path):
             if module_path == minimal_task_def.tools_module_path: return mock_tools_mod
             elif module_path == reward_module_path:
@@ -154,9 +154,9 @@ class TestOrchestratorComponentLoading:
         mock_reward_attr = "not_a_function"
         def import_side_effect(module_path):
             if module_path == minimal_task_def.tools_module_path: return mock_tools_mod
-            elif module_path == minimal_task_def.reward_function_path.rsplit('.', 1)[0]:
+            elif module_path == str(minimal_task_def.reward_function_path).rsplit('.', 1)[0]:
                 reward_module = MagicMock()
-                setattr(reward_module, minimal_task_def.reward_function_path.rsplit('.', 1)[1], mock_reward_attr)
+                setattr(reward_module, str(minimal_task_def.reward_function_path).rsplit('.', 1)[1], mock_reward_attr)
                 return reward_module
             raise ValueError(f"Unexpected module path: {module_path}")
         mock_import_module.side_effect = import_side_effect
@@ -315,8 +315,8 @@ class TestOrchestratorExecutionFlow:
         base_res.close = AsyncMock(return_value=None)
         return base_res
     
-    @patch("reward_kit.agent_v2.orchestrator.Orchestrator._get_resource_class")
-    @patch("reward_kit.agent_v2.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
+    @patch("reward_kit.agent.orchestrator.Orchestrator._get_resource_class")
+    @patch("reward_kit.agent.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
     async def test_execute_task_poc_successful_run_generic_tool(
         self, mock_load_components, mock_get_resource_class, minimal_task_def, mock_base_resource, mock_episode_resource_instance, caplog
     ):
@@ -368,7 +368,7 @@ class TestOrchestratorExecutionFlow:
         assert result is None
         assert "Failed to load task components" in caplog.text
 
-    @patch("reward_kit.agent_v2.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
+    @patch("reward_kit.agent.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
     async def test_execute_task_poc_setup_base_resource_fails(self, mock_load_components, minimal_task_def, caplog):
         mock_load_components.return_value = True # Ensure component loading succeeds
 
@@ -383,8 +383,8 @@ class TestOrchestratorExecutionFlow:
         assert result is None
         assert "Base resource setup failed or not performed" in caplog.text # Check this exact message
 
-    @patch("reward_kit.agent_v2.orchestrator.Orchestrator._get_resource_class")
-    @patch("reward_kit.agent_v2.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
+    @patch("reward_kit.agent.orchestrator.Orchestrator._get_resource_class")
+    @patch("reward_kit.agent.orchestrator.Orchestrator._load_task_components", new_callable=AsyncMock)
     async def test_execute_task_poc_tool_exception(
         self, mock_load_components, mock_get_resource_class, minimal_task_def, mock_base_resource, mock_episode_resource_instance, caplog
     ):

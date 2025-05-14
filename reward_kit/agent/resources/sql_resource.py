@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from reward_kit.agent_v2.resource_abc import ForkableResource
+from ..resource_abc import ForkableResource
 
 
 class SQLResource(ForkableResource):

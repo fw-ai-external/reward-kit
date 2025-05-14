@@ -19,7 +19,7 @@ import gc
 import inspect
 from typing import Any, Dict, List, Optional, Tuple, Union # Import Union
 
-from reward_kit.agent_v2.resource_abc import ForkableResource
+from ..resource_abc import ForkableResource
 
 class BFCLSimAPIResource(ForkableResource):
     CLASS_FILE_PATH_MAPPING = {

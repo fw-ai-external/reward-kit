@@ -6,7 +6,7 @@ agent evaluation framework, including the ForkableResource ABC, Orchestrator,
 and concrete resource implementations.
 """
 
-# Make key components easily importable from reward_kit.agent_v2
+# Make key components easily importable from reward_kit.agent
 from .resource_abc import ForkableResource
 from .orchestrator import Orchestrator
 from .resources import (

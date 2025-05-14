@@ -26,9 +26,6 @@ from .reward_function import (
 # Import the decorator from typed_interface (this is the one we want to expose)
 from .typed_interface import reward_function
 
-# Import key agent evaluation components
-from .agent import ToolRegistry, AgentEvaluator, Database
-
 import warnings
 
 # Show deprecation warnings
@@ -43,10 +40,6 @@ __all__ = [
     "EvaluateResult",
     "reward_function",  # New decorator from typed_interface
     "RewardFunction",
-    # Agent evaluation
-    "ToolRegistry",
-    "AgentEvaluator",
-    "Database",
     # Deprecated (will be removed in a future version)
     "legacy_reward_function",
 ]

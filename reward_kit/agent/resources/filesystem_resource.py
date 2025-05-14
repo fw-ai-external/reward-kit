@@ -8,7 +8,7 @@ import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from reward_kit.agent_v2.resource_abc import ForkableResource
+from ..resource_abc import ForkableResource
 
 
 class FileSystemResource(ForkableResource):

@@ -6,7 +6,7 @@ import io
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from reward_kit.agent_v2.resource_abc import ForkableResource
+from ..resource_abc import ForkableResource
 
 # Attempt to import Docker SDK with error handling
 try:

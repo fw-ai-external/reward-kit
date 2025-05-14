@@ -18,8 +18,7 @@ from reward_kit.evaluation import preview_evaluation, create_evaluation
 from .cli_commands.common import setup_logging, check_environment, check_agent_environment
 from .cli_commands.preview import preview_command
 from .cli_commands.deploy import deploy_command
-from .cli_commands.agent_eval_cmd import agent_eval_command # For the old agent-eval
-from .cli_commands.agent_eval_v2_cmd import agent_eval_v2_command # For the new agent-eval-v2
+from .cli_commands.agent_eval_cmd import agent_eval_command # Now points to the V2 logic
 
 # Note: validate_task_bundle, find_task_dataset, get_toolset_config, export_tool_specs
 # were helpers for the old agent_eval_command and are now moved into agent_eval_cmd.py
@@ -149,105 +148,23 @@ def parse_args(args=None):
 
     # Agent-eval command
     agent_eval_parser = subparsers.add_parser(
-        "agent-eval", help="Run agent evaluation on a task dataset"
+        "agent-eval", help="Run agent evaluation using the ForkableResource framework."
     )
-
-    # Task specification (mutually exclusive)
-    task_group = agent_eval_parser.add_argument_group("Task Specification")
-    task_group.add_argument(
-        "--task-dir",
-        help="Path to task bundle directory containing reward.py, tools.py, etc.",
-    )
-    task_group.add_argument(
-        "--dataset", "-d", help="Path to JSONL file containing task dataset"
-    )
-
-    # Output and models
-    output_group = agent_eval_parser.add_argument_group("Output and Models")
-    output_group.add_argument(
-        "--output-dir",
-        "-o",
-        default="./runs",
-        help="Directory to store evaluation runs (default: ./runs)",
-    )
-    output_group.add_argument(
-        "--model", help="Override MODEL_AGENT environment variable"
-    )
-    output_group.add_argument(
-        "--sim-model",
-        help="Override MODEL_SIM environment variable for simulated user",
-    )
-
-    # Test and debug options
-    debug_group = agent_eval_parser.add_argument_group("Testing and Debugging")
-    debug_group.add_argument(
-        "--no-sim-user",
-        action="store_true",
-        help="Disable simulated user (use static initial messages only)",
-    )
-    debug_group.add_argument(
-        "--test-mode",
-        action="store_true",
-        help="Run in test mode without requiring API keys",
-    )
-    debug_group.add_argument(
-        "--mock-response",
-        action="store_true",
-        help="Use a mock agent response (works with --test-mode)",
-    )
-    debug_group.add_argument(
-        "--debug", action="store_true", help="Enable detailed debug logging"
-    )
-    debug_group.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Validate task bundle structure without running evaluation",
-    )
-    debug_group.add_argument(
-        "--export-tools",
-        metavar="DIR",
-        help="Export tool specifications to directory for manual testing",
-    )
-
-    # Advanced options
-    advanced_group = agent_eval_parser.add_argument_group("Advanced Options")
-    advanced_group.add_argument(
-        "--task-ids", help="Comma-separated list of task IDs to run"
-    )
-    advanced_group.add_argument(
-        "--max-tasks", type=int, help="Maximum number of tasks to evaluate"
-    )
-    advanced_group.add_argument(
-        "--registries",
-        nargs="+",
-        help="Custom tool registries in format 'name=path'",
-    )
-    advanced_group.add_argument(
-        "--registry-override",
-        help="Override all toolset paths with this registry path",
-    )
-    advanced_group.add_argument(
-        "--evaluator", help="Custom evaluator module path (overrides default)"
-    )
-
-    # Agent-eval-v2 command (New Framework)
-    agent_eval_v2_parser = subparsers.add_parser(
-        "agent-eval-v2", help="Run agent evaluation using the new V2 (ForkableResource) framework."
-    )
-    agent_eval_v2_parser.add_argument(
+    agent_eval_parser.add_argument(
         "--task-def",
         required=True,
-        help="Path to the task definition JSON file for the V2 framework.",
+        help="Path to the task definition YAML/JSON file for the agent evaluation.",
     )
-    # Add other relevant arguments for V2 if needed, e.g., output_dir, model overrides, etc.
+    # Add other relevant arguments for agent-eval (formerly v2) if needed,
+    # e.g., output_dir, model overrides, etc.
     # For PoC, --task-def is the main one.
     # Re-use verbose and debug from the main parser if they are global.
-    # agent_eval_v2_parser.add_argument(
+    # agent_eval_parser.add_argument(
     #     "--output-dir", # Example, if Orchestrator needs it and it's not in task_def
-    #     default="./agent_v2_runs",
-    #     help="Directory to store V2 evaluation runs (default: ./agent_v2_runs)",
+    #     default="./agent_runs", # Updated default dir name
+    #     help="Directory to store agent evaluation runs (default: ./agent_runs)",
     # )
-
+    # Arguments like --debug are handled by the main parser.
 
     return parser.parse_args(args)
 
@@ -257,8 +174,6 @@ def main():
     args = parse_args()
     # Setup logging based on global verbose/debug flags if they exist on args,
     # or command-specific if not. getattr is good for this.
-    # The setup_logging in agent_eval_v2_cmd.py might be redundant if global flags are used.
-    # For now, main cli.py sets it up.
     setup_logging(args.verbose, getattr(args, "debug", False))
 
     if args.command == "preview":
@@ -267,8 +182,6 @@ def main():
         return deploy_command(args)
     elif args.command == "agent-eval":
         return agent_eval_command(args)
-    elif args.command == "agent-eval-v2":
-        return agent_eval_v2_command(args)
     else:
         # No command provided, show help
         # This case should ideally not be reached if subparsers are required.

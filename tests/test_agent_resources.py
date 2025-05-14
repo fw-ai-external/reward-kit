@@ -11,10 +11,10 @@ import tarfile
 import asyncio # For async tests
 from unittest.mock import AsyncMock # For mocking async methods if needed later
 
-from reward_kit.agent_v2.resources.python_state_resource import PythonStateResource
-from reward_kit.agent_v2.resources.sql_resource import SQLResource
-from reward_kit.agent_v2.resources.filesystem_resource import FileSystemResource
-from reward_kit.agent_v2.resources.docker_resource import DockerResource, DOCKER_SDK_AVAILABLE
+from reward_kit.agent.resources.python_state_resource import PythonStateResource
+from reward_kit.agent.resources.sql_resource import SQLResource
+from reward_kit.agent.resources.filesystem_resource import FileSystemResource
+from reward_kit.agent.resources.docker_resource import DockerResource, DOCKER_SDK_AVAILABLE
 
 @pytest.mark.asyncio
 class TestPythonStateResource:

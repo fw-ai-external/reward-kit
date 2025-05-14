@@ -2,8 +2,13 @@ import pytest
 from unittest.mock import MagicMock, patch
 import json
 from typing import List, Dict, Any, Optional
+import sys # Import sys
 
 from reward_kit.models import EvaluateResult, MetricResult # Changed
+# Ensure the module is loaded (though RewardFunction import likely does this)
+import reward_kit.reward_function 
+# Get a direct reference to the module object
+reward_function_module_obj = sys.modules['reward_kit.reward_function']
 from reward_kit.reward_function import RewardFunction
 
 
@@ -63,12 +68,12 @@ class TestEdgeCases:
 
     def test_remote_error_handling(self):
         """Test error handling in remote mode."""
-        with patch("reward_kit.reward_function.requests.post") as mock_post:
+        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
             # Mock the response to simulate an error
             mock_response = MagicMock()
             mock_response.status_code = 500
             mock_response.text = "Internal Server Error"
-            mock_post.return_value = mock_response
+            mock_requests_module.post.return_value = mock_response
 
             reward_fn = RewardFunction(
                 endpoint="https://example.com/reward", mode="remote"

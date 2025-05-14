@@ -265,8 +265,7 @@ def advanced_math_reward(
                         similarity  # Should be 1.0 if is_match is True
                     )
                     match_details_list.append(
-                        f"Correct match: Original '{orig_text}' ({orig_value}) vs Generated '{gen_text}' ({gen_value}), Sim: {
-                            similarity:.3f}"
+                        f"Correct match: Original '{orig_text}' ({orig_value}) vs Generated '{gen_text}' ({gen_value}), Sim: {similarity:.3f}"
                     )
                     break  # Move to next original answer
 
@@ -279,8 +278,7 @@ def advanced_math_reward(
                 num_correctly_matched_orig += 1
             else:
                 match_details_list.append(
-                    f"No correct match for Original '{orig_text}' ({orig_value}). Best sim found: {
-                        best_sim_for_this_orig:.3f}"
+                    f"No correct match for Original '{orig_text}' ({orig_value}). Best sim found: {best_sim_for_this_orig:.3f}"
                 )
 
         if num_correctly_matched_orig == num_orig_answers:
@@ -334,8 +332,7 @@ def advanced_math_reward(
                 )
                 if similarity > current_best_sim_for_orig:
                     current_best_sim_for_orig = similarity
-                    current_best_reason_for_orig = f"Original '{orig_text}' ({orig_value}) vs Generated '{gen_text}' ({gen_value}), Sim: {
-                        similarity:.3f}"
+                    current_best_reason_for_orig = f"Original '{orig_text}' ({orig_value}) vs Generated '{gen_text}' ({gen_value}), Sim: {similarity:.3f}"
                     found_any_match_for_orig = True
 
             if found_any_match_for_orig:

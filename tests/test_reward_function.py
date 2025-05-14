@@ -1,7 +1,12 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from typing import List, Dict, Any, Optional
+import sys # Import sys
 from reward_kit.reward_function import RewardFunction, reward_function
+# Ensure the module is loaded (though RewardFunction import likely does this)
+import reward_kit.reward_function
+# Get a direct reference to the module object
+reward_function_module_obj = sys.modules['reward_kit.reward_function']
 from reward_kit.models import EvaluateResult, MetricResult # Changed
 
 
@@ -33,12 +38,12 @@ class TestRewardFunction:
 
     def test_local_mode_function_path(self):
         """Test RewardFunction in local mode with function path."""
-        with patch(
-            "reward_kit.reward_function.importlib.import_module"
-        ) as mock_import:
+        with patch.object(
+            reward_function_module_obj, "importlib"
+        ) as mock_importlib_module:
             mock_module = MagicMock()
             mock_module.simple_reward_func = simple_reward_func
-            mock_import.return_value = mock_module
+            mock_importlib_module.import_module.return_value = mock_module
 
             reward_fn = RewardFunction(
                 func_path="test_module.simple_reward_func", mode="local"
@@ -72,14 +77,14 @@ class TestRewardFunction:
 
     def test_remote_mode(self):
         """Test RewardFunction in remote mode."""
-        with patch("reward_kit.reward_function.requests.post") as mock_post:
+        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
                 "score": 0.8,
                 "metrics": {"remote": {"score": 0.8, "reason": "Remote score"}},
             }
-            mock_post.return_value = mock_response
+            mock_requests_module.post.return_value = mock_response
 
             reward_fn = RewardFunction(
                 endpoint="https://example.com/reward", mode="remote"
@@ -98,14 +103,14 @@ class TestRewardFunction:
 
     def test_fireworks_hosted_mode(self):
         """Test RewardFunction in fireworks_hosted mode."""
-        with patch("reward_kit.reward_function.requests.post") as mock_post:
+        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
                 "score": 0.9,
                 "metrics": {"hosted": {"score": 0.9, "reason": "Hosted score"}},
             }
-            mock_post.return_value = mock_response
+            mock_requests_module.post.return_value = mock_response
 
             reward_fn = RewardFunction(
                 model_id="fireworks/test-model", mode="fireworks_hosted"

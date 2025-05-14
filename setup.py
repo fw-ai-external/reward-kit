@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.2.6",
+    version="0.2.7",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -12,6 +12,9 @@ setup(
         "uvicorn>=0.15.0",
         "python-dotenv>=0.19.0",
         "openai==1.9.0",
+        "aiosqlite",
+        "aiohttp",
+        "PyYAML>=5.0", # Added PyYAML
     ],
     extras_require={
         "dev": [
@@ -21,6 +24,7 @@ setup(
             "flake8>=3.9.2",
             "autopep8>=1.5.0",
             "transformers>=4.0.0",
+            "pytest-asyncio", # Added pytest-asyncio
         ],
         "deepseek": [
             "datasets>=2.12.0",

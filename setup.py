@@ -27,6 +27,7 @@ setup(
             "autopep8>=1.5.0",
             "transformers>=4.0.0",
             "pytest-asyncio", # Added pytest-asyncio
+            "types-setuptools", # For Mypy
         ],
         "deepseek": [
             "datasets>=2.12.0",
@@ -46,7 +47,7 @@ setup(
     url="https://github.com/fireworks-ai/reward-kit",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",

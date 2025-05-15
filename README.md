@@ -2,6 +2,15 @@
 
 Reward Kit is a library for defining, evaluating, and deploying reward functions for LLM fine-tuning. It provides tools to create custom reward functions and use them in reinforcement learning from machine feedback (RLMF) workflows.
 
+## Key Features
+
+*   **Easy-to-use Decorator**: Define reward functions with a simple `@reward_function` decorator.
+*   **Local Testing**: Quickly test your reward functions with sample data.
+*   **Flexible Evaluation**: Evaluate model outputs based on single or multiple custom metrics.
+*   **Seamless Deployment**: Deploy your reward functions to platforms like Fireworks AI.
+*   **CLI Support**: Manage and interact with your reward functions via a command-line interface.
+*   **Extensible**: Designed to be adaptable for various LLM evaluation scenarios.
+
 ## Installation
 
 ```bash
@@ -156,6 +165,10 @@ my_function.deploy(
 )
 ```
 
+## Detailed Documentation
+
+For more comprehensive information, including API references, tutorials, and advanced guides, please see our [full documentation](docs/documentation_home.mdx).
+
 ## Examples
 
 Check the `examples` directory for complete examples:
@@ -178,6 +191,16 @@ reward-kit preview --metrics-folders "metric=./path" --samples ./samples.jsonl
 reward-kit deploy --id my-evaluator --metrics-folders "metric=./path" --force
 ```
 
+## Community and Support
+
+*   **GitHub Issues**: For bug reports and feature requests, please use [GitHub Issues](https://github.com/fireworks-ai/reward-kit/issues).
+*   **GitHub Discussions**: (If enabled) For general questions, ideas, and discussions.
+*   Please also review our [Contributing Guidelines](development/CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Code of Conduct
+
+We are dedicated to providing a welcoming and inclusive experience for everyone. Please review and adhere to our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
-Reward Kit is released under the MIT License.
+Reward Kit is released under the Apache License 2.0.

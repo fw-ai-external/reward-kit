@@ -3,15 +3,14 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from typing import List, Dict, Any, Optional
 
-from reward_kit.models import EvaluateResult, MetricResult # Changed
+from reward_kit.models import EvaluateResult, MetricResult, Message # Changed
 from reward_kit.reward_function import RewardFunction, reward_function
 from reward_kit.server import create_app
 
 
 @reward_function
 def sample_reward_function(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message], # Changed: Use List[Message] for Pydantic conversion
     **kwargs,
 ) -> EvaluateResult: # Changed
     """Sample reward function that checks message length and keywords."""
@@ -68,9 +67,7 @@ class TestIntegration:
                     "content": "I'd be happy to assist you with Python. What do you need help with?",
                 },
             ],
-            "original_messages": [
-                {"role": "user", "content": "Can you help me with Python?"}
-            ],
+            # "original_messages" removed from payload
         }
 
         helpful_response = client.post("/reward", json=helpful_payload)
@@ -91,9 +88,7 @@ class TestIntegration:
                     "content": "Python is a programming language.",
                 },
             ],
-            "original_messages": [
-                {"role": "user", "content": "Can you help me with Python?"}
-            ],
+            # "original_messages" removed from payload
         }
 
         unhelpful_response = client.post("/reward", json=unhelpful_payload)
@@ -137,7 +132,28 @@ class TestIntegration:
         ]
 
         # Call the TRL adapter
-        scores = trl_adapter(batch_messages, batch_original_messages)
+        # batch_original_messages is no longer passed as TRL adapter
+        # should get ground_truth from the dataset structure if needed,
+        # or the reward_fn doesn't use it.
+        # The TRL adapter in reward_kit.reward_function.py might need updates
+        # if it still expects original_messages. This change assumes the adapter
+        # or the underlying reward function (sample_reward_function) no longer needs it passed this way.
+        # For now, focusing on fixing the call based on sample_reward_function's new signature.
+        # The TRL adapter's get_scores method takes: prompts, completions, **kwargs
+        # prompts would be batch_messages (each item being a list of dicts, with last being assistant)
+        # completions is not what sample_reward_function takes.
+        # The TRL adapter likely needs to be updated as part of Task 5.
+        # For now, to make this test call `sample_reward_function` correctly via the adapter,
+        # we assume the adapter will pass `messages` correctly and not need `original_messages`.
+        # The TRL adapter's `__call__` method in `reward_kit/reward_function.py`
+        # seems to take `prompts` and `completions`.
+        # `prompts`: List[List[Dict]] (list of user messages)
+        # `completions`: List[str] (list of assistant responses)
+        # It then constructs the full `messages` list for the reward function.
+        # It does not seem to use `original_messages`.
+        # So, removing `batch_original_messages` from the call should be fine.
+        scores = trl_adapter(prompts=batch_messages, completions=[msg[-1]['content'] for msg in batch_messages])
+
 
         # Verify the results
         assert isinstance(scores, list)

@@ -41,7 +41,7 @@ def run_tests():
     print("\nTest: Empty response")
     empty_statement = "Any statement"
     empty_response_messages = create_runner_messages(empty_statement, "")
-    result = lean_prover_reward(messages=empty_response_messages, statement=empty_statement)
+    result = lean_prover_reward(messages=empty_response_messages, ground_truth=None, statement=empty_statement)
     print(f"Score: {result['score']}")
     assert result['score'] == 0.0
 
@@ -56,7 +56,7 @@ begin
 end
     """
     messages_complete = create_runner_messages(statement_complete, response_complete)
-    result = lean_prover_reward(messages=messages_complete, statement=statement_complete, verbose=True)
+    result = lean_prover_reward(messages=messages_complete, ground_truth=None, statement=statement_complete, verbose=True)
     print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
     if "metrics" in result and result['metrics']:
@@ -93,7 +93,7 @@ begin
 end
     """
     messages_complex = create_runner_messages(statement_complex, response_complex)
-    result = deepseek_prover_v2_reward(messages=messages_complex, statement=statement_complex, verbose=True)
+    result = deepseek_prover_v2_reward(messages=messages_complex, ground_truth=None, statement=statement_complex, verbose=True)
     print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
     if "metrics" in result and result['metrics']:

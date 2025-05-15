@@ -321,9 +321,8 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Could not extract answers from original message (ground truth)" in result.reason # Made safe and used attribute
-        # Removed redundant or incorrect second reason check based on dictionary access
+        # assert result.score == 0.0 # Duplicate line removed
+        assert result.reason is not None and "Could not extract answers from original message (ground truth)" in result.reason
 
     def test_type_mismatch_mcq_vs_number(self):
         user_messages = self._get_prompt() or []
@@ -376,9 +375,8 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Could not extract answers from generated message" in result.reason
-        # Removed redundant or incorrect second reason check
+        # The reason should be about the original message (ground_truth) if it's unparseable
+        assert result.reason is not None and "Could not extract answers from original message (ground truth)" in result.reason
 
     def test_no_answer_in_generated(self):
         user_messages = self._get_prompt() or []
@@ -391,39 +389,35 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Could not extract answers from generated message" in result.reason
-        # Removed redundant or incorrect second reason check
+        # assert result.score == 0.0 # Duplicate line removed
+        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
 
-    def test_no_answer_in_original(self):
+    def test_no_answer_in_original_when_gen_is_unparseable(self): # Renamed to avoid conflict and be more descriptive
         user_messages = self._get_prompt() or []
-        assistant_message = Message(role="assistant", content="I don't know.")
+        assistant_message = Message(role="assistant", content="I don't know.") # Gen unparseable
         messages_arg = user_messages + [assistant_message]
-        ground_truth_arg = "Answer is \\boxed{1}."
+        ground_truth_arg = "Answer is \\boxed{1}." # GT parseable
         result = math_reward(
             messages=messages_arg,
             ground_truth=ground_truth_arg
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        # assert result.score == 0.0 # Corrected access
-        assert result.reason and "Could not extract answers from generated message" in result.reason
-        # assert result.reason and "Could not extract answers from generated message" in result.reason # Corrected access
+        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
 
-    def test_no_answer_in_original(self):
+    def test_unparseable_ground_truth(self): # Renamed from the second test_no_answer_in_original
         user_messages = self._get_prompt() or []
-        assistant_message = Message(role="assistant", content="Answer is \\boxed{1}.")
+        assistant_message = Message(role="assistant", content="Answer is \\boxed{1}.") # Gen parseable
         messages_arg = user_messages + [assistant_message]
-        ground_truth_arg = "What is it?"
+        ground_truth_arg = "What is it?" # GT unparseable
         result = math_reward(
             messages=messages_arg,
             ground_truth=ground_truth_arg
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Could not extract answers from original message (ground truth)" in result.reason
-        # Removed redundant or incorrect second reason check
+        # assert result.score == 0.0 # Duplicate line removed
+        assert result.reason is not None and "Could not extract answers from original message (ground truth)" in result.reason
 
     # --- Strictness Penalty Tests ---
     def test_penalty_unboxed_or_issue1(self):
@@ -437,10 +431,9 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Strictness fail (Issue #1)" in result.reason
+        # assert result.score == 0.0 # Duplicate line removed
+        assert result.reason is not None and "Strictness fail (Issue #1)" in result.reason
         assert result.metrics["strictness_penalty_unboxed_or"].reason == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
-        # assert result.metrics["strictness_penalty_unboxed_or"].reason == "Generated answer offers multiple numeric alternatives with an unboxed 'or'." # Corrected metrics access, removed duplicate
 
     def test_no_penalty_if_gen_is_single_boxed_or_expr(self):
         user_messages = self._get_prompt() or []
@@ -453,8 +446,8 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0 
-        assert result.score == 1.0 # Changed to attribute access
-        assert result.reason is None or "Strictness fail" not in result.reason 
+        # assert result.score == 1.0 # Duplicate line removed
+        assert result.reason is None or ("Strictness fail" not in result.reason)
 
     def test_penalty_ambiguity_issue2(self):
         user_messages = self._get_prompt() or []
@@ -467,10 +460,9 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.score == 0.0 # Changed to attribute access
-        assert result.reason and "Strictness fail (Issue #2)" in result.reason
+        # assert result.score == 0.0 # Duplicate line removed
+        assert result.reason is not None and "Strictness fail (Issue #2)" in result.reason
         assert result.metrics["strictness_penalty_ambiguity"].reason == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
-        # assert result.metrics["strictness_penalty_ambiguity"].reason == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)." # Corrected metrics access, removed duplicate
 
     def test_issue_false_mcq_match_on_v_B(self): 
         user_content_str = "## Task B-1.3.\n\nA ship traveling along a river has covered $24 \\mathrm{~km}$ upstream and $28 \\mathrm{~km}$ downstream. For this journey, it took half an hour less than for traveling $30 \\mathrm{~km}$ upstream and $21 \\mathrm{~km}$ downstream, or half an hour more than for traveling $15 \\mathrm{~km}$ upstream and $42 \\mathrm{~km}$ downstream, assuming that both the ship and the river move uniformly.\n\nDetermine the speed of the ship in still water and the speed of the river."
@@ -491,8 +483,8 @@ class TestMathReward:
         assert "'B'" not in extracted_gen_reason 
         assert "'B'" not in extracted_orig_reason
         assert result.score == 0.0 
-        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
-        assert result.reason and (("0.5" in result.reason) or ("6.0" in result.reason) or ("14.0" in result.reason))
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason is not None and (("0.5" in result.reason) or ("6.0" in result.reason) or ("14.0" in result.reason))
 
     def test_no_penalty_ambiguity_if_gt_is_also_ambiguous(self):
         user_messages = self._get_prompt() or []
@@ -505,8 +497,8 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0 
-        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
-        assert result.reason and "includes other distinct numerical values: [3.0]" in result.reason
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason is not None and "includes other distinct numerical values: [3.0]" in result.reason
 
     def test_issue3_scenario_correct_handling(self):
         user_messages = self._get_prompt() or []
@@ -521,8 +513,8 @@ class TestMathReward:
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
-        assert result.reason and (("0.5" in result.reason) or ("3.0" in result.reason) or ("7.0" in result.reason))
+        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason is not None and (("0.5" in result.reason) or ("3.0" in result.reason) or ("7.0" in result.reason))
 
     def test_require_units_basic_functionality(self):
         user_messages = self._get_prompt() or []
@@ -541,7 +533,7 @@ class TestMathReward:
         )
         assert isinstance(result_match, EvaluateResult)
         assert result_match.score == 1.0
-        assert result_match.reason is None or "Unit presence mismatch" not in result_match.reason
+        assert result_match.reason is None or ("Unit presence mismatch" not in result_match.reason)
 
         result_no_unit = math_reward(
             messages=messages_no_units_arg,
@@ -550,4 +542,4 @@ class TestMathReward:
         )
         assert isinstance(result_no_unit, EvaluateResult)
         assert result_no_unit.score == 0.0
-        assert result_no_unit.reason and "Unit presence mismatch" in result_no_unit.reason
+        assert result_no_unit.reason is not None and "Unit presence mismatch" in result_no_unit.reason

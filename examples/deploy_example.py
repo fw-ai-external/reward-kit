@@ -24,14 +24,13 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/deploy_example.py"
     )
 
-from reward_kit import reward_function, EvaluateResult, MetricResult
+from reward_kit import reward_function, EvaluateResult, MetricResult, Message
 from reward_kit.auth import get_authentication
 
 
 @reward_function
 def informativeness_reward(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Message],
     **kwargs,
 ) -> EvaluateResult:
     """
@@ -142,7 +141,7 @@ def test_reward_function():
 
     # Test the reward function
     result = informativeness_reward(
-        messages=test_messages, original_messages=[test_messages[0]]
+        messages=test_messages
     )
     print("Informativeness Reward Result:")
     print(f"Score: {result.score}")

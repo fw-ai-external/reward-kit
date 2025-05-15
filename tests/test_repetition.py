@@ -56,7 +56,7 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = repetition_penalty_reward(messages=messages, ngram_size=3)
+        result = repetition_penalty_reward(messages=messages, ground_truth=None, ngram_size=3)
 
         self.assertIsInstance(result, EvaluateResult)
         # Should be high score (low penalty) for non-repetitive text
@@ -80,7 +80,7 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = repetition_penalty_reward(messages=messages, ngram_size=3)
+        result = repetition_penalty_reward(messages=messages, ground_truth=None, ngram_size=3)
 
         self.assertIsInstance(result, EvaluateResult)
         # Should be lower score (higher penalty) for repetitive text
@@ -107,6 +107,7 @@ class TestRepetitionReward(unittest.TestCase):
 
         result = repetition_penalty_reward(
             messages=messages,
+            ground_truth=None,
             ngram_size=2,  # Bigrams will detect phrases like "this concept" repeating
         )
 
@@ -135,12 +136,12 @@ class TestRepetitionReward(unittest.TestCase):
 
         # Test with unigrams (individual words)
         result_1gram = repetition_penalty_reward(
-            messages=messages, ngram_size=1
+            messages=messages, ground_truth=None, ngram_size=1
         )
 
         # Test with trigrams (three-word phrases)
         result_3gram = repetition_penalty_reward(
-            messages=messages, ngram_size=3
+            messages=messages, ground_truth=None, ngram_size=3
         )
 
         self.assertIsInstance(result_1gram, EvaluateResult)
@@ -166,12 +167,12 @@ class TestRepetitionReward(unittest.TestCase):
 
         # Test with lower max penalty
         result_low = repetition_penalty_reward(
-            messages=messages, ngram_size=3, max_penalty=0.3
+            messages=messages, ground_truth=None, ngram_size=3, max_penalty=0.3
         )
 
         # Test with higher max penalty
         result_high = repetition_penalty_reward(
-            messages=messages, ngram_size=3, max_penalty=0.9
+            messages=messages, ground_truth=None, ngram_size=3, max_penalty=0.9
         )
 
         self.assertIsInstance(result_low, EvaluateResult)
@@ -189,7 +190,7 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": ""},
         ]
 
-        result = repetition_penalty_reward(messages=messages)
+        result = repetition_penalty_reward(messages=messages, ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Empty response should not be penalized
@@ -226,10 +227,10 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": repetitive_content},
         ]
 
-        result_diverse = diversity_reward(messages=messages_diverse)
+        result_diverse = diversity_reward(messages=messages_diverse, ground_truth=None)
         self.assertIsInstance(result_diverse, EvaluateResult)
 
-        result_repetitive = diversity_reward(messages=messages_repetitive)
+        result_repetitive = diversity_reward(messages=messages_repetitive, ground_truth=None)
         self.assertIsInstance(result_repetitive, EvaluateResult)
 
         # Diverse content should score higher
@@ -256,11 +257,12 @@ class TestRepetitionReward(unittest.TestCase):
         ]
 
         # Test with default weights
-        result_default = diversity_reward(messages=messages)
+        result_default = diversity_reward(messages=messages, ground_truth=None)
 
         # Test with custom weights prioritizing unigrams
         result_unigram = diversity_reward(
             messages=messages,
+            ground_truth=None,
             ngram_sizes=[1, 2, 3],
             weights=[
                 0.7,
@@ -272,6 +274,7 @@ class TestRepetitionReward(unittest.TestCase):
         # Test with custom weights prioritizing trigrams
         result_trigram = diversity_reward(
             messages=messages,
+            ground_truth=None,
             ngram_sizes=[1, 2, 3],
             weights=[
                 0.1,

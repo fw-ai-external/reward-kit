@@ -14,7 +14,7 @@ from ..models import Message, EvaluateResult, MetricResult
 
 @reward_function
 def tag_count_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],
     required_tags: List[str],
     score_per_tag: float = 0.25,
     require_balanced: bool = True,
@@ -48,37 +48,22 @@ def tag_count_reward(
             },
         )
 
-    response = messages[-1]
+    response = messages[-1] # response is a Message object
 
     # Check if it's an assistant message with content
-    if isinstance(response, Message):
-        if response.role != "assistant" or not response.content:
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "tag_count": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.content
-    elif isinstance(response, dict):
-        if response.get("role") != "assistant" or not response.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "tag_count": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.get("content", "")
+    if response.role != "assistant" or not response.content:
+        return EvaluateResult(
+            score=0.0,
+            reason="No assistant response found or response has no content",
+            metrics={
+                "tag_count": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Message not from assistant or has no content",
+                )
+            },
+        )
+    text: str = response.content
 
     # Track metrics for each tag
     tag_metrics = {}

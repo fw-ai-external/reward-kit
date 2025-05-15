@@ -39,7 +39,8 @@ def count_tokens(text: str, method: str = "whitespace") -> int:
 
 @reward_function
 def length_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
     target_length: Optional[int] = None,
     min_length: Optional[int] = None,
     max_length: Optional[int] = None,
@@ -50,15 +51,17 @@ def length_reward(
 ) -> EvaluateResult:
     """
     Reward function that evaluates the length of model responses.
+    The model's response is assumed to be the last message in the `messages` list.
 
     This function can calculate rewards based on token count and can encourage either
     conciseness or thoroughness by setting appropriate min/max/target parameters.
 
     Args:
-        messages: List of conversation messages
-        target_length: Optional target token count (optimal length)
-        min_length: Minimum acceptable token count
-        max_length: Maximum acceptable token count
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this length reward.
+        target_length: Optional target token count (optimal length).
+        min_length: Minimum acceptable token count.
+        max_length: Maximum acceptable token count.
         token_method: Method to count tokens ('whitespace', 'character', or 'words')
         scaling: Scaling method for reward calculation ('linear' or 'cosine')
         reward_range: Range for reward values, default is [0.0, 1.0]
@@ -110,6 +113,17 @@ def length_reward(
                 },
             )
         text = response.get("content", "")
+    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+        return EvaluateResult(
+            score=0.0,
+            reason="Last message is of unexpected type.",
+            metrics={
+                "length": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type in messages."
+                )
+            },
+        )
+
 
     # Count tokens in response
     token_count = count_tokens(text, method=token_method)
@@ -284,7 +298,8 @@ def length_reward(
 
 @reward_function
 def cosine_length_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
     correctness: Optional[float] = None,
     is_correct: Optional[bool] = None,
     max_length: int = 1000,
@@ -297,6 +312,7 @@ def cosine_length_reward(
 ) -> EvaluateResult:
     """
     Reward function that scales based on completion length using a cosine schedule.
+    The model's response is assumed to be the last message in the `messages` list.
 
     Inspired by the OpenR1 implementation (https://github.com/OpenRL-Lab/open-r1) and
     Kimi Technical Report (https://arxiv.org/abs/2501.12599).
@@ -305,10 +321,11 @@ def cosine_length_reward(
     Longer incorrect solutions are penalized less than shorter ones.
 
     Args:
-        messages: List of conversation messages
-        correctness: Optional float (0-1) indicating solution correctness
-        is_correct: Optional boolean indicating if the solution is correct
-        max_length: Maximum length for scaling
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this length reward.
+        correctness: Optional float (0-1) indicating solution correctness.
+        is_correct: Optional boolean indicating if the solution is correct.
+        max_length: Maximum length for scaling.
         min_value_wrong: Minimum reward for wrong answers (typically negative)
         max_value_wrong: Maximum reward for wrong answers (typically negative but closer to zero)
         min_value_correct: Minimum reward for correct answers (typically positive)
@@ -362,6 +379,16 @@ def cosine_length_reward(
                 },
             )
         text = response.get("content", "")
+    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+        return EvaluateResult(
+            score=0.0,
+            reason="Last message is of unexpected type.",
+            metrics={
+                "cosine_length": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type in messages."
+                )
+            },
+        )
 
     # Count tokens
     token_count = count_tokens(text, method=token_method)

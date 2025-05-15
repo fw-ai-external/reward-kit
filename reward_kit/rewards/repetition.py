@@ -52,24 +52,27 @@ def get_ngrams(
 
 @reward_function
 def repetition_penalty_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
     ngram_size: int = 3,
     max_penalty: float = 0.5,
     language: str = "en",
     **kwargs: Any,
-) -> EvaluateResult:  # Change back to EvaluateResult for correct typing
+) -> EvaluateResult:
     """
     Reward function that penalizes repetitive text in model responses.
+    The model's response is assumed to be the last message in the `messages` list.
 
     This function computes repetition by examining unique n-grams in the response
     and penalizes texts with a high proportion of repeated phrases.
 
     Args:
-        messages: List of conversation messages
-        ngram_size: Size of n-grams to check for repetition
-        max_penalty: Maximum penalty to apply for repetitive text
-        language: Language of the text (affects tokenization)
-        **kwargs: Additional arguments
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this reward.
+        ngram_size: Size of n-grams to check for repetition.
+        max_penalty: Maximum penalty to apply for repetitive text.
+        language: Language of the text (affects tokenization).
+        **kwargs: Additional arguments.
 
     Returns:
         EvaluateResult with score penalizing repetition
@@ -91,58 +94,67 @@ def repetition_penalty_reward(
     # Extract response text
     if isinstance(response, Message):
         if response.role != "assistant":
-            return {
-                "score": 0.0,
-                "reason": "No assistant response found",
-                "metrics": {
-                    "repetition": {
-                        "score": 0.0,
-                        "success": False,
-                        "reason": "Message not from assistant",
-                    }
+            return EvaluateResult(
+                score=0.0,
+                reason="No assistant response found",
+                metrics={
+                    "repetition": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Message not from assistant",
+                    )
                 },
-            }
+            )
         text = response.content or ""  # Handle None content as empty string
     elif isinstance(response, dict):
         if response.get("role") != "assistant":
-            return {
-                "score": 0.0,
-                "reason": "No assistant response found",
-                "metrics": {
-                    "repetition": {
-                        "score": 0.0,
-                        "success": False,
-                        "reason": "Message not from assistant",
-                    }
+            return EvaluateResult(
+                score=0.0,
+                reason="No assistant response found",
+                metrics={
+                    "repetition": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Message not from assistant",
+                    )
                 },
-            }
+            )
         text = response.get("content", "")
+    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+        return EvaluateResult(
+            score=0.0,
+            reason="Last message is of unexpected type.",
+            metrics={
+                "repetition": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type in messages."
+                )
+            },
+        )
 
     # Empty response - no repetition to penalize
     if not text.strip():
         # For empty response, we return a perfect score since there's no repetition
-        result = {
-            "score": 1.0,
-            "reason": "Empty response, no repetition to penalize",
-            "metrics": {
-                "repetition": {
-                    "score": 1.0,
-                    "success": True,
-                    "reason": "Empty response",
-                },
-                "unique_ngram_ratio": {
-                    "score": 1.0,
-                    "success": True,
-                    "reason": "Empty response",
-                },
-                "repetition_penalty": {
-                    "score": 1.0,
-                    "success": True,
-                    "reason": "No penalty applied to empty response",
-                },
+        return EvaluateResult(
+            score=1.0,
+            reason="Empty response, no repetition to penalize",
+            metrics={
+                "repetition": MetricResult(
+                    score=1.0,
+                    success=True,
+                    reason="Empty response",
+                ),
+                "unique_ngram_ratio": MetricResult(
+                    score=1.0,
+                    success=True,
+                    reason="Empty response",
+                ),
+                "repetition_penalty": MetricResult(
+                    score=1.0, # No penalty means score is 1.0 for this metric
+                    success=True,
+                    reason="No penalty applied to empty response",
+                ),
             },
-        }
-        return result
+        )
 
     # Get n-grams from the response
     ngrams, total = get_ngrams(text, ngram_size, language)
@@ -193,42 +205,32 @@ def repetition_penalty_reward(
         ),
     }
 
-    # Return a dict that has the same structure as EvaluateResult for testing compatibility
-    result = {
-        "score": score,
-        "reason": reason,
-        "metrics": {
-            key: {
-                "score": metric.score,
-                "success": metric.success,
-                "reason": metric.reason,
-            }
-            for key, metric in metrics.items()
-        },
-    }
-    return result
+    return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
 
 @reward_function
 def diversity_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
     ngram_sizes: List[int] = [1, 2, 3],
     weights: Optional[List[float]] = None,
     language: str = "en",
     **kwargs: Any,
-) -> EvaluateResult:  # Change back to EvaluateResult for correct typing
+) -> EvaluateResult:
     """
     Reward function that measures lexical diversity in model responses.
+    The model's response is assumed to be the last message in the `messages` list.
 
     This function computes diversity across multiple n-gram sizes and combines them
     into a weighted score to encourage varied vocabulary and phrasing.
 
     Args:
-        messages: List of conversation messages
-        ngram_sizes: List of n-gram sizes to evaluate
-        weights: Optional list of weights for each n-gram size (normalized if provided)
-        language: Language of the text (affects tokenization)
-        **kwargs: Additional arguments
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this reward.
+        ngram_sizes: List of n-gram sizes to evaluate.
+        weights: Optional list of weights for each n-gram size (normalized if provided).
+        language: Language of the text (affects tokenization).
+        **kwargs: Additional arguments.
 
     Returns:
         EvaluateResult with score based on lexical diversity
@@ -250,46 +252,57 @@ def diversity_reward(
     # Extract response text
     if isinstance(response, Message):
         if response.role != "assistant":
-            return {
-                "score": 0.0,
-                "reason": "No assistant response found",
-                "metrics": {
-                    "diversity": {
-                        "score": 0.0,
-                        "success": False,
-                        "reason": "Message not from assistant",
-                    }
+            return EvaluateResult(
+                score=0.0,
+                reason="No assistant response found",
+                metrics={
+                    "diversity": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Message not from assistant",
+                    )
                 },
-            }
+            )
         text = response.content or ""  # Handle None content as empty string
     elif isinstance(response, dict):
         if response.get("role") != "assistant":
-            return {
-                "score": 0.0,
-                "reason": "No assistant response found",
-                "metrics": {
-                    "diversity": {
-                        "score": 0.0,
-                        "success": False,
-                        "reason": "Message not from assistant",
-                    }
+            return EvaluateResult(
+                score=0.0,
+                reason="No assistant response found",
+                metrics={
+                    "diversity": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Message not from assistant",
+                    )
                 },
-            }
+            )
         text = response.get("content", "")
+    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+        return EvaluateResult(
+            score=0.0,
+            reason="Last message is of unexpected type.",
+            metrics={
+                "diversity": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type in messages."
+                )
+            },
+        )
+
 
     # Empty response
     if not text.strip():
-        return {
-            "score": 0.0,
-            "reason": "Empty response",
-            "metrics": {
-                "diversity": {
-                    "score": 0.0,
-                    "success": False,
-                    "reason": "Empty response",
-                }
+        return EvaluateResult(
+            score=0.0, # Or 1.0 if empty is considered perfectly diverse (no repetition)
+            reason="Empty response",
+            metrics={
+                "diversity": MetricResult(
+                    score=0.0, # Or 1.0
+                    success=False, # Or True
+                    reason="Empty response",
+                )
             },
-        }
+        )
 
     # Set default weights if not provided
     if weights is None:
@@ -357,17 +370,8 @@ def diversity_reward(
         **size_metrics,
     }
 
-    # Return a dict that has the same structure as EvaluateResult for testing compatibility
-    result = {
-        "score": final_score,
-        "reason": f"Lexical diversity score: {final_score:.2f}",
-        "metrics": {
-            key: {
-                "score": metric.score,
-                "success": metric.success,
-                "reason": metric.reason,
-            }
-            for key, metric in metrics.items()
-        },
-    }
-    return result
+    return EvaluateResult(
+        score=final_score,
+        reason=f"Lexical diversity score: {final_score:.2f}",
+        metrics=metrics
+    )

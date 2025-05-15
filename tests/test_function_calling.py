@@ -33,9 +33,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -72,9 +70,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -115,9 +111,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -159,9 +153,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -203,9 +195,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -246,9 +236,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            original_messages=[
-                {"role": "user", "content": "What's the weather?"}
-            ],
+            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -348,6 +336,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
         )
 
@@ -390,6 +379,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
         )
 
@@ -435,6 +425,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
         )
 
@@ -479,6 +470,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "Create a user for John Doe"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
         )
 
@@ -527,6 +519,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
             expected_behavior="Get the weather for the specified location with the specified unit",
             openai_api_key="fake_key_for_testing",
@@ -582,6 +575,7 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "function_call": function_call},
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
             expected_behavior="Get the weather for the specified location with the specified unit",
             openai_api_key="fake_key_for_testing",

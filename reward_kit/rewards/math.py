@@ -6,12 +6,12 @@ answers by extracting numerical values from text using regex patterns and
 comparing them with expected answers.
 """
 
-from typing import Dict, List, Tuple, Any, Union, cast, Optional
+from typing import Dict, List, Tuple, Any, Union, Optional
 import re
 import math
 from ..typed_interface import reward_function
 
-# RewardOutput and MetricRewardOutput will be replaced by EvaluateResult and MetricResult
+# Removed outdated comment
 from ..models import Message, EvaluateResult, MetricResult
 
 
@@ -330,75 +330,53 @@ def compare_numbers( # This function remains for float comparisons
 
 @reward_function
 def math_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Union[List[Dict[str, Any]], List[Message]],
-    tolerance: float = 0.001, # For float comparisons
-    absolute_tolerance: float = 1e-8, # For float comparisons
-    require_units: bool = False, # Currently for numbers with units
+    messages: List[Message],           # Full conversation, last message is model's response
+    ground_truth: str,                 # Expected math answer string (this is the new ground_truth)
+    tolerance: float = 0.001,          # For float comparisons
+    absolute_tolerance: float = 1e-8,  # For float comparisons
+    require_units: bool = False,       # Currently for numbers with units
     **kwargs: Any,
 ) -> EvaluateResult:
     """
-    Evaluate mathematical answers in messages.
+    Evaluate mathematical answers by comparing the model's response to an expected answer string.
 
     Extracts numerical or specific string (MCQ, "or" expressions) answers
-    from generated and original messages, then compares them.
-    Applies strictness rules based on ISSUES.md.
+    from the model's response content (from `messages[-1].content`) and the `ground_truth` (expected answer string),
+    then compares them. Applies strictness rules based on ISSUES.md.
 
     Args:
-        messages: Generated conversation messages.
-        original_messages: Original conversation messages (ground truth).
+        messages: List of conversation messages. The last message is assumed to be the
+                  assistant's response to evaluate.
+        ground_truth: The ground truth string representing the expected mathematical answer.
         tolerance: Relative tolerance for numerical comparison.
         absolute_tolerance: Absolute tolerance for numerical comparison.
         require_units: Whether to require matching units for numerical answers.
-                       (Note: unit handling in new extract_numbers is simplified,
-                        this flag's effect might be limited to post-extraction checks if needed)
         **kwargs: Additional keyword arguments.
 
     Returns:
         EvaluateResult with score and metrics.
     """
-
-    if not messages or not original_messages: # Ensure correct type for EvaluateResult
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
         return EvaluateResult(
             score=0.0,
-            reason="Missing messages or original messages",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="Missing messages or original messages",
-                )
-            },
+            reason="Invalid or missing assistant response in messages.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
         )
-
-    # Extract the last assistant message from each list
-    gen_content = ""
-    if messages and len(messages) > 0:
-        gen_response_message = messages[-1]
-        if isinstance(gen_response_message, Message) and gen_response_message.role == "assistant":
-            gen_content = gen_response_message.content or ""
-        elif isinstance(gen_response_message, dict) and gen_response_message.get("role") == "assistant":
-            gen_content = gen_response_message.get("content", "")
     
-    if not gen_content:
-        return EvaluateResult(score=0.0, reason="Last generated message not from assistant or has no content",
-                              metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid generated message")})
+    model_response_content = messages[-1].content
+    # model_response_content can be an empty string "" if assistant returned that.
 
-    orig_content = ""
-    if original_messages and len(original_messages) > 0:
-        orig_response_message = original_messages[-1]
-        if isinstance(orig_response_message, Message) and orig_response_message.role == "assistant":
-            orig_content = orig_response_message.content or ""
-        elif isinstance(orig_response_message, dict) and orig_response_message.get("role") == "assistant":
-            orig_content = orig_response_message.get("content", "")
-
-    if not orig_content:
-        return EvaluateResult(score=0.0, reason="Last original message not from assistant or has no content",
-                              metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid original message")})
-
+    # The 'ground_truth' parameter is now the expected_math_answer_str
+    if ground_truth is None or ground_truth == "": # Check the new ground_truth parameter
+        return EvaluateResult(
+            score=0.0,
+            reason="Missing or empty ground_truth (expected math answer string).",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth string.")}
+        )
+    
     # Extract numerical or string answers using the new extract_numbers
-    gen_answers_extracted = extract_numbers(gen_content)
-    orig_answers_extracted = extract_numbers(orig_content)
+    gen_answers_extracted = extract_numbers(model_response_content)
+    orig_answers_extracted = extract_numbers(ground_truth) # Use new ground_truth parameter here
 
     metrics: Dict[str, MetricResult] = {}
     def format_extracted(items: List[Tuple[str, Union[float, str]]]) -> str:
@@ -424,7 +402,7 @@ def math_reward(
     # --- Strictness Penalties (as per ISSUES.md) ---
 
     # Penalty 1 (Issue #1): Generated answer uses unboxed "or" to offer multiple numeric alternatives.
-    # An "unboxed or" means " or " appears in gen_content, AND multiple numeric items were extracted,
+    # An "unboxed or" means " or " appears in model_response_content, AND multiple numeric items were extracted,
     # AND no single extracted item from gen_answers_extracted is a string like "X or Y" (which would come from \boxed{X or Y}).
     
     # Check if any extracted gen_answer is a string containing " or " (this implies it was from \boxed{... or ...})
@@ -434,7 +412,8 @@ def math_reward(
     )
     gen_numeric_values_count = sum(1 for _, val in gen_answers_extracted if isinstance(val, (float, int)))
 
-    if " or " in gen_content.lower() and gen_numeric_values_count > 1 and not is_gen_single_boxed_or_expr:
+    # Use model_response_content for gen_content
+    if " or " in model_response_content.lower() and gen_numeric_values_count > 1 and not is_gen_single_boxed_or_expr:
         specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
         full_reason = f"Strictness fail (Issue #1): {specific_reason_detail}"
         metrics["strictness_penalty_unboxed_or"] = MetricResult(score=0.0, success=False, reason=specific_reason_detail)

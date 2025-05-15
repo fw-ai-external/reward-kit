@@ -29,8 +29,9 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result = cosine_scaled_accuracy_length_reward(
-            messages=messages, ground_truth="4", max_length=50
+            messages=messages, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -62,8 +63,9 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result = cosine_scaled_accuracy_length_reward(
-            messages=messages, ground_truth="4", max_length=50
+            messages=messages, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -86,8 +88,9 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result = cosine_scaled_accuracy_length_reward(
-            messages=messages, ground_truth="4", max_length=50
+            messages=messages, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -120,8 +123,9 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result = cosine_scaled_accuracy_length_reward(
-            messages=messages, ground_truth="4", max_length=50
+            messages=messages, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -160,12 +164,13 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content_long},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result_short = cosine_scaled_accuracy_length_reward(
-            messages=messages_short, ground_truth="4", max_length=50
+            messages=messages_short, ground_truth=gt_list, max_length=50
         )
 
         result_long = cosine_scaled_accuracy_length_reward(
-            messages=messages_long, ground_truth="4", max_length=50
+            messages=messages_long, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result_short, EvaluateResult)
@@ -201,12 +206,13 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content_long},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result_short = cosine_scaled_accuracy_length_reward(
-            messages=messages_short, ground_truth="4", max_length=50
+            messages=messages_short, ground_truth=gt_list, max_length=50
         )
 
         result_long = cosine_scaled_accuracy_length_reward(
-            messages=messages_long, ground_truth="4", max_length=50
+            messages=messages_long, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result_short, EvaluateResult)
@@ -227,15 +233,16 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         # Default weights (accuracy_weight=0.7, length_weight=0.3)
         result_default = cosine_scaled_accuracy_length_reward(
-            messages=messages, ground_truth="4", max_length=50
+            messages=messages, ground_truth=gt_list, max_length=50
         )
 
         # Custom weights (accuracy_weight=0.9, length_weight=0.1)
         result_custom = cosine_scaled_accuracy_length_reward(
             messages=messages,
-            ground_truth="4",
+            ground_truth=gt_list,
             max_length=50,
             correctness_weight=0.9,
             length_weight=0.1,
@@ -275,12 +282,13 @@ class TestCosineScaledAccuracyLengthReward(unittest.TestCase):
             {"role": "assistant", "content": content_short_incorrect},
         ]
 
+        gt_list = [{"role": "assistant", "content": "4"}]
         result_long_correct = cosine_scaled_accuracy_length_reward(
-            messages=messages_long_correct, ground_truth="4", max_length=50
+            messages=messages_long_correct, ground_truth=gt_list, max_length=50
         )
 
         result_short_incorrect = cosine_scaled_accuracy_length_reward(
-            messages=messages_short_incorrect, ground_truth="4", max_length=50
+            messages=messages_short_incorrect, ground_truth=gt_list, max_length=50
         )
 
         self.assertIsInstance(result_long_correct, EvaluateResult)

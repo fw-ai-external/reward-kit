@@ -13,12 +13,13 @@ except ImportError:
     # Type to mock in tests
     OpenAI = None  # type: ignore
 
-from ..models import EvaluateResult, MetricResult
+from ..models import EvaluateResult, MetricResult, Message # Added Message
+from ..typed_interface import reward_function # Added reward_function
 
 
 def match_function_call(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
+    messages: List[Dict[str, str]], # messages is for context if needed, not directly used here for func call parts
+    # original_messages: List[Dict[str, str]], # Removed
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
@@ -29,11 +30,10 @@ def match_function_call(
     Evaluate how well a function call matches an expected schema.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context
-        function_name: The parsed function name
-        parsed_arguments: The parsed arguments from the function call
-        expected_call_schema: The expected schema for the function call
+        messages: The conversation messages (for context, not directly used for call parts).
+        function_name: The parsed function name.
+        parsed_arguments: The parsed arguments from the function call.
+        expected_call_schema: The expected schema for the function call.
         argument_match_strictness: How strict to be with argument matching:
             - "exact": All arguments must match exactly
             - "partial": Only check provided arguments, ignore missing ones
@@ -265,25 +265,28 @@ def normalize_schema(schema: Union[Dict[str, Any], str]) -> Dict[str, Any]:
     return schema
 
 
+@reward_function # Added decorator
 def schema_jaccard_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
 ) -> EvaluateResult:
     """
     Evaluate a function call using Jaccard similarity between actual and expected schema.
+    The model's response (containing the function call) is assumed to be `messages[-1]`.
 
     This reward function compares the structure of a function call against an expected schema
     and calculates a similarity score using Jaccard similarity.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context (optional)
-        function_call: The function call to evaluate (if not provided, extracts from last message)
-        expected_schema: The expected schema for the function call
-        **kwargs: Additional keyword arguments
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. If this contains an expected
+                      function call, it might be used in future versions or by specific setups.
+        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
+        expected_schema: The expected schema for the function call.
+        **kwargs: Additional keyword arguments.
 
     Returns:
         RewardOutput with score and metrics
@@ -304,28 +307,44 @@ def schema_jaccard_reward(
             )
 
         last_message = messages[-1]
+        extracted_fc_from_message = None
 
-        # Try to extract function call from the message
-        if "function_call" in last_message:
-            function_call_obj = last_message.get("function_call")
-            if isinstance(function_call_obj, dict):
-                function_call = function_call_obj
-        elif "tool_calls" in last_message:
-            # Extract first tool call of function type
-            tool_calls_obj = last_message.get("tool_calls")
-            if isinstance(tool_calls_obj, list):
-                tool_calls: List[Dict[str, Any]] = tool_calls_obj
-                for tool_call in tool_calls:
-                    if (
-                        isinstance(tool_call, dict)
-                        and tool_call.get("type") == "function"
-                    ):
-                        function_obj = tool_call.get("function")
-                        if isinstance(function_obj, dict):
-                            function_call = function_obj
-                            break
+        if isinstance(last_message, Message):
+            if last_message.role == "assistant":
+                if last_message.function_call:
+                    extracted_fc_from_message = last_message.function_call
+                elif last_message.tool_calls:
+                    for tc in last_message.tool_calls:
+                        if tc.type == "function":
+                            extracted_fc_from_message = tc.function # Assuming tc.function is a dict {name, arguments}
+                            if isinstance(extracted_fc_from_message, dict): # Ensure it's a dict
+                                break 
+                            else: # If tc.function is not a dict (e.g. pydantic model), convert or handle
+                                extracted_fc_from_message = {"name": getattr(extracted_fc_from_message, "name", ""), "arguments": getattr(extracted_fc_from_message, "arguments", "{}")}
+                                break
 
-        if not function_call:
+
+        elif isinstance(last_message, dict):
+            if last_message.get("role") == "assistant":
+                if "function_call" in last_message and isinstance(last_message["function_call"], dict):
+                    extracted_fc_from_message = last_message["function_call"]
+                elif "tool_calls" in last_message and isinstance(last_message["tool_calls"], list):
+                    for tc in last_message["tool_calls"]:
+                        if isinstance(tc, dict) and tc.get("type") == "function":
+                            if "function" in tc and isinstance(tc["function"], dict):
+                                extracted_fc_from_message = tc["function"]
+                                break
+        else:
+            return EvaluateResult(
+                score=0.0,
+                reason=f"Unexpected type for last message: {type(last_message)}.",
+                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for function call extraction.", success=False)}
+            )
+
+        if extracted_fc_from_message:
+            function_call = extracted_fc_from_message
+
+        if not function_call: # Check again if function_call is still None or empty
             return EvaluateResult(
                 score=0.0,
                 reason="No function call found in messages.",
@@ -490,9 +509,10 @@ def schema_jaccard_reward(
     return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
+@reward_function # Added decorator
 def llm_judge_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -503,16 +523,17 @@ def llm_judge_reward(
 ) -> EvaluateResult:
     """
     Evaluate a function call using an LLM (GPT-4o-mini) as a judge.
+    The model's response (containing the function call) is assumed to be `messages[-1]`.
 
     This reward function sends the function call and expected behavior to an LLM
     to evaluate the quality and correctness of the function call.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context (optional)
-        function_call: The function call to evaluate (if not provided, extracts from last message)
-        expected_schema: The expected schema for the function call
-        expected_behavior: Description of the expected behavior for the function call
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory.
+        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
+        expected_schema: The expected schema for the function call.
+        expected_behavior: Description of the expected behavior for the function call.
         openai_api_key: OpenAI API key (if not provided, uses environment variable)
         model: Model to use for evaluation (default: gpt-4o-mini)
         temperature: Temperature for the model generation (default: 0.0)
@@ -551,28 +572,42 @@ def llm_judge_reward(
             )
 
         last_message = messages[-1]
+        extracted_fc_from_message = None
 
-        # Try to extract function call from the message
-        if "function_call" in last_message:
-            function_call_obj = last_message.get("function_call")
-            if isinstance(function_call_obj, dict):
-                function_call = function_call_obj
-        elif "tool_calls" in last_message:
-            # Extract first tool call of function type
-            tool_calls_obj = last_message.get("tool_calls")
-            if isinstance(tool_calls_obj, list):
-                tool_calls: List[Dict[str, Any]] = tool_calls_obj
-                for tool_call in tool_calls:
-                    if (
-                        isinstance(tool_call, dict)
-                        and tool_call.get("type") == "function"
-                    ):
-                        function_obj = tool_call.get("function")
-                        if isinstance(function_obj, dict):
-                            function_call = function_obj
-                            break
+        if isinstance(last_message, Message):
+            if last_message.role == "assistant":
+                if last_message.function_call:
+                    extracted_fc_from_message = last_message.function_call
+                elif last_message.tool_calls:
+                    for tc in last_message.tool_calls:
+                        if tc.type == "function":
+                            extracted_fc_from_message = tc.function
+                            if isinstance(extracted_fc_from_message, dict):
+                                break
+                            else:
+                                extracted_fc_from_message = {"name": getattr(extracted_fc_from_message, "name", ""), "arguments": getattr(extracted_fc_from_message, "arguments", "{}")}
+                                break
+        elif isinstance(last_message, dict):
+            if last_message.get("role") == "assistant":
+                if "function_call" in last_message and isinstance(last_message["function_call"], dict):
+                    extracted_fc_from_message = last_message["function_call"]
+                elif "tool_calls" in last_message and isinstance(last_message["tool_calls"], list):
+                    for tc in last_message["tool_calls"]:
+                        if isinstance(tc, dict) and tc.get("type") == "function":
+                            if "function" in tc and isinstance(tc["function"], dict):
+                                extracted_fc_from_message = tc["function"]
+                                break
+        else:
+            return EvaluateResult(
+                score=0.0,
+                reason=f"Unexpected type for last message: {type(last_message)}.",
+                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for function call extraction.", success=False)}
+            )
+        
+        if extracted_fc_from_message:
+            function_call = extracted_fc_from_message
 
-        if not function_call:
+        if not function_call: # Check again if function_call is still None or empty
             return EvaluateResult(
                 score=0.0,
                 reason="No function call found in messages.",
@@ -720,9 +755,10 @@ EXPLANATION: [your detailed explanation]
         )
 
 
+@reward_function # Added decorator
 def composite_function_call_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -733,13 +769,14 @@ def composite_function_call_reward(
 ) -> EvaluateResult:
     """
     Combined reward function that evaluates function calls using both schema validation and LLM judgment.
+    The model's response (containing the function call) is assumed to be `messages[-1]`.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context (optional)
-        function_call: The function call to evaluate (if not provided, extracts from last message)
-        expected_schema: The expected schema for the function call
-        expected_behavior: Description of the expected behavior for the function call
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory.
+        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
+        expected_schema: The expected schema for the function call.
+        expected_behavior: Description of the expected behavior for the function call.
         openai_api_key: OpenAI API key (if not provided, uses environment variable)
         llm_model: Model to use for LLM evaluation (default: gpt-4o-mini)
         weights: Dictionary of weights for each component (default: {"schema": 0.5, "llm": 0.5})
@@ -759,7 +796,7 @@ def composite_function_call_reward(
     # Run schema validation
     schema_result = schema_jaccard_reward(
         messages=messages,
-        original_messages=original_messages,
+        ground_truth=ground_truth, # Pass through
         function_call=function_call,
         expected_schema=expected_schema,
         **kwargs,
@@ -769,7 +806,7 @@ def composite_function_call_reward(
     if expected_behavior:
         llm_result = llm_judge_reward(
             messages=messages,
-            original_messages=original_messages,
+            ground_truth=ground_truth, # Pass through
             function_call=function_call,
             expected_schema=expected_schema,
             expected_behavior=expected_behavior,

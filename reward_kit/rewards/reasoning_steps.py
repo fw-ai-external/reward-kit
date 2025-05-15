@@ -14,7 +14,7 @@ from ..models import Message, EvaluateResult, MetricResult
 
 @reward_function
 def reasoning_steps_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],
     pattern: Optional[str] = None,
     min_steps: int = 3,
     max_steps: Optional[int] = None,
@@ -51,37 +51,22 @@ def reasoning_steps_reward(
             },
         )
 
-    response = messages[-1]
+    response = messages[-1] # response is a Message object due to type hint and decorator
 
     # Extract response text
-    if isinstance(response, Message):
-        if response.role != "assistant" or not response.content:
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "reasoning_steps": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.content
-    elif isinstance(response, dict):
-        if response.get("role") != "assistant" or not response.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "reasoning_steps": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.get("content", "")
+    if response.role != "assistant" or not response.content:
+        return EvaluateResult(
+            score=0.0,
+            reason="No assistant response found or response has no content",
+            metrics={
+                "reasoning_steps": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Message not from assistant or has no content",
+                )
+            },
+        )
+    text: str = response.content
 
     # Default patterns for detecting reasoning steps
     default_patterns = [
@@ -194,7 +179,7 @@ def reasoning_steps_reward(
 
 @reward_function
 def sequence_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],
     sequence_terms: Optional[List[str]] = None,
     min_matches: int = 3,
     case_sensitive: bool = False,
@@ -228,37 +213,22 @@ def sequence_reward(
             },
         )
 
-    response = messages[-1]
+    response = messages[-1] # response is a Message object
 
     # Extract response text
-    if isinstance(response, Message):
-        if response.role != "assistant" or not response.content:
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "sequence_reasoning": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.content
-    elif isinstance(response, dict):
-        if response.get("role") != "assistant" or not response.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "sequence_reasoning": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.get("content", "")
+    if response.role != "assistant" or not response.content:
+        return EvaluateResult(
+            score=0.0,
+            reason="No assistant response found or response has no content",
+            metrics={
+                "sequence_reasoning": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Message not from assistant or has no content",
+                )
+            },
+        )
+    text: str = response.content
 
     # Default sequence terms if none provided
     if not sequence_terms:

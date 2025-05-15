@@ -591,12 +591,8 @@ async def run_cpp_test_cases(
 
 @reward_function
 def ioi_cpp_code_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[
-        Union[List[Dict[str, Any]], List[Message]]
-    ] = None,
-    expected_output: Optional[str] = None,
-    test_cases: Optional[List[Dict[str, Any]]] = None,
+    messages: List[Message],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth type
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -614,11 +610,11 @@ def ioi_cpp_code_reward(
 
     try:
         # This calls the actual implementation with all the same arguments
+        # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         return _ioi_cpp_code_reward_impl(
             messages=messages,
-            original_messages=original_messages,
-            expected_output=expected_output,
-            test_cases=test_cases,
+            ground_truth=ground_truth, # Pass the new combined ground_truth
+            # expected_output_str and test_cases are now derived inside _impl
             language=language,
             version=version,
             timeout=timeout,
@@ -632,12 +628,8 @@ def ioi_cpp_code_reward(
 
 
 def _ioi_cpp_code_reward_impl(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[
-        Union[List[Dict[str, Any]], List[Message]]
-    ] = None,
-    expected_output: Optional[str] = None,
-    test_cases: Optional[List[Dict[str, Any]]] = None,
+    messages: List[Message], # Full conversation, model's response is messages[-1]
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -669,118 +661,84 @@ def _ioi_cpp_code_reward_impl(
         RewardOutput with score and metrics
     """
     # Initialize metrics dictionary
-    metrics = {}
-    error_reason = None
+    metrics: Dict[str, MetricResult] = {} # Explicitly type hint
 
-    # Extract the last assistant message
-    if not messages:
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
         return EvaluateResult(
             score=0.0,
-            reason="No messages provided",
+            reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
-                )
+                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
             },
         )
+    
+    response_content = messages[-1].content
 
-    last_message = messages[-1]
+    # Determine if ground_truth is expected_output_str or test_cases
+    expected_output_str_from_gt: Optional[str] = None
+    test_cases_from_gt: Optional[List[Dict[str, Any]]] = None
 
-    # Check role of the last message
-    if getattr(last_message, "role", last_message.get("role")) != "assistant":
+    if isinstance(ground_truth, str):
+        expected_output_str_from_gt = ground_truth
+    elif isinstance(ground_truth, list):
+        if all(isinstance(item, dict) for item in ground_truth): # Basic check
+            test_cases_from_gt = ground_truth
+        else:
+            return EvaluateResult(
+                score=0.0,
+                reason="Invalid ground_truth format: if list, must be list of test case dicts.",
+                metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth list format.")}
+            )
+    elif ground_truth is not None: # Not str, not list, not None - unsupported
         return EvaluateResult(
             score=0.0,
-            reason="Last message is not from assistant",
-            metrics={
-                "error": MetricResult(
-                    score=0.0, success=False, reason="Last message is not from assistant"
-                )
-            },
+            reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
         )
-
-    # Get content from the message
-    content = getattr(last_message, "content", last_message.get("content", ""))
-
-    # Extract code blocks from the message
-    code_blocks = extract_code_blocks(content, language)
+    # If ground_truth is None, both derived vars remain None.
+    
+    # Extract code blocks from the model's response content
+    code_blocks = extract_code_blocks(response_content, language)
 
     if not code_blocks:
         return EvaluateResult(
             score=0.0,
-            reason=f"No {language} code blocks found in message",
+            reason=f"No {language} code blocks found in model's response.",
             metrics={
                 "error": MetricResult(
                     score=0.0,
                     success=False,
-                    reason=f"No {language} code blocks found in message",
+                    reason=f"No {language} code blocks found in model's response.",
                 )
             },
         )
 
-    # Extract expected output if not provided directly
-    if expected_output is None and original_messages and not test_cases:
-        # Convert original_messages to standard dict format if needed
-        orig_msgs = []
-        for msg in original_messages:
-            if hasattr(msg, "role"):
-                orig_msgs.append({"role": msg.role, "content": msg.content})
-            else:
-                orig_msgs.append(msg)
-
-        # Try to find expected output in the original messages
-        for msg in orig_msgs:
-            if msg.get("role") == "user":
-                # Look for expected output patterns like "Expected output:" or "Output:"
-                msg_content = msg.get("content", "")
-                output_patterns = [
-                    r"Expected output:?\s*([\s\S]+)",
-                    r"Output:?\s*([\s\S]+)",
-                    r"Result:?\s*([\s\S]+)",
-                    r"Should (output|return|print):?\s*([\s\S]+)",
-                ]
-
-                for pattern in output_patterns:
-                    match = re.search(pattern, msg_content)
-                    if match:
-                        # Use group 1 or 2 depending on the pattern
-                        expected_output = (
-                            match.group(2)
-                            if len(match.groups()) > 1 and match.group(2)
-                            else match.group(1)
-                        )
-                        expected_output = expected_output.strip()
-                        break
-
-                if expected_output:
-                    break
-
     # Use the first code block for execution
     code = code_blocks[0]["code"]
 
-    # Log the extracted code
     metrics["extracted_code"] = MetricResult(
-        score=0.0,  # Not a real score
+        score=0.0,
         success=True,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
 
-    # Add expected output to metrics if available
-    if expected_output and not test_cases:
+    # Add expected output to metrics if available (using derived expected_output_str_from_gt)
+    if expected_output_str_from_gt and not test_cases_from_gt:
         metrics["expected_output"] = MetricResult(
-            score=0.0,  # Not a real score
+            score=0.0,
             success=True,
-            reason=f"Expected output:\n{expected_output}",
+            reason=f"Expected output:\n{expected_output_str_from_gt}",
         )
 
     # Multiple test cases
-    if test_cases:
+    if test_cases_from_gt:
         # Execute the tests and get results
         # We're already in a function that has an event loop set up,
         # so we can just use run_until_complete
         results = asyncio.get_event_loop().run_until_complete(
             run_cpp_test_cases(
                 code=code,
-                test_cases=test_cases,
+                test_cases=test_cases_from_gt, # Use derived test_cases
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -821,12 +779,12 @@ def _ioi_cpp_code_reward_impl(
 
         return EvaluateResult(score=overall_score, reason=final_reason, metrics=metrics)
 
-    # Single test case with expected output
-    elif expected_output:
-        # Execute the code against the expected output
+    # Single test case with expected_output_str_from_gt
+    elif expected_output_str_from_gt:
+        # Execute the code against the expected_output_str_from_gt
         execution_result = asyncio.get_event_loop().run_until_complete(
             execute_cpp_code(
-                code=code,
+                code=code, # stdin is empty by default for this path
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -845,9 +803,9 @@ def _ioi_cpp_code_reward_impl(
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
-            # Compare with expected output
-            similarity = compare_outputs(output, expected_output)
-            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
+            # Compare with expected_output_str_from_gt
+            similarity = compare_outputs(output, expected_output_str_from_gt)
+            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str_from_gt}\n\nActual:\n{output}"
             final_reason += f" Output similarity: {similarity:.2f}."
 
             metrics["output_match"] = MetricResult(
@@ -904,12 +862,8 @@ def _ioi_cpp_code_reward_impl(
 
 @reward_function
 def binary_cpp_code_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[
-        Union[List[Dict[str, Any]], List[Message]]
-    ] = None,
-    expected_output: Optional[str] = None,
-    test_cases: Optional[List[Dict[str, Any]]] = None,
+    messages: List[Message],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth type
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -946,11 +900,11 @@ def binary_cpp_code_reward(
 
     try:
         # Call the main reward function using the _impl version to avoid double event loop issues
+        # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         reward_output = _ioi_cpp_code_reward_impl(
             messages=messages,
-            original_messages=original_messages,
-            expected_output=expected_output,
-            test_cases=test_cases,
+            ground_truth=ground_truth, # Pass the new combined ground_truth
+            # expected_output_str and test_cases are now derived inside _impl
             language=language,
             version=version,
             timeout=timeout,

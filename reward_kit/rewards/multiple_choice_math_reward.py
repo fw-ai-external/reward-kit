@@ -90,19 +90,20 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
 
 @reward_function
 def multiple_choice_math_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],
+    ground_truth: List[Message],
     **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate multiple-choice answers in messages.
 
     Extracts MCQ options (A-E) from the last assistant message in
-    both generated and original (ground truth) messages, then compares them.
+    the generated messages and from the ground truth assistant message, then compares them.
 
     Args:
-        messages: Generated conversation messages.
-        original_messages: Original conversation messages (ground truth).
+        messages: Generated conversation messages, where the last message is the
+                  assistant's response.
+        ground_truth: A list containing the ground truth assistant message.
         **kwargs: Additional keyword arguments.
 
     Returns:
@@ -110,42 +111,52 @@ def multiple_choice_math_reward(
     """
     metrics: Dict[str, MetricResult] = {}
 
-    if not messages or not original_messages:
+    if not messages:
         return EvaluateResult(
             score=0.0,
-            reason="Missing messages or original messages",
+            reason="Missing generated messages",
             metrics={
                 "error": MetricResult(
                     score=0.0,
                     success=False,
-                    reason="Missing messages or original messages",
+                    reason="Missing generated messages",
+                )
+            },
+        )
+    
+    if not ground_truth:
+        return EvaluateResult(
+            score=0.0,
+            reason="Missing ground truth message",
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Missing ground truth message",
                 )
             },
         )
 
     gen_content = ""
     if messages and len(messages) > 0:
-        gen_response_message = messages[-1]
-        if isinstance(gen_response_message, Message) and gen_response_message.role == "assistant":
+        gen_response_message = messages[-1] # Assistant's response is the last message
+        if gen_response_message.role == "assistant": # Assumes Pydantic Message object
             gen_content = gen_response_message.content or ""
-        elif isinstance(gen_response_message, dict) and gen_response_message.get("role") == "assistant":
-            gen_content = gen_response_message.get("content", "")
     
     if not gen_content:
         metrics["error_generated_message"] = MetricResult(score=0.0, success=False, reason="Invalid generated message: Last message not from assistant or has no content.")
         return EvaluateResult(score=0.0, reason="Last generated message not from assistant or has no content.", metrics=metrics)
 
     orig_content = ""
-    if original_messages and len(original_messages) > 0:
-        orig_response_message = original_messages[-1]
-        if isinstance(orig_response_message, Message) and orig_response_message.role == "assistant":
+    # ground_truth is expected to be a list containing the single assistant ground truth message
+    if ground_truth and len(ground_truth) > 0:
+        orig_response_message = ground_truth[0]
+        if orig_response_message.role == "assistant": # Assumes Pydantic Message object
             orig_content = orig_response_message.content or ""
-        elif isinstance(orig_response_message, dict) and orig_response_message.get("role") == "assistant":
-            orig_content = orig_response_message.get("content", "")
 
     if not orig_content:
-        metrics["error_original_message"] = MetricResult(score=0.0, success=False, reason="Invalid original message: Last message not from assistant or has no content.")
-        return EvaluateResult(score=0.0, reason="Last original message not from assistant or has no content.", metrics=metrics)
+        metrics["error_original_message"] = MetricResult(score=0.0, success=False, reason="Invalid ground truth message: Not an assistant message or has no content.")
+        return EvaluateResult(score=0.0, reason="Invalid ground truth message: Not an assistant message or has no content.", metrics=metrics)
 
     gen_mcq_options = extract_mcq_option(gen_content)
     orig_mcq_options = extract_mcq_option(orig_content)

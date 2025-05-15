@@ -1,295 +1,207 @@
-# API Design for Composable Reward Functions
+# Reward Function API, Data Format, and Input Handling Refactor
 
-## Problem Statement
+## 1. Overview
 
-The current `@reward_function` decorator (defined in `reward_kit/typed_interface.py`) is designed to provide a consistent dictionary-based input/output interface for reward functions. While this is useful for standardization and serialization, it makes it inconvenient to compose reward functions.
+This document outlines a significant refactor to the Reward Kit's API concerning reward functions and their associated data formats. The primary goals are:
 
-The decorator takes a function that internally uses Pydantic models (`List[Message]` for input, `EvaluateResult` for output) and wraps it. The wrapper accepts `List[Dict]` as input and, crucially, converts the `EvaluateResult` object from the internal function back into a plain `Dict` using `model_dump()` before returning.
+*   **Standardize Dataset Format**: Establish a clear and unambiguous structure for `.jsonl` datasets used with reward functions.
+*   **Clarify Reward Function Inputs**: Define distinct roles for input parameters, with `messages` representing the prompt/context and `ground_truth` representing the complete expected assistant response.
+*   **Explicit Type-Hint Driven Pydantic Conversion**: Empower developers to control Pydantic conversion of `messages` and `ground_truth` inputs through explicit type hints in their reward function signatures, managed by the `@reward_function` decorator.
+*   **Remove Ambiguity**: Deprecate and remove the `original_messages` concept to simplify the data model.
 
-This final conversion to a dictionary means that rich type information is lost. If one decorated function's output is intended to be the input for another function that expects an `EvaluateResult` object (or another specific object type), this direct composition is not possible as a dictionary is received instead.
+## 2. Core Concepts
 
-## Goal
+### 2.1. Dataset Structure (`.jsonl` files)
 
-Redesign the reward function API to allow for easier composition of reward functions, enabling them to pass richer data types (like `EvaluateResult` objects or other custom objects) between each other, while still providing an option for a dictionary-based interface for serialization or compatibility with external systems.
+Reward function datasets, typically in `.jsonl` format, will adhere to the following structure for each JSON line (entry):
 
-## Proposed Options
+*   **`messages`: `List[Message]`**
+    *   This field contains a list of message objects representing the input prompt or conversation context provided to the language model.
+    *   Each message object in the list should conform to a dictionary structure (e.g., `{"role": "user", "content": "Hello"}`).
+    *   This would contain the model output
+*   **`ground_truth`: Can be `List[Message]` or `str` Any**
+    *   This field contains a complete list of message object representing the expected or target response from the assistant for the given `messages` prompt.
+    *   Each object includes all relevant attributes of an assistant's turn, such as `role` (which will be "assistant"), `content`, `tool_calls`, `function_call`, etc.
+    *   Example: 
+        * `{"role": "assistant", "content": "Hi there!", "tool_calls": null}` or 
+        * just some simple integer for math questions.
+    *   It can also be Anything else, for example for math or coding, it is cleaner to just have one string as the output.
+    *   This would **not** be the model output, it will be the ground truth that the model output should be compared against.
+*   **`original_messages`: (Deprecated)**
+    *   This field is **deprecated** and must be removed from all datasets. 
 
-Here are several options for redesigning the API:
-
-### Option 1: Dual-Mode Decorator
-
-The `@reward_function` decorator could be modified to include a parameter that controls the return type.
-
-```python
-# In reward_kit/typed_interface.py
-def reward_function(return_object: bool = False): # New parameter
-    def decorator(func: EvaluateFunction) -> Union[DictEvaluateFunction, Callable[..., EvaluateResult]]:
-        @wraps(func)
-        def wrapper(
-            messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-        ) -> Union[Dict[str, Any], EvaluateResult]:
-            # ... (input coercion logic remains the same) ...
-            typed_messages = _coerce_input_messages(messages)
-
-            result_obj = func(typed_messages, **kwargs) # This should be an EvaluateResult or compatible
-
-            # Coerce to EvaluateResult if it's a dict
-            if not isinstance(result_obj, EvaluateResult):
-                result_obj = _res_adapter.validate_python(result_obj)
-
-            if return_object:
-                return result_obj # Return the EvaluateResult object itself
-            else:
-                return result_obj.model_dump() # Current behavior: return a dict
-        
-        if return_object:
-            return cast(Callable[..., EvaluateResult], wrapper)
-        else:
-            return cast(DictEvaluateFunction, wrapper)
-    return decorator
-
-# Usage
-@reward_function(return_object=True)
-def my_composable_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
-
-@reward_function() # Defaults to return_object=False
-def my_dict_output_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
+**Example `.jsonl` line:**
+```json
+{"messages": [{"role": "user", "content": "What is the capital of France?"}], "ground_truth": [{"role": "assistant", "content": "The capital of France is Paris."}]}
 ```
 
-**Pros:**
-*   Single decorator, potentially less confusing than multiple decorators.
-*   Flexible for the user.
+### 2.2. Reward Function Signature
 
-**Cons:**
-*   The decorator's return type becomes more complex (`Union`).
-*   Slightly more verbose usage if `return_object=True` is common.
-*   The decorator itself becomes a higher-order function (it returns the actual decorator).
-
-### Option 2: Separate Decorators
-
-Introduce a new decorator specifically for composable functions that return objects, keeping the existing one for dictionary outputs.
+The recommended standard signature for a reward function is as follows:
 
 ```python
-# In reward_kit/typed_interface.py
+from typing import List, Dict, Any, Union
+from reward_kit.models import Message, EvaluateResult
+from reward_kit.typed_interface import reward_function
 
-# Existing @reward_function (returns dict)
-# ... remains as is ...
-
-# New decorator
-def typed_reward_function(func: EvaluateFunction) -> Callable[..., EvaluateResult]:
-    """
-    Wraps an evaluate-style function, performing input coercion but returning 
-    the direct EvaluateResult object (or compatible type from func).
-    """
-    @wraps(func)
-    def wrapper(
-        messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> EvaluateResult:
-        typed_messages = _coerce_input_messages(messages) # Helper for input coercion
-        
-        result_obj = func(typed_messages, **kwargs)
-
-        # Ensure it's an EvaluateResult or can be coerced
-        if not isinstance(result_obj, EvaluateResult):
-            # This step ensures the function still adheres to returning something
-            # that can be understood as an EvaluateResult, even if it's an object.
-            # If func is guaranteed to return EvaluateResult, this might be simplified.
-            result_obj = _res_adapter.validate_python(result_obj) 
-        
-        return result_obj
-    return cast(Callable[..., EvaluateResult], wrapper)
-
-# Usage
-@typed_reward_function
-def my_composable_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
-
-@reward_function 
-def my_dict_output_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
-```
-
-**Pros:**
-*   Clear separation of concerns. The decorator name indicates its behavior.
-*   Simpler implementation for each decorator.
-*   Type signature of each decorator is simpler.
-
-**Cons:**
-*   Users need to know about and choose between two decorators.
-
-### Option 3: Accessing the Original/Typed Function via an Attribute
-
-The existing `@reward_function` decorator could attach the underlying typed function (or a version that returns objects) as an attribute to the wrapped dictionary-returning function.
-
-```python
-# In reward_kit/typed_interface.py
-def reward_function(func: EvaluateFunction) -> DictEvaluateFunction:
-    @wraps(func)
-    def wrapper(
-        messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> Dict[str, Any]:
-        # ... (current logic for input coercion and calling func) ...
-        typed_messages = _coerce_input_messages(messages)
-        result_obj = func(typed_messages, **kwargs)
-        if not isinstance(result_obj, EvaluateResult):
-            result_obj = _res_adapter.validate_python(result_obj)
-        return result_obj.model_dump()
-
-    # Create the object-returning version
-    @wraps(func) # Preserve metadata of original func
-    def object_returning_version(
-        messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> EvaluateResult:
-        typed_messages = _coerce_input_messages(messages)
-        result_obj = func(typed_messages, **kwargs)
-        if not isinstance(result_obj, EvaluateResult):
-            result_obj = _res_adapter.validate_python(result_obj)
-        return result_obj
-    
-    wrapper.as_object = cast(Callable[..., EvaluateResult], object_returning_version)
-    # or wrapper.raw_function = func (if func already handles coercion or is strictly typed)
-    
-    return cast(DictEvaluateFunction, wrapper)
-
-# Usage
 @reward_function
-def my_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
-
-dict_result = my_reward_func(some_messages)
-object_result = my_reward_func.as_object(some_messages) 
+def my_reward_func(
+    messages: List[Message],  # Or List[Dict[str, Any]] if no Pydantic conversion is desired
+    ground_truth: List[Message],    # Or Any if no Pydantic conversion is desired
+    **kwargs: Any
+) -> EvaluateResult:
+    # Assistant's response content can be accessed via ground_truth.content
+    # Prompt/context is in messages
+    # ... evaluation logic ...
+    pass
 ```
 
-**Pros:**
-*   Maintains backward compatibility for the default behavior.
-*   Composition is possible by accessing the `.as_object` (or similar) attribute.
+The type hints for the `messages` and `ground_truth` parameters play a crucial role in how the `@reward_function` decorator processes these inputs (see next section).
 
-**Cons:**
-*   Accessing an attribute for a different behavior might feel less clean or discoverable.
-*   The type hinting for the decorated function and its attribute can be tricky.
+### 2.3. `@reward_function` Decorator Behavior (Input Handling)
 
-### Option 4: Decorator Returns a Wrapper Object
+The `@reward_function` decorator, located in `reward_kit/typed_interface.py`, will manage the Pydantic conversion of the `messages` and `ground_truth` arguments based on the type hints of the decorated function.
 
-The decorator could return an object that provides different methods for different return types.
+*   **`messages` Argument Processing**:
+    *   If the decorated function's `messages` parameter is explicitly type-hinted as `List[Message]` (e.g., `messages: List[Message]`), the decorator will attempt to convert the input `messages` (expected to be `List[Dict[str, Any]]` from the dataset) into a list of `reward_kit.models.Message` Pydantic objects.
+    *   If the type hint is anything else (e.g., `List[Dict[str, Any]]`, `Any`, or if no type hint is provided that specifically indicates `List[Message]`), the `messages` argument will be passed through to the decorated function as is, without Pydantic conversion.
+*   **`ground_truth` Argument Processing**:
+    *   If the decorated function's `ground_truth` parameter is explicitly type-hinted as `List[Message]` (e.g., `ground_truth: List[Message]`), the decorator will attempt to convert the input `ground_truth` (expected to be `List[Dict[str, Any]]` from the dataset) into a `List[reward_kit.models.Message]` Pydantic object.
+    *   If the type hint is anything else (e.g., `List[Dict[str, Any]]`, `str`, `Any`, or if no type hint is provided that specifically indicates `List[Message]`), the `ground_truth` argument will be passed through as is.
+*   **Type Hinting Guidance**:
+    *   For maximum clarity and predictable behavior, developers should use explicit type hints for `messages` and `ground_truth` parameters in their reward functions.
+    *   Preferred hints:
+        *   For `messages`: `List[Message]` (for Pydantic objects) or `List[Dict[str, Any]]` (for raw dictionaries).
+        *   For `ground_truth`: `List[Message]` (for a Pydantic object) or `List[Dict[str, Any]]` (for a raw dictionary).
+    *   The use of `Union` types for these specific parameters (e.g., `Union[List[Message], List[Dict[str, Any]]]`) should be minimized in new and refactored code to simplify understanding the decorator's behavior. The decorator will prioritize the `Message` / `List[Message]` part of a Union if present for conversion.
 
-```python
-# In reward_kit/typed_interface.py
-class RewardFunctionWrapper:
-    def __init__(self, func: EvaluateFunction):
-        self._typed_func = func # The original function expecting typed inputs
-        # Potentially pre-validate or inspect func signature here
+## 3. Refactoring Tasks (Breakdown for Parallel Work)
 
-    def _call_internal(self, messages_input: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any) -> EvaluateResult:
-        typed_messages = _coerce_input_messages(messages_input)
-        result_obj = self._typed_func(typed_messages, **kwargs)
-        if not isinstance(result_obj, EvaluateResult):
-            result_obj = _res_adapter.validate_python(result_obj)
-        return result_obj
+The following tasks are identified to implement this refactor. They can be worked on in parallel where dependencies allow.
 
-    def __call__(self, messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any) -> Dict[str, Any]:
-        """Default call returns a dictionary."""
-        result_obj = self._call_internal(messages, **kwargs)
-        return result_obj.model_dump()
+**Task 1: Update `@reward_function` Decorator (`reward_kit/typed_interface.py`)**
+*   **Description**: Modify the decorator to implement the conditional Pydantic conversion logic described in section 2.3 for `messages` and `ground_truth` arguments based on their type hints in the decorated function.
+*   **Key Files**: `reward_kit/typed_interface.py`
+*   **Acceptance Criteria**:
+    *   Decorator correctly converts `messages` to `List[Message]` if type-hinted as such.
+    *   Decorator correctly converts `ground_truth` to `List[Message]` if type-hinted as such.
+    *   Inputs are passed as-is if not matching these specific Pydantic type hints.
+    *   Comprehensive unit tests for all conversion scenarios (hinted for Pydantic, hinted for raw, no hint) are added and pass.
 
-    def call_object(self, messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any) -> EvaluateResult:
-        """Call and return the EvaluateResult object."""
-        return self._call_internal(messages, **kwargs)
+**Task 2: Dataset Migration Script & Execution**
+*   **Description**: Develop a robust Python script to transform all existing `.jsonl` datasets to the new format. The script must:
+    1.  Iterate through each line of an input `.jsonl` file.
+    2.  For each JSON object, read the `messages` list.
+    3.  Identify the last message in this list. If it has `role: "assistant"`, move this entire message object into a new list and assign it to a new top-level field named `ground_truth`. (If `ground_truth` is intended to capture a longer trajectory, this step would involve collecting all relevant assistant and tool messages into the list).
+    4.  The `messages` field should then be updated to contain only the preceding messages (the context/prompt).
+    5.  Remove the `original_messages` field entirely if it exists.
+    6.  Write the modified JSON object to an output file (or overwrite with backup).
+*   **Files to Migrate**: A comprehensive list needs to be compiled by searching for `*.jsonl` files within the `examples/` and `development/` directories. Key examples include:
+    *   `examples/samples/samples.jsonl`
+    *   `development/CODING_DATASET.jsonl`
+    *   (Others to be identified)
+*   **Acceptance Criteria**:
+    *   All specified `.jsonl` datasets are correctly transformed to the new structure.
+    *   The script is idempotent or handles already migrated files gracefully.
+    *   The script logs its actions and any anomalies encountered.
 
-def reward_function(func: EvaluateFunction) -> RewardFunctionWrapper:
-    return RewardFunctionWrapper(func)
+**Task 3: Refactor Core Reward Functions (`reward_kit/rewards/`)**
+*   **Description**: Update all existing reward functions located in the `reward_kit/rewards/` directory to:
+    1.  Adapt their signatures to accept `messages` (as the prompt/context) and `ground_truth` (as the assistant's full response object).
+    2.  Remove any internal logic that extracts the assistant's response from `messages[-1]`. Instead, use attributes of the `ground_truth` objects (e.g., `ground_truth[0].content`, iterate through the list if it's a trajectory).
+    3.  Completely remove any handling or reliance on an `original_messages` parameter.
+    4.  Update type hints for `messages` and `ground_truth` to be explicit (e.g., `List[Message]`, `List[Dict[str, Any]]`) to clearly define whether Pydantic conversion is expected for each.
+*   **Key Files**: All Python files in `reward_kit/rewards/`.
+*   **Acceptance Criteria**:
+    *   All core reward functions are refactored to the new input paradigm.
+    *   Functions operate correctly with the new data flow.
+    *   Corresponding unit tests in the `tests/` directory are updated to reflect these changes and all tests pass.
 
-# Usage
-@reward_function
-def my_reward_func(messages: List[Message]) -> EvaluateResult:
-    # ...
-    return EvaluateResult(...)
+**Task 4: Update Example Scripts (`examples/`)**
+*   **Description**: Review and refactor all Python example scripts in the `examples/` directory that demonstrate the use of reward functions, dataset loading, or dataset processing. These scripts must be updated to align with the new API, data format, and best practices.
+*   **Key Files**: All relevant `*.py` files in `examples/`.
+*   **Acceptance Criteria**:
+    *   Example scripts run correctly using the refactored reward functions and new dataset structure.
+    *   Examples clearly demonstrate the new way of defining and using reward functions.
 
-dict_result = my_reward_func(some_messages) # Calls __call__
-object_result = my_reward_func.call_object(some_messages)
-```
+**Task 5: Update TRL Adapter (`reward_kit/reward_function.py`)**
+*   **Description**: Review and update the `RewardFunction.get_trl_adapter` method. Ensure it correctly processes `prompts` (which will map to the new `messages` format – the input context) and `solutions` (which will map to the new `ground_truth` format – the target assistant response). The adapter must pass these to the underlying reward function in the expected manner.
+*   **Key Files**: `reward_kit/reward_function.py`
+*   **Acceptance Criteria**:
+    *   The TRL adapter correctly interfaces with refactored reward functions.
+    *   TRL integration examples (if any) continue to work or are updated.
+    *   Relevant tests for the TRL adapter pass.
 
-**Pros:**
-*   Clean and explicit API via methods on the wrapper object.
-*   Good discoverability of different calling conventions.
-*   The wrapper object can potentially hold more state or offer more utilities in the future.
+**Task 6: Documentation Update (`docs/`, `CONTRIBUTING.md`, etc.)**
+*   **Description**: Thoroughly update all project documentation to reflect the changes. This includes:
+    *   API reference documentation for `@reward_function`, `Message`, `EvaluateResult`.
+    *   Tutorials and guides on creating and using reward functions.
+    *   Explanations of the new dataset format.
+    *   Updates to `CONTRIBUTING.md` regarding reward function development standards and type hinting.
+*   **Key Files**: Files within `docs/`, `README.md`, `development/CONTRIBUTING.md`.
+*   **Acceptance Criteria**: All documentation is accurate, consistent, and clearly explains the new API and data structures.
 
-**Cons:**
-*   The decorated function is no longer a simple callable in the traditional sense for its default behavior (it's an object that *is* callable). This might affect introspection or how it's treated by some frameworks, though `__call__` makes it behave like a function.
+**Task 7: Review `RewardFunction` Class (`reward_kit/reward_function.py`)**
+*   **Description**: Examine the `RewardFunction` class, specifically its `__call__` method and how it handles functions loaded via `func_path` that might not be decorated with `@reward_function`. Determine if this class should also implement similar type-hint-based Pydantic conversion for `messages` and `ground_truth` for consistency, or if it should be clearly documented that functions used this way must manage their own input types.
+*   **Key Files**: `reward_kit/reward_function.py`
+*   **Acceptance Criteria**: The behavior of the `RewardFunction` class with potentially non-decorated functions is well-defined, consistent with the overall design, and clearly documented.
 
-### Option 5: Conditional Dumping Based on Function's Return Annotation (More Implicit)
+## 4. Code Style and Type Hinting Conventions
 
-Modify the existing decorator to inspect the wrapped function's return type annotation. If it's `EvaluateResult`, it could avoid dumping to dict. This is more implicit.
+*   **Explicit Type Hints**: When defining or refactoring reward functions, use explicit type hints for `messages` and `ground_truth` parameters.
+    *   For `messages`: Prefer `List[Message]` if Pydantic objects are desired, or `List[Dict[str, Any]]` if raw dictionaries are preferred.
+    *   For `ground_truth`: Prefer `List[Message]` if Pydantic objects are desired, or `List[Dict[str, Any]]` if raw dictionaries are preferred.
+*   **Minimize `Union` Types**: Avoid using `Union` types for the `messages` and `ground_truth` parameters in reward function signatures where possible, as the decorator's behavior is more straightforward with explicit, non-union types.
+*   **Consistency**: Ensure that the type hints used in function signatures accurately reflect whether Pydantic conversion is expected for those inputs.
 
-```python
-# In reward_kit/typed_interface.py
-import inspect
+## 5. Progress Update (As of 2025-05-15)
 
-def reward_function(func: EvaluateFunction) -> Union[DictEvaluateFunction, Callable[..., EvaluateResult]]:
-    @wraps(func)
-    def wrapper(
-        messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> Union[Dict[str, Any], EvaluateResult]:
-        typed_messages = _coerce_input_messages(messages)
-        result_obj = func(typed_messages, **kwargs)
+**Task 1: Update `@reward_function` Decorator (`reward_kit/typed_interface.py`)**
+*   **Status**: COMPLETED
+*   **Details**: The decorator in `reward_kit/typed_interface.py` has been modified to implement conditional Pydantic conversion for `messages` (to `List[Message]`) and `ground_truth` (to `List[Message]`) based strictly on whether the decorated function's parameters are type-hinted as `List[Message]`.
 
-        # Ensure result_obj is an EvaluateResult instance
-        if not isinstance(result_obj, EvaluateResult):
-            result_obj = _res_adapter.validate_python(result_obj)
+**Task 2: Dataset Migration Script & Execution**
+*   **Status**: COMPLETED
+*   **Details**: A script `scripts/migrate_datasets.py` was created and executed on the following target files:
+    *   `development/CODING_DATASET.jsonl`
+    *   `examples/samples/samples.jsonl`
+    *   `examples/flight_task/task.jsonl`
+    *   `examples/trl_integration/data/simulated_deepcoder_raw_sample.jsonl`
+    *   `examples/trl_integration/data/simulated_deepcoder_transformed_sample.jsonl`
+    The script transformed these datasets to the new format (`messages` for prompt, `ground_truth` as a list containing the assistant's response message, and `original_messages` removed).
 
-        # Check original function's return annotation
-        sig = inspect.signature(func)
-        if sig.return_annotation == EvaluateResult:
-            return result_obj # Return as object
-        else:
-            return result_obj.model_dump() # Default to dict
+**Task 3: Refactor Core Reward Functions (`reward_kit/rewards/`)**
+*   **Status**: IN PROGRESS
+*   **Completed Sub-tasks**:
+    *   `reward_kit/rewards/accuracy.py` and `tests/test_accuracy.py` refactored and tests passing.
+    *   `reward_kit/rewards/length.py` and `tests/test_length.py` refactored and tests passing.
+    *   `reward_kit/rewards/format.py` and `tests/test_format.py` refactored and tests passing.
+    *   `reward_kit/rewards/repetition.py` and `tests/test_repetition.py` refactored and tests passing.
+    *   `reward_kit/rewards/json_schema.py` (specifically `json_schema_reward` and `json_schema_reward_with_llm_judge`) and `tests/test_json_schema.py` refactored and tests passing.
+    *   `reward_kit/rewards/function_calling.py` (specifically `schema_jaccard_reward`, `llm_judge_reward`, `composite_function_call_reward`, and helper `match_function_call`) and `tests/test_function_calling.py` refactored and tests passing.
+    *   `reward_kit/rewards/math.py` and `tests/test_math.py` refactored and tests passing.
+    *   `reward_kit/rewards/language_consistency.py` and `tests/test_language_consistency.py` refactored and tests passing.
+    *   `reward_kit/rewards/code_execution.py` and `tests/test_code_execution.py` refactored and tests passing.
+    *   `reward_kit/rewards/bfcl_reward.py` refactored. (Note: No specific tests found for `bfcl_reward.py` in `tests/` directory).
+    *   `reward_kit/rewards/cpp_code.py` and `tests/test_cpp_code.py` refactored and tests passing.
+    *   `reward_kit/rewards/deepcoder_reward.py` and `tests/test_deepcoder_reward.py` refactored and tests passing.
+    *   `reward_kit/rewards/lean_prover.py` and `tests/test_lean_prover.py` refactored and tests passing.
+    *   `reward_kit/rewards/list_comparison_math_reward.py` and `tests/test_list_comparison_math_reward.py` refactored and tests passing.
+*   **Remaining Sub-tasks (Example)**:
+    *   Refactor `reward_kit/rewards/advanced_math.py` and its tests. (Note: File `reward_kit/rewards/advanced_math.py` not found, likely removed or renamed).
+    *   Refactor `reward_kit/rewards/multiple_choice_math_reward.py` and its tests.
+    *   Refactor `reward_kit/rewards/reasoning_steps.py` and its tests.
+    *   Refactor `reward_kit/rewards/accuracy_length.py` and its tests.
+    *   (Review all files in `reward_kit/rewards/` for any other reward functions).
 
-    # This casting becomes tricky due to conditional return type
-    # Needs careful thought on how to represent this to type checkers
-    # For simplicity, one might assume it usually returns DictEvaluateFunction
-    # and users wanting objects would type assert or ignore type errors.
-    return cast(DictEvaluateFunction, wrapper) 
-```
+**Task 4: Update Example Scripts (`examples/`)**
+*   **Status**: PENDING
 
-**Pros:**
-*   Potentially "just works" for functions annotated to return `EvaluateResult`.
+**Task 5: Update TRL Adapter (`reward_kit/reward_function.py`)**
+*   **Status**: PENDING
 
-**Cons:**
-*   Behavior is implicit and depends on type annotations, which might not always be present or accurate.
-*   Harder to type correctly and for users to understand the exact return type without inspecting the wrapped function's annotations.
-*   Could lead to unexpected behavior if annotations are changed.
+**Task 6: Documentation Update (`docs/`, `CONTRIBUTING.md`, etc.)**
+*   **Status**: PENDING
 
-## Recommendation
-
-**Option 2 (Separate Decorators)** or **Option 4 (Decorator Returns a Wrapper Object)** seem like the cleanest and most explicit solutions.
-
-*   **Option 2 (`typed_reward_function`)** is simple and makes the intent very clear through the decorator name. It's a common pattern to have different decorators for different behaviors.
-*   **Option 4 (`RewardFunctionWrapper` object)** offers a very explicit API (`.call_object()`) and is perhaps the most "object-oriented". It also provides a natural place to add more functionality to the wrapped reward function in the future.
-
-**Option 1 (Dual-Mode Decorator)** is also viable but makes the decorator itself a bit more complex (being a function that returns a decorator).
-
-A common helper function `_coerce_input_messages` should be used by any chosen solution to handle the conversion from `List[Dict]` to `List[Message]` to avoid code duplication. Similarly, a `_ensure_evaluate_result` helper could be used.
-
-Let's assume `_coerce_input_messages` would look something like this (extracted from the current `typed_interface.py`):
-```python
-def _coerce_input_messages(messages_input: Union[List[Dict[str, Any]], List[Message]]) -> List[Message]:
-    try:
-        typed_messages = []
-        for msg in messages_input:
-            if isinstance(msg, Message):
-                typed_messages.append(msg)
-            else:
-                # Simplified for brevity, full validation from typed_interface.py
-                typed_messages.append(Message(**msg)) 
-        return typed_messages
-    except Exception as err:
-        raise ValueError(f"Input messages failed validation:\n{err}") from None
-```
-
-Further discussion is needed to decide on the best path forward. The primary trade-off is between explicitness, simplicity, and the number of new symbols introduced.
+**Task 7: Review `RewardFunction` Class (`reward_kit/reward_function.py`)**
+*   **Status**: PENDING

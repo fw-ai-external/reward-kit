@@ -387,142 +387,137 @@ def string_similarity(s1: str, s2: str) -> float:
 
 @reward_function
 def accuracy_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    ground_truth: Optional[str] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Last message is model's response
+    ground_truth: Union[List[Message], List[Dict[str, Any]]], # Expected assistant response trajectory
     extract_fn: Optional[Callable[[str], str]] = None,
     compare_fn: Optional[Callable[[str, str], float]] = None,
     **kwargs: Any,
 ) -> EvaluateResult:
     """
     Reward function that evaluates accuracy of responses against ground truth.
+    The model's response is assumed to be the last message in the `messages` list.
+    The ground truth is expected to be a list of messages, typically the content of
+    the first message in this list (`ground_truth[0].content`) is used for comparison.
 
     Args:
-        messages: List of conversation messages
-        ground_truth: Expected correct answer
-        extract_fn: Optional function to extract answer from text
-        compare_fn: Optional function to compare answers
-        **kwargs: Additional arguments
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: List of ground truth messages. For simple accuracy, `ground_truth[0].content` is typically used.
+        extract_fn: Optional function to extract answer from text.
+        compare_fn: Optional function to compare answers.
+        **kwargs: Additional arguments.
 
     Returns:
         EvaluateResult with score based on accuracy
     """
-    # Get last message (the model's response)
-    if not messages or len(messages) == 0:
+    model_response_text = ""
+    if not messages:
         return EvaluateResult(
             score=0.0,
-            reason="No messages provided",
-            metrics={
-                "accuracy": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
-                )
-            },
+            reason="No messages provided (cannot extract model response).",
+            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="No messages provided.")}
         )
 
-    response = messages[-1]
-
-    # Extract response text
-    if isinstance(response, Message):
-        if response.role != "assistant" or not response.content:
+    model_last_message = messages[-1]
+    if isinstance(model_last_message, Message):
+        if model_last_message.role == "assistant" and model_last_message.content is not None:
+            model_response_text = model_last_message.content
+        else:
             return EvaluateResult(
                 score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "accuracy": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
+                reason="Last message is not a valid assistant response.",
+                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid assistant response.")}
             )
-        text = response.content
-    elif isinstance(response, dict):
-        if response.get("role") != "assistant" or not response.get("content"):
+    elif isinstance(model_last_message, dict):
+        if model_last_message.get("role") == "assistant" and model_last_message.get("content") is not None:
+            model_response_text = model_last_message.get("content", "")
+        else:
             return EvaluateResult(
                 score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "accuracy": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
+                reason="Last message is not a valid assistant response (dict format).",
+                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid assistant response (dict).")}
             )
-        text = response.get("content", "")
-
-    # Find ground truth if not provided
-    if ground_truth is None:
-        # Attempt to extract from user query
-        for msg in messages:
-            if (isinstance(msg, Message) and msg.role == "user") or (
-                isinstance(msg, dict) and msg.get("role") == "user"
-            ):
-                content = (
-                    msg.content
-                    if isinstance(msg, Message)
-                    else msg.get("content", "")
-                )
-                # Look for ground truth patterns like "correct answer is X"
-                gt_patterns = [
-                    r"(?:correct|right|expected)\s+answer\s+(?:is|:)\s+(.*?)(?:\.|$)",
-                    r"answer\s*(?:is|:)\s*(.*?)(?:\.|$)",
-                    r"equals\s+(.*?)(?:\.|$)",
-                    r"evaluate to\s+(.*?)(?:\.|$)",
-                ]
-
-                for pattern in gt_patterns:
-                    match = re.search(pattern, content, re.IGNORECASE)
-                    if match:
-                        ground_truth = match.group(1).strip()
-                        break
-
-                if ground_truth:
-                    break
-
-    # If still no ground truth, we can't evaluate accuracy
-    if not ground_truth:
-        return EvaluateResult(
-            score=0.0,
-            reason="No ground truth provided for comparison",
-            metrics={
-                "accuracy": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="Cannot evaluate accuracy without ground truth",
-                )
-            },
-        )
-
-    # Extract answer from response using provided function or default
-    if extract_fn:
-        extracted_answer = extract_fn(text)
     else:
-        extracted_answer = extract_math_expression(text)
+        return EvaluateResult(
+            score=0.0,
+            reason=f"Unexpected type for last message: {type(model_last_message)}.",
+            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid message type.")}
+        )
 
-    # If extraction failed, try direct comparison
-    if not extracted_answer:
-        # For simple answers like "Paris", just check if ground truth is in text
-        if len(ground_truth) > 2:  # Avoid matching short strings like "a", "an"
-            if ground_truth.lower() in text.lower():
-                extracted_answer = ground_truth
+    ground_truth_comparison_text = ""
+    if not ground_truth or not isinstance(ground_truth, list) or len(ground_truth) == 0:
+        return EvaluateResult(
+            score=0.0,
+            reason="Ground truth not provided or not in expected list format.",
+            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid ground truth format.")}
+        )
+
+    # Assuming for simple accuracy, we compare against the content of the first ground truth message
+    first_gt_message = ground_truth[0]
+    if isinstance(first_gt_message, Message):
+        if first_gt_message.content is not None:
+            ground_truth_comparison_text = first_gt_message.content
+        else:
+            # Ground truth message has no content
+            return EvaluateResult(
+                score=0.0,
+                reason="First ground truth message has no content.",
+                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Ground truth content missing.")}
+            )
+    elif isinstance(first_gt_message, dict):
+        if first_gt_message.get("content") is not None:
+            ground_truth_comparison_text = first_gt_message.get("content", "")
+        else:
+            # Ground truth message dict has no content
+            return EvaluateResult(
+                score=0.0,
+                reason="First ground truth message (dict) has no content.",
+                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Ground truth content missing (dict).")}
+            )
+    else:
+         return EvaluateResult(
+            score=0.0,
+            reason=f"Unexpected type for first ground_truth message: {type(first_gt_message)}.",
+            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid ground truth message type.")}
+        )
+    
+    # If ground_truth_comparison_text ended up empty (e.g. content was explicitly None and handled by .get default)
+    # This check is important if None content is valid but means "empty string" for comparison.
+    # However, the above checks for `is not None` should make this specific check less critical
+    # unless an empty string itself is an invalid ground truth for comparison.
+    # For safety, we can add a check if an empty string is not a valid GT for comparison.
+    # For now, an empty string will proceed to comparison.
+
+    # Extract answer from model's response text using provided function or default
+    if extract_fn:
+        extracted_answer = extract_fn(model_response_text)
+    else:
+        extracted_answer = extract_math_expression(model_response_text)
+
+    # If extraction failed, try direct comparison using the full model_response_text
+    if not extracted_answer and model_response_text: # Check model_response_text to avoid error if it's empty
+        # For simple answers like "Paris", check if ground truth is in the model response text
+        if len(ground_truth_comparison_text) > 2:  # Avoid matching short strings like "a", "an"
+            if ground_truth_comparison_text.lower() in model_response_text.lower():
+                extracted_answer = ground_truth_comparison_text # If GT is found in response, consider it "extracted"
+            # else, extracted_answer remains empty, and comparison will likely yield 0
 
     # Check extraction result
     has_extracted = bool(extracted_answer)
 
-    # Compare extracted answer with ground truth using provided function or default
+    # Compare extracted answer with ground truth text using provided function or default
     if compare_fn:
-        similarity_score = compare_fn(extracted_answer, ground_truth)
+        similarity_score = compare_fn(extracted_answer, ground_truth_comparison_text)
     else:
         similarity_score = compare_math_expressions(
-            extracted_answer, ground_truth
+            extracted_answer, ground_truth_comparison_text
         )
 
     # Success is 1.0 for perfect match, otherwise based on threshold
-    success = similarity_score >= 0.9
+    success = similarity_score >= 0.9 # Assuming 0.9 is the threshold for success
 
     # Prepare reason text
     reason = (
-        f"Expected: '{ground_truth}', Extracted: '{extracted_answer}', "
+        f"Expected: '{ground_truth_comparison_text}', Extracted: '{extracted_answer}', "
         f"Similarity: {similarity_score:.2f}"
     )
 

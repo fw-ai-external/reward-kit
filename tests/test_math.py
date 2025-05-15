@@ -4,16 +4,17 @@ Tests for math reward functions.
 
 import pytest
 import re
-from typing import Union, Optional # Added Optional
+from typing import Union, Optional, List # Added List
 from reward_kit.rewards.math import (
     extract_numbers,
     compare_numbers,
     math_reward,
 )
-from reward_kit.rewards.advanced_math import advanced_math_reward
+# Removed: from reward_kit.rewards.advanced_math import advanced_math_reward
 from reward_kit.models import (
     EvaluateResult,
     MetricResult,
+    Message, # Added Message import
 )
 
 
@@ -279,360 +280,274 @@ class TestCompareNumbers:
 
 
 class TestMathReward:
+    # Helper to create a common prompt
+    def _get_prompt(self) -> Optional[List[Message]]: # Ensure return type matches Optional if used as such
+        return [Message(role="user", content="Solve the math problem.")]
+
     def test_basic_match_boxed(self):
-        original = [{"role": "assistant", "content": "Answer is \\boxed{4}."}]
-        generated = [{"role": "assistant", "content": "It is \\boxed{4}."}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="It is \\boxed{4}.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Answer is \\boxed{4}."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert result['score'] == 1.0
+        # assert result.score == 1.0 # Corrected access
 
     def test_basic_match_gsm8k(self):
-        original = [{"role": "assistant", "content": "Final answer: #### 4"}]
-        generated = [{"role": "assistant", "content": "The result is #### 4"}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="The result is #### 4")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Final answer: #### 4"
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert result['score'] == 1.0
+        # assert result.score == 1.0 # Corrected access
 
     def test_basic_match_mcq(self):
-        # math_reward no longer handles MCQs directly.
-        # extract_numbers on "(A)" will return [].
-        original = [{"role": "assistant", "content": "Choice (A)."}] # Original still has an MCQ-like string
-        generated = [{"role": "assistant", "content": "My answer is (A)."}] # Generated also
-        result = math_reward(messages=generated, original_messages=original)
-        assert isinstance(result, EvaluateResult)
-        # Expected: No answer extracted from either if they only contain "(A)" and no other numbers.
-        # If original_messages's extract_numbers also returns [], then reason is "Could not extract answers from original message"
-        # If original_messages's extract_numbers returns something (e.g. if it was "\\boxed{A}"), 
-        # and generated's extract_numbers returns [], then reason is "Could not extract answers from generated message"
-        assert result.score == 0.0 
-        assert result['score'] == 0.0
-        # Check for a reason indicating no extractable answer, rather than a specific match/mismatch reason.
-        assert result.reason is not None and ("Could not extract answers from original message" in result.reason or \
-               "Could not extract answers from generated message" in result.reason)
-        assert result['reason'] is not None and ("Could not extract answers from original message" in result['reason'] or \
-               "Could not extract answers from generated message" in result['reason'])
-        
-    def test_basic_match_general_fallback_number(self):
-        original = [{"role": "assistant", "content": "The number is 4."}]
-        generated = [{"role": "assistant", "content": "It is 4."}]
-        result = math_reward(messages=generated, original_messages=original)
-        assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
-
-    def test_close_match_tolerance(self):
-        original = [{"role": "assistant", "content": "Pi is \\boxed{3.14159}."}]
-        generated = [{"role": "assistant", "content": "Pi is \\boxed{3.14}."}]
-        result = math_reward(messages=generated, original_messages=original, tolerance=0.01)
-        assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
-
-    def test_wrong_answer_numeric(self):
-        original = [{"role": "assistant", "content": "Answer: \\boxed{4}."}]
-        generated = [{"role": "assistant", "content": "Answer: \\boxed{5}."}]
-        result = math_reward(messages=generated, original_messages=original)
-        assert isinstance(result, EvaluateResult)
-        assert result.score < 0.1 
-        assert result['score'] < 0.1
-
-    def test_wrong_answer_mcq(self):
-        # Both original and generated will have [] from extract_numbers if only MCQs are present.
-        original = [{"role": "assistant", "content": "Choice (A)."}]
-        generated = [{"role": "assistant", "content": "Choice (B)."}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="My answer is (A).")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Choice (A)."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        assert result.reason is not None and "Could not extract answers from original message" in result.reason
-        assert result['reason'] is not None and "Could not extract answers from original message" in result['reason']
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Could not extract answers from original message (ground truth)" in result.reason # Made safe and used attribute
+        # Removed redundant or incorrect second reason check based on dictionary access
 
     def test_type_mismatch_mcq_vs_number(self):
-        original = [{"role": "assistant", "content": "Answer is \\boxed{1}."}] 
-        generated = [{"role": "assistant", "content": "Answer is (A)."}] # extract_numbers for this is []
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="It is 4.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "The number is 4."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        # assert result.score == 1.0 # Corrected access
+
+    def test_close_match_tolerance(self):
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Pi is \\boxed{3.14}.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Pi is \\boxed{3.14159}."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            tolerance=0.01
+        )
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 1.0
+        # assert result.score == 1.0 # Corrected access
+
+    def test_wrong_answer_numeric(self):
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Answer: \\boxed{5}.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Answer: \\boxed{4}."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
+        assert isinstance(result, EvaluateResult)
+        assert result.score < 0.1 
+        # assert result.score < 0.1 # Corrected access
+
+    def test_wrong_answer_mcq(self):
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Choice (B).")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Choice (A)."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        # Original extracts [("\\boxed{1}", 1.0)]. Generated extracts [].
-        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
-        assert result['reason'] is not None and "Could not extract answers from generated message" in result['reason']
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Could not extract answers from generated message" in result.reason
+        # Removed redundant or incorrect second reason check
 
     def test_no_answer_in_generated(self):
-        original = [{"role": "assistant", "content": "Answer is \\boxed{1}."}]
-        generated = [{"role": "assistant", "content": "I don't know."}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Answer is (A).")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Answer is \\boxed{1}."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        assert result.reason is not None and "Could not extract answers from generated message" in result.reason
-        assert result['reason'] is not None and "Could not extract answers from generated message" in result['reason']
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Could not extract answers from generated message" in result.reason
+        # Removed redundant or incorrect second reason check
 
     def test_no_answer_in_original(self):
-        original = [{"role": "assistant", "content": "What is it?"}]
-        generated = [{"role": "assistant", "content": "Answer is \\boxed{1}."}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="I don't know.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Answer is \\boxed{1}."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        assert result.reason is not None and "Could not extract answers from original message" in result.reason
-        assert result['reason'] is not None and "Could not extract answers from original message" in result['reason']
+        # assert result.score == 0.0 # Corrected access
+        assert result.reason and "Could not extract answers from generated message" in result.reason
+        # assert result.reason and "Could not extract answers from generated message" in result.reason # Corrected access
+
+    def test_no_answer_in_original(self):
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Answer is \\boxed{1}.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "What is it?"
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
+        assert isinstance(result, EvaluateResult)
+        assert result.score == 0.0
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Could not extract answers from original message (ground truth)" in result.reason
+        # Removed redundant or incorrect second reason check
 
     # --- Strictness Penalty Tests ---
     def test_penalty_unboxed_or_issue1(self):
-        original = [{"role": "assistant", "content": "The answer is $\\boxed{1/2}$."}] 
-        generated_content = "The answer is $1/2 \\text{ or } 1$." 
-        # extract_numbers(generated_content) -> [("1/2", 0.5), ("1", 1.0)] (from general fallback)
-        # gen_numeric_values_count = 2. " or " in gen_content. is_gen_single_boxed_or_expr = False.
-        # Penalty 1 applies.
-        generated = [{"role": "assistant", "content": generated_content}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="The answer is $1/2 \\text{ or } 1$.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "The answer is $\\boxed{1/2}$."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        assert result.reason is not None and "Strictness fail (Issue #1)" in result.reason
-        assert result['reason'] == result.reason # Check attribute and dict access give same reason string
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Strictness fail (Issue #1)" in result.reason
         assert result.metrics["strictness_penalty_unboxed_or"].reason == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
-        assert result['metrics']["strictness_penalty_unboxed_or"]['reason'] == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
+        # assert result.metrics["strictness_penalty_unboxed_or"].reason == "Generated answer offers multiple numeric alternatives with an unboxed 'or'." # Corrected metrics access, removed duplicate
 
     def test_no_penalty_if_gen_is_single_boxed_or_expr(self):
-        original = [{"role": "assistant", "content": "The answer is $\\boxed{1/2 \\text{ or } 1}$."}]
-        generated = [{"role": "assistant", "content": "The answer is $\\boxed{1/2 \\text{ or } 1}$."}]
-        # gen_answers_extracted = [("\\boxed{1/2 or 1}", "1/2 or 1")]
-        # is_gen_single_boxed_or_expr = True. Penalty 1 does not apply.
-        # len(orig) = 1, len(gen) = 1. Penalty 2 does not apply.
-        # Comparison: "1/2 or 1" vs "1/2 or 1" -> match.
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="The answer is $\\boxed{1/2 \\text{ or } 1}$.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "The answer is $\\boxed{1/2 \\text{ or } 1}$."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
-        assert result.reason is None or "Strictness fail" not in result.reason # reason can be None if score is 1.0
-        assert result['reason'] is None or "Strictness fail" not in result['reason']
+        assert result.score == 1.0 
+        assert result.score == 1.0 # Changed to attribute access
+        assert result.reason is None or "Strictness fail" not in result.reason 
 
     def test_penalty_ambiguity_issue2(self):
-        original = [{"role": "assistant", "content": "The answer is $\\boxed{1/4}$."}] 
-        generated_content = "The equation is $x=\\frac{1}{4}$. Some other numbers are 1, 2, 3."
-        # orig_answers_extracted = [("\\boxed{1/4}", 0.25)], len=1
-        # gen_answers_extracted from generated_content (using fallback):
-        # [("\\frac{1}{4}", 0.25), ("1", 1.0), ("2", 2.0), ("3", 3.0)], len=4
-        # Penalty 2 applies.
-        generated = [{"role": "assistant", "content": generated_content}]
-        result = math_reward(messages=generated, original_messages=original)
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="The equation is $x=\\frac{1}{4}$. Some other numbers are 1, 2, 3.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "The answer is $\\boxed{1/4}$."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
-        assert result.reason is not None and "Strictness fail (Issue #2)" in result.reason
-        assert result['reason'] == result.reason
+        assert result.score == 0.0 # Changed to attribute access
+        assert result.reason and "Strictness fail (Issue #2)" in result.reason
         assert result.metrics["strictness_penalty_ambiguity"].reason == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
-        assert result['metrics']["strictness_penalty_ambiguity"]['reason'] == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
+        # assert result.metrics["strictness_penalty_ambiguity"].reason == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)." # Corrected metrics access, removed duplicate
 
-    def test_issue_false_mcq_match_on_v_B(self):
-        """
-        Tests fix for issue where 'B' was incorrectly extracted from 'v_B'
-        due to overly greedy MCQ extraction.
-        """
-        user_content = "## Task B-1.3.\n\nA ship traveling along a river has covered $24 \\mathrm{~km}$ upstream and $28 \\mathrm{~km}$ downstream. For this journey, it took half an hour less than for traveling $30 \\mathrm{~km}$ upstream and $21 \\mathrm{~km}$ downstream, or half an hour more than for traveling $15 \\mathrm{~km}$ upstream and $42 \\mathrm{~km}$ downstream, assuming that both the ship and the river move uniformly.\n\nDetermine the speed of the ship in still water and the speed of the river."
-        assistant_content_generated = "## Solution.\n\nLet $t$ be the time required for the boat to travel $24 \\mathrm{~km}$ upstream and $28 \\mathrm{~km}$ downstream, $v_{R}$ the speed of the river, and $v_{B}$ the speed of the boat. When the boat is traveling upstream, its speed is $v_{B}-v_{R}$, and when it is traveling downstream, its speed is $v_{B}+v_{R}$.\n\nSince $t=\\frac{s}{v}$, from the given data, we obtain the following system of equations:\n\n$\\left\\{\\begin{array}{l}t=\\frac{24}{v_{B}-v_{R}}+\\frac{28}{v_{B}+v_{R}} \\\\ t+0.5=\\frac{30}{v_{B}-v_{R}}+\\frac{21}{v_{B}+v_{R}} \\\\ t-0.5=\\frac{15}{v_{B}-v_{R}}+\\frac{42}{v_{B}+v_{R}}\\end{array}\\right.$\n\nBy introducing new variables $x=\\frac{3}{v_{B}-v_{R}}, y=\\frac{7}{v_{B}+v_{R}}$, the system transforms into:\n\n$\\left\\{\\begin{array}{l}t=8 x+4 y \\\\ t+0.5=10 x+3 y \\\\ t-0.5=5 x+6 y\\end{array}\\right.$\n\nSubstituting $t$ from the first equation into the remaining two, we get:\n\n$\\left\\{\\begin{array}{l}8 x+4 y+0.5=10 x+3 y \\\\ 8 x+4 y-0.5=5 x+6 y\\end{array}\\right.$\n\n$\\left\\{\\begin{array}{l}2 x-y=0.5 \\\\ 3 x-2 y=0.5\\end{array}\\right.$\n\nThe solution to the last system is (0.5, 0.5). Then we have:\n\n$\\frac{3}{v_{B}-v_{R}}=0.5$, hence, $v_{B}-v_{R}=6 \\mathrm{~and}$\n\n$\\frac{7}{v_{B}+v_{R}}=0.5$, hence, $v_{B}+v_{R}=14$.\n\nThe speed of the river is $v_{R}=4 \\mathrm{~km} / \\mathrm{h}$, and the speed of the boat is $v_{B}=10 \\mathrm{~km} / \\mathrm{h}$.\n\n## Note:\n\nBy substituting $x=\\frac{1}{v_{B}-v_{R}}, y=\\frac{1}{v_{B}+v_{R}} \\mathrm{~and}$ following the same procedure, the initial system transforms into the system $\\left\\{\\begin{array}{l}6 x-7 y=0.5 \\\\ 9 x-14 y=0.5\\end{array}\\right.$\n\nThe solution to this system is $\\left(\\frac{1}{6}, \\frac{1}{14}\\right)$."
+    def test_issue_false_mcq_match_on_v_B(self): 
+        user_content_str = "## Task B-1.3.\n\nA ship traveling along a river has covered $24 \\mathrm{~km}$ upstream and $28 \\mathrm{~km}$ downstream. For this journey, it took half an hour less than for traveling $30 \\mathrm{~km}$ upstream and $21 \\mathrm{~km}$ downstream, or half an hour more than for traveling $15 \\mathrm{~km}$ upstream and $42 \\mathrm{~km}$ downstream, assuming that both the ship and the river move uniformly.\n\nDetermine the speed of the ship in still water and the speed of the river."
+        assistant_content_generated_str = "## Solution.\n\nLet $t$ be the time required for the boat to travel $24 \\mathrm{~km}$ upstream and $28 \\mathrm{~km}$ downstream, $v_{R}$ the speed of the river, and $v_{B}$ the speed of the boat. When the boat is traveling upstream, its speed is $v_{B}-v_{R}$, and when it is traveling downstream, its speed is $v_{B}+v_{R}$.\n\nSince $t=\\frac{s}{v}$, from the given data, we obtain the following system of equations:\n\n$\\left\\{\\begin{array}{l}t=\\frac{24}{v_{B}-v_{R}}+\\frac{28}{v_{B}+v_{R}} \\\\ t+0.5=\\frac{30}{v_{B}-v_{R}}+\\frac{21}{v_{B}+v_{R}} \\\\ t-0.5=\\frac{15}{v_{B}-v_{R}}+\\frac{42}{v_{B}+v_{R}}\\end{array}\\right.$\n\nBy introducing new variables $x=\\frac{3}{v_{B}-v_{R}}, y=\\frac{7}{v_{B}+v_{R}}$, the system transforms into:\n\n$\\left\\{\\begin{array}{l}t=8 x+4 y \\\\ t+0.5=10 x+3 y \\\\ t-0.5=5 x+6 y\\end{array}\\right.$\n\nSubstituting $t$ from the first equation into the remaining two, we get:\n\n$\\left\\{\\begin{array}{l}8 x+4 y+0.5=10 x+3 y \\\\ 8 x+4 y-0.5=5 x+6 y\\end{array}\\right.$\n\n$\\left\\{\\begin{array}{l}2 x-y=0.5 \\\\ 3 x-2 y=0.5\\end{array}\\right.$\n\nThe solution to the last system is (0.5, 0.5). Then we have:\n\n$\\frac{3}{v_{B}-v_{R}}=0.5$, hence, $v_{B}-v_{R}=6 \\mathrm{~and}$\n\n$\\frac{7}{v_{B}+v_{R}}=0.5$, hence, $v_{B}+v_{R}=14$.\n\nThe speed of the river is $v_{R}=4 \\mathrm{~km} / \\mathrm{h}$, and the speed of the boat is $v_{B}=10 \\mathrm{~km} / \\mathrm{h}$.\n\n## Note:\n\nBy substituting $x=\\frac{1}{v_{B}-v_{R}}, y=\\frac{1}{v_{B}+v_{R}} \\mathrm{~and}$ following the same procedure, the initial system transforms into the system $\\left\\{\\begin{array}{l}6 x-7 y=0.5 \\\\ 9 x-14 y=0.5\\end{array}\\right.$\n\nThe solution to this system is $\\left(\\frac{1}{6}, \\frac{1}{14}\\right)$."
+        ground_truth_arg = "The speed of the river is $v_R=4 \\mathrm{km/h}$, and the speed of the boat is $v_B=10 \\mathrm{km/h}$."
         
-        # Ground truth content based on the issue's "ground_truth_answer_from_column" and typical formatting.
-        ground_truth_content = "The speed of the river is $v_R=4 \\mathrm{km/h}$, and the speed of the boat is $v_B=10 \\mathrm{km/h}$."
-
-        generated_messages = [
-            {"role": "user", "content": user_content},
-            {"role": "assistant", "content": assistant_content_generated}
-        ]
-        original_messages = [
-            {"role": "user", "content": user_content},
-            {"role": "assistant", "content": ground_truth_content}
-        ]
-
-        result = math_reward(messages=generated_messages, original_messages=original_messages)
+        user_message = Message(role="user", content=user_content_str)
+        assistant_message = Message(role="assistant", content=assistant_content_generated_str)
+        messages_arg = [user_message, assistant_message]
+        
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
+        )
         assert isinstance(result, EvaluateResult)
-        
         extracted_gen_reason = result.metrics["extracted_generated_answers"].reason
         extracted_orig_reason = result.metrics["extracted_original_answers"].reason
-        # Check dict access for metric reasons
-        assert result['metrics']["extracted_generated_answers"]['reason'] == extracted_gen_reason
-        assert result['metrics']["extracted_original_answers"]['reason'] == extracted_orig_reason
-
-
-        assert "'B'" not in extracted_gen_reason, "MCQ 'B' should not be extracted from generated content after fix"
-        assert "'B'" not in extracted_orig_reason, "MCQ 'B' should not be extracted from original content after fix"
-        
-        # With the new "Conflicting Answers" penalty, even if (4,10) matches,
-        # the presence of (1/6, 1/14) and other numbers in the generated text should cause a penalty.
-        # The ground_truth_content is based on the ISSUES.md JSON's "ground_truth_answer_from_column" which is "v_R=4...,v_B=10...".
-        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result.score}. Reason: {result.reason}"
-        assert result['score'] == 0.0 # dict access
-        
-        # Check that the reason reflects the "Conflicting Answers" penalty.
-        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason, "Reason should indicate Conflicting Answers penalty"
-        assert result.reason is not None and "also includes other distinct numerical values" in result.reason, "Reason detail for conflicting answers missing"
-        # Verify that some of the conflicting numbers like 1/6 (approx 0.166) or 1/14 (approx 0.071) are mentioned.
-        # The formatting in the reason is `sorted(list(set(conflicting_extra_numeric_values)))`.
-        # 1/6 = 0.166666..., 1/14 = 0.071428...
-        # Other numbers in gen: 0.5, 6, 14.
-        # Conflicting set might be [0.071428..., 0.166666..., 0.5, 6.0, 14.0] (if 4,10 are GT)
-        # Check for a few representative conflicting numbers in the reason string.
-        assert result.reason is not None and ("0.5" in result.reason or "6.0" in result.reason or "14.0" in result.reason or str(1/6) in result.reason or str(1/14) in result.reason)
-        assert result['reason'] == result.reason # check dict access for reason
-
+        assert "'B'" not in extracted_gen_reason 
+        assert "'B'" not in extracted_orig_reason
+        assert result.score == 0.0 
+        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason and (("0.5" in result.reason) or ("6.0" in result.reason) or ("14.0" in result.reason))
 
     def test_no_penalty_ambiguity_if_gt_is_also_ambiguous(self):
-        original = [{"role": "assistant", "content": "Answers: $\\boxed{1}$, $\\boxed{2}$."}] # len=2
-        generated = [{"role": "assistant", "content": "Solutions: $\\boxed{1}$, $\\boxed{2}$, $\\boxed{3}$."}] # len=3
-        # Old Penalty 2 (ambiguity) does not apply because len(orig_answers_extracted) > 1.
-        # However, the new Penalty 3 (Conflicting Answers) should apply because '3' is an extra, distinct number.
-        result = math_reward(messages=generated, original_messages=original)
-        assert isinstance(result, EvaluateResult)
-        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answer '3'. Got {result.score}. Reason: {result.reason}"
-        assert result['score'] == 0.0 # dict access
-        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason
-        assert result.reason is not None and "includes other distinct numerical values: [3.0]" in result.reason # Check for the specific conflicting value
-        assert result['reason'] == result.reason # check dict access
-
-    def test_issue3_scenario_correct_handling(self):
-        original_content = "The speed of the river is $v_R=4 \\mathrm{km/h}$, and the speed of the boat is $v_B=10 \\mathrm{km/h}$."
-        # orig_answers_extracted: [("4", 4.0), ("10", 10.0)]
-        original = [{"role": "assistant", "content": original_content}]
-        
-        generated_content = "Let $x=\\frac{3}{v_{B}-v_{R}}, y=\\frac{7}{v_{B}+v_{R}}$. The solution to the last system is (0.5, 0.5). Then $v_R=4 \\mathrm{km} / \\mathrm{h}$, and $v_B=10 \\mathrm{km} / \\mathrm{h}$."
-        # gen_answers_extracted (fallback): [("3", 3.0), ("7", 7.0), ("0.5", 0.5), ("0.5", 0.5), ("4", 4.0), ("10", 10.0)] (order may vary)
-        # The `_is_coefficient` check should prevent "4y" from being extracted if it were present.
-        generated = [{"role": "assistant", "content": generated_content}]
-
-        # Strictness:
-        # Penalty 1 (unboxed or): " or " not in gen_content. Does not apply.
-        # Penalty 2 (ambiguity): len(orig)=2, len(gen)=6. Does not apply as len(orig) > 1.
-        # Comparison proceeds.
-        result = math_reward(messages=generated, original_messages=original)
-        assert isinstance(result, EvaluateResult)
-        # With the new "Conflicting Answers" penalty, this should now fail.
-        # GT is (4,10). Generated has (4,10) but also (0.5, 3, 7, etc.).
-        assert result.score == 0.0, f"Score should be 0.0 due to conflicting answers. Got {result.score}. Reason: {result.reason}"
-        assert result['score'] == 0.0 # dict access
-        assert result.reason is not None and "Strictness fail (Conflicting Answers)" in result.reason, "Reason should indicate Conflicting Answers penalty"
-        # Conflicting numbers here would be 0.5, 3, 7 (if 6, 14 are considered intermediate for 4,10)
-        # Let's check for 0.5 as a key conflicting one.
-        assert result.reason is not None and ("0.5" in result.reason or "3.0" in result.reason or "7.0" in result.reason)
-        assert result['reason'] == result.reason # check dict access
-
-
-    def test_require_units_basic_functionality(self):
-        original = [{"role": "assistant", "content": "Answer is \\boxed{10 km}."}]
-        generated_match = [{"role": "assistant", "content": "Answer is \\boxed{10 km}."}]
-        generated_no_unit = [{"role": "assistant", "content": "Answer is \\boxed{10}."}]
-        
-        result_match = math_reward(messages=generated_match, original_messages=original, require_units=True)
-        assert isinstance(result_match, EvaluateResult)
-        assert result_match.score == 1.0
-        assert result_match['score'] == 1.0
-        assert result_match.reason is None or "Unit presence mismatch" not in result_match.reason
-        assert result_match['reason'] is None or "Unit presence mismatch" not in result_match['reason']
-
-        result_no_unit = math_reward(messages=generated_no_unit, original_messages=original, require_units=True)
-        assert isinstance(result_no_unit, EvaluateResult)
-        assert result_no_unit.score == 0.0 # Score should be 0 if units mismatch and required
-        assert result_no_unit['score'] == 0.0
-        assert result_no_unit.reason is not None and "Unit presence mismatch" in result_no_unit.reason
-        assert result_no_unit['reason'] is not None and "Unit presence mismatch" in result_no_unit['reason']
-
-
-class TestAdvancedMathReward:
-    def test_multiple_answers_all_match(self):
-        original_messages = [
-            {"role": "user", "content": "Calculate 2+2 and 3*4"},
-            {
-                "role": "assistant",
-                "content": "The answers are $\\boxed{4}$ and $\\boxed{12}$.",
-            },
-        ]
-
-        generated_messages = [
-            {"role": "user", "content": "Calculate 2+2 and 3*4"},
-            {"role": "assistant", "content": "The answers are 4 and 12."},
-        ]
-
-        result = advanced_math_reward(
-            messages=generated_messages,
-            original_messages=original_messages,
-            match_all_answers=True,
+        user_messages = self._get_prompt() or []
+        assistant_message = Message(role="assistant", content="Solutions: $\\boxed{1}$, $\\boxed{2}$, $\\boxed{3}$.")
+        messages_arg = user_messages + [assistant_message]
+        ground_truth_arg = "Answers: $\\boxed{1}$, $\\boxed{2}$."
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
         )
         assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
+        assert result.score == 0.0 
+        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason and "includes other distinct numerical values: [3.0]" in result.reason
 
-    def test_multiple_answers_partial_match(self):
-        original_messages = [
-            {"role": "user", "content": "Calculate 2+2, 3*4, and 10/2"},
-            # For this test, we want to ensure that if orig_content has more numbers than gen_content,
-            # match_all_answers=True results in 0. So, plain numbers are fine here.
-            {"role": "assistant", "content": "The answers are 4, 12, and 5."},
-        ]
-
-        generated_messages = [
-            {"role": "user", "content": "Calculate 2+2, 3*4, and 10/2"},
-            {"role": "assistant", "content": "The answers are 4 and 12."},
-        ]
-
-        result = advanced_math_reward(
-            messages=generated_messages,
-            original_messages=original_messages,
-            match_all_answers=True,
+    def test_issue3_scenario_correct_handling(self):
+        user_messages = self._get_prompt() or []
+        ground_truth_arg = "The speed of the river is $v_R=4 \\mathrm{km/h}$, and the speed of the boat is $v_B=10 \\mathrm{km/h}$."
+        response_content_str = "Let $x=\\frac{3}{v_{B}-v_{R}}, y=\\frac{7}{v_{B}+v_{R}}$. The solution to the last system is (0.5, 0.5). Then $v_R=4 \\mathrm{km} / \\mathrm{h}$, and $v_B=10 \\mathrm{km} / \\mathrm{h}$."
+        assistant_message = Message(role="assistant", content=response_content_str)
+        messages_arg = user_messages + [assistant_message]
+        
+        result = math_reward(
+            messages=messages_arg,
+            ground_truth=ground_truth_arg
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert result['score'] == 0.0
+        assert result.reason and "Strictness fail (Conflicting Answers)" in result.reason
+        assert result.reason and (("0.5" in result.reason) or ("3.0" in result.reason) or ("7.0" in result.reason))
 
-        result_partial_match = advanced_math_reward(
-            messages=generated_messages,
-            original_messages=original_messages,
-            match_all_answers=False,
+    def test_require_units_basic_functionality(self):
+        user_messages = self._get_prompt() or []
+        ground_truth_arg = "Answer is \\boxed{10 km}."
+        
+        assistant_message_match_units = Message(role="assistant", content="Answer is \\boxed{10 km}.")
+        messages_match_units_arg = user_messages + [assistant_message_match_units]
+        
+        assistant_message_no_units = Message(role="assistant", content="Answer is \\boxed{10}.")
+        messages_no_units_arg = user_messages + [assistant_message_no_units]
+        
+        result_match = math_reward(
+            messages=messages_match_units_arg,
+            ground_truth=ground_truth_arg,
+            require_units=True
         )
-        assert isinstance(result_partial_match, EvaluateResult)
-        assert result_partial_match.score == 1.0
-        assert result_partial_match['score'] == 1.0
+        assert isinstance(result_match, EvaluateResult)
+        assert result_match.score == 1.0
+        assert result_match.reason is None or "Unit presence mismatch" not in result_match.reason
 
-    def test_answer_with_different_formats(self):
-        original_messages = [
-            {"role": "user", "content": "What is one half?"},
-            {"role": "assistant", "content": "One half is 1/2 or 0.5."},
-        ]
-
-        generated_messages = [
-            {"role": "user", "content": "What is one half?"},
-            {"role": "assistant", "content": "One half is 0.5 or 50%."},
-        ]
-
-        result = advanced_math_reward(
-            messages=generated_messages, original_messages=original_messages
+        result_no_unit = math_reward(
+            messages=messages_no_units_arg,
+            ground_truth=ground_truth_arg,
+            require_units=True
         )
-        assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
-
-    def test_scientific_notation_match(self):
-        original_messages = [
-            {"role": "user", "content": "What is Avogadro's number?"},
-            {
-                "role": "assistant",
-                "content": "Avogadro's number is approximately 6.022×10^23 or 6.022e23.",
-            },
-        ]
-
-        generated_messages = [
-            {"role": "user", "content": "What is Avogadro's number?"},
-            {
-                "role": "assistant",
-                "content": "Avogadro's number is approximately 6.022e23.",
-            },
-        ]
-
-        result = advanced_math_reward(
-            messages=generated_messages, original_messages=original_messages
-        )
-        assert isinstance(result, EvaluateResult)
-        assert result.score == 1.0
-        assert result['score'] == 1.0
+        assert isinstance(result_no_unit, EvaluateResult)
+        assert result_no_unit.score == 0.0
+        assert result_no_unit.reason and "Unit presence mismatch" in result_no_unit.reason

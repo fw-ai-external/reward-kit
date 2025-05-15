@@ -4,18 +4,18 @@ from typing import List
 
 @reward_function
 def evaluate(
-    messages: List[Message], original_messages: List[Message] = list(), **kwargs
+    messages: List[Message], **kwargs
 ) -> EvaluateResult:
     """
     Evaluate a sample entry by counting words in the response.
 
     Args:
-        messages: List of conversation messages
-        original_messages: Original messages (usually without the response being evaluated)
+        messages: List of conversation messages, where the last message is the
+                  assistant's response to be evaluated.
         **kwargs: Additional parameters
 
     Returns:
-        Dict with score and metrics information
+        EvaluateResult with score and metrics information
     """
     # If this is the first message, there's nothing to evaluate
     if not messages:

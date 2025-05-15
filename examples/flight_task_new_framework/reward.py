@@ -34,6 +34,7 @@ def evaluate_flight_booking(
     metrics_dict = {
         "task_goal_achieved": { # Clearer metric name
             "score": 1.0 if task_achieved else 0.0,
+            "success": task_achieved,
             "reason": (
                 "Agent successfully booked and paid for the flight."
                 if task_achieved
@@ -42,16 +43,19 @@ def evaluate_flight_booking(
         },
         "search_flights_tool_usage": {
             "score": 1.0 if search_count > 0 else 0.0, # Binary: used or not
+            "success": search_count > 0,
             "reason": f"search_flights tool was called {search_count} times.",
             "count": search_count,
         },
         "create_booking_tool_usage": {
             "score": 1.0 if booking_count > 0 else 0.0, # Binary: used or not
+            "success": booking_count > 0,
             "reason": f"create_booking tool was called {booking_count} times.",
             "count": booking_count,
         },
         "pay_booking_tool_usage": {
             "score": 1.0 if payment_count > 0 else 0.0, # Binary: used or not
+            "success": payment_count > 0,
             "reason": f"pay_booking tool was called {payment_count} times.",
             "count": payment_count,
         },

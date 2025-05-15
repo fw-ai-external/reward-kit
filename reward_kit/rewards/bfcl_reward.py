@@ -5,7 +5,7 @@ import logging # Import logging
 from typing import List, Dict, Any, Union, Optional, Tuple
 
 from reward_kit.typed_interface import reward_function
-from reward_kit.models import EvaluateResult, MetricResult
+from reward_kit.models import Message, EvaluateResult, MetricResult
 from reward_kit.agent.resources.bfcl_sim_api_resource import BFCLSimAPIResource
 
 # Get logger for bfcl_reward
@@ -133,21 +133,23 @@ def compare_comparable_states(model_state: Dict[str, Any], gt_state: Dict[str, A
 
 @reward_function
 def bfcl_reward(
-    messages: Union[List[Dict[str, Any]], List[Any]],
-    state: Dict[str, Any],
-    ground_truth_function_calls: Optional[List[List[str]]] = None, # Explicit argument
-    ground_truth_comparable_state: Optional[Dict[str, Any]] = None, # Explicit argument
+    messages: List[Message],      # Full conversation, assistant responses are at the end
+    ground_truth: Dict[str, Any], # Contains 'function_calls' and 'comparable_state'
+    state: Dict[str, Any],        # Runtime state (BFCLSimAPIResource, successful_func_calls)
     **kwargs: Any
 ) -> EvaluateResult:
     """
     Evaluates agent performance on BFCL tasks based on state, function calls, and format.
     """
+    ground_truth_function_calls: Optional[List[List[str]]] = ground_truth.get("function_calls")
+    ground_truth_comparable_state: Optional[Dict[str, Any]] = ground_truth.get("comparable_state")
+
     # Log ground truth data received
-    logger.debug(f"Ground truth function calls received: {ground_truth_function_calls}")
-    logger.debug(f"Ground truth comparable state received: {ground_truth_comparable_state}")
+    logger.debug(f"Ground truth function calls from input: {ground_truth_function_calls}")
+    logger.debug(f"Ground truth comparable state from input: {ground_truth_comparable_state}")
 
     if ground_truth_function_calls is None or ground_truth_comparable_state is None:
-        return EvaluateResult(score=0.0, reason="Ground truth data not provided for BFCL reward.", metrics={})
+        return EvaluateResult(score=0.0, reason="Ground truth 'function_calls' or 'comparable_state' not found in ground_truth dict.", metrics={})
 
     # Access the BFCLSimAPIResource instance from the state
     bfcl_resource: Optional[BFCLSimAPIResource] = state.get("resource")
@@ -160,9 +162,8 @@ def bfcl_reward(
     state_match, state_diffs = compare_comparable_states(model_comparable_state, ground_truth_comparable_state)
 
     state_match_score = 0.5 if state_match else 0.0
-    num_state_matches = int(state_match)
-    num_state_total = 1 if ground_truth_comparable_state else 0
-
+    # num_state_matches = int(state_match) # Not used
+    # num_state_total = 1 if ground_truth_comparable_state else 0 # Not used
 
     # --- Function Call Matches Check ---
     # model_successful_func_calls is List[List[Dict[str, Any]]], one inner list per user turn's accumulated calls
@@ -189,10 +190,6 @@ def bfcl_reward(
                 logger.debug(f"GT calls for turn {i}: {json.dumps(gt_calls_for_this_turn)}")
                 logger.debug(f"Model calls for turn {i}: {json.dumps(model_calls_for_this_turn)}")
                 
-                # Check if the model's calls for this turn are a supersequence of GT calls for this turn
-                # (i.e., all GT calls are present in model's calls, model might have extra exploratory calls)
-                # For stricter matching (exact sequence or exact set without extras), _is_subsequence_unordered might need adjustment
-                # or a different comparison. For now, we check if GT calls are a subset of model calls.
                 is_match_for_turn, missing_gt_calls = _is_subsequence_unordered(gt_calls_for_this_turn, model_calls_for_this_turn)
                 if is_match_for_turn:
                     num_func_matches_for_score += 1
@@ -202,53 +199,46 @@ def bfcl_reward(
             except Exception as e:
                 logger.error(f"Error comparing function calls for GT turn index {i}: {e}")
         
-        # Scoring:
-        # Option 1: Strict - all GT turns must be matched, and no extra model turns with calls.
         if num_func_matches_for_score == num_gt_turns_with_calls and num_model_turns_with_actual_calls == num_gt_turns_with_calls:
             func_match_score = 0.5
-        # Option 2: More lenient - partial credit for matched turns, penalize if model made calls on more/fewer turns than GT.
-        # else:
-        #    func_match_score = 0.5 * (num_func_matches_for_score / num_gt_turns_with_calls)
-        # Let's stick to a stricter interpretation for now: score 0.5 if all GT turns are matched correctly
-        # and the number of turns with calls match. Otherwise 0.
-        # This means if GT expects 3 turns of calls, model must also make calls in exactly 3 turns, and all must match.
-        # The current AGENT_BFCL_ISSUES.md implies high strictness.
         elif num_func_matches_for_score == num_gt_turns_with_calls and num_model_turns_with_actual_calls != num_gt_turns_with_calls:
-             # All GT turns matched, but model made calls in a different number of turns (e.g. fewer, or more)
-             func_match_score = 0.0 # Penalize for wrong number of interaction turns with tools
+             func_match_score = 0.0 
         else:
-            func_match_score = 0.0 # Not all GT turns with calls were matched
+            func_match_score = 0.0 
 
-    elif num_gt_turns_with_calls == 0: # No GT calls were expected
-        if num_model_turns_with_actual_calls == 0: # Model also made no calls
-            func_match_score = 0.5 # Perfect match (no calls expected, no calls made)
-        else: # Model made unexpected calls
+    elif num_gt_turns_with_calls == 0: 
+        if num_model_turns_with_actual_calls == 0: 
+            func_match_score = 0.5 
+        else: 
             func_match_score = 0.0
     
-    # For the reason string, always use num_gt_turns_with_calls as the denominator for clarity on expectation.
     reason_num_total_gt_turns_with_calls = num_gt_turns_with_calls if num_gt_turns_with_calls > 0 else "0 (no GT calls expected)"
 
-
-    # --- Format Check ---
-    # If using standard OpenAI tool calling, XML tags for reasoning/tool are not expected in content.
-    # For now, let's assume format is correct if the agent is making tool calls or providing content.
-    # This part might need refinement based on desired output structure.
-    format_score = 0.2 # Assume correct format for now
-    valid_messages = 0 # Keep for metrics, but don't use for score penalty
-    total_messages = 0
+    # --- Format Check (on model's response messages from the `messages` list) ---
+    format_score = 0.2 
+    valid_assistant_messages = 0 
+    total_assistant_messages = 0
     assistant_message_found = False
-    for msg in messages:
-        if hasattr(msg, 'role') and msg.role == 'assistant':
-            assistant_message_found = True
-            total_messages +=1 # Count assistant messages
-            # If we want to check for *any* content or *any* tool_call:
-            if (hasattr(msg, 'content') and msg.content) or (hasattr(msg, 'tool_calls') and msg.tool_calls):
-                valid_messages +=1
     
-    # If no assistant messages at all, perhaps format score should be 0.
-    if not assistant_message_found and total_messages == 0 : # Or simply if not assistant_message_found
+    # Iterate over all messages to find assistant responses
+    # The actual model response messages are part of the `messages` list.
+    # Typically, these would be the last few messages if it's a multi-turn interaction,
+    # or messages[-1] if it's a single assistant response.
+    # For simplicity in format check, we scan all assistant messages in the provided `messages`.
+    for msg in messages: 
+        if isinstance(msg, Message) and msg.role == 'assistant':
+            assistant_message_found = True
+            total_assistant_messages +=1 
+            # Check for any content or any tool_call
+            if (msg.content and msg.content.strip()) or msg.tool_calls:
+                valid_assistant_messages +=1
+    
+    if not assistant_message_found: 
         format_score = 0.0
-
+    elif total_assistant_messages > 0 and valid_assistant_messages == 0:
+        # Assistant messages were found, but none had content or tool_calls
+        format_score = 0.0 
+    # If valid_assistant_messages > 0, format_score remains 0.2 (or could be scaled)
 
     # --- Combine Scores ---
     base_score = state_match_score + func_match_score
@@ -285,8 +275,8 @@ def bfcl_reward(
     )
     metrics["format_check"] = MetricResult(
         score=format_score,
-        success=format_score == 0.2,
-        reason=f"{valid_messages}/{total_messages} assistant messages had correct format."
+        success=format_score == 0.2, # Success if it gets the full 0.2 for format
+        reason=f"{valid_assistant_messages}/{total_assistant_messages} assistant messages had correct format."
     )
 
     return EvaluateResult(

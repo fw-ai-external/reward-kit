@@ -75,8 +75,6 @@ class TestExtractNumberList(unittest.TestCase):
         self.assertEqual(extract_number_list("No numbers here."), [])
         self.assertEqual(extract_number_list("\\boxed{a,b,c}"), [])
         self.assertEqual(extract_number_list("$one, two$"), [])
-        # This case is covered by test_extract_from_full_text_fallback, should be []
-        # self.assertEqual(extract_number_list("The number is 123."), [[123.0]]) 
         self.assertEqual(extract_number_list("The number is 123."), [])
 
 
@@ -98,148 +96,99 @@ class TestListComparisonMathReward(unittest.TestCase):
     def test_exact_match_set_comparison(self):
         # Default: order_matters=False (set comparison)
         gen_msgs = self._create_messages("The divisors are \\boxed{1,2,3}.")
-        orig_msgs = self._create_messages("Answer: $3,1,2$")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "Answer: $3,1,2$"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertIn("Set match", result.reason)
-        self.assertIn("Gen: [1.0, 2.0, 3.0] vs Orig: [1.0, 2.0, 3.0]", result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertIn("Set match", result['reason'])
-        self.assertIn("Gen: [1.0, 2.0, 3.0] vs Orig: [1.0, 2.0, 3.0]", result['reason'])
+        self.assertTrue(result.reason and "Set match" in result.reason)
+        self.assertTrue(result.reason and "Gen: [1.0, 2.0, 3.0] vs Orig: [1.0, 2.0, 3.0]" in result.reason)
 
     def test_exact_match_list_comparison(self):
         gen_msgs = self._create_messages("\\boxed{1,2,3}")
-        orig_msgs = self._create_messages("$1,2,3$")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs, order_matters=True)
+        ground_truth_str = "$1,2,3$"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str, order_matters=True)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertIn("Exact list match", result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertIn("Exact list match", result['reason'])
+        self.assertTrue(result.reason and "Exact list match" in result.reason)
 
     def test_mismatch_set_comparison(self):
         gen_msgs = self._create_messages("$1,2,4$")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Set mismatch" in result.reason)
-        self.assertTrue(result.reason is not None and "Missing in generated: [3.0]" in result.reason)
-        self.assertTrue(result.reason is not None and "Extra in generated: [4.0]" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Set mismatch" in result['reason'])
-        self.assertTrue(result['reason'] is not None and "Missing in generated: [3.0]" in result['reason'])
-        self.assertTrue(result['reason'] is not None and "Extra in generated: [4.0]" in result['reason'])
+        self.assertTrue(result.reason and "Set mismatch" in result.reason)
+        self.assertTrue(result.reason and "Missing in generated: [3.0]" in result.reason)
+        self.assertTrue(result.reason and "Extra in generated: [4.0]" in result.reason)
 
     def test_mismatch_list_comparison_order(self):
         gen_msgs = self._create_messages("$1,3,2$")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs, order_matters=True)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str, order_matters=True)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "List mismatch (order matters)" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "List mismatch (order matters)" in result['reason'])
+        self.assertTrue(result.reason and "List mismatch (order matters)" in result.reason)
 
     def test_mismatch_list_comparison_value(self):
         gen_msgs = self._create_messages("$1,2,4$")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs, order_matters=True)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str, order_matters=True)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "List mismatch (order matters)" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "List mismatch (order matters)" in result['reason'])
+        self.assertTrue(result.reason and "List mismatch (order matters)" in result.reason)
 
     def test_subset_set_comparison(self):
         # Gen is subset of Orig
         gen_msgs = self._create_messages("$1,2$")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Missing in generated: [3.0]" in result.reason)
-        self.assertTrue(result.reason is not None and "Extra in generated" not in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Missing in generated: [3.0]" in result['reason'])
-        self.assertTrue(result['reason'] is not None and "Extra in generated" not in result['reason'])
+        self.assertTrue(result.reason and "Missing in generated: [3.0]" in result.reason)
+        self.assertTrue(result.reason and "Extra in generated" not in result.reason)
 
     def test_superset_set_comparison(self):
         # Gen is superset of Orig
         gen_msgs = self._create_messages("$1,2,3,4$")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Extra in generated: [4.0]" in result.reason)
-        self.assertTrue(result.reason is not None and "Missing in generated" not in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Extra in generated: [4.0]" in result['reason'])
-        self.assertTrue(result['reason'] is not None and "Missing in generated" not in result['reason'])
+        self.assertTrue(result.reason and "Extra in generated: [4.0]" in result.reason)
+        self.assertTrue(result.reason and "Missing in generated" not in result.reason)
 
     def test_no_list_in_gen(self):
         gen_msgs = self._create_messages("The answer is three.")
-        orig_msgs = self._create_messages("\\boxed{1,2,3}")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "\\boxed{1,2,3}"
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Could not extract any number list from generated message" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Could not extract any number list from generated message" in result['reason'])
+        self.assertTrue(result.reason and "Could not extract any number list from generated message" in result.reason)
 
     def test_no_list_in_orig(self):
         gen_msgs = self._create_messages("\\boxed{1,2,3}")
-        orig_msgs = self._create_messages("The answer is three.")
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "The answer is three."
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Could not extract any number list from original message" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Could not extract any number list from original message" in result['reason'])
+        self.assertTrue(result.reason and "Could not extract any number list from original message" in result.reason)
 
     def test_example_from_issue(self):
         # "1,3,59,177"
         gen_msgs = self._create_messages("$1,3,59,177$")
-        orig_msgs = self._create_messages("1,3,59,177") # Fallback extraction for original
-        result = list_comparison_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        ground_truth_str = "1,3,59,177" # Fallback extraction for original
+        result = list_comparison_math_reward(messages=gen_msgs, ground_truth=ground_truth_str)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.reason is not None and "Set match" in result.reason)
-        self.assertTrue(result.reason is not None and "Gen: [1.0, 3.0, 59.0, 177.0] vs Orig: [1.0, 3.0, 59.0, 177.0]" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['reason'] is not None and "Set match" in result['reason'])
-        self.assertTrue(result['reason'] is not None and "Gen: [1.0, 3.0, 59.0, 177.0] vs Orig: [1.0, 3.0, 59.0, 177.0]" in result['reason'])
+        self.assertTrue(result.reason and "Set match" in result.reason)
+        self.assertTrue(result.reason and "Gen: [1.0, 3.0, 59.0, 177.0] vs Orig: [1.0, 3.0, 59.0, 177.0]" in result.reason)
 
     def test_empty_messages(self):
-        result = list_comparison_math_reward(messages=[], original_messages=[])
+        # Test with empty messages list, should fail early due to messages[-1] access
+        result = list_comparison_math_reward(messages=[], ground_truth="1,2,3")
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Missing messages" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Missing messages" in result['reason'])
+        self.assertTrue(result.reason and "Invalid or missing assistant response" in result.reason)
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

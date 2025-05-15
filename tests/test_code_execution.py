@@ -25,9 +25,8 @@ class TestE2BCodeExecution:
         # Patch _HAS_E2B to False to simulate missing E2B package
         monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", False)
 
-        messages = [
-            {"role": "user", "content": "Write a function to add two numbers"},
-            {
+        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """Here's a function to add two numbers:
 
@@ -40,20 +39,21 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = e2b_code_execution_reward(
-            messages=messages, expected_output="5", language="python"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="python"
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 0.0
         assert "E2B package not installed" in result.metrics['error'].reason
-        # Dictionary access
-        assert result['score'] == 0.0
-        assert "E2B package not installed" in result['metrics']['error']['reason']
+        # assert result['score'] == 0.0 # Use attribute access
+        # assert "E2B package not installed" in result['metrics']['error']['reason'] # Use attribute access
 
         # Restore _HAS_E2B to its original value
         monkeypatch.setattr(
@@ -78,9 +78,8 @@ This will output `5`.
         # Ensure E2B_API_KEY is not set in environment
         monkeypatch.delenv("E2B_API_KEY", raising=False)
 
-        messages = [
-            {"role": "user", "content": "Write a function to add two numbers"},
-            {
+        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """```python
 def add(a, b):
@@ -88,23 +87,22 @@ def add(a, b):
 
 print(add(2, 3))
 ```""",
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = e2b_code_execution_reward(
-            messages=messages,
-            expected_output="5",
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
             api_key=None,
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 0.0
         assert "API key is required" in result.metrics['error'].reason
-        # Dictionary access
-        assert result['score'] == 0.0
-        assert "API key is required" in result['metrics']['error']['reason']
+        # assert result['score'] == 0.0 # Use attribute access
+        # assert "API key is required" in result['metrics']['error']['reason'] # Use attribute access
 
 
 class TestExtractCodeBlocks:
@@ -324,9 +322,8 @@ class TestCompareOutputs:
 
 class TestLocalCodeExecutionReward:
     def test_python_success_match(self):
-        messages = [
-            {"role": "user", "content": "Write a function to add two numbers"},
-            {
+        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """Here's a function to add two numbers:
 
@@ -339,18 +336,19 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages, expected_output="5", language="python"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="python"
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 1.0
-        # Dictionary access
-        assert result['score'] == 1.0
+        # assert result['score'] == 1.0 # Use attribute access
 
 
 CODE_WITH_ARG_COLLECTOR = """
@@ -395,14 +393,21 @@ class TestFractionalCodeRewardArgParsing:
             {"input": test_input_str, "expected_output": repr(expected_return_val)}
         ]
 
+        # messages_arg combines prompt and assistant's code response
+        messages_arg = [
+            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[0], # User message
+            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[1]  # Assistant message with code
+        ]
+        # test_cases are now passed via the ground_truth parameter
+        ground_truth_arg = test_cases
+
         result = fractional_code_reward(
-            messages=DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg, # This now takes the test_cases
             language="python",
-            test_cases=test_cases,
+            # test_cases=test_cases, # Removed, passed via ground_truth
             environment="local", # Ensure local execution for direct testing of parsing
             function_to_call="arg_collector",
-            # Provide the code containing arg_collector directly if fractional_code_reward uses last message
-            # For this test, the DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD provides the code.
         )
 
         assert isinstance(result, EvaluateResult), "Result should be an EvaluateResult object"
@@ -430,9 +435,8 @@ class TestFractionalCodeRewardArgParsing:
             else:
                 print(f"Full result (object): {result.model_dump()}") # Dump object for full view
 
-        # Attribute and dictionary access for score
-        assert result.score == 1.0, f"Test case for input '{test_input_str}' failed (attribute access)."
-        assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed (dictionary access)."
+        assert result.score == 1.0, f"Test case for input '{test_input_str}' failed."
+        # assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed (dictionary access)." # Use attribute access
         
         # Additionally, check the actual output if available in metrics
         test_results_metric = result.metrics.get('test_results') if result.metrics else None
@@ -445,18 +449,18 @@ class TestFractionalCodeRewardArgParsing:
                     assert actual_output_str == repr(expected_return_val), \
                         f"Actual output '{actual_output_str}' did not match expected '{repr(expected_return_val)}' for input '{test_input_str}'"
             except json.JSONDecodeError: # Catch specifically json.JSONDecodeError
-                print(f"Could not parse test_results metric reason (JSONDecodeError) for input '{test_input_str}': {test_results_metric['reason']}")
+                # Accessing reason from MetricResult object
+                print(f"Could not parse test_results metric reason (JSONDecodeError) for input '{test_input_str}': {test_results_metric.reason}")
             except IndexError:
                 print(f"test_results metric reason list was empty for input '{test_input_str}'")
         # The 'execution_result' metric might not be present if tests pass but output mismatches,
         # as it's typically for code execution status itself, not output comparison.
-        # The primary check is result['score'] == 1.0 and the actual_output comparison.
-        # If result['score'] == 1.0, it implies successful execution.
+        # The primary check is result.score == 1.0 and the actual_output comparison.
+        # If result.score == 1.0, it implies successful execution.
 
     def test_python_success_mismatch(self):
-        messages = [
-            {"role": "user", "content": "Write a function to add two numbers"},
-            {
+        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """Here's a function to add two numbers:
 
@@ -469,25 +473,25 @@ print(add(1, 3))
 
 This will output `4`.
 """,
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages, expected_output="5", language="python"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="python"
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "Output similarity:" in result.metrics['output_match'].reason
-        # Dictionary access
-        assert result['score'] < 1.0
-        assert "Output similarity:" in result['metrics']['output_match']['reason']
+        # assert result['score'] < 1.0 # Use attribute access
+        # assert "Output similarity:" in result['metrics']['output_match']['reason'] # Use attribute access
 
     def test_code_execution_failure(self):
-        messages = [
-            {"role": "user", "content": "Write a function to add two numbers"},
-            {
+        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """Here's a function to add two numbers:
 
@@ -500,28 +504,28 @@ print(add(undeclared_variable, 3))
 
 This will output `5`.
 """,
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages, expected_output="5", language="python"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="python"
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 0.0
         assert "failed with error" in result.metrics['execution_result'].reason
-        # Dictionary access
-        assert result['score'] == 0.0
-        assert "failed with error" in result['metrics']['execution_result']['reason']
+        # assert result['score'] == 0.0 # Use attribute access
+        # assert "failed with error" in result['metrics']['execution_result']['reason'] # Use attribute access
 
     def test_extract_expected_output_from_message(self):
-        messages = [
-            {
+        prompt_message_dict = {
                 "role": "user",
                 "content": "Write a function to add two numbers. Expected output: 5",
-            },
-            {
+        }
+        assistant_message_dict = {
                 "role": "assistant",
                 "content": """Here's a function to add two numbers:
 
@@ -534,17 +538,16 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            },
-        ]
+            }
+        messages_arg = [prompt_message_dict, assistant_message_dict]
+        ground_truth_arg = "5" # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages,
-            original_messages=messages,  # Using the same messages
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 1.0
-        # Dictionary access
-        assert result['score'] == 1.0
+        # assert result['score'] == 1.0 # Use attribute access

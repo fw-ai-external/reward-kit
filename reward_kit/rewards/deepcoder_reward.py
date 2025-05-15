@@ -22,66 +22,47 @@ import re # For function name extraction
 
 @reward_function
 def deepcoder_code_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],               # Full conversation, model's response is messages[-1]
+    ground_truth: List[Dict[str, Any]],    # This is the test_cases
     language: str,
-    test_cases: List[Dict[str, Any]],
     timeout: int = 10, # DeepCoder paper mentions 6-12s, default to 10s
     environment: str = "local",
     api_key: Optional[str] = None,
-    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None, # Kept for potential future use, but not needed for name extraction now
-    target_function: Optional[str] = None, # Added explicit argument
+    target_function: Optional[str] = None,
     **kwargs: Any,
-) -> EvaluateResult: # Changed to EvaluateResult
+) -> EvaluateResult:
     """
     Evaluates code based on a set of test cases, DeepCoder-style.
     Returns 1.0 if all test cases pass, 0.0 otherwise.
     This version calls the shared _run_test_cases utility.
 
     Args:
-        messages: List of conversation messages. The last assistant message should contain the code.
+        messages: List of conversation messages. The last message is assumed to be the
+                  assistant's response containing the code.
+        ground_truth: A list of dictionaries, each representing a test case with "input" (string)
+                      and "expected_output" (string). This corresponds to the `test_cases`
+                      parameter in the previous signature.
         language: Programming language of the code (e.g., "python", "javascript").
-        test_cases: A list of dictionaries, each with "input" (string) and "expected_output" (string).
         timeout: Execution timeout per test case in seconds.
         environment: "local" or "e2b" for code execution.
         api_key: E2B API key, required if environment is "e2b".
-        original_messages: Original conversation context, used to find the user prompt for function name extraction.
+        target_function: Optional name of the function to call within the code.
         **kwargs: Additional arguments.
 
     Returns:
-        RewardOutput with a score of 1.0 or 0.0 and detailed metrics.
+        EvaluateResult with a score of 1.0 or 0.0 and detailed metrics.
     """
-    metrics_dict: Dict[str, MetricResult] = {} # Changed to MetricResult
+    metrics_dict: Dict[str, MetricResult] = {}
 
-    if not messages:
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
         return EvaluateResult(
             score=0.0,
-            reason="No messages provided.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="No messages provided.")}
+            reason="Invalid or missing assistant response in messages.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
         )
-
-    last_message = messages[-1]
-    assistant_content: str
-    assistant_role: Optional[str]
-
-    if isinstance(last_message, Message):
-        assistant_content = last_message.content
-        assistant_role = last_message.role
-    elif isinstance(last_message, dict):
-        assistant_content = last_message.get("content", "")
-        assistant_role = last_message.get("role")
-    else:
-        return EvaluateResult(
-            score=0.0,
-            reason="Last message is of an unexpected type.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message is of an unexpected type.")}
-        )
-
-    if assistant_role != "assistant":
-        return EvaluateResult(
-            score=0.0,
-            reason="Last message is not from assistant.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message is not from assistant.")}
-        )
+    
+    assistant_content = messages[-1].content
+    test_cases = ground_truth # The new ground_truth parameter is the test_cases
 
     code_blocks = extract_code_blocks(assistant_content, language)
     if not code_blocks:

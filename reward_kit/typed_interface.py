@@ -1,5 +1,6 @@
+import inspect # Added for signature inspection
 from functools import wraps
-from typing import Any, Dict, List, TypeVar, cast, Protocol, Union
+from typing import Any, Dict, List, TypeVar, cast, Protocol, Union, get_origin, get_args
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -55,56 +56,74 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
     def wrapper(
         messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
     ) -> EvaluateResult: # Changed return type
-        # 1. Validate / coerce the incoming messages to list[Message]
-        try:
-            # Convert messages to Message objects if they're not already
-            typed_messages = []
+        
+        sig = inspect.signature(func)
+        params = sig.parameters
 
-            for msg in messages:
-                if isinstance(msg, Message):
-                    # Already a Message object, use it directly
-                    typed_messages.append(msg)
-                else:
-                    # It's a dictionary, validate and convert to Message
-                    if "role" not in msg:
-                        raise ValueError("Role is required in message")
+        processed_messages = messages # Default to original messages
+        
+        # 1. Conditional Pydantic conversion for 'messages'
+        if 'messages' in params:
+            messages_param_annotation = params['messages'].annotation
+            # Check if the annotation is List[Message]
+            # Handles List[Message] and typing.List[Message]
+            is_list_message_hint = False
+            if get_origin(messages_param_annotation) in (list, List):
+                args = get_args(messages_param_annotation)
+                if args and args[0] == Message:
+                    is_list_message_hint = True
+            
+            if is_list_message_hint:
+                try:
+                    typed_messages_list = []
+                    for msg_data in messages:
+                        if isinstance(msg_data, Message):
+                            typed_messages_list.append(msg_data)
+                        elif isinstance(msg_data, dict):
+                            # Simplified conversion, assuming valid dict structure for Message
+                            # Full validation as before can be reinstated if needed
+                            typed_messages_list.append(Message(**msg_data))
+                        else:
+                            # Handle unexpected item type in messages list
+                            raise TypeError(f"Unexpected type in messages list: {type(msg_data)}")
+                    processed_messages = typed_messages_list
+                except Exception as err:
+                    raise ValueError(f"Input 'messages' failed Pydantic validation: {err}") from None
+        
+        # 2. Conditional Pydantic conversion for 'ground_truth'
+        if 'ground_truth' in params and 'ground_truth' in kwargs:
+            ground_truth_param_annotation = params['ground_truth'].annotation
+            ground_truth_data = kwargs['ground_truth']
 
-                    role = msg.get("role", "")
-                    content = msg.get(
-                        "content", ""
-                    )  # Default to empty string if None
+            # Check if the annotation is List[Message]
+            is_list_message_gt_hint = False
+            if get_origin(ground_truth_param_annotation) in (list, List):
+                args = get_args(ground_truth_param_annotation)
+                if args and args[0] == Message:
+                    is_list_message_gt_hint = True
 
-                    # Common message parameters
-                    message_params = {"role": role}
+            if is_list_message_gt_hint and ground_truth_data is not None:
+                if not isinstance(ground_truth_data, list):
+                    raise TypeError(f"'ground_truth' expected a list for List[Message] hint, got {type(ground_truth_data)}")
+                try:
+                    typed_ground_truth_list = []
+                    for gt_item_data in ground_truth_data:
+                        if isinstance(gt_item_data, Message):
+                            typed_ground_truth_list.append(gt_item_data)
+                        elif isinstance(gt_item_data, dict):
+                             # Simplified conversion
+                            typed_ground_truth_list.append(Message(**gt_item_data))
+                        else:
+                            raise TypeError(f"Unexpected type in ground_truth list: {type(gt_item_data)}")
+                    kwargs['ground_truth'] = typed_ground_truth_list
+                except Exception as err:
+                    raise ValueError(f"Input 'ground_truth' failed Pydantic validation for List[Message]: {err}") from None
+            # (Optional: Add handling for single Message hint if that's ever re-introduced)
 
-                    # Add content only if it exists (can be None for tool calls)
-                    if "content" in msg:
-                        message_params["content"] = (
-                            content if content is not None else ""
-                        )
+        # 3. Call the author's function with processed inputs
+        result = func(processed_messages, **kwargs)
 
-                    # Add role-specific parameters
-                    if role == "tool":
-                        message_params["tool_call_id"] = msg.get(
-                            "tool_call_id", ""
-                        )
-                        message_params["name"] = msg.get("name", "")
-                    elif role == "function":
-                        message_params["name"] = msg.get("name", "")
-                    elif role == "assistant" and "tool_calls" in msg:
-                        message_params["tool_calls"] = msg.get("tool_calls")
-
-                    # Create the message object
-                    typed_messages.append(Message(**message_params))
-        except Exception as err:
-            raise ValueError(
-                f"Input messages failed validation:\n{err}"
-            ) from None
-
-        # 2. Call the author's function
-        result = func(typed_messages, **kwargs)
-
-        # Author might return EvaluateResult *or* a bare dict → coerce either way
+        # 4. Author might return EvaluateResult *or* a bare dict → coerce either way
         try:
             # If it's already an EvaluateResult, use it directly
             if isinstance(result, EvaluateResult):

@@ -17,18 +17,21 @@ def test_lean_prover_reward_empty():
     """Test lean_prover_reward with empty input"""
     # Pass empty messages list, or messages with empty content
     messages_empty_assistant = create_messages("some statement", "")
-    result = lean_prover_reward(messages=messages_empty_assistant, statement="some statement")
-    assert "score" in result
-    assert result['score'] == 0.0
+    result = lean_prover_reward(messages=messages_empty_assistant, ground_truth=None, statement="some statement")
+    assert hasattr(result, 'score') # Check attribute existence
+    assert result.score == 0.0
 
     messages_no_assistant = [Message(role="user", content="Prove something")]
-    result_no_assistant = lean_prover_reward(messages=messages_no_assistant, statement="something")
-    assert "score" in result_no_assistant
-    assert result_no_assistant['score'] == 0.0
+    # lean_prover_reward expects messages[-1] to be assistant. This will fail internally.
+    result_no_assistant = lean_prover_reward(messages=messages_no_assistant, ground_truth=None, statement="something")
+    assert hasattr(result_no_assistant, 'score')
+    assert result_no_assistant.score == 0.0 # Expected to fail due to invalid messages structure
     
-    result_no_statement = lean_prover_reward(messages=messages_empty_assistant, statement=None)
-    assert "score" in result_no_statement
-    assert result_no_statement['score'] == 0.0
+    # Test with statement=None, which should also result in 0 score.
+    # messages_empty_assistant is valid structure but empty assistant content.
+    result_no_statement = lean_prover_reward(messages=messages_empty_assistant, ground_truth=None, statement=None)
+    assert hasattr(result_no_statement, 'score')
+    assert result_no_statement.score == 0.0
 
 
 def test_lean_prover_reward_basic():
@@ -40,12 +43,12 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, statement=statement)
-    assert "score" in result
+    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement)
+    assert hasattr(result, 'score')
 
     # Get completeness score from metrics if available
-    if "metrics" in result and "completeness" in result['metrics']:
-        assert result['metrics']["completeness"]['score'] < 1.0  # Should detect "sorry"
+    if result.metrics and "completeness" in result.metrics:
+        assert result.metrics["completeness"].score < 1.0  # Should detect "sorry"
 
 
 def test_lean_prover_reward_complete():
@@ -57,9 +60,9 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, statement=statement)
-    assert "score" in result
-    assert result['score'] >= 0.5
+    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement)
+    assert hasattr(result, 'score')
+    assert result.score >= 0.5
 
 
 def test_lean_prover_reward_verbose():
@@ -71,11 +74,11 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, statement=statement, verbose=True)
-    assert "score" in result
-    assert "metrics" in result
-    assert "syntax" in result['metrics']
-    assert result['metrics']["syntax"]['score'] > 0
+    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement, verbose=True)
+    assert hasattr(result, 'score')
+    assert result.metrics is not None
+    assert "syntax" in result.metrics
+    assert result.metrics["syntax"].score > 0
 
 
 def test_deepseek_prover_v2_reward():
@@ -104,14 +107,15 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = deepseek_prover_v2_reward(messages=messages, statement=statement, verbose=True)
-    assert "score" in result
-    assert result['score'] > 0.7  # Should be high due to good subgoals
+    # expected_proof is None for this test as it's focused on subgoal detection
+    result = deepseek_prover_v2_reward(messages=messages, ground_truth=None, statement=statement, verbose=True)
+    assert hasattr(result, 'score')
+    assert result.score > 0.7  # Should be high due to good subgoals
 
     # Check for subgoal analysis in metrics
-    assert "metrics" in result
-    assert "subgoal_decomposition" in result['metrics']
-    assert "hierarchical_structure" in result['metrics']
+    assert result.metrics is not None
+    assert "subgoal_decomposition" in result.metrics
+    assert "hierarchical_structure" in result.metrics
 
 
 @pytest.mark.skip(
@@ -148,10 +152,15 @@ end
     }
 
     try:
+        ground_truth_dict = {
+            "statement": statement,
+            "dataset_item": dataset_item
+            # expected_proof and answer would be inside dataset_item or could be top-level here
+        }
         result = deepseek_huggingface_prover_benchmark(
-            messages=messages, statement=statement, dataset_item=dataset_item, verbose=True
+            messages=messages, ground_truth=ground_truth_dict, verbose=True
         )
-        assert "score" in result
-        assert result['score'] >= 0.8  # Should be high for good proof
+        assert hasattr(result, 'score')
+        assert result.score >= 0.8  # Should be high for good proof
     except ImportError:
         pytest.skip("Hugging Face datasets package not installed")

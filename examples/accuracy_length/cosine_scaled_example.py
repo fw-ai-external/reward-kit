@@ -122,8 +122,18 @@ def evaluate_example(messages, ground_truth, **kwargs):
     # Update with any provided kwargs
     params.update(kwargs)
 
+    # Prepare ground_truth in the expected List[Message] format
+    # (as List[Dict[str, str]] which the decorator will convert)
+    if isinstance(ground_truth, str):
+        gt_list = [{"role": "assistant", "content": ground_truth}]
+    elif ground_truth is None:
+        gt_list = None
+    else:
+        # Assuming it might already be in the correct list format if not str
+        gt_list = ground_truth
+
     result = cosine_scaled_accuracy_length_reward(
-        messages=messages, ground_truth=ground_truth, **params
+        messages=messages, ground_truth=gt_list, **params
     )
 
     # Extract the assistant's response for reference

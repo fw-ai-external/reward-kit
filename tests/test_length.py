@@ -52,7 +52,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_target = length_reward(
-            messages=messages_target, target_length=target_length
+            messages=messages_target, ground_truth=None, target_length=target_length
         )
 
         self.assertIsInstance(result_target, EvaluateResult)
@@ -71,7 +71,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_short = length_reward(
-            messages=messages_short, target_length=target_length
+            messages=messages_short, ground_truth=None, target_length=target_length
         )
 
         self.assertIsInstance(result_short, EvaluateResult)
@@ -88,7 +88,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_long = length_reward(
-            messages=messages_long, target_length=target_length
+            messages=messages_long, ground_truth=None, target_length=target_length
         )
 
         self.assertIsInstance(result_long, EvaluateResult)
@@ -112,7 +112,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_adequate = length_reward(
-            messages=messages_adequate, min_length=min_length
+            messages=messages_adequate, ground_truth=None, min_length=min_length
         )
 
         self.assertIsInstance(result_adequate, EvaluateResult)
@@ -131,7 +131,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_short = length_reward(
-            messages=messages_short, min_length=min_length
+            messages=messages_short, ground_truth=None, min_length=min_length
         )
 
         self.assertIsInstance(result_short, EvaluateResult)
@@ -157,7 +157,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_short = length_reward(
-            messages=messages_short, max_length=max_length
+            messages=messages_short, ground_truth=None, max_length=max_length
         )
 
         self.assertIsInstance(result_short, EvaluateResult)
@@ -176,7 +176,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_long = length_reward(
-            messages=messages_long, max_length=max_length
+            messages=messages_long, ground_truth=None, max_length=max_length
         )
 
         self.assertIsInstance(result_long, EvaluateResult)
@@ -206,7 +206,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_good = length_reward(
-            messages=messages_good, min_length=min_length, max_length=max_length
+            messages=messages_good, ground_truth=None, min_length=min_length, max_length=max_length
         )
 
         self.assertIsInstance(result_good, EvaluateResult)
@@ -226,6 +226,7 @@ class TestLengthReward(unittest.TestCase):
 
         result_short = length_reward(
             messages=messages_short,
+            ground_truth=None,
             min_length=min_length,
             max_length=max_length,
         )
@@ -246,7 +247,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_long = length_reward(
-            messages=messages_long, min_length=min_length, max_length=max_length
+            messages=messages_long, ground_truth=None, min_length=min_length, max_length=max_length
         )
 
         self.assertIsInstance(result_long, EvaluateResult)
@@ -276,12 +277,14 @@ class TestLengthReward(unittest.TestCase):
 
         result_linear = length_reward(
             messages=messages_short,
+            ground_truth=None,
             target_length=target_length,
             scaling="linear",
         )
 
         result_cosine = length_reward(
             messages=messages_short,
+            ground_truth=None,
             target_length=target_length,
             scaling="cosine",
         )
@@ -307,6 +310,7 @@ class TestLengthReward(unittest.TestCase):
 
         result_short_correct = cosine_length_reward(
             messages=messages_short,
+            ground_truth=None,
             is_correct=True,
             max_length=50,  # Short max length to highlight difference
         )
@@ -318,7 +322,7 @@ class TestLengthReward(unittest.TestCase):
         ]
 
         result_long_correct = cosine_length_reward(
-            messages=messages_long, is_correct=True, max_length=50
+            messages=messages_long, ground_truth=None, is_correct=True, max_length=50
         )
 
         self.assertIsInstance(result_short_correct, EvaluateResult)
@@ -335,11 +339,11 @@ class TestLengthReward(unittest.TestCase):
 
         # Test with incorrect answers
         result_short_incorrect = cosine_length_reward(
-            messages=messages_short, is_correct=False, max_length=50
+            messages=messages_short, ground_truth=None, is_correct=False, max_length=50
         )
 
         result_long_incorrect = cosine_length_reward(
-            messages=messages_long, is_correct=False, max_length=50
+            messages=messages_long, ground_truth=None, is_correct=False, max_length=50
         )
 
         self.assertIsInstance(result_short_incorrect, EvaluateResult)
@@ -382,12 +386,13 @@ class TestLengthReward(unittest.TestCase):
         # Test with different correctness values
         result_high = cosine_length_reward(
             messages=messages,
+            ground_truth=None,
             correctness=0.95,  # High correctness
             max_length=50,
         )
 
         result_low = cosine_length_reward(
-            messages=messages, correctness=0.5, max_length=50  # Low correctness
+            messages=messages, ground_truth=None, correctness=0.5, max_length=50  # Low correctness
         )
 
         self.assertIsInstance(result_high, EvaluateResult)

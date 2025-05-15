@@ -47,6 +47,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=json_content,
             expected_schema=expected_schema,
         )
@@ -98,6 +99,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=json_content,
             expected_schema=expected_schema,
         )
@@ -140,6 +142,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 message_with_json,
             ],
+            ground_truth=None,
             expected_schema=expected_schema,
         )
 
@@ -175,6 +178,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=json_content,
             expected_schema=expected_schema,
         )
@@ -210,6 +214,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=json_string,
             expected_schema=expected_schema,
         )
@@ -235,6 +240,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me an empty object"},
                 {"role": "assistant", "content": "Here's an empty object"},
             ],
+            ground_truth=None,
             json_content=json_content,
             expected_schema=expected_schema,
         )
@@ -266,6 +272,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=invalid_json,
             expected_schema=expected_schema,
         )
@@ -312,6 +319,7 @@ class TestJsonSchemaReward:
                 {"role": "user", "content": "Give me user information"},
                 {"role": "assistant", "content": "Here's the user information"},
             ],
+            ground_truth=None,
             json_content=json_content,
             expected_schema=expected_schema,
             expected_behavior="Provide a user object with name and age",
@@ -373,6 +381,7 @@ class TestJsonSchemaReward:
                         "content": "Here's the user information",
                     },
                 ],
+                ground_truth=None,
                 json_content=json_content,
                 expected_schema=expected_schema,
                 expected_behavior="Provide a user object with name and age",

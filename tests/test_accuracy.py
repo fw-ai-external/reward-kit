@@ -40,7 +40,7 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth="4")
+        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
 
         # Check for exact match (score = 1.0)
         self.assertIsInstance(result, EvaluateResult)
@@ -79,7 +79,7 @@ class TestAccuracyReward(unittest.TestCase):
 
         result = accuracy_reward(
             messages=messages,
-            ground_truth="3.3333333",
+            ground_truth=[{"role": "assistant", "content": "3.3333333"}],
             extract_fn=custom_extract,
             compare_fn=custom_compare,
         )
@@ -114,7 +114,7 @@ class TestAccuracyReward(unittest.TestCase):
 
         # For this test, we explicitly provide the ground truth
         # to avoid relying on extraction from the context
-        result = accuracy_reward(messages=messages, ground_truth="4")
+        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
 
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
@@ -138,7 +138,7 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth="3.5")
+        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "3.5"}])
 
         # Check for low score
         self.assertIsInstance(result, EvaluateResult)
@@ -176,7 +176,7 @@ class TestAccuracyReward(unittest.TestCase):
             return ""
 
         result = accuracy_reward(
-            messages=messages, ground_truth="7", extract_fn=custom_extract
+            messages=messages, ground_truth=[{"role": "assistant", "content": "7"}], extract_fn=custom_extract
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -198,7 +198,7 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth="Paris")
+        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "Paris"}])
 
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
@@ -226,10 +226,10 @@ class TestAccuracyReward(unittest.TestCase):
         ]
 
         # Test for x = 4
-        result1 = accuracy_reward(messages=messages, ground_truth="4")
+        result1 = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
 
         # Test for x = -1
-        result2 = accuracy_reward(messages=messages, ground_truth="-1")
+        result2 = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "-1"}])
 
         self.assertIsInstance(result1, EvaluateResult)
         self.assertIsInstance(result2, EvaluateResult)
@@ -247,27 +247,48 @@ class TestAccuracyReward(unittest.TestCase):
         )
 
     def test_no_ground_truth(self):
-        """Test behavior when no ground truth is available."""
-        content = """
-        The answer is 42.
-        """
-
-        messages = [
+        """Test behavior with invalid or missing ground truth."""
+        messages_valid = [
             {"role": "user", "content": "What is the meaning of life?"},
-            {"role": "assistant", "content": content},
+            {"role": "assistant", "content": "The answer is 42."},
         ]
 
-        # No ground truth provided or available in context
-        result = accuracy_reward(messages=messages)
+        # Test case 1: ground_truth is None (though type hint now expects a list)
+        # The decorator might pass None if the key is missing in kwargs.
+        # The function itself handles None for ground_truth.
+        result_none_gt = accuracy_reward(messages=messages_valid, ground_truth=None)
+        self.assertIsInstance(result_none_gt, EvaluateResult)
+        self.assertEqual(result_none_gt.score, 0.0)
+        self.assertIn("Ground truth not provided", result_none_gt.reason)
+        self.assertFalse(result_none_gt.metrics["accuracy"].success)
 
-        self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
-        self.assertEqual(result.score, 0.0)
-        # Note: The metric key in accuracy_reward for this case is "accuracy"
-        self.assertFalse(result.metrics["accuracy"].success)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertFalse(result['metrics']["accuracy"]['success'])
+
+        # Test case 2: ground_truth is an empty list
+        result_empty_list_gt = accuracy_reward(messages=messages_valid, ground_truth=[])
+        self.assertIsInstance(result_empty_list_gt, EvaluateResult)
+        self.assertEqual(result_empty_list_gt.score, 0.0)
+        self.assertIn("Ground truth not provided", result_empty_list_gt.reason)
+        self.assertFalse(result_empty_list_gt.metrics["accuracy"].success)
+
+        # Test case 3: ground_truth is a list with a message that has no content
+        result_no_content_gt = accuracy_reward(
+            messages=messages_valid, 
+            ground_truth=[{"role": "assistant"}] # No "content" key
+        )
+        self.assertIsInstance(result_no_content_gt, EvaluateResult)
+        self.assertEqual(result_no_content_gt.score, 0.0)
+        self.assertIn("has no content", result_no_content_gt.reason) # Or similar message from function
+        self.assertFalse(result_no_content_gt.metrics["accuracy"].success)
+
+        # Test case 4: ground_truth is a list with a message that has None content
+        result_none_content_gt = accuracy_reward(
+            messages=messages_valid, 
+            ground_truth=[{"role": "assistant", "content": None}]
+        )
+        self.assertIsInstance(result_none_content_gt, EvaluateResult)
+        self.assertEqual(result_none_content_gt.score, 0.0)
+        self.assertIn("has no content", result_none_content_gt.reason)
+        self.assertFalse(result_none_content_gt.metrics["accuracy"].success)
 
     def test_no_answer_extraction(self):
         """Test behavior when no answer can be extracted."""
@@ -280,7 +301,7 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth="4")
+        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
 
         self.assertIsInstance(result, EvaluateResult)
         # Answer extraction should fail

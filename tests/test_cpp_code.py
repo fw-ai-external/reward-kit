@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 from typing import Dict, List, Any
-from reward_kit.models import MetricResult, EvaluateResult # Changed
+from reward_kit.models import Message, MetricResult, EvaluateResult # Changed
 
 from reward_kit.rewards.cpp_code import (
     extract_code_blocks,
@@ -562,7 +562,7 @@ class TestIOICppCodeReward:
         # Our execute_cpp_code mock can just return anything since we're bypassing it
         mock_execute.return_value = mock_result
 
-        messages = [
+        messages_data = [
             {
                 "role": "user",
                 "content": "Write a C++ program to add two numbers",
@@ -580,23 +580,26 @@ This program reads two integers and outputs their sum.
             },
         ]
 
+        messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
+        ground_truth_arg = "42" # This is the expected_output_str
+
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages, expected_output="42", language="cpp"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="cpp"
         )
 
         # Check result - execution should have succeeded with perfect match
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 1.0
         assert (
             "executed successfully" in result.metrics["execution_result"].reason
         )
-        # Dictionary access
-        assert result['score'] == 1.0
-        assert (
-            "executed successfully" in result['metrics']["execution_result"]['reason']
-        )
+        # assert result['score'] == 1.0 # Use attribute access
+        # assert (
+        #     "executed successfully" in result['metrics']["execution_result"]['reason'] # Use attribute access
+        # )
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
     @patch("reward_kit.rewards.cpp_code.execute_cpp_code")
@@ -612,7 +615,7 @@ This program reads two integers and outputs their sum.
         # Our execute_cpp_code mock can just return anything since we're bypassing it
         mock_execute.return_value = mock_result
 
-        messages = [
+        messages_data = [
             {
                 "role": "user",
                 "content": "Write a C++ program to add two numbers",
@@ -630,19 +633,22 @@ This program reads two integers and outputs their sum.
             },
         ]
 
+        messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
+        ground_truth_arg = "42" # This is the expected_output_str
+
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages, expected_output="42", language="cpp"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="cpp"
         )
 
         # Check result - should have partial match
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "Output similarity:" in result.metrics["output_match"].reason
-        # Dictionary access
-        assert result['score'] < 1.0
-        assert "Output similarity:" in result['metrics']["output_match"]['reason']
+        # assert result['score'] < 1.0 # Use attribute access
+        # assert "Output similarity:" in result['metrics']["output_match"]['reason'] # Use attribute access
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
     @patch("reward_kit.rewards.cpp_code.execute_cpp_code")
@@ -662,7 +668,7 @@ This program reads two integers and outputs their sum.
         # Our execute_cpp_code mock can just return anything since we're bypassing it
         mock_execute.return_value = mock_result
 
-        messages = [
+        messages_data = [
             {
                 "role": "user",
                 "content": "Write a C++ program to add two numbers",
@@ -681,19 +687,22 @@ int main() {
             },
         ]
 
+        messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
+        ground_truth_arg = "42" # This is the expected_output_str
+
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages, expected_output="42", language="cpp"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="cpp"
         )
 
         # Check result - execution should have failed
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 0.0
         assert "failed with error" in result.metrics["execution_result"].reason
-        # Dictionary access
-        assert result['score'] == 0.0
-        assert "failed with error" in result['metrics']["execution_result"]['reason']
+        # assert result['score'] == 0.0 # Use attribute access
+        # assert "failed with error" in result['metrics']["execution_result"]['reason'] # Use attribute access
 
     @patch("reward_kit.rewards.cpp_code.asyncio.get_event_loop")
     @patch("reward_kit.rewards.cpp_code.run_cpp_test_cases")
@@ -721,7 +730,7 @@ int main() {
         mock_loop.run_until_complete.return_value = test_results
         mock_run_tests.return_value = test_results
 
-        messages = [
+        messages_data = [
             {
                 "role": "user",
                 "content": "Write a C++ program to add two numbers",
@@ -739,15 +748,20 @@ This program reads two integers and outputs their sum.
             },
         ]
 
-        test_cases = [
+        test_cases_data = [
             {"name": "Test 1", "input": "10 15", "expected_output": "25"},
             {"name": "Test 2", "input": "0 0", "expected_output": "0"},
             {"name": "Test 3", "input": "-5 5", "expected_output": "0"},
         ]
 
+        messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
+        ground_truth_arg = test_cases_data # This is the test_cases
+
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages, test_cases=test_cases, language="cpp"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="cpp"
         )
 
         # Check result
@@ -758,16 +772,14 @@ This program reads two integers and outputs their sum.
         # With a default pass_threshold of 0.99, only the first two tests would pass,
         # resulting in 2/3 = 0.6666...
         expected_score = 2.0 / 3.0  # 2 out of 3 tests pass the threshold
-        # Attribute access
         assert (
             abs(result.score - expected_score) < 0.001
         )  # Use approximate comparison
         assert "2/3 tests passed" in result.metrics["pass_rate"].reason
-        # Dictionary access
-        assert (
-            abs(result['score'] - expected_score) < 0.001
-        )
-        assert "2/3 tests passed" in result['metrics']["pass_rate"]['reason']
+        # assert (
+        #     abs(result['score'] - expected_score) < 0.001 # Use attribute access
+        # )
+        # assert "2/3 tests passed" in result['metrics']["pass_rate"]['reason'] # Use attribute access
 
 
 class TestBinaryCppCodeReward:
@@ -802,19 +814,22 @@ class TestBinaryCppCodeReward:
             },
         ]
 
+        messages_arg = [Message(**messages[0]), Message(**messages[1])]
+        ground_truth_arg = "25" # This is the expected_output_str
+
         # Call function
         result = binary_cpp_code_reward(
-            messages=messages, expected_output="25", language="cpp"
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
+            language="cpp"
         )
 
         # Check result
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 1.0
         assert "Passed" in result.metrics['binary_result'].reason
-        # Dictionary access
-        assert result['score'] == 1.0
-        assert "Passed" in result['metrics']['binary_result']['reason']
+        # assert result['score'] == 1.0 # Use attribute access
+        # assert "Passed" in result['metrics']['binary_result']['reason'] # Use attribute access
 
     @patch("reward_kit.rewards.cpp_code._ioi_cpp_code_reward_impl")
     def test_binary_fail(self, mock_reward_impl):
@@ -845,19 +860,20 @@ class TestBinaryCppCodeReward:
             },
         ]
 
+        messages_arg = [Message(**messages[0]), Message(**messages[1])]
+        ground_truth_arg = "25" # This is the expected_output_str
+
         # Call function
         result = binary_cpp_code_reward(
-            messages=messages,
-            expected_output="25",
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="cpp",
             pass_threshold=0.9,  # Set threshold higher than the actual score
         )
 
         # Check result
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 0.0
         assert "Failed" in result.metrics['binary_result'].reason
-        # Dictionary access
-        assert result['score'] == 0.0
-        assert "Failed" in result['metrics']['binary_result']['reason']
+        # assert result['score'] == 0.0 # Use attribute access
+        # assert "Failed" in result['metrics']['binary_result']['reason'] # Use attribute access

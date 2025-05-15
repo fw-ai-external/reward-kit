@@ -38,7 +38,7 @@ I think the answer is 42.
             {"role": "assistant", "content": correct_format},
         ]
 
-        result = format_reward(messages=messages)
+        result = format_reward(messages=messages, ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 1.0 for correct format
@@ -65,7 +65,7 @@ The answer is 42."""
             {"role": "assistant", "content": incorrect_format},
         ]
 
-        result = format_reward(messages=messages)
+        result = format_reward(messages=messages, ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 0.0 for incorrect format
@@ -97,7 +97,7 @@ I think the answer is 42.
             {"role": "assistant", "content": wrong_order},
         ]
 
-        result = format_reward(messages=messages)
+        result = format_reward(messages=messages, ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 0.0 for incorrect order
@@ -133,7 +133,7 @@ This is my reasoning process.
             r"^\[REASONING\].*?\[/REASONING\].*?\[RESULT\].*?\[/RESULT\]$"
         )
 
-        result = format_reward(messages=messages, format_regex=custom_regex)
+        result = format_reward(messages=messages, ground_truth=None, format_regex=custom_regex)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 1.0 for correct custom format
@@ -148,7 +148,7 @@ This is my reasoning process.
 
     def test_no_messages(self):
         """Test that the format reward handles empty message list."""
-        result = format_reward(messages=[])
+        result = format_reward(messages=[], ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 0.0 for no messages
@@ -170,7 +170,7 @@ This is my reasoning process.
             }
         ]
 
-        result = format_reward(messages=messages)
+        result = format_reward(messages=messages, ground_truth=None)
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 0.0 for no assistant message
@@ -206,7 +206,7 @@ Thanks for asking!"""
 
         # Exact match should fail
         result_exact = format_reward(
-            messages=messages, require_exact_match=True
+            messages=messages, ground_truth=None, require_exact_match=True
         )
         self.assertIsInstance(result_exact, EvaluateResult)
         # Attribute access
@@ -220,6 +220,7 @@ Thanks for asking!"""
         )
         result_partial = format_reward(
             messages=messages,
+            ground_truth=None,
             format_regex=pattern_without_anchors,
             require_exact_match=False,
         )

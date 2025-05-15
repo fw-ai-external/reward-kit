@@ -88,20 +88,21 @@ def extract_number_list(text: str) -> List[List[float]]:
 
 @reward_function
 def list_comparison_math_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: List[Message],      # Full conversation, model's response is messages[-1]
+    ground_truth: str,            # String representation of the expected list of numbers
     order_matters: bool = False,
     **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate answers that are lists/sets of numbers.
 
-    Extracts lists of numbers from generated and original messages,
-    then compares them. By default, order does not matter (set comparison).
+    Extracts lists of numbers from the model's response (messages[-1].content)
+    and the ground_truth string, then compares them.
+    By default, order does not matter (set comparison).
 
     Args:
-        messages: Generated conversation messages.
-        original_messages: Original conversation messages (ground truth).
+        messages: List of conversation messages. The last message is the assistant's response.
+        ground_truth: String representation of the expected list of numbers.
         order_matters: If True, compares lists directly (order and count matter).
                        If False (default), compares as sets (order and duplicates
                        within a list don't matter beyond presence).
@@ -112,23 +113,20 @@ def list_comparison_math_reward(
     """
     metrics: Dict[str, MetricResult] = {}
 
-    if not messages or not original_messages:
-        return EvaluateResult(score=0.0, reason="Missing messages or original messages", metrics={"error": MetricResult(score=0.0, success=False, reason="Missing messages")})
-
-    gen_content = ""
-    if messages and len(messages) > 0:
-        gen_msg = messages[-1]
-        gen_content = (gen_msg.content if isinstance(gen_msg, Message) else gen_msg.get("content", "")) or ""
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+        return EvaluateResult(
+            score=0.0,
+            reason="Invalid or missing assistant response in messages.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+        )
     
-    orig_content = ""
-    if original_messages and len(original_messages) > 0:
-        orig_msg = original_messages[-1]
-        orig_content = (orig_msg.content if isinstance(orig_msg, Message) else orig_msg.get("content", "")) or ""
+    gen_content = messages[-1].content
+    orig_content = ground_truth # The new ground_truth parameter is the expected list string
 
-    if not gen_content:
-        return EvaluateResult(score=0.0, reason="Last generated message has no content.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty generated message")})
-    if not orig_content:
-        return EvaluateResult(score=0.0, reason="Last original message has no content.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty original message")})
+    if not gen_content: # Model's response content is empty
+        return EvaluateResult(score=0.0, reason="Assistant response content is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty generated message content.")})
+    if not orig_content: # Ground truth string is empty
+        return EvaluateResult(score=0.0, reason="Ground truth string (expected list) is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty ground truth string.")})
 
     gen_lists = extract_number_list(gen_content)
     orig_lists = extract_number_list(orig_content)

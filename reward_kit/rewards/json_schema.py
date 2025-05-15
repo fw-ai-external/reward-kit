@@ -2,23 +2,26 @@ from typing import Dict, List, Any, Optional, Union
 import json
 import re
 
-from ..models import EvaluateResult, MetricResult
+from ..models import EvaluateResult, MetricResult, Message # Added Message import
 from .function_calling import (
     calculate_jaccard_similarity,
     extract_schema_properties,
     normalize_schema,
 )
+from ..typed_interface import reward_function # Added import
 
 
+@reward_function # Added decorator
 def json_schema_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added, not used by core logic
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
 ) -> EvaluateResult:
     """
     Evaluate JSON content against an expected schema using Jaccard similarity.
+    The model's response (containing JSON) is assumed to be the last message in the `messages` list.
 
     This reward function compares the structure of JSON content against an
     expected schema and calculates a similarity score using Jaccard similarity.
@@ -26,12 +29,12 @@ def json_schema_reward(
     general JSON schema validation.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context (optional)
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this reward.
         json_content: The JSON content to evaluate (if not provided, extracts
-                      from message)
-        expected_schema: The expected schema for the JSON content
-        **kwargs: Additional keyword arguments
+                      from the last message).
+        expected_schema: The expected schema for the JSON content.
+        **kwargs: Additional keyword arguments.
 
     Returns:
         RewardOutput with score and metrics
@@ -52,25 +55,60 @@ def json_schema_reward(
             )
 
         last_message = messages[-1]
-        content = last_message.get("content", "")
+        content_text = "" # Initialize to handle cases where content might be None or role isn't assistant
 
-        # Try to extract JSON from the message content
-        if content:
+        if isinstance(last_message, Message):
+            if last_message.role == "assistant" and last_message.content is not None:
+                content_text = last_message.content
+            else: # Not an assistant message or no content
+                return EvaluateResult(
+                    score=0.0,
+                    reason="Last message is not a valid assistant response to extract JSON from.",
+                    metrics={"error": MetricResult(score=0.0, reason="Invalid assistant message for JSON extraction.", success=False)}
+                )
+        elif isinstance(last_message, dict):
+            if last_message.get("role") == "assistant" and last_message.get("content") is not None:
+                content_text = last_message.get("content", "")
+            else: # Not an assistant message or no content
+                return EvaluateResult(
+                    score=0.0,
+                    reason="Last message is not a valid assistant response (dict) to extract JSON from.",
+                    metrics={"error": MetricResult(score=0.0, reason="Invalid assistant message (dict) for JSON extraction.", success=False)}
+                )
+        else:
+            return EvaluateResult(
+                score=0.0,
+                reason=f"Unexpected type for last message: {type(last_message)}.",
+                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for JSON extraction.", success=False)}
+            )
+
+        # Try to extract JSON from the message content_text
+        extracted_json_str = None
+        if content_text:
             try:
                 # First look for JSON code blocks
                 pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                code_blocks = re.findall(pattern, content)
+                code_blocks = re.findall(pattern, content_text)
                 if code_blocks:
-                    json_content = code_blocks[0]
+                    extracted_json_str = code_blocks[0]
                 else:
                     # Try to find JSON-like content in the message
-                    json_matches = re.findall(r"\{.*\}", content, re.DOTALL)
-                    if json_matches:
-                        json_content = json_matches[0]
-            except Exception:
+                    # More robust regex to find a valid JSON object or array
+                    json_match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", content_text, re.DOTALL)
+                    if json_match:
+                        # Attempt to parse to ensure it's valid before assigning
+                        try:
+                            json.loads(json_match.group(0))
+                            extracted_json_str = json_match.group(0)
+                        except json.JSONDecodeError:
+                            pass # Not a valid JSON object/array
+            except Exception: # Broad exception for regex or other issues
                 pass
+        
+        if extracted_json_str:
+            json_content = extracted_json_str # Update json_content if successfully extracted
 
-        if not json_content:
+        if not json_content: # Check again if json_content is still None or empty after extraction attempt
             return EvaluateResult(
                 score=0.0,
                 reason="No JSON content found in messages.",
@@ -191,8 +229,8 @@ def json_schema_reward(
 
 
 def json_schema_reward_with_llm_judge(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -207,11 +245,11 @@ def json_schema_reward_with_llm_judge(
     validation and LLM judgment.
 
     Args:
-        messages: The conversation messages
-        original_messages: Original conversation context (optional)
+        messages: The conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this reward.
         json_content: The JSON content to evaluate (if not provided, extracts
-                      from message)
-        expected_schema: The expected schema for the JSON content
+                      from the last message).
+        expected_schema: The expected schema for the JSON content.
         expected_behavior: Description of the expected behavior/content
         openai_api_key: OpenAI API key (if not provided, uses environment variable)
         model: Model to use for LLM evaluation (default: gpt-4o-mini)
@@ -249,8 +287,8 @@ def json_schema_reward_with_llm_judge(
 
     # Run schema validation
     schema_result = json_schema_reward(
-        messages=messages,
-        original_messages=original_messages,
+        messages=messages, # Pass messages through
+        ground_truth=ground_truth, # Pass ground_truth through
         json_content=json_content,
         expected_schema=expected_schema,
         **kwargs,

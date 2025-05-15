@@ -10,7 +10,9 @@ from reward_kit.models import Message # Import Message model
 
 @reward_function
 def lean_prover_reward(
-    messages: List[Message],
+    messages: List[Message],        # Full conversation, model's response is messages[-1]
+    ground_truth: Optional[str],    # This is the expected_answer (proof string)
+    # statement is still expected via kwargs as per original logic
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -18,8 +20,9 @@ def lean_prover_reward(
     and correctness based on the DeepSeek-Prover-V2 benchmark approach.
 
     Args:
-        messages: List of conversation messages. The last message is assumed to be the assistant's response.
-        **kwargs: Must include 'statement' (str). Optional: 'expected_answer' (str), 
+        messages: List of conversation messages. The last message is the assistant's response.
+        ground_truth: The expected proof string. Corresponds to 'expected_answer' in original kwargs.
+        **kwargs: Must include 'statement' (str). Optional: 
                   'lean_version' (str, default "4"), 'check_partial_progress' (bool, default True),
                   'verbose' (bool, default False).
 
@@ -27,24 +30,25 @@ def lean_prover_reward(
         EvaluateResult with score and metrics
     """
     statement: Optional[str] = kwargs.get("statement")
-    expected_answer: Optional[str] = kwargs.get("expected_answer")
-    lean_version: str = kwargs.get("lean_version", "4")
+    # expected_answer is now the ground_truth parameter
+    expected_answer: Optional[str] = ground_truth
+    # lean_version: str = kwargs.get("lean_version", "4") # lean_version is not used in this function's logic
     check_partial_progress: bool = kwargs.get("check_partial_progress", True)
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
         return EvaluateResult(score=0.0, reason="Statement not provided in kwargs.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided.")})
 
-    if not messages:
-        return EvaluateResult(score=0.0, reason="No messages provided.", metrics={"error": MetricResult(score=0.0, success=False, reason="No messages provided.")})
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+        return EvaluateResult(
+            score=0.0,
+            reason="Invalid or missing assistant response in messages.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+        )
     
-    last_message = messages[-1]
-    if not isinstance(last_message, Message) or last_message.role != "assistant":
-        return EvaluateResult(score=0.0, reason="Last message is not a valid assistant response.", metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not from assistant.")})
-    
-    response = last_message.content or ""
-    if not response:
-        return EvaluateResult(score=0.0, reason="Assistant response is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response.")})
+    response = messages[-1].content
+    if not response: # Check if content is empty string
+        return EvaluateResult(score=0.0, reason="Assistant response content is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response content.")})
 
     # Define patterns for Lean syntax validation
     patterns = {
@@ -184,7 +188,9 @@ def lean_prover_reward(
 
 @reward_function
 def deepseek_prover_v2_reward(
-    messages: List[Message],
+    messages: List[Message],        # Full conversation, model's response is messages[-1]
+    ground_truth: Optional[str],    # This is the expected_proof
+    # statement is still expected via kwargs
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -192,48 +198,51 @@ def deepseek_prover_v2_reward(
     focuses on subgoal decomposition and formal verification.
 
     Args:
-        messages: List of conversation messages.
-        **kwargs: Must include 'statement' (str). Optional: 'expected_proof' (str), 
+        messages: List of conversation messages. The last message is the assistant's response.
+        ground_truth: The expected proof string. Corresponds to 'expected_proof' in original kwargs.
+        **kwargs: Must include 'statement' (str). Optional: 
                   'check_subgoals' (bool, default True), 'verbose' (bool, default False).
     Returns:
         EvaluateResult with score and metrics
     """
     statement: Optional[str] = kwargs.get("statement")
-    expected_proof: Optional[str] = kwargs.get("expected_proof")
+    # expected_proof is now the ground_truth parameter
+    expected_proof: Optional[str] = ground_truth
     check_subgoals: bool = kwargs.get("check_subgoals", True)
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
         return EvaluateResult(score=0.0, reason="Statement not provided in kwargs for deepseek_prover_v2_reward.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided.")})
 
-    if not messages:
-        return EvaluateResult(score=0.0, reason="No messages provided for deepseek_prover_v2_reward.", metrics={"error": MetricResult(score=0.0, success=False, reason="No messages provided.")})
-
-    # Call the decorated lean_prover_reward by passing messages and relevant kwargs
-    # The `response` will be extracted from `messages` inside `lean_prover_reward`
-    lean_prover_kwargs = {
+    # The model's response is in messages[-1].content.
+    # lean_prover_reward will handle checking messages[-1].
+    # No need for a separate check here if lean_prover_reward does it.
+    
+    # Prepare kwargs for lean_prover_reward.
+    # The `ground_truth` for lean_prover_reward is `expected_proof`.
+    lean_prover_kwargs_for_call = {
         "statement": statement,
-        "expected_answer": expected_proof,
-        "lean_version": "4", # DeepSeek-Prover-V2 uses Lean 4
-        "check_partial_progress": True,
+        # "expected_answer" for lean_prover_reward is our expected_proof (now ground_truth for this func)
+        # This will be passed as the ground_truth argument to lean_prover_reward directly.
+        "check_partial_progress": True, # Default from original call structure
         "verbose": verbose,
     }
-    # The `lean_prover_reward` is decorated, so it returns a dict
-    base_result_dict = lean_prover_reward(
-        messages=messages, 
-        **lean_prover_kwargs
-    )
-    # Convert dict back to EvaluateResult for internal processing if needed, or access as dict
-    # For simplicity, let's assume we'll work with the dict form here as per decorator's output
     
-    base_score = base_result_dict.get('score', 0.0)
-    base_reason = base_result_dict.get('reason', "Formal proof evaluation")
-    base_metrics = base_result_dict.get('metrics', {})
-    # Get reason from base_result if available, otherwise use a default
+    # Call the refactored lean_prover_reward.
+    # messages (full convo) is passed as messages.
+    # expected_proof (this function's ground_truth) is passed as ground_truth to lean_prover_reward.
+    base_evaluate_result: EvaluateResult = lean_prover_reward(
+        messages=messages,
+        ground_truth=expected_proof, 
+        **lean_prover_kwargs_for_call
+    )
+    
+    base_score = base_evaluate_result.score
+    base_reason = base_evaluate_result.reason or "Formal proof evaluation"
+    base_metrics = base_evaluate_result.metrics or {}
     top_level_reason = base_reason
 
-    # Initialize metrics from base result
-    metrics = base_metrics.copy() # base_metrics is already a dict
+    metrics = base_metrics.copy()
 
     # Specific patterns for DeepSeek-Prover-V2 subgoal approach
     subgoal_patterns = {
@@ -245,9 +254,13 @@ def deepseek_prover_v2_reward(
     }
 
     # Analyze subgoal decomposition if requested
-    # Need `response` string for this part. Extract from messages again.
-    last_message = messages[-1] # Assuming messages is not empty due to prior checks
-    response_content = last_message.content or ""
+    # Need `response_content` from messages[-1].content for this part.
+    # Ensure messages[-1] is valid before accessing content (already done by lean_prover_reward if it was called)
+    # If lean_prover_reward returned due to invalid messages, base_score would be 0 and this part might not run or matter.
+    response_content = ""
+    if messages and isinstance(messages[-1], Message) and messages[-1].role == "assistant" and messages[-1].content is not None:
+        response_content = messages[-1].content
+    # If response_content is empty here, subgoal checks will yield 0, which is fine.
 
     final_score = base_score
     subgoal_count = 0
@@ -311,7 +324,9 @@ def deepseek_prover_v2_reward(
 
 @reward_function
 def deepseek_huggingface_prover_benchmark(
-    messages: List[Message],
+    messages: List[Message],        # Full conversation, model's response is messages[-1]
+    ground_truth: Dict[str, Any],   # Expected to contain 'statement', and optionally 'dataset_item' or its components
+    # Other specific args like dataset_name, check_for_answer, verbose can remain in kwargs
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -320,32 +335,40 @@ def deepseek_huggingface_prover_benchmark(
     deepseek-ai/DeepSeek-ProverBench dataset.
 
     Args:
-        messages: List of conversation messages.
-        **kwargs: Must include 'statement' (str). Optional: 'dataset_item' (dict), 
-                  'dataset_name' (str), 'check_for_answer' (bool), 'verbose' (bool).
+        messages: List of conversation messages. The last message is the assistant's response.
+        ground_truth: A dictionary containing ground truth information. Expected keys:
+                      'statement' (str): The theorem statement.
+                      Optionally 'dataset_item' (dict): Pre-loaded dataset item.
+                      Optionally 'expected_proof' (str): The reference proof.
+                      Optionally 'answer' (str): A short answer if applicable.
+        **kwargs: Optional: 'dataset_name' (str), 'check_for_answer' (bool), 'verbose' (bool).
 
     Returns:
         EvaluateResult with score and metrics
     """
-    statement: Optional[str] = kwargs.get("statement")
-    dataset_item: Optional[Dict[str, Any]] = kwargs.get("dataset_item")
+    statement: Optional[str] = ground_truth.get("statement")
+    dataset_item: Optional[Dict[str, Any]] = ground_truth.get("dataset_item")
+    # Allow expected_proof and answer to be directly in ground_truth if dataset_item is not.
+    expected_proof_from_gt: Optional[str] = ground_truth.get("expected_proof")
+    answer_from_gt: Optional[str] = ground_truth.get("answer")
+
     dataset_name: str = kwargs.get("dataset_name", "deepseek-ai/DeepSeek-ProverBench")
     check_for_answer: bool = kwargs.get("check_for_answer", True)
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
-        return EvaluateResult(score=0.0, reason="Statement not provided in kwargs for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided.")})
+        return EvaluateResult(score=0.0, reason="Statement not found in ground_truth dict for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided in ground_truth.")})
 
-    if not messages:
-        return EvaluateResult(score=0.0, reason="No messages provided for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="No messages provided.")})
-
-    last_message = messages[-1]
-    if not isinstance(last_message, Message) or last_message.role != "assistant":
-        return EvaluateResult(score=0.0, reason="Last message is not a valid assistant response for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not from assistant.")})
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+        return EvaluateResult(
+            score=0.0,
+            reason="Invalid or missing assistant response in messages.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+        )
     
-    response = last_message.content or ""
-    if not response: # Check if response content is empty
-        return EvaluateResult(score=0.0, reason="Assistant response is empty for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response.")})
+    response = messages[-1].content # This is the model's proof attempt
+    if not response: 
+        return EvaluateResult(score=0.0, reason="Assistant response content is empty for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response content.")})
 
     try:
         from datasets import load_dataset
@@ -419,28 +442,35 @@ def deepseek_huggingface_prover_benchmark(
 
         dataset_item = matched_item
 
-    # Extract expected proof if available
-    expected_proof = dataset_item.get("expected_proof", None)
-    reference_solution = dataset_item.get("reference_solution", None)
+    # Extract expected proof if available from dataset_item or directly from ground_truth
+    expected_proof = expected_proof_from_gt # Prioritize direct key from ground_truth
+    reference_solution = None
+    if dataset_item:
+        if not expected_proof: # If not in ground_truth directly, try from dataset_item
+             expected_proof = dataset_item.get("expected_proof", None)
+        reference_solution = dataset_item.get("reference_solution", None)
 
     # Use the expected proof or reference solution if available
     proof_reference = expected_proof or reference_solution
 
     # Check for the answer/solution if required
-    current_top_level_reason = "Evaluation against DeepSeek ProverBench dataset." # Renamed to avoid conflict
-    if check_for_answer and dataset_item and dataset_item.get("answer", None): # Added check for dataset_item
-        expected_answer = str(dataset_item["answer"])
-        # Look for the answer in the response (which is messages[-1].content)
-        answer_found = expected_answer in response 
+    current_top_level_reason = "Evaluation against DeepSeek ProverBench dataset."
+    # Use answer_from_gt if available, otherwise try from dataset_item
+    answer_to_check = answer_from_gt
+    if not answer_to_check and dataset_item:
+        answer_to_check = dataset_item.get("answer")
 
-        # If answer is provided but not found in the response, penalize score
+    if check_for_answer and answer_to_check:
+        expected_answer_str = str(answer_to_check)
+        answer_found = expected_answer_str in response 
+
         if not answer_found:
             metrics["answer_match"] = MetricResult(
                 score=0.0,
                 success=False,
-                reason=f"Expected answer '{expected_answer}' not found in response",
+                reason=f"Expected answer '{expected_answer_str}' not found in response",
             )
-            return EvaluateResult(score=0.2, reason=f"Expected answer '{expected_answer}' not found.", metrics=metrics)
+            return EvaluateResult(score=0.2, reason=f"Expected answer '{expected_answer_str}' not found.", metrics=metrics)
         else:
             metrics["answer_match"] = MetricResult(
                 score=1.0, success=True, reason="Expected answer found in response"
@@ -448,29 +478,30 @@ def deepseek_huggingface_prover_benchmark(
             current_top_level_reason += " Expected answer found."
 
     # Use the deepseek_prover_v2_reward function for evaluation
-    # Pass messages and relevant kwargs
-    deepseek_kwargs = {
+    # messages (full convo) is passed as messages.
+    # proof_reference (derived) is passed as ground_truth to deepseek_prover_v2_reward.
+    deepseek_kwargs_for_call = {
         "statement": statement,
-        "expected_proof": proof_reference,
-        "check_subgoals": True,
+        # "expected_proof" for deepseek_prover_v2_reward is our proof_reference
+        # This will be passed as the ground_truth argument to deepseek_prover_v2_reward.
+        "check_subgoals": True, # Default from original call structure
         "verbose": verbose,
     }
-    result_dict = deepseek_prover_v2_reward(
+    eval_result_from_deepseek: EvaluateResult = deepseek_prover_v2_reward(
         messages=messages,
-        **deepseek_kwargs
+        ground_truth=proof_reference, 
+        **deepseek_kwargs_for_call
     )
     
-    # result_dict is the dictionary returned by the decorated deepseek_prover_v2_reward
-    result_score = result_dict.get('score', 0.0)
-    result_reason = result_dict.get('reason')
-    result_metrics = result_dict.get('metrics', {})
+    result_score = eval_result_from_deepseek.score
+    result_reason = eval_result_from_deepseek.reason
+    result_metrics = eval_result_from_deepseek.metrics or {}
 
 
     # Combine metrics
-    combined_metrics = (
-        {**metrics, **result_metrics} if result_metrics else metrics 
-    )
-    if result_reason and result_reason not in current_top_level_reason: # Append reason from sub-call
+    combined_metrics = {**metrics, **result_metrics}
+    
+    if result_reason and result_reason not in current_top_level_reason:
         current_top_level_reason += f" Sub-evaluation: {result_reason}"
 
 

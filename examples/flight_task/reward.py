@@ -5,22 +5,25 @@ This reward function evaluates if an agent successfully booked a flight by check
 for a paid booking record for the specified passenger.
 """
 
-from reward_kit import reward_function
+from reward_kit import reward_function, Message, EvaluateResult, MetricResult
+from typing import List, Any, Dict
+from sqlalchemy.engine.base import Connection # Assuming db is an SQLAlchemy connection
 
 
 @reward_function
-def evaluate(messages, *, db, end_goal_sql=None, passenger="Alice", **kwargs):
+def evaluate(messages: List[Message], *, db: Connection, end_goal_sql: str = None, passenger: str = "Alice", **kwargs: Any) -> EvaluateResult:
     """
     Evaluate if a flight booking was successfully completed.
 
     Args:
-        messages: List of conversation messages
-        db: Database connection
-        end_goal_sql: Optional SQL query to check the end goal (overrides default)
-        passenger: Name of the passenger to check for booking
+        messages: List of conversation messages (currently unused by this function but part of standard signature)
+        db: Database connection object.
+        end_goal_sql: Optional SQL query to check the end goal (overrides default).
+        passenger: Name of the passenger to check for booking.
+        **kwargs: Additional arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics.
     """
     # Default SQL query if not provided
     if not end_goal_sql:
@@ -48,27 +51,31 @@ def evaluate(messages, *, db, end_goal_sql=None, passenger="Alice", **kwargs):
     ).scalar()
 
     # Create metrics dictionary compatible with EvaluateResult
-    metrics_dict = {
-        "task_complete": {
-            "score": 1.0 if success else 0.0,
-            "reason": (
+    metrics_dict: Dict[str, MetricResult] = {
+        "task_complete": MetricResult(
+            score=1.0 if success else 0.0,
+            success=success,
+            reason=(
                 "Successfully booked and paid for flight"
                 if success
                 else "Failed to complete booking"
             ),
-        },
-        "search_flights": {
-            "score": min(1.0, search_count / 1.0),
-            "reason": f"Agent searched for flights {search_count} times",
-        },
-        "create_booking": {
-            "score": min(1.0, booking_count / 1.0),
-            "reason": f"Agent created {booking_count} bookings",
-        },
-        "pay_booking": {
-            "score": min(1.0, payment_count / 1.0),
-            "reason": f"Agent made {payment_count} payment attempts",
-        },
+        ),
+        "search_flights": MetricResult(
+            score=min(1.0, search_count / 1.0),
+            success=search_count > 0,
+            reason=f"Agent searched for flights {search_count} times",
+        ),
+        "create_booking": MetricResult(
+            score=min(1.0, booking_count / 1.0),
+            success=booking_count > 0,
+            reason=f"Agent created {booking_count} bookings",
+        ),
+        "pay_booking": MetricResult(
+            score=min(1.0, payment_count / 1.0),
+            success=payment_count > 0,
+            reason=f"Agent made {payment_count} payment attempts",
+        ),
     }
 
     # Final score is 1.0 if successful, otherwise partial credit for steps completed
@@ -85,5 +92,5 @@ def evaluate(messages, *, db, end_goal_sql=None, passenger="Alice", **kwargs):
         score = progress_score
         reason = f"Task incomplete: {progress_score:.2f} progress score"
 
-    # Return as a dictionary compatible with EvaluateResult
-    return {"score": score, "reason": reason, "metrics": metrics_dict}
+    # Return as an EvaluateResult object
+    return EvaluateResult(score=score, reason=reason, metrics=metrics_dict)

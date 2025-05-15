@@ -37,15 +37,20 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
     """Test the multiple_choice_math_reward function."""
 
     def _create_messages(self, assistant_content: str) -> List[Dict[str, str]]:
+        """Creates a list of messages including a user prompt and an assistant response."""
         return [
             {"role": "user", "content": "What is the answer?"},
             {"role": "assistant", "content": assistant_content}
         ]
 
+    def _create_ground_truth(self, assistant_content: str) -> List[Dict[str, str]]:
+        """Creates a ground_truth list containing a single assistant message."""
+        return [{"role": "assistant", "content": assistant_content}]
+
     def test_perfect_match_parentheses(self):
         gen_msgs = self._create_messages("The correct option is (B).")
-        orig_msgs = self._create_messages("The answer is (B).")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The answer is (B).")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
@@ -58,16 +63,16 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
 
     def test_perfect_match_dot(self):
         gen_msgs = self._create_messages("My choice is C.")
-        orig_msgs = self._create_messages("C. is the one.")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("C. is the one.")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 1.0)
         self.assertEqual(result['score'], 1.0)
 
     def test_mismatch(self):
         gen_msgs = self._create_messages("I think it's (A).")
-        orig_msgs = self._create_messages("The answer is definitely (D).")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The answer is definitely (D).")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
@@ -80,20 +85,20 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
 
     def test_gen_no_mcq_orig_has_mcq(self):
         gen_msgs = self._create_messages("The answer is 42.")
-        orig_msgs = self._create_messages("The answer is (A).")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The answer is (A).")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
         self.assertTrue(result.reason is not None and "Could not extract MCQ option from generated message" in result.reason)
         # Dictionary access
         self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Could not extract MCQ option from generated message" in result['reason'])
+        self.assertTrue(result['reason'] is not None and "Could not extract MCQ option from generated message" in result.reason)
 
     def test_orig_no_mcq(self):
         gen_msgs = self._create_messages("The answer is (B).")
-        orig_msgs = self._create_messages("The answer is two.")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The answer is two.")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
@@ -108,8 +113,8 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         
     def test_ambiguous_generated_answer(self):
         gen_msgs = self._create_messages("It could be (A) or maybe (B).")
-        orig_msgs = self._create_messages("The answer is (A).")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The answer is (A).")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0) # Penalized for ambiguity
@@ -123,8 +128,8 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
     def test_ambiguous_original_answer_still_compares_first(self):
         # If original is ambiguous, current logic picks the first and compares.
         gen_msgs = self._create_messages("The answer is (A).")
-        orig_msgs = self._create_messages("The options are (A) and (C).")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("The options are (A) and (C).")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0) # Matches first extracted from original
@@ -137,8 +142,8 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
 
     def test_both_ambiguous_compares_first(self):
         gen_msgs = self._create_messages("Let's say (D), or perhaps (E).")
-        orig_msgs = self._create_messages("Is it (D) or (A)?")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        gt_msgs = self._create_ground_truth("Is it (D) or (A)?")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0) # D vs D
@@ -151,39 +156,43 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertTrue(result['metrics']["ambiguous_original_mcq"]['success'] == False)
         self.assertTrue(result['reason'] is not None and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result['reason'])
 
-    def test_empty_messages(self):
-        result = multiple_choice_math_reward(messages=[], original_messages=[])
+    def test_empty_messages_and_ground_truth(self):
+        result = multiple_choice_math_reward(messages=[], ground_truth=[])
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Missing messages" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Missing messages" in result['reason'])
+        self.assertTrue(result.reason is not None and "Missing generated messages" in result.reason) # Checks messages first
+
+    def test_empty_messages_only(self):
+        gt_msgs = self._create_ground_truth("(A)")
+        result = multiple_choice_math_reward(messages=[], ground_truth=gt_msgs)
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Missing generated messages" in result.reason)
+
+    def test_empty_ground_truth_only(self):
+        gen_msgs = self._create_messages("(A)")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=[])
+        self.assertIsInstance(result, EvaluateResult)
+        self.assertEqual(result.score, 0.0)
+        self.assertTrue(result.reason is not None and "Missing ground truth message" in result.reason)
 
     def test_missing_assistant_message_gen(self):
-        gen_msgs = [{"role": "user", "content": "Query"}]
-        orig_msgs = self._create_messages("(A)")
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        # messages[-1] is not an assistant message
+        gen_msgs = [{"role": "user", "content": "Query"}, {"role": "user", "content": "Another query"}]
+        gt_msgs = self._create_ground_truth("(A)")
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Last generated message not from assistant" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Last generated message not from assistant" in result['reason'])
+        self.assertTrue(result.reason is not None and "Last generated message not from assistant or has no content" in result.reason)
 
     def test_missing_assistant_message_orig(self):
         gen_msgs = self._create_messages("(A)")
-        orig_msgs = [{"role": "user", "content": "Query"}]
-        result = multiple_choice_math_reward(messages=gen_msgs, original_messages=orig_msgs)
+        # ground_truth[0] is not an assistant message
+        gt_msgs = [{"role": "user", "content": "This is not an assistant message"}]
+        result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(result.reason is not None and "Last original message not from assistant" in result.reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertTrue(result['reason'] is not None and "Last original message not from assistant" in result['reason'])
+        self.assertTrue(result.reason is not None and "Invalid ground truth message: Not an assistant message or has no content" in result.reason)
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

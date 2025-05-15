@@ -17,8 +17,8 @@ from .length import count_tokens
 
 @reward_function
 def cosine_scaled_accuracy_length_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    ground_truth: Optional[str] = None,
+    messages: List[Message],
+    ground_truth: Optional[List[Message]] = None,
     extract_fn: Optional[Callable[[str], str]] = None,
     compare_fn: Optional[Callable[[str, str], float]] = None,
     max_length: int = 1000,
@@ -68,60 +68,41 @@ def cosine_scaled_accuracy_length_reward(
             },
         )
 
-    response = messages[-1]
+    response = messages[-1] # response is a Message object
 
     # Extract response text
-    if isinstance(response, Message):
-        if response.role != "assistant" or not response.content:
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "combined_reward": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.content
-    elif isinstance(response, dict):
-        if response.get("role") != "assistant" or not response.get("content"):
-            return EvaluateResult(
-                score=0.0,
-                reason="No assistant response found",
-                metrics={
-                    "combined_reward": MetricResult(
-                        score=0.0,
-                        success=False,
-                        reason="Message not from assistant or has no content",
-                    )
-                },
-            )
-        text = response.get("content", "")
+    if response.role != "assistant" or not response.content:
+        return EvaluateResult(
+            score=0.0,
+            reason="No assistant response found or response has no content",
+            metrics={
+                "combined_reward": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Message not from assistant or has no content",
+                )
+            },
+        )
+    text: str = response.content
 
     # Step 1: Evaluate accuracy
-    accuracy_result = accuracy_reward(
-        messages=messages,
-        ground_truth=ground_truth,
+    # The accuracy_reward function is expected to be refactored to handle
+    # messages: List[Message] (prompt + generated) and ground_truth: Optional[List[Message]] (target)
+    accuracy_eval_result = accuracy_reward(
+        messages=messages, # Pass the full messages list
+        ground_truth=ground_truth, # Pass the ground_truth list
         extract_fn=extract_fn,
         compare_fn=compare_fn,
     )
 
-    # Unpack the accuracy result
-    if isinstance(accuracy_result, dict):  # Dict returned from decorator
-        accuracy_score = accuracy_result.get("score", 0.0)
-        accuracy_metrics = accuracy_result.get("metrics", {})
-        answer_accuracy = accuracy_metrics.get("answer_accuracy", {})
-        accuracy_success = answer_accuracy.get("success", False)
-        accuracy_reason = accuracy_result.get("reason", "")
-    else:  # It's an EvaluateResult object
-        accuracy_score = accuracy_result.score
-        answer_accuracy = accuracy_result.metrics.get(
-            "answer_accuracy", MetricResult(score=0.0, success=False, reason="")
-        )
-        accuracy_success = answer_accuracy.success
-        accuracy_reason = accuracy_result.reason or ""
+    # Unpack the accuracy result (accuracy_reward returns EvaluateResult)
+    accuracy_score = accuracy_eval_result.score
+    # Ensure answer_accuracy metric exists, provide a default if not
+    answer_accuracy_metric = accuracy_eval_result.metrics.get(
+        "answer_accuracy", MetricResult(score=0.0, success=False, reason="Accuracy metric not found")
+    )
+    accuracy_success = answer_accuracy_metric.success
+    accuracy_reason = accuracy_eval_result.reason or "No reason from accuracy_reward"
 
     # Step 2: Calculate length-based score
     token_count = count_tokens(text, method=token_method)

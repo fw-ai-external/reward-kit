@@ -36,29 +36,28 @@ class TestDeepCoderReward(unittest.TestCase):
             self.skipTest("Test data not loaded.")
         
         sample = self.SAMPLES[0] # add_one function
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 1\n\n# To be called by the testing harness\nval = input()\nprint(add_one(val))\n```")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 1\n\n# To be called by the testing harness\nval = input()\nprint(add_one(val))\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"] # test_cases are the ground_truth
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 1.0)
         self.assertIn("test_results", result.metrics)
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(all(tc.get("passed") for tc in details))
-        # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertIn("test_results", result['metrics'])
-        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-            details = json.loads(result['metrics']["test_results"]['reason'])
-            self.assertTrue(all(tc.get("passed") for tc in details))
+        # self.assertEqual(result['score'], 1.0) # Use attribute access
+        # self.assertIn("test_results", result['metrics']) # Use attribute access
+        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+        #     details = json.loads(result['metrics']["test_results"]['reason'])
+        #     self.assertTrue(all(tc.get("passed") for tc in details))
 
     def test_python_one_test_fails_local(self):
         """Test Python code where one test case fails locally."""
@@ -66,54 +65,52 @@ class TestDeepCoderReward(unittest.TestCase):
             self.skipTest("Test data not loaded.")
 
         sample = self.SAMPLES[0] # add_one function, but we make it add_two
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 2\n\nval = input()\nprint(add_one(val))\n```")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 2\n\nval = input()\nprint(add_one(val))\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertFalse(details[0].get("passed")) # First test case (5 -> expected 6, actual 7) should fail
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-            details = json.loads(result['metrics']["test_results"]['reason'])
-            self.assertFalse(details[0].get("passed"))
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
+        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+        #     details = json.loads(result['metrics']["test_results"]['reason'])
+        #     self.assertFalse(details[0].get("passed"))
 
     def test_python_syntax_error_local(self):
         """Test Python code with a syntax error locally."""
         if not self.SAMPLES:
             self.skipTest("Test data not loaded.")
         sample = self.SAMPLES[0]
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\ndef add_one(x)\n  return x + 1\n\nval = input()\nprint(add_one(val))\n```") # Missing colon
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\ndef add_one(x)\n  return x + 1\n\nval = input()\nprint(add_one(val))\n```") # Missing colon
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(any("error" in tc for tc in details))
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-            details = json.loads(result['metrics']["test_results"]['reason'])
-            self.assertTrue(any("error" in tc for tc in details))
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
+        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+        #     details = json.loads(result['metrics']["test_results"]['reason'])
+        #     self.assertTrue(any("error" in tc for tc in details))
 
 
     def test_python_timeout_local(self):
@@ -121,90 +118,90 @@ class TestDeepCoderReward(unittest.TestCase):
         if not self.SAMPLES:
             self.skipTest("Test data not loaded.")
         sample = self.SAMPLES[0]
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\nimport time\ndef add_one(x):\n  time.sleep(15)\n  return int(x) + 1\n\nval = input()\nprint(add_one(val))\n```")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\nimport time\ndef add_one(x):\n  time.sleep(15)\n  return int(x) + 1\n\nval = input()\nprint(add_one(val))\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             timeout=2, # Short timeout
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-            details = json.loads(result['metrics']["test_results"]['reason'])
-            self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
+        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+        #     details = json.loads(result['metrics']["test_results"]['reason'])
+        #     self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
 
     def test_no_code_block(self):
         """Test when no code block is found in the assistant message."""
         if not self.SAMPLES:
             self.skipTest("Test data not loaded.")
         sample = self.SAMPLES[0]
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="I am not sure how to do that.")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="I am not sure how to do that.")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0)
         self.assertIn("error", result.metrics)
         if "error" in result.metrics:
              self.assertIn("No python code block found", result.metrics["error"].reason)
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertIn("error", result['metrics'])
-        if "error" in result['metrics']:
-             self.assertIn("No python code block found", result['metrics']["error"]['reason'])
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
+        # self.assertIn("error", result['metrics']) # Use attribute access
+        # if "error" in result['metrics']:
+        #      self.assertIn("No python code block found", result['metrics']["error"]['reason']) # Use attribute access
 
     def test_javascript_all_tests_pass_local(self):
         """Test JavaScript code that passes all test cases locally."""
         # Using a simplified version of add_one for JS
         js_test_cases = [{"input": "5", "expected_output": "6\n"}, {"input": "-2", "expected_output": "-1\n"}]
-        messages = [
-            Message(role="user", content="Write a JS function addOne."),
-            Message(role="assistant", content="```javascript\nfunction addOne(x) {\n  return parseInt(x) + 1;\n}\n\nconst val = readline();\nconsole.log(addOne(val));\n```")
-        ]
+        prompt_message = Message(role="user", content="Write a JS function addOne.")
+        assistant_message = Message(role="assistant", content="```javascript\nfunction addOne(x) {\n  return parseInt(x) + 1;\n}\n\nconst val = readline();\nconsole.log(addOne(val));\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = js_test_cases
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="javascript",
-            test_cases=js_test_cases,
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 1.0)
-        self.assertEqual(result['score'], 1.0)
+        # self.assertEqual(result['score'], 1.0) # Use attribute access
 
     def test_javascript_one_test_fails_local(self):
         """Test JavaScript code where one test case fails locally."""
         js_test_cases = [{"input": "5", "expected_output": "6\n"}, {"input": "-2", "expected_output": "-1\n"}]
-        messages = [
-            Message(role="user", content="Write a JS function addOne."),
-            Message(role="assistant", content="```javascript\nfunction addOne(x) {\n  return parseInt(x) + 2; // Bug here\n}\n\nconst val = readline();\nconsole.log(addOne(val));\n```")
-        ]
+        prompt_message = Message(role="user", content="Write a JS function addOne.")
+        assistant_message = Message(role="assistant", content="```javascript\nfunction addOne(x) {\n  return parseInt(x) + 2; // Bug here\n}\n\nconst val = readline();\nconsole.log(addOne(val));\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = js_test_cases
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="javascript",
-            test_cases=js_test_cases,
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
-        self.assertEqual(result['score'], 0.0)
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
 
     @unittest.skip("Skipping E2B tests due to intermittent service issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
@@ -214,30 +211,29 @@ class TestDeepCoderReward(unittest.TestCase):
             self.skipTest("Test data not loaded.")
         
         sample = self.SAMPLES[0] # add_one function
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 1\n\nval = input()\nprint(add_one(val))\n```")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 1\n\nval = input()\nprint(add_one(val))\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="e2b",
             api_key=E2B_API_KEY 
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 1.0)
         self.assertIn("test_results", result.metrics)
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(all(tc.get("passed") for tc in details))
-        # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertIn("test_results", result['metrics'])
-        if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-            details = json.loads(result['metrics']["test_results"]['reason'])
-            self.assertTrue(all(tc.get("passed") for tc in details))
+        # self.assertEqual(result['score'], 1.0) # Use attribute access
+        # self.assertIn("test_results", result['metrics']) # Use attribute access
+        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
+        #     details = json.loads(result['metrics']["test_results"]['reason'])
+        #     self.assertTrue(all(tc.get("passed") for tc in details))
 
     @unittest.skip("Skipping E2B tests due to intermittent service issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
@@ -247,44 +243,44 @@ class TestDeepCoderReward(unittest.TestCase):
             self.skipTest("Test data not loaded.")
 
         sample = self.SAMPLES[0] # add_one function, but we make it add_two
-        messages = [
-            Message(role="user", content=sample["prompt"]),
-            Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 2\n\nval = input()\nprint(add_one(val))\n```")
-        ]
+        prompt_message = Message(role="user", content=sample["prompt"])
+        assistant_message = Message(role="assistant", content="```python\ndef add_one(x):\n  return int(x) + 2\n\nval = input()\nprint(add_one(val))\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = sample["test_cases"]
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=sample["test_cases"],
             environment="e2b",
             api_key=E2B_API_KEY
         )
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
-        self.assertEqual(result['score'], 0.0)
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
 
     def test_empty_test_cases(self):
         """Test behavior with an empty list of test cases."""
-        messages = [
-            Message(role="user", content="Prompt"),
-            Message(role="assistant", content="```python\nprint('hello')\n```")
-        ]
+        prompt_message = Message(role="user", content="Prompt")
+        assistant_message = Message(role="assistant", content="```python\nprint('hello')\n```")
+        messages_arg = [prompt_message, assistant_message]
+        ground_truth_arg = [] # Empty test cases
+        
         result = deepcoder_code_reward(
-            messages=messages,
+            messages=messages_arg,
+            ground_truth=ground_truth_arg,
             language="python",
-            test_cases=[], # Empty test cases
             environment="local"
         )
         self.assertIsInstance(result, EvaluateResult)
-        # Attribute access
         self.assertEqual(result.score, 0.0) # Should be 0 as per implementation
         self.assertIn("error", result.metrics)
         if "error" in result.metrics:
             self.assertEqual(result.metrics["error"].reason, "No test cases provided.")
-        # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertIn("error", result['metrics'])
-        if "error" in result['metrics']:
-            self.assertEqual(result['metrics']["error"]['reason'], "No test cases provided.")
+        # self.assertEqual(result['score'], 0.0) # Use attribute access
+        # self.assertIn("error", result['metrics']) # Use attribute access
+        # if "error" in result['metrics']:
+        #     self.assertEqual(result['metrics']["error"]['reason'], "No test cases provided.") # Use attribute access
 
 if __name__ == '__main__':
     unittest.main()

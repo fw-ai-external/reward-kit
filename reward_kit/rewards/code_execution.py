@@ -132,14 +132,13 @@ def extract_code_blocks(
 
 @reward_function
 def local_code_execution_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
-    expected_output: Optional[str] = None,
+    messages: List[Message],             # Full conversation, last message is model's response
+    ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 5,
-    max_memory_mb: int = 100,
+    max_memory_mb: int = 100,  # Specific to local execution
     **kwargs,
-) -> EvaluateResult:  # Changed
+) -> EvaluateResult:
     """
     Evaluate code correctness by executing it locally and comparing the output.
 
@@ -147,162 +146,112 @@ def local_code_execution_reward(
     and timeouts to prevent malicious code from harming the system.
 
     Args:
-        messages: Generated conversation messages
-        original_messages: Original conversation context (optional)
-        expected_output: Expected output from code execution
+        messages: List of conversation messages. The last message is assumed to be the
+                  assistant's response containing the code.
+        ground_truth: Expected output string from code execution. This corresponds to
+                      the `expected_output_str` in the previous signature.
         language: Programming language of the code ("python", "javascript", etc.)
-        timeout: Maximum execution time in seconds
-        max_memory_mb: Maximum memory usage in megabytes (default: 100)
-        **kwargs: Additional keyword arguments
+        timeout: Maximum execution time in seconds.
+        max_memory_mb: Maximum memory usage in megabytes (default: 100).
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics.
     """
     # Initialize metrics dictionary for tracking various aspects of the execution
-    metrics = {}
+    metrics: Dict[str, MetricResult] = {}
 
-    # Note: We don't set the reliability guard in the main process
-    # as it would interfere with the test runner and other system processes.
-    # Instead, the guard is applied in each subprocess during code execution.
-
-    # Extract the last assistant message
-    if not messages:
-        return EvaluateResult(  # Changed
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+        return EvaluateResult(
             score=0.0,
-            reason="No messages provided for evaluation.",  # Added reason
+            reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(  # Changed
-                    score=0.0, reason="No messages provided", success=False
-                )
+                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
             },
         )
+    
+    response_content = messages[-1].content
+    expected_output_str = ground_truth # Use the new ground_truth parameter as expected_output_str
 
-    last_message = messages[-1]
-
-    # Check role of the last message
-    if last_message.role != "assistant":
-        return EvaluateResult(  # Changed
-            score=0.0,
-            reason="Last message is not from assistant.",  # Added reason
-            metrics={
-                "error": MetricResult(  # Changed
-                    score=0.0,
-                    reason="Last message is not from assistant",
-                    success=False,
-                )
-            },
-        )
-
-    # Extract code blocks from the message
-    code_blocks = extract_code_blocks(last_message.content or "", language)
+    # Extract code blocks from the model's response content
+    code_blocks = extract_code_blocks(response_content, language)
 
     if not code_blocks:
-        return EvaluateResult(  # Changed
+        return EvaluateResult(
             score=0.0,
-            reason=f"No {language} code blocks found in message.",  # Added reason
+            reason=f"No {language} code blocks found in model's response.",
             metrics={
-                "error": MetricResult(  # Changed
+                "error": MetricResult(
                     score=0.0,
-                    reason=f"No {language} code blocks found in message",
+                    reason=f"No {language} code blocks found in model's response.",
                     success=False,
                 )
             },
         )
-
-    # Extract expected output if not provided directly
-    if expected_output is None and original_messages:
-        # Try to find expected output in the original messages
-        for msg in original_messages:
-            if msg.get("role") == "user":
-                # Look for expected output patterns like "Expected output:" or "Output:"
-                content = msg.get("content", "")
-                output_patterns = [
-                    r"Expected output:?\s*([\s\S]+)",
-                    r"Output:?\s*([\s\S]+)",
-                    r"Result:?\s*([\s\S]+)",
-                    r"Should (output|return|print):?\s*([\s\S]+)",
-                ]
-
-                for pattern in output_patterns:
-                    match = re.search(pattern, content)
-                    if match:
-                        # Use group 1 or 2 depending on the pattern
-                        expected_output = (
-                            match.group(2)
-                            if len(match.groups()) > 1 and match.group(2)
-                            else match.group(1)
-                        )
-                        expected_output = expected_output.strip()
-                        break
-
-                if expected_output:
-                    break
 
     # Use the first code block for execution
     code = code_blocks[0]["code"]
 
-    # Log the extracted code
-    metrics["extracted_code"] = MetricResult(  # Changed
-        score=0.0,  # Not a real score
+    metrics["extracted_code"] = MetricResult(
+        score=0.0,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
-        success=True,  # Informational
+        success=True,
     )
 
     # Add expected output to metrics if available
-    if expected_output:
-        metrics["expected_output"] = MetricResult(  # Changed
-            score=0.0,  # Not a real score
-            reason=f"Expected output:\n{expected_output}",
-            success=True,  # Informational
+    if expected_output_str:
+        metrics["expected_output"] = MetricResult(
+            score=0.0,
+            reason=f"Expected output:\n{expected_output_str}",
+            success=True,
         )
 
     # Execute the code based on language
     if language.lower() == "python":
-        execution_result = execute_python_code(code, timeout)
+        execution_result = execute_python_code(code, timeout) # max_memory_mb is handled inside _execute_python_in_subprocess
     elif language.lower() in ["javascript", "js"]:
         execution_result = execute_javascript_code(code, timeout)
     else:
-        metrics["error"] = MetricResult(  # Changed
+        metrics["error"] = MetricResult(
             score=0.0, reason=f"Unsupported language: {language}", success=False
         )
         return EvaluateResult(
             score=0.0, reason=f"Unsupported language: {language}", metrics=metrics
-        )  # Changed
+        )
 
     # Check execution result
     if execution_result["success"]:
         output = execution_result["output"]
 
-        metrics["execution_result"] = MetricResult(  # Changed
+        metrics["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully with output:\n{output}",
             success=True,
         )
 
         # Compare with expected output if provided
-        if expected_output:
-            similarity = compare_outputs(output, expected_output)
-            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
+        if expected_output_str:
+            similarity = compare_outputs(output, expected_output_str)
+            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str}\n\nActual:\n{output}"
 
-            metrics["output_match"] = MetricResult(  # Changed
+            metrics["output_match"] = MetricResult(
                 score=similarity, reason=match_reason, success=similarity == 1.0
             )
-            # Reason for overall EvaluateResult
             final_reason = f"Execution successful. Output similarity: {similarity:.2f}."
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metrics
-            )  # Changed
+            )
 
         # No expected output provided, score based on successful execution
         final_reason = "Execution successful. No expected output to compare."
         return EvaluateResult(
             score=1.0, reason=final_reason, metrics=metrics
-        )  # Changed
+        )
     else:
         # Execution failed
         error = execution_result["error"]
 
-        metrics["execution_result"] = MetricResult(  # Changed
+        metrics["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed with error:\n{error}",
             success=False,
@@ -310,7 +259,7 @@ def local_code_execution_reward(
         final_reason = f"Code execution failed: {error}"
         return EvaluateResult(
             score=0.0, reason=final_reason, metrics=metrics
-        )  # Changed
+        )
 
 
 def _execute_code_in_process(
@@ -994,37 +943,37 @@ def execute_code_with_e2b(
 
 @reward_function
 def e2b_code_execution_reward(
-    messages: List[Dict[str, str]],
-    original_messages: Optional[List[Dict[str, str]]] = None,
-    expected_output: Optional[str] = None,
+    messages: List[Message],             # Full conversation, last message is model's response
+    ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 30,
     api_key: Optional[str] = None,
     **kwargs,
-) -> EvaluateResult:  # Changed
+) -> EvaluateResult:
     """
     Evaluate code correctness by executing it in E2B sandbox and comparing the output.
 
     E2B provides a secure, cloud-based sandbox for executing code safely.
 
     Args:
-        messages: Generated conversation messages
-        original_messages: Original conversation context (optional)
-        expected_output: Expected output from code execution
+        messages: List of conversation messages. The last message is assumed to be the
+                  assistant's response containing the code.
+        ground_truth: Expected output string from code execution. This corresponds to
+                      the `expected_output_str` in the previous signature.
         language: Programming language of the code ("python", "javascript", etc.)
-        timeout: Maximum execution time in seconds
-        api_key: Optional E2B API key (if not provided, will use E2B_API_KEY env var)
-        **kwargs: Additional keyword arguments
+        timeout: Maximum execution time in seconds.
+        api_key: Optional E2B API key (if not provided, will use E2B_API_KEY env var).
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics.
     """
     if not _HAS_E2B:
-        return EvaluateResult(  # Changed
+        return EvaluateResult(
             score=0.0,
-            reason="E2B package not installed.",  # Added reason
+            reason="E2B package not installed.",
             metrics={
-                "error": MetricResult(  # Changed
+                "error": MetricResult(
                     score=0.0,
                     reason="E2B package not installed. Install with: pip install e2b",
                     success=False,
@@ -1034,11 +983,11 @@ def e2b_code_execution_reward(
 
     # Check for E2B API key in environment variables if not provided
     if api_key is None and os.environ.get("E2B_API_KEY") is None:
-        return EvaluateResult(  # Changed
+        return EvaluateResult(
             score=0.0,
-            reason="E2B API key is required.",  # Added reason
+            reason="E2B API key is required.",
             metrics={
-                "error": MetricResult(  # Changed
+                "error": MetricResult(
                     score=0.0,
                     reason="E2B API key is required. Set the E2B_API_KEY environment variable or provide api_key parameter.",
                     success=False,
@@ -1047,97 +996,51 @@ def e2b_code_execution_reward(
         )
 
     # Initialize metrics dictionary for tracking various aspects of the execution
-    metrics = {}
+    metrics: Dict[str, MetricResult] = {}
 
-    # Extract the last assistant message
-    if not messages:
-        return EvaluateResult(  # Changed
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+        return EvaluateResult(
             score=0.0,
-            reason="No messages provided for evaluation.",  # Added reason
+            reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(
-                    score=0.0, reason="No messages provided", success=False
-                )  # Changed
+                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
             },
         )
+    
+    response_content = messages[-1].content
+    expected_output_str = ground_truth # Use the new ground_truth parameter as expected_output_str
 
-    last_message = messages[-1]
-
-    # Check role of the last message
-    if last_message.role != "assistant":
-        return EvaluateResult(  # Changed
-            score=0.0,
-            reason="Last message is not from assistant.",  # Added reason
-            metrics={
-                "error": MetricResult(  # Changed
-                    score=0.0,
-                    reason="Last message is not from assistant",
-                    success=False,
-                )
-            },
-        )
-
-    # Extract code blocks from the message
-    code_blocks = extract_code_blocks(last_message.content or "", language)
+    # Extract code blocks from the model's response content
+    code_blocks = extract_code_blocks(response_content, language)
 
     if not code_blocks:
-        return EvaluateResult(  # Changed
+        return EvaluateResult(
             score=0.0,
-            reason=f"No {language} code blocks found in message.",  # Added reason
+            reason=f"No {language} code blocks found in model's response.",
             metrics={
-                "error": MetricResult(  # Changed
+                "error": MetricResult(
                     score=0.0,
-                    reason=f"No {language} code blocks found in message",
+                    reason=f"No {language} code blocks found in model's response.",
                     success=False,
                 )
             },
         )
-
-    # Extract expected output if not provided directly
-    if expected_output is None and original_messages:
-        # Try to find expected output in the original messages
-        for msg in original_messages:
-            if msg.get("role") == "user":
-                # Look for expected output patterns like "Expected output:" or "Output:"
-                content = msg.get("content", "")
-                output_patterns = [
-                    r"Expected output:?\s*([\s\S]+)",
-                    r"Output:?\s*([\s\S]+)",
-                    r"Result:?\s*([\s\S]+)",
-                    r"Should (output|return|print):?\s*([\s\S]+)",
-                ]
-
-                for pattern in output_patterns:
-                    match = re.search(pattern, content)
-                    if match:
-                        # Use group 1 or 2 depending on the pattern
-                        expected_output = (
-                            match.group(2)
-                            if len(match.groups()) > 1 and match.group(2)
-                            else match.group(1)
-                        )
-                        expected_output = expected_output.strip()
-                        break
-
-                if expected_output:
-                    break
 
     # Use the first code block for execution
     code = code_blocks[0]["code"]
 
-    # Log the extracted code
-    metrics["extracted_code"] = MetricResult(  # Changed
-        score=0.0,  # Not a real score
+    metrics["extracted_code"] = MetricResult(
+        score=0.0,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
-        success=True,  # Informational
+        success=True,
     )
 
     # Add expected output to metrics if available
-    if expected_output:
-        metrics["expected_output"] = MetricResult(  # Changed
-            score=0.0,  # Not a real score
-            reason=f"Expected output:\n{expected_output}",
-            success=True,  # Informational
+    if expected_output_str:
+        metrics["expected_output"] = MetricResult(
+            score=0.0,
+            reason=f"Expected output:\n{expected_output_str}",
+            success=True,
         )
 
     # Execute the code in E2B sandbox
@@ -1149,18 +1052,18 @@ def e2b_code_execution_reward(
     if execution_result["success"]:
         output = execution_result["output"]
 
-        metrics["execution_result"] = MetricResult(  # Changed
+        metrics["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully in E2B sandbox with output:\n{output}",
             success=True,
         )
 
         # Compare with expected output if provided
-        if expected_output:
-            similarity = compare_outputs(output, expected_output)
-            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
+        if expected_output_str:
+            similarity = compare_outputs(output, expected_output_str)
+            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str}\n\nActual:\n{output}"
 
-            metrics["output_match"] = MetricResult(  # Changed
+            metrics["output_match"] = MetricResult(
                 score=similarity, reason=match_reason, success=similarity == 1.0
             )
             final_reason = (
@@ -1168,18 +1071,18 @@ def e2b_code_execution_reward(
             )
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metrics
-            )  # Changed
+            )
 
         # No expected output provided, score based on successful execution
         final_reason = "E2B execution successful. No expected output to compare."
         return EvaluateResult(
             score=1.0, reason=final_reason, metrics=metrics
-        )  # Changed
+        )
     else:
         # Execution failed
         error = execution_result["error"]
 
-        metrics["execution_result"] = MetricResult(  # Changed
+        metrics["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed in E2B sandbox with error:\n{error}",
             success=False,
@@ -1187,19 +1090,18 @@ def e2b_code_execution_reward(
         final_reason = f"E2B code execution failed: {error}"
         return EvaluateResult(
             score=0.0, reason=final_reason, metrics=metrics
-        )  # Changed
+        )
 
 
 @reward_function
 def fractional_code_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
-    original_messages: Optional[Union[List[Dict[str, Any]], List[Message]]] = None,
-    expected_output: Optional[str] = None,
+    messages: List[Message],  # Full conversation, last message is model's response
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # Expected output string OR list of test_cases
     language: str = "python",
     timeout: int = 30,
     environment: str = "local",
     api_key: Optional[str] = None,
-    test_cases: Optional[List[Dict[str, Any]]] = None,
+    # function_to_call can be passed via kwargs to _run_test_cases
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -1209,144 +1111,113 @@ def fractional_code_reward(
     how closely the code output matches the expected output or how many test cases pass.
 
     Args:
-        messages: Generated conversation messages
-        original_messages: Original conversation context (optional)
-        expected_output: Expected output from code execution
-        language: Programming language of the code ("python", "javascript", etc.)
-        timeout: Maximum execution time in seconds
-        environment: Environment to run the code in ("local" or "e2b")
-        api_key: Optional E2B API key (if using e2b environment)
-        test_cases: List of test cases, each with "input" and "expected_output" keys
-        **kwargs: Additional keyword arguments
+        messages: List of conversation messages. The last message is assumed to be the
+                  assistant's response containing the code.
+        ground_truth: Expected output string from code execution, OR a list of test cases.
+                      If a string, it's direct output comparison.
+                      If a list of dicts, each dict is a test case with "input" and "expected_output".
+        language: Programming language of the code ("python", "javascript", etc.).
+        timeout: Maximum execution time in seconds.
+        environment: Environment to run the code in ("local" or "e2b").
+        api_key: Optional E2B API key (if using e2b environment).
+        **kwargs: Additional keyword arguments (e.g., function_to_call for _run_test_cases).
 
     Returns:
-        EvaluateResult with score between 0 and 1 representing the exact pass rate
+        EvaluateResult with score between 0 and 1 representing the exact pass rate.
     """
     # Initialize metrics dictionary
-    metrics = {}
+    metrics_strings: Dict[str, str] = {} # Store string reasons first
 
-    # Extract the last assistant message
-    if not messages:
+    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
         return EvaluateResult(
             score=0.0,
-            reason="No messages provided for fractional code reward.",  # Added reason
+            reason="Invalid or missing assistant response in messages for fractional code reward.",
             metrics={
-                "error": MetricResult(  # Changed
-                    score=0.0, reason="No messages provided", success=False
-                )
+                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
             },
         )
+    
+    response_content = messages[-1].content
 
-    last_message = messages[-1]
+    # Determine if ground_truth is expected_output_str or test_cases
+    expected_output_str_from_gt: Optional[str] = None
+    test_cases_from_gt: Optional[List[Dict[str, Any]]] = None
 
-    # Check role of the last message
-    if last_message.role != "assistant":
+    if isinstance(ground_truth, str):
+        expected_output_str_from_gt = ground_truth
+    elif isinstance(ground_truth, list):
+        # Basic check to see if it looks like a list of test cases
+        if all(isinstance(item, dict) for item in ground_truth):
+            test_cases_from_gt = ground_truth
+        else:
+            # It's a list, but not of dicts, treat as an error or unsupported ground_truth format for now
+            return EvaluateResult(
+                score=0.0,
+                reason="Invalid ground_truth format: expected string or list of test case dicts.",
+                metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
+            )
+    elif ground_truth is not None: # Not str, not list, not None - unsupported
         return EvaluateResult(
             score=0.0,
-            reason="Last message is not from assistant for fractional code reward.",  # Added reason
-            metrics={
-                "error": MetricResult(  # Changed
-                    score=0.0,
-                    reason="Last message is not from assistant",
-                    success=False,
-                )
-            },
+            reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
         )
+    # If ground_truth is None, both expected_output_str_from_gt and test_cases_from_gt will remain None.
 
-    # Get content from the message
-    content = last_message.content or ""
-
-    # Extract code blocks from the message
-    code_blocks = extract_code_blocks(content, language)
+    # Extract code blocks from the model's response content
+    code_blocks = extract_code_blocks(response_content, language)
 
     if not code_blocks:
         return EvaluateResult(
             score=0.0,
-            reason=f"No {language} code blocks found in message for fractional code reward.",  # Added reason
+            reason=f"No {language} code blocks found in model's response for fractional code reward.",
             metrics={
-                "error": MetricResult(  # Changed
+                "error": MetricResult(
                     score=0.0,
-                    reason=f"No {language} code blocks found in message",
+                    reason=f"No {language} code blocks found in model's response.",
                     success=False,
                 )
             },
         )
 
-    # Extract expected output if not provided directly
-    if expected_output is None and original_messages and not test_cases:
-        # Convert original_messages to standard dict format if needed
-        orig_msgs = []
-        for msg in original_messages:
-            if hasattr(msg, "role"):
-                orig_msgs.append({"role": msg.role, "content": msg.content})
-            else:
-                orig_msgs.append(msg)
-
-        # Try to find expected output in the original messages
-        for msg in orig_msgs:
-            if msg.get("role") == "user":
-                # Look for expected output patterns like "Expected output:" or "Output:"
-                content = msg.get("content", "")
-                output_patterns = [
-                    r"Expected output:?\s*([\s\S]+)",
-                    r"Output:?\s*([\s\S]+)",
-                    r"Result:?\s*([\s\S]+)",
-                    r"Should (output|return|print):?\s*([\s\S]+)",
-                ]
-
-                for pattern in output_patterns:
-                    match = re.search(pattern, content)
-                    if match:
-                        # Use group 1 or 2 depending on the pattern
-                        expected_output = (
-                            match.group(2)
-                            if len(match.groups()) > 1 and match.group(2)
-                            else match.group(1)
-                        )
-                        expected_output = expected_output.strip()
-                        break
-
-                if expected_output:
-                    break
-
     # Use the first code block for execution
     code = code_blocks[0]["code"]
 
-    # Log the extracted code
-    metrics["extracted_code"] = f"Extracted code:\n```{language}\n{code}\n```"
+    metrics_strings["extracted_code"] = f"Extracted code:\n```{language}\n{code}\n```"
 
     # Add expected output to metrics if available and not using test cases
-    if expected_output and not test_cases:
-        metrics["expected_output"] = f"Expected output:\n{expected_output}"
+    if expected_output_str_from_gt and not test_cases_from_gt:
+        metrics_strings["expected_output"] = f"Expected output:\n{expected_output_str_from_gt}"
 
     # Handle multiple test cases if provided
-    if test_cases:
-        # Pass kwargs through to _run_test_cases
+    if test_cases_from_gt:
+        # Pass kwargs through to _run_test_cases, which might include function_to_call
         return _run_test_cases(
             code=code,
             language=language,
-            test_cases=test_cases,
+            test_cases=test_cases_from_gt, # Use derived test_cases
             timeout=timeout,
             environment=environment,
             api_key=api_key,
-            **kwargs,  # Pass any extra args like function_to_call
+            **kwargs, 
         )
 
-    # Execute code in specified environment
+    # This part handles single expected_output_str if test_cases_from_gt are not provided
+    # (i.e., ground_truth was a string or None)
+    execution_result: Dict[str, Any]
     if environment.lower() == "e2b":
         if not _HAS_E2B:
-            return EvaluateResult(  # Changed
+            return EvaluateResult(
                 score=0.0,
-                reason="E2B package not installed for fractional code reward.",  # Added reason
+                reason="E2B package not installed for fractional code reward.",
                 metrics={
-                    "error": MetricResult(  # Changed
+                    "error": MetricResult(
                         score=0.0,
                         reason="E2B package not installed. Install with: pip install e2b",
                         success=False,
                     )
                 },
             )
-
         execution_result = execute_code_with_e2b(
             code=code, language=language, timeout=timeout, api_key=api_key
         )
@@ -1356,66 +1227,54 @@ def fractional_code_reward(
         elif language.lower() in ["javascript", "js"]:
             execution_result = execute_javascript_code(code, timeout)
         else:
-            return EvaluateResult(  # Changed
+            # Convert string metrics to MetricResult objects before returning
+            final_metrics_on_error: Dict[str, MetricResult] = {
+                k: MetricResult(score=0.0, reason=v, success=(k=="extracted_code")) for k, v in metrics_strings.items()
+            }
+            final_metrics_on_error["error"] = MetricResult(
                 score=0.0,
-                reason=f"Unsupported language for fractional code reward: {language}",  # Added reason
-                metrics={
-                    "error": MetricResult(  # Changed
-                        score=0.0,
-                        reason=f"Unsupported language: {language}",
-                        success=False,
-                    )
-                },
+                reason=f"Unsupported language: {language}",
+                success=False,
+            )
+            return EvaluateResult(
+                score=0.0,
+                reason=f"Unsupported language for fractional code reward: {language}",
+                metrics=final_metrics_on_error,
             )
 
-    # Check execution result
-    metric_results: Dict[str, MetricResult] = {}  # Ensure metric_results is defined
-    for (
-        key,
-        value_str,
-    ) in metrics.items():  # Convert initial string metrics to MetricResult
-        metric_results[key] = MetricResult(
-            score=0.0,
-            reason=str(value_str),
-            success=(
-                True if key == "extracted_code" or key == "expected_output" else False
-            ),
-        )
+    # Convert initial string metrics to MetricResult objects
+    metric_results: Dict[str, MetricResult] = {
+        k: MetricResult(score=0.0, reason=v, success=(k=="extracted_code" or (k=="expected_output" and expected_output_str_from_gt is not None))) 
+        for k, v in metrics_strings.items()
+    }
 
     if execution_result["success"]:
         output = execution_result["output"]
-
-        metric_results["execution_result"] = MetricResult(  # Changed
+        metric_results["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully with output:\n{output}",
             success=True,
         )
 
-        # Compare with expected output if provided
-        if expected_output:
-            similarity = compare_outputs(output, expected_output)
-            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output}\n\nActual:\n{output}"
-
-            metric_results["output_match"] = MetricResult(  # Changed
+        if expected_output_str_from_gt: # Only compare if expected_output_str_from_gt is available
+            similarity = compare_outputs(output, expected_output_str_from_gt)
+            match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str_from_gt}\n\nActual:\n{output}"
+            metric_results["output_match"] = MetricResult(
                 score=similarity, reason=match_reason, success=similarity == 1.0
             )
             final_reason = f"Fractional code execution successful. Output similarity: {similarity:.2f}."
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metric_results
-            )  # Changed
-
-        # No expected output provided, score based on successful execution
-        final_reason = (
-            "Fractional code execution successful. No expected output to compare."
-        )
-        return EvaluateResult(
-            score=1.0, reason=final_reason, metrics=metric_results
-        )  # Changed
+            )
+        else: # Successful execution, but no expected_output_str_from_gt to compare against
+            final_reason = "Fractional code execution successful. No expected output string to compare."
+            return EvaluateResult(
+                score=1.0, reason=final_reason, metrics=metric_results 
+            ) # Score 1.0 for successful execution if no expected output
     else:
         # Execution failed
         error = execution_result["error"]
-
-        metric_results["execution_result"] = MetricResult(  # Changed
+        metric_results["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed with error:\n{error}",
             success=False,
@@ -1423,7 +1282,7 @@ def fractional_code_reward(
         final_reason = f"Fractional code execution failed: {error}"
         return EvaluateResult(
             score=0.0, reason=final_reason, metrics=metric_results
-        )  # Changed
+        )
 
 
 def _run_test_cases(

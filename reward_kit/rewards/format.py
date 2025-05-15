@@ -7,7 +7,7 @@ in the correct order.
 """
 
 import re
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Optional # Added Optional
 
 from ..typed_interface import reward_function
 from ..models import Message, EvaluateResult, MetricResult
@@ -15,24 +15,27 @@ from ..models import Message, EvaluateResult, MetricResult
 
 @reward_function
 def format_reward(
-    messages: Union[List[Dict[str, Any]], List[Message]],
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
     format_regex: str = r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$",
     require_exact_match: bool = True,
     **kwargs: Any
 ) -> EvaluateResult:
     """
     Reward function that validates if text follows a specific format pattern.
+    The model's response is assumed to be the last message in the `messages` list.
 
     By default, this checks for <think> and <answer> tags in the correct order,
     ensuring proper separation of reasoning and final answer.
 
     Args:
-        messages: List of conversation messages
+        messages: List of conversation messages, where `messages[-1]` is the model's response.
+        ground_truth: Optional. Expected assistant response trajectory. Not directly used by this format reward.
         format_regex: Regular expression pattern to match. Default checks for
-                      <think>...</think> followed by <answer>...</answer>
+                      <think>...</think> followed by <answer>...</answer>.
         require_exact_match: If True, the entire text must match the pattern.
-                           If False, pattern just needs to be found in text.
-        **kwargs: Additional arguments
+                             If False, pattern just needs to be found in text.
+        **kwargs: Additional arguments.
 
     Returns:
         EvaluateResult with score 1.0 if format is correct, 0.0 otherwise
@@ -80,6 +83,16 @@ def format_reward(
                 },
             )
         text = response.get("content", "")
+    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+        return EvaluateResult(
+            score=0.0,
+            reason="Last message is of unexpected type.",
+            metrics={
+                "format_check": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type in messages."
+                )
+            },
+        )
 
     # Compile the regex with DOTALL flag to match across newlines
     pattern = re.compile(format_regex, re.DOTALL)

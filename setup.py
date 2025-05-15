@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="reward-kit",
-    version="0.2.7",
+    version="0.2.8",
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -18,6 +18,8 @@ setup(
     ],
     extras_require={
         "dev": [
+            "build",
+            "twine",
             "pytest>=6.0.0",
             "black>=21.5b2",
             "mypy>=0.812",

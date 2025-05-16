@@ -11,7 +11,7 @@ setup(
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",
         "python-dotenv>=0.19.0",
-        "openai==1.9.0",
+        "openai==1.78.1",
         "aiosqlite",
         "aiohttp",
         "PyYAML>=5.0", # Added PyYAML

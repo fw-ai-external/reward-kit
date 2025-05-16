@@ -20,8 +20,6 @@ sys.path.insert(
 # Import reward-kit components
 from reward_kit.reward_function import RewardFunction, reward_function
 from reward_kit.models import (
-    RewardOutput,
-    MetricRewardOutput,
     EvaluateResult,
     MetricResult,
 )

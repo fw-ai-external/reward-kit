@@ -52,11 +52,67 @@ def extract_numbers(text: str) -> List[Tuple[str, Union[float, str]]]:
         except (ValueError, ZeroDivisionError):
             return None
         return None
+    
+    html_tag_answers: List[Tuple[str, Union[float, str]]] = []
+    tag_re = re.compile(r"<(?P<tag>answer|ans)\b[^>]*>(?P<inner>.*?)</(?P=tag)>",
+                        re.IGNORECASE | re.DOTALL)
+    for m in tag_re.finditer(text):
+        raw = m.group(0)
+        inner = m.group("inner").strip()
+
+        # 1 Remove the outermost LaTeX delimiters
+        inner = re.sub(r"^\$+|^\(+|^\[+|(\$|\)|\])+?$", "", inner).strip()
+
+        # 2 Try simple numeric value first
+        val = _parse_numeric_string(inner)
+        if val is not None:
+            html_tag_answers.append((raw, val))
+            continue
+
+        # 3 LaTeX fraction \frac{a}{b}
+        m_frac = re.fullmatch(r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", inner)
+        if m_frac:
+            num, den = float(m_frac.group(1)), float(m_frac.group(2))
+            if den != 0:
+                html_tag_answers.append((raw, num/den))
+                continue
+
+        # 4 Scientific notation or numbers with commas
+        sci = re.fullmatch(r"([-+]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?)", inner)
+        if sci:
+            try:
+                cleaned = sci.group(1).replace(",", "")
+                html_tag_answers.append((raw, float(cleaned)))
+                continue
+            except ValueError:
+                pass
+
+        # 5 Number with unit e.g. "10 km"
+        m_num_unit = re.fullmatch(r"(-?\d+(?:\.\d+)?)[ ]*[a-zA-Z%]+", inner)
+        if m_num_unit:
+            try:
+                html_tag_answers.append((raw, float(m_num_unit.group(1))))
+                continue
+            except ValueError:
+                pass
+
+    if html_tag_answers:
+        return html_tag_answers
+
+    # # --- Priority 0.5: 代码块里的纯数字（``` 42 ```） ---
+    # code_block_answers: List[Tuple[str, Union[float, str]]] = []
+    # for m in re.finditer(r"```+\s*([-+]?\d+(?:\.\d+)?)\s*```+", text):
+    #     try:
+    #         code_block_answers.append((m.group(0), float(m.group(1))))
+    #     except ValueError:
+    #         pass
+    # if code_block_answers:
+    #     return code_block_answers
 
     # --- Priority 1: Boxed LaTeX expressions ---
     boxed_answers: List[Tuple[str, Union[float, str]]] = []
     found_any_boxed_expr = False
-    for m_boxed in re.finditer(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}", text):
+    for m_boxed in re.finditer(r"\\boxed\s*\{\s*((?:[^{}]|\{[^{}]*\})*?)\s*\}", text):
         found_any_boxed_expr = True
         original_boxed_expr = m_boxed.group(0)
         content = m_boxed.group(1).strip()

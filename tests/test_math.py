@@ -231,6 +231,34 @@ class TestExtractNumbers:
         assert len(results_combined) == 1
         assert results_combined[0] == ("4", 4.0)
 
+    # --- PRIORITY 0: HTML/XML tag–wrapped numeric answers ---
+    def test_P0_html_tag_simple_number(self):
+        text = "Some text <answer>77</answer> more text."
+        expected = [("<answer>77</answer>", 77.0)]
+        assert extract_numbers(text) == expected
+
+    def test_P0_html_tag_with_whitespace(self):
+        text = "<answer>   3.14   </answer>"
+        expected = [("<answer>   3.14   </answer>", 3.14)]
+        assert extract_numbers(text) == expected
+
+    def test_P0_html_tag_string_content(self):
+        text = "<answer>Not a number</answer>"
+        expected = []
+        assert extract_numbers(text) == expected
+
+    def test_P0_html_tag_multiple_answer_tags(self):
+        text = "<answer>1</answer> and <answer>2.5</answer>"
+        results = extract_numbers(text)
+        assert ("<answer>1</answer>", 1.0) in results
+        assert ("<answer>2.5</answer>", 2.5) in results
+        assert len(results) == 2
+
+    def test_P0_html_tag_priority_over_general(self):
+        text = "The answer is <answer>42</answer> but also 99."
+        expected = [("<answer>42</answer>", 42.0)]
+        assert extract_numbers(text) == expected
+
 
 class TestCompareNumbers:
     def test_exact_match(self):

@@ -52,14 +52,11 @@ jobs:
     # Ensure PyPI project settings are configured for trusted publishing from this GitHub repository and workflow.
 
     - name: Upload release assets (package files) to GitHub Release
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/*
-        asset_name: ${{ github.event.repository.name }}-${{ github.ref_name }}.tar.gz # Example, adjust as needed
-        asset_content_type: application/gzip
+        files: ./dist/*
 
     # Consider adding another asset upload for the .whl file if desired
     # - name: Upload Wheel to GitHub Release

@@ -3,8 +3,19 @@ Pytest configuration file for reward-kit tests.
 """
 
 import pytest
+import sys
 from typing import List, Dict, Any, Optional
 from reward_kit.models import EvaluateResult, MetricResult
+
+# Check if e2b is available and skip related tests if not
+try:
+    import e2b
+    HAS_E2B = True
+except ImportError:
+    HAS_E2B = False
+
+# Mark to skip tests requiring e2b
+skip_e2b = pytest.mark.skipif(not HAS_E2B, reason="e2b module not installed")
 
 
 @pytest.fixture

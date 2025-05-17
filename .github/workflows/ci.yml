@@ -53,12 +53,15 @@ jobs:
       run: |
         pip install pytest pytest-cov pytest-asyncio
 
-        # Set the E2B_API_KEY just for running tests, using a dummy value for those that need to skip
+        # Set dummy environment variables needed for tests
         export E2B_API_KEY="dummy_key_for_testing"
+        export FIREWORKS_API_KEY="dummy_api_key_for_testing"
+        export FIREWORKS_ACCOUNT_ID="dummy-account-id"
+        export FIREWORKS_API_BASE="https://dummy-api.fireworks.ai"
 
         # Run tests with increased timeout and filter out deprecation warnings
         # We're only focusing on actual test failures
-        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::PydanticDeprecatedSince20,ignore::RuntimeWarning" \
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
         pytest tests/ --cov=reward_kit --cov-report=xml -v --durations=10
 
         # Check the exit code from pytest as source of truth

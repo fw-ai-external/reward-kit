@@ -30,9 +30,14 @@ class Message(BaseModel):
 
 
 class MetricResult(BaseModel):
-    """Result of a single metric evaluation."""
-
-    success: Optional[bool] = None
+    """Result of a single metric evaluation.
+    
+    Attributes:
+        is_score_valid (bool): Whether the score is valid for this metric (required).
+        score (float): The score for this metric.
+        reason (str): Explanation for the score.
+    """
+    is_score_valid: bool
     score: float = Field(..., ge=0.0, le=1.0)
     reason: str
 
@@ -69,11 +74,19 @@ class MetricResult(BaseModel):
 
 
 class EvaluateResult(BaseModel):
-    """The complete result of an evaluator with multiple metrics."""
-
+    """The complete result of an evaluator with multiple metrics.
+    
+    Attributes:
+        is_score_valid (bool): Whether the overall score is valid (required).
+        score (float): The overall evaluation score.
+        reason (Optional[str]): Optional explanation for the overall score.
+        error (Optional[str]): Optional error message.
+        metrics (Dict[str, MetricResult]): Dictionary of component metrics.
+    """
     error: Optional[str] = None
     score: float = Field(..., ge=0.0, le=1.0)
     reason: Optional[str] = None
+    is_score_valid: bool
     metrics: Dict[str, MetricResult]
 
     def __getitem__(self, key: str) -> Any:

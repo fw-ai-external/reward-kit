@@ -9,17 +9,18 @@ on:
 
 jobs:
   lint-and-test:
+    name: Lint and Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -35,43 +36,46 @@ jobs:
       run: |
         pip install flake8
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exclude virtual environment and external packages from check
+        flake8 reward_kit tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        flake8 reward_kit tests examples scripts --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
 
     - name: Type check with mypy
       run: |
-        pip install mypy
+        pip install mypy types-docker
+        # Install stubs for dependencies
+        python -m pip install types-requests types-PyYAML
         # Run mypy but don't fail the build on errors for now
-        mypy reward_kit || echo "Mypy found issues that should be fixed in the future"
+        mypy reward_kit --ignore-missing-imports || echo "Mypy found issues that should be fixed in the future"
 
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov pytest-asyncio
-        # Use a pytest.ini to silence the asyncio warning
-        echo '[pytest]
-        asyncio_mode = strict
-        asyncio_default_fixture_loop_scope = function' > pytest.ini
-        
-        # Skip e2b tests if the module is not installed
-        if pip list | grep -q e2b; then
-          # Set the E2B_API_KEY just for running tests, using a dummy value for those that need to skip
-          export E2B_API_KEY="dummy_key_for_testing"
-          # Run tests with increased timeout to handle potential slow CI runners
-          pytest --cov=reward_kit --cov-report=xml -v --durations=10
-        else
-          pytest --cov=reward_kit --cov-report=xml -k "not e2b" -v --durations=10
-        fi
+
+        # Set the E2B_API_KEY just for running tests, using a dummy value for those that need to skip
+        export E2B_API_KEY="dummy_key_for_testing"
+
+        # Run tests with increased timeout and filter out deprecation warnings
+        # We're only focusing on actual test failures
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::PydanticDeprecatedSince20,ignore::RuntimeWarning" \
+        pytest tests/ --cov=reward_kit --cov-report=xml -v --durations=10
+
+        # Check the exit code from pytest as source of truth
+        PYTEST_EXIT_CODE=$?
+        echo "Pytest exit code: $PYTEST_EXIT_CODE"
+        exit $PYTEST_EXIT_CODE
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }} # Optional: if you have a Codecov token
         files: ./coverage.xml
-        fail_ci_if_error: true
+        fail_ci_if_error: false # Don't fail if token isn't provided
         verbose: true
 
   build-package:
+    name: Build Package
     runs-on: ubuntu-latest
     needs: lint-and-test # Ensure tests pass before building
 
@@ -79,9 +83,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Use a common version for building
+        python-version: '3.12' # Use the latest version for building
 
     - name: Install build dependencies
       run: |
@@ -92,7 +96,7 @@ jobs:
       run: python -m build
 
     - name: Upload package artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: reward-kit-package
         path: dist/

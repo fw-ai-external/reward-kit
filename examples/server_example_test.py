@@ -4,9 +4,10 @@ This is used by run_all_examples.py to test the server functionality
 without having to deal with threading or servers.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from reward_kit import reward_function
-from reward_kit.models import Message, EvaluateResult
+from reward_kit.models import EvaluateResult, Message
 
 
 @reward_function
@@ -52,9 +53,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         "training",
     ]
 
-    found_keywords = [
-        kw for kw in keywords if kw.lower() in last_response.lower()
-    ]
+    found_keywords = [kw for kw in keywords if kw.lower() in last_response.lower()]
     informativeness_score = min(
         len(found_keywords) / 4, 1.0
     )  # Cap at 1.0 for ≥4 keywords
@@ -77,9 +76,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
     clarity_score = 0.5  # Base score
     if has_structure:
         clarity_score += 0.5
-        clarity_reason = (
-            "Response has good structure with paragraphs or bullet points"
-        )
+        clarity_reason = "Response has good structure with paragraphs or bullet points"
     else:
         clarity_reason = "Response could be improved with better structure"
 
@@ -87,9 +84,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
 
     # Calculate final score (weighted average)
     weights = {"length": 0.2, "informativeness": 0.5, "clarity": 0.3}
-    final_score = sum(
-        metrics[key]["score"] * weight for key, weight in weights.items()
-    )
+    final_score = sum(metrics[key]["score"] * weight for key, weight in weights.items())
 
     return EvaluateResult(score=final_score, metrics=metrics)
 

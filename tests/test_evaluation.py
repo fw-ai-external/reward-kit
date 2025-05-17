@@ -1,14 +1,11 @@
-import os
 import json
+import os
 import tempfile
 from pathlib import Path
+
 import pytest
 
-from reward_kit.evaluation import (
-    Evaluator,
-    preview_evaluation,
-    create_evaluation,
-)
+from reward_kit.evaluation import Evaluator, create_evaluation, preview_evaluation
 
 
 def create_test_folder():
@@ -22,13 +19,13 @@ def create_test_folder():
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -130,13 +127,13 @@ def evaluate(entry):
     messages = entry.get('messages', [])
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -158,13 +155,13 @@ def evaluate(entry):
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'

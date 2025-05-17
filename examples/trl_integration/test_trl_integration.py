@@ -10,28 +10,24 @@ This file contains tests for:
 import os
 import sys
 import unittest
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-)
-
-# Import reward-kit components
-from reward_kit.reward_function import RewardFunction, reward_function
-from reward_kit.models import (
-    EvaluateResult,
-    MetricResult,
-)
-from reward_kit.rewards.length import length_reward
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # Import TRL adapter utilities
 from trl_adapter import (
-    create_combined_reward,
-    grpo_format_reward,
-    create_grpo_reward,
     apply_reward_to_responses,
+    create_combined_reward,
+    create_grpo_reward,
+    grpo_format_reward,
 )
+
+from reward_kit.models import EvaluateResult, MetricResult
+
+# Import reward-kit components
+from reward_kit.reward_function import RewardFunction, reward_function
+from reward_kit.rewards.length import length_reward
 
 
 # Define a simple test reward function

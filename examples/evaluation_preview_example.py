@@ -6,9 +6,7 @@ import os
 import sys
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
@@ -22,7 +20,7 @@ if not os.environ.get("FIREWORKS_API_KEY"):
 
 # No example mode - will use real authentication
 
-from reward_kit.evaluation import preview_evaluation, create_evaluation
+from reward_kit.evaluation import create_evaluation, preview_evaluation
 
 
 def main():

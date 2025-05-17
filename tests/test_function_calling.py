@@ -1,15 +1,18 @@
-import pytest
 import json
+from typing import Any, Dict, List, Tuple, cast
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from reward_kit.models import EvaluateResult  # Changed
 from reward_kit.rewards.function_calling import (
-    match_function_call,
-    schema_jaccard_reward,
     calculate_jaccard_similarity,
+    composite_function_call_reward,
     extract_schema_properties,
     llm_judge_reward,
-    composite_function_call_reward,
+    match_function_call,
+    schema_jaccard_reward,
 )
-from reward_kit.models import EvaluateResult # Changed
-from unittest.mock import patch, MagicMock
 
 
 class TestFunctionCalling:
@@ -48,9 +51,9 @@ class TestFunctionCalling:
         assert result.metrics["function_name_match"].score == 1.0
         assert result.metrics["arguments_match"].score == 1.0
         # Dictionary access
-        assert result['score'] == 1.0
-        assert result['metrics']["function_name_match"]['score'] == 1.0
-        assert result['metrics']["arguments_match"]['score'] == 1.0
+        assert result["score"] == 1.0
+        assert result["metrics"]["function_name_match"]["score"] == 1.0
+        assert result["metrics"]["arguments_match"]["score"] == 1.0
 
     def test_wrong_function_name(self):
         """Test with incorrect function name."""
@@ -82,13 +85,19 @@ class TestFunctionCalling:
         assert result.score < 1.0
         assert "function_name_match" in result.metrics
         assert result.metrics["function_name_match"].score == 0.0
-        assert result.metrics["function_name_match"].reason is not None and \
-            "Function name does not match" in result.metrics["function_name_match"].reason
+        assert (
+            result.metrics["function_name_match"].reason is not None
+            and "Function name does not match"
+            in result.metrics["function_name_match"].reason
+        )
         # Dictionary access
-        assert result['score'] < 1.0
-        assert result['metrics']["function_name_match"]['score'] == 0.0
-        assert result['metrics']["function_name_match"]['reason'] is not None and \
-            "Function name does not match" in result['metrics']["function_name_match"]['reason']
+        assert result["score"] < 1.0
+        assert result["metrics"]["function_name_match"]["score"] == 0.0
+        assert (
+            result["metrics"]["function_name_match"]["reason"] is not None
+            and "Function name does not match"
+            in result["metrics"]["function_name_match"]["reason"]
+        )
 
     def test_missing_required_argument(self):
         """Test with missing required argument."""
@@ -123,13 +132,17 @@ class TestFunctionCalling:
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
         assert result.metrics["arguments_match"].score < 1.0
-        assert result.metrics["arguments_match"].reason is not None and \
-            "Missing argument" in result.metrics["arguments_match"].reason
+        assert (
+            result.metrics["arguments_match"].reason is not None
+            and "Missing argument" in result.metrics["arguments_match"].reason
+        )
         # Dictionary access
-        assert result['score'] < 1.0
-        assert result['metrics']["arguments_match"]['score'] < 1.0
-        assert result['metrics']["arguments_match"]['reason'] is not None and \
-            "Missing argument" in result['metrics']["arguments_match"]['reason']
+        assert result["score"] < 1.0
+        assert result["metrics"]["arguments_match"]["score"] < 1.0
+        assert (
+            result["metrics"]["arguments_match"]["reason"] is not None
+            and "Missing argument" in result["metrics"]["arguments_match"]["reason"]
+        )
 
     def test_extra_argument(self):
         """Test with extra argument not in schema."""
@@ -165,13 +178,17 @@ class TestFunctionCalling:
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
         assert result.metrics["arguments_match"].score < 1.0
-        assert result.metrics["arguments_match"].reason is not None and \
-            "Unexpected argument" in result.metrics["arguments_match"].reason
+        assert (
+            result.metrics["arguments_match"].reason is not None
+            and "Unexpected argument" in result.metrics["arguments_match"].reason
+        )
         # Dictionary access
-        assert result['score'] < 1.0
-        assert result['metrics']["arguments_match"]['score'] < 1.0
-        assert result['metrics']["arguments_match"]['reason'] is not None and \
-            "Unexpected argument" in result['metrics']["arguments_match"]['reason']
+        assert result["score"] < 1.0
+        assert result["metrics"]["arguments_match"]["score"] < 1.0
+        assert (
+            result["metrics"]["arguments_match"]["reason"] is not None
+            and "Unexpected argument" in result["metrics"]["arguments_match"]["reason"]
+        )
 
     def test_permissive_mode(self):
         """Test permissive mode with extra arguments."""
@@ -211,9 +228,9 @@ class TestFunctionCalling:
         assert result.metrics["function_name_match"].score == 1.0
         assert result.metrics["arguments_match"].score == 1.0
         # Dictionary access
-        assert result['score'] == 1.0
-        assert result['metrics']["function_name_match"]['score'] == 1.0
-        assert result['metrics']["arguments_match"]['score'] == 1.0
+        assert result["score"] == 1.0
+        assert result["metrics"]["function_name_match"]["score"] == 1.0
+        assert result["metrics"]["arguments_match"]["score"] == 1.0
 
     def test_wrong_argument_value_type(self):
         """Test with wrong argument value type."""
@@ -248,13 +265,17 @@ class TestFunctionCalling:
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
         assert result.metrics["arguments_match"].score < 1.0
-        assert result.metrics["arguments_match"].reason is not None and \
-            "Type mismatch" in result.metrics["arguments_match"].reason
+        assert (
+            result.metrics["arguments_match"].reason is not None
+            and "Type mismatch" in result.metrics["arguments_match"].reason
+        )
         # Dictionary access
-        assert result['score'] < 1.0
-        assert result['metrics']["arguments_match"]['score'] < 1.0
-        assert result['metrics']["arguments_match"]['reason'] is not None and \
-            "Type mismatch" in result['metrics']["arguments_match"]['reason']
+        assert result["score"] < 1.0
+        assert result["metrics"]["arguments_match"]["score"] < 1.0
+        assert (
+            result["metrics"]["arguments_match"]["reason"] is not None
+            and "Type mismatch" in result["metrics"]["arguments_match"]["reason"]
+        )
 
     def test_calculate_jaccard_similarity(self):
         """Test Jaccard similarity calculation."""
@@ -297,7 +318,7 @@ class TestFunctionCalling:
         assert ("age", "number") in properties
 
         # Nested schema
-        schema = {
+        schema: Dict[str, Any] = {
             "properties": {
                 "user": {
                     "type": "object",
@@ -326,9 +347,7 @@ class TestFunctionCalling:
 
         function_call = {
             "name": "get_weather",
-            "arguments": json.dumps(
-                {"location": "New York", "unit": "celsius"}
-            ),
+            "arguments": json.dumps({"location": "New York", "unit": "celsius"}),
         }
 
         result = schema_jaccard_reward(
@@ -348,9 +367,9 @@ class TestFunctionCalling:
         assert result.metrics["function_name_match"].score == 1.0
         assert result.metrics["schema_similarity"].score > 0.9
         # Dictionary access
-        assert result['score'] > 0.9
-        assert result['metrics']["function_name_match"]['score'] == 1.0
-        assert result['metrics']["schema_similarity"]['score'] > 0.9
+        assert result["score"] > 0.9
+        assert result["metrics"]["function_name_match"]["score"] == 1.0
+        assert result["metrics"]["schema_similarity"]["score"] > 0.9
 
     def test_schema_jaccard_reward_partial_match(self):
         """Test schema Jaccard reward with partial match."""
@@ -390,18 +409,26 @@ class TestFunctionCalling:
         assert "schema_similarity" in result.metrics
         assert result.metrics["function_name_match"].score == 1.0
         assert 0.3 < result.metrics["schema_similarity"].score < 0.9
-        assert result.metrics["schema_similarity"].reason is not None and \
-            "Missing properties" in result.metrics["schema_similarity"].reason
-        assert result.metrics["schema_similarity"].reason is not None and \
-            "Extra properties" in result.metrics["schema_similarity"].reason
+        assert (
+            result.metrics["schema_similarity"].reason is not None
+            and "Missing properties" in result.metrics["schema_similarity"].reason
+        )
+        assert (
+            result.metrics["schema_similarity"].reason is not None
+            and "Extra properties" in result.metrics["schema_similarity"].reason
+        )
         # Dictionary access
-        assert 0.3 < result['score'] < 0.9
-        assert result['metrics']["function_name_match"]['score'] == 1.0
-        assert 0.3 < result['metrics']["schema_similarity"]['score'] < 0.9
-        assert result['metrics']["schema_similarity"]['reason'] is not None and \
-            "Missing properties" in result['metrics']["schema_similarity"]['reason']
-        assert result['metrics']["schema_similarity"]['reason'] is not None and \
-            "Extra properties" in result['metrics']["schema_similarity"]['reason']
+        assert 0.3 < result["score"] < 0.9
+        assert result["metrics"]["function_name_match"]["score"] == 1.0
+        assert 0.3 < result["metrics"]["schema_similarity"]["score"] < 0.9
+        assert (
+            result["metrics"]["schema_similarity"]["reason"] is not None
+            and "Missing properties" in result["metrics"]["schema_similarity"]["reason"]
+        )
+        assert (
+            result["metrics"]["schema_similarity"]["reason"] is not None
+            and "Extra properties" in result["metrics"]["schema_similarity"]["reason"]
+        )
 
     def test_schema_jaccard_reward_wrong_function_name(self):
         """Test schema Jaccard reward with wrong function name."""
@@ -415,9 +442,7 @@ class TestFunctionCalling:
 
         function_call = {
             "name": "fetch_weather",  # Wrong name
-            "arguments": json.dumps(
-                {"location": "New York", "unit": "celsius"}
-            ),
+            "arguments": json.dumps({"location": "New York", "unit": "celsius"}),
         }
 
         result = schema_jaccard_reward(
@@ -434,13 +459,19 @@ class TestFunctionCalling:
         assert result.score < 0.2  # Should be very low
         assert "function_name_match" in result.metrics
         assert result.metrics["function_name_match"].score == 0.0
-        assert result.metrics["function_name_match"].reason is not None and \
-            "Function name does not match" in result.metrics["function_name_match"].reason
+        assert (
+            result.metrics["function_name_match"].reason is not None
+            and "Function name does not match"
+            in result.metrics["function_name_match"].reason
+        )
         # Dictionary access
-        assert result['score'] < 0.2
-        assert result['metrics']["function_name_match"]['score'] == 0.0
-        assert result['metrics']["function_name_match"]['reason'] is not None and \
-            "Function name does not match" in result['metrics']["function_name_match"]['reason']
+        assert result["score"] < 0.2
+        assert result["metrics"]["function_name_match"]["score"] == 0.0
+        assert (
+            result["metrics"]["function_name_match"]["reason"] is not None
+            and "Function name does not match"
+            in result["metrics"]["function_name_match"]["reason"]
+        )
 
     def test_nested_schema(self):
         """Test schema Jaccard reward with nested objects."""
@@ -480,9 +511,9 @@ class TestFunctionCalling:
         assert "schema_similarity" in result.metrics
         assert result.metrics["schema_similarity"].score > 0.9
         # Dictionary access
-        assert result['score'] > 0.9
-        assert "schema_similarity" in result['metrics']
-        assert result['metrics']["schema_similarity"]['score'] > 0.9
+        assert result["score"] > 0.9
+        assert "schema_similarity" in result["metrics"]
+        assert result["metrics"]["schema_similarity"]["score"] > 0.9
 
     @patch("reward_kit.rewards.function_calling.OpenAI")
     def test_llm_judge_reward_mock(self, mock_openai):
@@ -509,9 +540,7 @@ class TestFunctionCalling:
 
         function_call = {
             "name": "get_weather",
-            "arguments": json.dumps(
-                {"location": "New York", "unit": "celsius"}
-            ),
+            "arguments": json.dumps({"location": "New York", "unit": "celsius"}),
         }
 
         result = llm_judge_reward(
@@ -531,14 +560,19 @@ class TestFunctionCalling:
         assert result.score == 0.85
         assert "llm_judge" in result.metrics
         assert result.metrics["llm_judge"].score == 0.85
-        assert result.metrics["llm_judge"].reason is not None and \
-            "This is a good function call" in result.metrics["llm_judge"].reason
+        assert (
+            result.metrics["llm_judge"].reason is not None
+            and "This is a good function call" in result.metrics["llm_judge"].reason
+        )
         # Dictionary access
-        assert result['score'] == 0.85
-        assert "llm_judge" in result['metrics']
-        assert result['metrics']["llm_judge"]['score'] == 0.85
-        assert result['metrics']["llm_judge"]['reason'] is not None and \
-            "This is a good function call" in result['metrics']["llm_judge"]['reason']
+        assert result["score"] == 0.85
+        assert "llm_judge" in result["metrics"]
+        assert result["metrics"]["llm_judge"]["score"] == 0.85
+        assert (
+            result["metrics"]["llm_judge"]["reason"] is not None
+            and "This is a good function call"
+            in result["metrics"]["llm_judge"]["reason"]
+        )
 
     @patch("reward_kit.rewards.function_calling.OpenAI")
     def test_composite_function_call_reward(self, mock_openai):
@@ -565,9 +599,7 @@ class TestFunctionCalling:
 
         function_call = {
             "name": "get_weather",
-            "arguments": json.dumps(
-                {"location": "New York", "unit": "celsius"}
-            ),
+            "arguments": json.dumps({"location": "New York", "unit": "celsius"}),
         }
 
         result = composite_function_call_reward(
@@ -588,19 +620,27 @@ class TestFunctionCalling:
         assert "llm_score" in result.metrics
         assert "weights" in result.metrics
         assert result.score > 0.8
-        assert result.metrics["weights"].reason is not None and \
-            "0.70" in result.metrics["weights"].reason  # Schema weight
-        assert result.metrics["weights"].reason is not None and \
-            "0.30" in result.metrics["weights"].reason  # LLM weight
+        assert (
+            result.metrics["weights"].reason is not None
+            and "0.70" in result.metrics["weights"].reason
+        )  # Schema weight
+        assert (
+            result.metrics["weights"].reason is not None
+            and "0.30" in result.metrics["weights"].reason
+        )  # LLM weight
         # Dictionary access
-        assert "schema_score" in result['metrics']
-        assert "llm_score" in result['metrics']
-        assert "weights" in result['metrics']
-        assert result['score'] > 0.8
-        assert result['metrics']["weights"]['reason'] is not None and \
-            "0.70" in result['metrics']["weights"]['reason']
-        assert result['metrics']["weights"]['reason'] is not None and \
-            "0.30" in result['metrics']["weights"]['reason']
+        assert "schema_score" in result["metrics"]
+        assert "llm_score" in result["metrics"]
+        assert "weights" in result["metrics"]
+        assert result["score"] > 0.8
+        assert (
+            result["metrics"]["weights"]["reason"] is not None
+            and "0.70" in result["metrics"]["weights"]["reason"]
+        )
+        assert (
+            result["metrics"]["weights"]["reason"] is not None
+            and "0.30" in result["metrics"]["weights"]["reason"]
+        )
 
 
 # The JSON schema tests have been moved to tests/test_json_schema.py

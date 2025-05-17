@@ -1,5 +1,6 @@
 import json
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 
 def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -29,7 +30,7 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
             if msg.get("role") == "user" and msg.get("content"):
                 prompt_content = msg["content"]
                 break
-    if not prompt_content: # Fallback if specific structure not found
+    if not prompt_content:  # Fallback if specific structure not found
         # Attempt to convert to string in case it's not the expected list of dicts
         prompt_content = str(raw_sample.get("prompt", ""))
 
@@ -54,7 +55,7 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
             "If the problem implies standard input/output, structure your code to read from "
             "stdin and print to stdout. Only print the final result."
         )
-    
+
     final_prompt = prompt_content + instruction
 
     # Parse test cases from ground_truth JSON string
@@ -66,10 +67,10 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
         if isinstance(test_cases_str, list):
             test_cases = test_cases_str
         else:
-            test_cases = [] # Default to empty list if parsing fails
+            test_cases = []  # Default to empty list if parsing fails
 
     return {
         "prompt": final_prompt,
         "test_cases": test_cases,
-        "target_function": target_function # Pass through for reward_kwargs_map
+        "target_function": target_function,  # Pass through for reward_kwargs_map
     }

@@ -1,10 +1,11 @@
-import os
-import pytest
-import tempfile
-import json
 import importlib.util
+import json
+import os
 import shutil
-from unittest.mock import patch, MagicMock
+import tempfile
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Helper function to import modules from file paths
@@ -32,9 +33,9 @@ def mock_env_variables(monkeypatch):
 @pytest.fixture
 def mock_requests():
     """Mock all requests methods with appropriate responses"""
-    with patch("requests.post") as mock_post, patch(
-        "requests.get"
-    ) as mock_get, patch("requests.delete") as mock_delete:
+    with patch("requests.post") as mock_post, patch("requests.get") as mock_get, patch(
+        "requests.delete"
+    ) as mock_delete:
 
         # Configure mock_post for different use cases
         def post_side_effect(*args, **kwargs):
@@ -92,9 +93,7 @@ def mock_requests():
         mock_post.side_effect = post_side_effect
 
         # Configure mock_get
-        mock_get.return_value.status_code = (
-            404  # Evaluator doesn't exist by default
-        )
+        mock_get.return_value.status_code = 404  # Evaluator doesn't exist by default
 
         # Configure mock_delete
         mock_delete.return_value.status_code = 200

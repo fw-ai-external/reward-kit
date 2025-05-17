@@ -6,9 +6,7 @@ import os
 import sys
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
@@ -21,9 +19,8 @@ if not os.environ.get("FIREWORKS_API_KEY"):
     )
 
 # Import the evaluation functions
-from reward_kit.evaluation import (
-    huggingface_dataset_to_jsonl,
-)
+from reward_kit.evaluation import huggingface_dataset_to_jsonl
+
 # Unused reward functions were removed
 
 
@@ -34,9 +31,7 @@ def main():
     try:
         from datasets import load_dataset
 
-        dataset = load_dataset(
-            "deepseek-ai/DeepSeek-ProverBench", split="train"
-        )
+        dataset = load_dataset("deepseek-ai/DeepSeek-ProverBench", split="train")
         print(f"First sample: {dataset[0]}")
         prompt_key = "statement"
         response_key = "reference_solution"

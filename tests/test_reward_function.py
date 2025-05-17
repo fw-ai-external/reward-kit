@@ -1,36 +1,41 @@
-import pytest
+import sys  # Import sys
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
-from typing import List, Dict, Any, Optional
-import sys # Import sys
-from reward_kit.reward_function import RewardFunction, reward_function
+
+import pytest
+
 # Ensure the module is loaded (though RewardFunction import likely does this)
 import reward_kit.reward_function
+from reward_kit.reward_function import RewardFunction, reward_function
+
 # Get a direct reference to the module object
-reward_function_module_obj = sys.modules['reward_kit.reward_function']
-from reward_kit.models import EvaluateResult, MetricResult # Changed
+reward_function_module_obj = sys.modules["reward_kit.reward_function"]
+from reward_kit.models import EvaluateResult, MetricResult  # Changed
 
 
 def simple_reward_func(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
-    **kwargs
-) -> EvaluateResult: # Changed
+    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+) -> EvaluateResult:  # Changed
     """Example reward function for testing."""
     metrics = {
-        "length": MetricResult(score=0.5, reason="Length-based score", success=True) # Changed
+        "length": MetricResult(
+            score=0.5, reason="Length-based score", success=True
+        )  # Changed
     }
-    return EvaluateResult(score=0.5, reason="Simple reward", metrics=metrics) # Changed
+    return EvaluateResult(score=0.5, reason="Simple reward", metrics=metrics)  # Changed
 
 
 @reward_function
 def decorated_reward_func(
-    messages: List[Dict[str, str]],
-    original_messages: List[Dict[str, str]],
-    **kwargs
-) -> EvaluateResult: # Changed
+    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+) -> EvaluateResult:  # Changed
     """Example decorated reward function."""
-    metrics = {"test": MetricResult(score=0.7, reason="Test score", success=True)} # Changed
-    return EvaluateResult(score=0.7, reason="Decorated reward", metrics=metrics) # Changed
+    metrics = {
+        "test": MetricResult(score=0.7, reason="Test score", success=True)
+    }  # Changed
+    return EvaluateResult(
+        score=0.7, reason="Decorated reward", metrics=metrics
+    )  # Changed
 
 
 class TestRewardFunction:
@@ -77,7 +82,9 @@ class TestRewardFunction:
 
     def test_remote_mode(self):
         """Test RewardFunction in remote mode."""
-        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
+        with patch.object(
+            reward_function_module_obj, "requests"
+        ) as mock_requests_module:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
@@ -103,7 +110,9 @@ class TestRewardFunction:
 
     def test_fireworks_hosted_mode(self):
         """Test RewardFunction in fireworks_hosted mode."""
-        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
+        with patch.object(
+            reward_function_module_obj, "requests"
+        ) as mock_requests_module:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
@@ -161,9 +170,7 @@ class TestRewardFunctionDecorator:
         orig_msgs = [test_msgs[0]]
 
         # Call the decorated function directly
-        result = decorated_reward_func(
-            messages=test_msgs, original_messages=orig_msgs
-        )
+        result = decorated_reward_func(messages=test_msgs, original_messages=orig_msgs)
         # The legacy_reward_function (imported as reward_function here)
         # should return an EvaluateResult object.
         assert isinstance(result, EvaluateResult)
@@ -180,15 +187,17 @@ class TestRewardFunctionDecorator:
         assert metric_test.success is True
 
         # Dictionary-style access (since EvaluateResult is now hybrid)
-        assert result['score'] == 0.7
-        assert result['reason'] == "Decorated reward"
-        assert result['metrics'] is not None
-        assert "test" in result['metrics']
-        metric_test_dict_access = result['metrics']["test"] # This is a MetricResult object
+        assert result["score"] == 0.7
+        assert result["reason"] == "Decorated reward"
+        assert result["metrics"] is not None
+        assert "test" in result["metrics"]
+        metric_test_dict_access = result["metrics"][
+            "test"
+        ]  # This is a MetricResult object
         assert isinstance(metric_test_dict_access, MetricResult)
-        assert metric_test_dict_access['score'] == 0.7
-        assert metric_test_dict_access['reason'] == "Test score"
-        assert metric_test_dict_access['success'] is True
+        assert metric_test_dict_access["score"] == 0.7
+        assert metric_test_dict_access["reason"] == "Test score"
+        assert metric_test_dict_access["success"] is True
 
     def test_decorator_deploy_method(self):
         """Test that the new decorator does NOT add a deploy method directly."""

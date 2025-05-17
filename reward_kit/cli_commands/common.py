@@ -1,8 +1,10 @@
 """
 Common utility functions for the Reward Kit CLI.
 """
+
 import logging
 import os
+
 
 def setup_logging(verbose=False, debug=False):
     """Setup logging configuration"""
@@ -26,9 +28,7 @@ def check_environment():
         print(
             "This is required for API calls. Set this variable before running the command."
         )
-        print(
-            "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY reward-kit [command]"
-        )
+        print("Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY reward-kit [command]")
         return False
     return True
 
@@ -48,8 +48,10 @@ def check_agent_environment(test_mode=False):
             print(
                 f"Note: The following environment variables are not set: {', '.join(missing_vars)}"
             )
-            print("Since you're running in test mode, these are not strictly required for all operations.")
-        return True # Return true as it's test mode, warnings are informational
+            print(
+                "Since you're running in test mode, these are not strictly required for all operations."
+            )
+        return True  # Return true as it's test mode, warnings are informational
 
     if missing_vars:
         print(
@@ -58,11 +60,9 @@ def check_agent_environment(test_mode=False):
         print(
             "These are typically required for full agent evaluation. Set these variables for full functionality."
         )
-        print(
-            "Example: MODEL_AGENT=openai/gpt-4o-mini reward-kit agent-eval [args]"
-        )
+        print("Example: MODEL_AGENT=openai/gpt-4o-mini reward-kit agent-eval [args]")
         print(
             "Alternatively, use --test-mode for certain validation tasks without requiring all API keys."
         )
-        return False # Return false if not test_mode and vars are missing
+        return False  # Return false if not test_mode and vars are missing
     return True

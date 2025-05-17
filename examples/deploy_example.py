@@ -7,24 +7,20 @@ that evaluates the informativeness of an assistant's response.
 
 import os
 import sys
-from typing import List, Dict
+from typing import Dict, List
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
     print("Warning: FIREWORKS_API_KEY environment variable is not set.")
-    print(
-        "Either set this variable or provide an auth_token when calling deploy()."
-    )
+    print("Either set this variable or provide an auth_token when calling deploy().")
     print(
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/deploy_example.py"
     )
 
-from reward_kit import reward_function, EvaluateResult, MetricResult, Message
+from reward_kit import EvaluateResult, Message, MetricResult, reward_function
 from reward_kit.auth import get_authentication
 
 
@@ -41,18 +37,22 @@ def informativeness_reward(
     # messages are List[Dict[str, str]] as per type hint, but decorator converts to List[Message]
     # However, the decorator in typed_interface.py passes List[Message] to the wrapped function.
     # So, messages[-1] here will be a Message object.
-    if not messages or messages[-1].role != "assistant": # Use attribute access
+    if not messages or messages[-1].role != "assistant":  # Use attribute access
         return EvaluateResult(
             score=0.0,
-            reason="No assistant response found", # Added reason for EvaluateResult
+            reason="No assistant response found",  # Added reason for EvaluateResult
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="No assistant response found" # success added
+                    score=0.0,
+                    success=False,
+                    reason="No assistant response found",  # success added
                 )
             },
         )
 
-    response = messages[-1].content if messages[-1].content is not None else "" # Use attribute access
+    response = (
+        messages[-1].content if messages[-1].content is not None else ""
+    )  # Use attribute access
     metrics = {}
 
     # 1. Length check - reward concise but informative responses
@@ -60,7 +60,7 @@ def informativeness_reward(
     length_score = min(length / 1000.0, 1.0)  # Cap at 1000 chars
     metrics["length"] = MetricResult(
         score=length_score * 0.2,  # 20% weight
-        success=length_score > 0, # Basic success if length > 0
+        success=length_score > 0,  # Basic success if length > 0
         reason=f"Response length: {length} chars",
     )
 
@@ -75,14 +75,12 @@ def informativeness_reward(
         "exactly",
     ]
     marker_count = sum(
-        1
-        for marker in specificity_markers
-        if marker.lower() in response.lower()
+        1 for marker in specificity_markers if marker.lower() in response.lower()
     )
     marker_score = min(marker_count / 2.0, 1.0)  # Cap at 2 markers
     metrics["specificity"] = MetricResult(
         score=marker_score * 0.3,  # 30% weight
-        success=marker_count > 0, # Basic success if markers found
+        success=marker_count > 0,  # Basic success if markers found
         reason=f"Found {marker_count} specificity markers",
     )
 
@@ -111,7 +109,7 @@ def informativeness_reward(
 
     metrics["content_density"] = MetricResult(
         score=density_score * 0.5,  # 50% weight
-        success=density_score > 0.1, # Basic success if density is somewhat reasonable
+        success=density_score > 0.1,  # Basic success if density is somewhat reasonable
         reason=f"Content density: {content_word_count} content words in {word_count} total words",
     )
 
@@ -123,7 +121,6 @@ def informativeness_reward(
         overall_reason = "Response is informative."
     elif final_score < 0.3:
         overall_reason = "Response lacks informativeness."
-
 
     return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
 
@@ -140,9 +137,7 @@ def test_reward_function():
     ]
 
     # Test the reward function
-    result = informativeness_reward(
-        messages=test_messages
-    )
+    result = informativeness_reward(messages=test_messages)
     print("Informativeness Reward Result:")
     print(f"Score: {result.score}")
     print("Metrics:")
@@ -187,9 +182,7 @@ def deploy_to_fireworks():
                 }
             ],
         )
-        print(
-            f"Deployed evaluation with custom provider: {custom_evaluation_id}"
-        )
+        print(f"Deployed evaluation with custom provider: {custom_evaluation_id}")
 
         # Show how to use the evaluation ID in a training job
         print("Use this in your RL training job:")

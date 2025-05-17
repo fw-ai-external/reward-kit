@@ -2,12 +2,13 @@
 Refactored flight booking reward function for the new agent evaluation framework.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 def evaluate_flight_booking(
     task_achieved: bool,
     tool_usage_counts: Dict[str, int],
-    **kwargs: Any # For any other potential future arguments
+    **kwargs: Any,  # For any other potential future arguments
 ) -> Dict[str, Any]:
     """
     Evaluates the flight booking task based on goal achievement and tool usage.
@@ -32,7 +33,7 @@ def evaluate_flight_booking(
 
     # Define metrics based on the provided counts and task achievement
     metrics_dict = {
-        "task_goal_achieved": { # Clearer metric name
+        "task_goal_achieved": {  # Clearer metric name
             "score": 1.0 if task_achieved else 0.0,
             "success": task_achieved,
             "reason": (
@@ -42,19 +43,19 @@ def evaluate_flight_booking(
             ),
         },
         "search_flights_tool_usage": {
-            "score": 1.0 if search_count > 0 else 0.0, # Binary: used or not
+            "score": 1.0 if search_count > 0 else 0.0,  # Binary: used or not
             "success": search_count > 0,
             "reason": f"search_flights tool was called {search_count} times.",
             "count": search_count,
         },
         "create_booking_tool_usage": {
-            "score": 1.0 if booking_count > 0 else 0.0, # Binary: used or not
+            "score": 1.0 if booking_count > 0 else 0.0,  # Binary: used or not
             "success": booking_count > 0,
             "reason": f"create_booking tool was called {booking_count} times.",
             "count": booking_count,
         },
         "pay_booking_tool_usage": {
-            "score": 1.0 if payment_count > 0 else 0.0, # Binary: used or not
+            "score": 1.0 if payment_count > 0 else 0.0,  # Binary: used or not
             "success": payment_count > 0,
             "reason": f"pay_booking tool was called {payment_count} times.",
             "count": payment_count,
@@ -67,17 +68,21 @@ def evaluate_flight_booking(
         reason = "Task completed successfully: flight booked and paid."
     else:
         # Simplified partial credit logic for PoC
-        if payment_count > 0 and booking_count > 0 : # Assumes payment implies successful booking attempt
-            score = 0.75 
+        if (
+            payment_count > 0 and booking_count > 0
+        ):  # Assumes payment implies successful booking attempt
+            score = 0.75
             reason = "Task incomplete: Payment was attempted after booking, but primary goal not met."
         elif booking_count > 0:
             score = 0.5
             reason = "Task incomplete: Booking was attempted, but payment was not, or primary goal not met."
         elif search_count > 0:
             score = 0.25
-            reason = "Task incomplete: Flights were searched, but no booking was attempted."
+            reason = (
+                "Task incomplete: Flights were searched, but no booking was attempted."
+            )
         else:
             score = 0.0
             reason = "Task incomplete: No significant flight booking actions (search, book, pay) were taken."
-            
+
     return {"score": score, "reason": reason, "metrics": metrics_dict}

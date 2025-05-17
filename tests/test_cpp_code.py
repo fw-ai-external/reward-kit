@@ -2,25 +2,27 @@
 Tests for C/C++ code execution reward functions.
 """
 
-import os
-import pytest
 import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
-from typing import Dict, List, Any
-from reward_kit.models import Message, MetricResult, EvaluateResult # Changed
+import os
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from reward_kit.models import EvaluateResult, Message, MetricResult  # Changed
 from reward_kit.rewards.cpp_code import (
-    extract_code_blocks,
-    add_cpp_includes,
-    add_c_includes,
-    compare_outputs,
-    string_similarity,
     PistonClient,
-    execute_cpp_code,
-    ioi_cpp_code_reward,
-    binary_cpp_code_reward,
     _ioi_cpp_code_reward_impl,
+    add_c_includes,
+    add_cpp_includes,
+    binary_cpp_code_reward,
+    compare_outputs,
+    execute_cpp_code,
+    extract_code_blocks,
+    ioi_cpp_code_reward,
+    string_similarity,
 )
+
 # RewardOutput import removed, EvaluateResult is already imported
 
 # Example C++ code for testing
@@ -51,7 +53,7 @@ int main() {
 class TestExtractCodeBlocks:
     def test_extract_cpp_code(self):
         text = """Here's a simple C++ function:
-        
+
 ```cpp
 #include <iostream>
 using namespace std;
@@ -73,7 +75,7 @@ This will output `Hello, World!`."""
 
     def test_extract_c_code(self):
         text = """Here's a simple C function:
-        
+
 ```c
 #include <stdio.h>
 
@@ -94,7 +96,7 @@ This will output `Hello, World!`."""
 
     def test_extract_with_language_filter(self):
         text = """Here are multiple code blocks:
-        
+
 ```python
 print("Hello, Python!")
 ```
@@ -444,9 +446,7 @@ class TestExecuteCppCode:
     def test_execute_cpp_success(self, MockPistonClient):
         # Setup the mock client
         mock_client = MagicMock()
-        mock_client.execute = AsyncMock(
-            return_value=MOCK_PISTON_EXECUTE_SUCCESS
-        )
+        mock_client.execute = AsyncMock(return_value=MOCK_PISTON_EXECUTE_SUCCESS)
         MockPistonClient.return_value = mock_client
 
         # Also mock the close method
@@ -459,9 +459,7 @@ class TestExecuteCppCode:
         ):
             # Call function with a synchronous wrapper
             async def run_test():
-                return await execute_cpp_code(
-                    code=SAMPLE_CPP_CODE, stdin="10 15"
-                )
+                return await execute_cpp_code(code=SAMPLE_CPP_CODE, stdin="10 15")
 
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -479,9 +477,7 @@ class TestExecuteCppCode:
     def test_execute_cpp_compile_error(self, MockPistonClient):
         # Setup the mock client
         mock_client = MagicMock()
-        mock_client.execute = AsyncMock(
-            return_value=MOCK_PISTON_EXECUTE_COMPILE_ERROR
-        )
+        mock_client.execute = AsyncMock(return_value=MOCK_PISTON_EXECUTE_COMPILE_ERROR)
         MockPistonClient.return_value = mock_client
 
         # Also mock the close method
@@ -515,9 +511,7 @@ class TestExecuteCppCode:
     def test_execute_c_code(self, MockPistonClient):
         # Setup the mock client
         mock_client = MagicMock()
-        mock_client.execute = AsyncMock(
-            return_value=MOCK_PISTON_EXECUTE_SUCCESS
-        )
+        mock_client.execute = AsyncMock(return_value=MOCK_PISTON_EXECUTE_SUCCESS)
         MockPistonClient.return_value = mock_client
 
         # Also mock the close method
@@ -581,21 +575,17 @@ This program reads two integers and outputs their sum.
         ]
 
         messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
-        ground_truth_arg = "42" # This is the expected_output_str
+        ground_truth_arg = "42"  # This is the expected_output_str
 
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="cpp"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="cpp"
         )
 
         # Check result - execution should have succeeded with perfect match
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert (
-            "executed successfully" in result.metrics["execution_result"].reason
-        )
+        assert "executed successfully" in result.metrics["execution_result"].reason
         # assert result['score'] == 1.0 # Use attribute access
         # assert (
         #     "executed successfully" in result['metrics']["execution_result"]['reason'] # Use attribute access
@@ -634,13 +624,11 @@ This program reads two integers and outputs their sum.
         ]
 
         messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
-        ground_truth_arg = "42" # This is the expected_output_str
+        ground_truth_arg = "42"  # This is the expected_output_str
 
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="cpp"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="cpp"
         )
 
         # Check result - should have partial match
@@ -688,13 +676,11 @@ int main() {
         ]
 
         messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
-        ground_truth_arg = "42" # This is the expected_output_str
+        ground_truth_arg = "42"  # This is the expected_output_str
 
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="cpp"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="cpp"
         )
 
         # Check result - execution should have failed
@@ -715,15 +701,9 @@ int main() {
         from reward_kit.rewards.cpp_code import TestResult
 
         test_results = [
-            TestResult(
-                test_name="Test 1", score=1.0, status="AC", feedback="Perfect"
-            ),
-            TestResult(
-                test_name="Test 2", score=1.0, status="AC", feedback="Perfect"
-            ),
-            TestResult(
-                test_name="Test 3", score=0.5, status="PA", feedback="Partial"
-            ),
+            TestResult(test_name="Test 1", score=1.0, status="AC", feedback="Perfect"),
+            TestResult(test_name="Test 2", score=1.0, status="AC", feedback="Perfect"),
+            TestResult(test_name="Test 3", score=0.5, status="PA", feedback="Partial"),
         ]
 
         # Setup mock return values
@@ -755,13 +735,11 @@ This program reads two integers and outputs their sum.
         ]
 
         messages_arg = [Message(**messages_data[0]), Message(**messages_data[1])]
-        ground_truth_arg = test_cases_data # This is the test_cases
+        ground_truth_arg = test_cases_data  # This is the test_cases
 
         # Call the function - should use our mocked get_event_loop() and run_until_complete()
         result = _ioi_cpp_code_reward_impl(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="cpp"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="cpp"
         )
 
         # Check result
@@ -772,9 +750,7 @@ This program reads two integers and outputs their sum.
         # With a default pass_threshold of 0.99, only the first two tests would pass,
         # resulting in 2/3 = 0.6666...
         expected_score = 2.0 / 3.0  # 2 out of 3 tests pass the threshold
-        assert (
-            abs(result.score - expected_score) < 0.001
-        )  # Use approximate comparison
+        assert abs(result.score - expected_score) < 0.001  # Use approximate comparison
         assert "2/3 tests passed" in result.metrics["pass_rate"].reason
         # assert (
         #     abs(result['score'] - expected_score) < 0.001 # Use attribute access
@@ -815,19 +791,17 @@ class TestBinaryCppCodeReward:
         ]
 
         messages_arg = [Message(**messages[0]), Message(**messages[1])]
-        ground_truth_arg = "25" # This is the expected_output_str
+        ground_truth_arg = "25"  # This is the expected_output_str
 
         # Call function
         result = binary_cpp_code_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="cpp"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="cpp"
         )
 
         # Check result
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert "Passed" in result.metrics['binary_result'].reason
+        assert "Passed" in result.metrics["binary_result"].reason
         # assert result['score'] == 1.0 # Use attribute access
         # assert "Passed" in result['metrics']['binary_result']['reason'] # Use attribute access
 
@@ -838,7 +812,9 @@ class TestBinaryCppCodeReward:
             "execution_result": MetricResult(
                 score=1.0, reason="Code executed successfully", success=True
             ),
-            "output_match": MetricResult(score=0.8, reason="Close match", success=False),
+            "output_match": MetricResult(
+                score=0.8, reason="Close match", success=False
+            ),
         }
         mock_reward_impl.return_value = EvaluateResult(
             score=0.8, reason="Binary fail due to partial match", metrics=mock_metrics
@@ -861,7 +837,7 @@ class TestBinaryCppCodeReward:
         ]
 
         messages_arg = [Message(**messages[0]), Message(**messages[1])]
-        ground_truth_arg = "25" # This is the expected_output_str
+        ground_truth_arg = "25"  # This is the expected_output_str
 
         # Call function
         result = binary_cpp_code_reward(
@@ -874,6 +850,6 @@ class TestBinaryCppCodeReward:
         # Check result
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "Failed" in result.metrics['binary_result'].reason
+        assert "Failed" in result.metrics["binary_result"].reason
         # assert result['score'] == 0.0 # Use attribute access
         # assert "Failed" in result['metrics']['binary_result']['reason'] # Use attribute access

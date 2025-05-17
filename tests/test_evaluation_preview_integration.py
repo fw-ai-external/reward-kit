@@ -1,11 +1,12 @@
-import os
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
-import json
 import importlib.util
-from pathlib import Path
+import json
+import os
+import sys
 import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Load the evaluation_preview_example module directly from the examples folder
@@ -102,21 +103,19 @@ def mock_word_count_metric():
     os.makedirs(os.path.join(tmp_dir, "metrics", "word_count"), exist_ok=True)
 
     # Create main.py in the word_count directory
-    with open(
-        os.path.join(tmp_dir, "metrics", "word_count", "main.py"), "w"
-    ) as f:
+    with open(os.path.join(tmp_dir, "metrics", "word_count", "main.py"), "w") as f:
         f.write(
             """
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -182,13 +181,13 @@ def test_preview_evaluation(mock_env_variables, mock_preview_api, monkeypatch):
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -235,9 +234,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
 
         # Call preview_evaluation
         result = preview_evaluation(
-            metric_folders=[
-                f"word_count={os.path.join(tmp_dir, 'word_count')}"
-            ],
+            metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
             sample_file=sample_path,
             max_samples=2,
         )
@@ -268,13 +265,13 @@ def test_create_evaluation(mock_env_variables, mock_create_api, monkeypatch):
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -285,22 +282,16 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         # Call create_evaluation
         result = create_evaluation(
             evaluator_id="word-count-eval",
-            metric_folders=[
-                f"word_count={os.path.join(tmp_dir, 'word_count')}"
-            ],
+            metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
             display_name="Word Count Evaluator",
             description="Evaluates responses based on word count",
             force=True,
         )
 
         # Verify results
-        assert (
-            result["name"] == "accounts/test_account/evaluators/word-count-eval"
-        )
+        assert result["name"] == "accounts/test_account/evaluators/word-count-eval"
         assert result["displayName"] == "Word Count Evaluator"
-        assert (
-            result["description"] == "Evaluates responses based on word count"
-        )
+        assert result["description"] == "Evaluates responses based on word count"
 
 
 def test_preview_then_create(
@@ -321,13 +312,13 @@ def test_preview_then_create(
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -368,16 +359,14 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
             )
 
         # Create a patched example module with modified paths
-        from reward_kit.evaluation import preview_evaluation, create_evaluation
+        from reward_kit.evaluation import create_evaluation, preview_evaluation
 
         # Define a patched main function
         def patched_main():
             # Preview the evaluation using metrics folder and samples file
             print("Previewing evaluation...")
             preview_result = preview_evaluation(
-                metric_folders=[
-                    f"word_count={os.path.join(tmp_dir, 'word_count')}"
-                ],
+                metric_folders=[f"word_count={os.path.join(tmp_dir, 'word_count')}"],
                 sample_file=sample_path,
                 max_samples=2,
             )
@@ -405,9 +394,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
                 return evaluator
             except Exception as e:
                 print(f"Error creating evaluator: {str(e)}")
-                print(
-                    "Make sure you have proper Fireworks API credentials set up."
-                )
+                print("Make sure you have proper Fireworks API credentials set up.")
                 return None
 
         # Run the patched main function
@@ -418,6 +405,4 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
 
         # Verify the result
         assert result is not None
-        assert (
-            result["name"] == "accounts/test_account/evaluators/word-count-eval"
-        )
+        assert result["name"] == "accounts/test_account/evaluators/word-count-eval"

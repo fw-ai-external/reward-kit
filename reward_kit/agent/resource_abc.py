@@ -1,14 +1,22 @@
 """
 Abstract Base Class for Forkable Resources in the Agent Evaluation Framework V2.
 """
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional # Callable removed as not directly used in ABC signatures
+from typing import (  # Callable removed as not directly used in ABC signatures
+    Any,
+    Dict,
+    List,
+    Optional,
+)
+
 
 class ForkableResource(ABC):
     """
     Abstract base class defining the interface for a forkable, checkpointable,
     and interactive environment resource for agent evaluation.
     """
+
     @abstractmethod
     async def setup(self, config: Dict[str, Any]) -> None:
         """
@@ -20,7 +28,7 @@ class ForkableResource(ABC):
         pass
 
     @abstractmethod
-    async def fork(self) -> 'ForkableResource':
+    async def fork(self) -> "ForkableResource":
         """
         Creates and returns a new, independent instance of this resource
         with an identical copy of the current state of the resource it was forked from.

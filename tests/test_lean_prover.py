@@ -1,50 +1,67 @@
 import pytest
+
+from reward_kit.models import Message  # Import Message
 from reward_kit.rewards.lean_prover import (
-    lean_prover_reward,
-    deepseek_prover_v2_reward,
     deepseek_huggingface_prover_benchmark,
+    deepseek_prover_v2_reward,
+    lean_prover_reward,
 )
-from reward_kit.models import Message # Import Message
+
 
 # Helper to create messages list
 def create_messages(statement_content: str, assistant_response: str):
     return [
-        Message(role="user", content=f"Prove the following statement: {statement_content}"),
+        Message(
+            role="user", content=f"Prove the following statement: {statement_content}"
+        ),
         Message(role="assistant", content=assistant_response),
     ]
+
 
 def test_lean_prover_reward_empty():
     """Test lean_prover_reward with empty input"""
     # Pass empty messages list, or messages with empty content
     messages_empty_assistant = create_messages("some statement", "")
-    result = lean_prover_reward(messages=messages_empty_assistant, ground_truth=None, statement="some statement")
-    assert hasattr(result, 'score') # Check attribute existence
+    result = lean_prover_reward(
+        messages=messages_empty_assistant, ground_truth=None, statement="some statement"
+    )
+    assert hasattr(result, "score")  # Check attribute existence
     assert result.score == 0.0
 
     messages_no_assistant = [Message(role="user", content="Prove something")]
     # lean_prover_reward expects messages[-1] to be assistant. This will fail internally.
-    result_no_assistant = lean_prover_reward(messages=messages_no_assistant, ground_truth=None, statement="something")
-    assert hasattr(result_no_assistant, 'score')
-    assert result_no_assistant.score == 0.0 # Expected to fail due to invalid messages structure
-    
+    result_no_assistant = lean_prover_reward(
+        messages=messages_no_assistant, ground_truth=None, statement="something"
+    )
+    assert hasattr(result_no_assistant, "score")
+    assert (
+        result_no_assistant.score == 0.0
+    )  # Expected to fail due to invalid messages structure
+
     # Test with statement=None, which should also result in 0 score.
     # messages_empty_assistant is valid structure but empty assistant content.
-    result_no_statement = lean_prover_reward(messages=messages_empty_assistant, ground_truth=None, statement=None)
-    assert hasattr(result_no_statement, 'score')
+    result_no_statement = lean_prover_reward(
+        messages=messages_empty_assistant, ground_truth=None, statement=None
+    )
+    assert hasattr(result_no_statement, "score")
     assert result_no_statement.score == 0.0
 
 
 def test_lean_prover_reward_basic():
     """Test lean_prover_reward with a basic example"""
-    statement = "All even integers greater than 2 can be expressed as the sum of two primes."
+    statement = (
+        "All even integers greater than 2 can be expressed as the sum of two primes."
+    )
     response = """theorem goldbach (n : ℕ) (h1 : n > 2) (h2 : even n) : ∃ p q, prime p ∧ prime q ∧ p + q = n :=
 begin
   sorry
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement)
-    assert hasattr(result, 'score')
+    result = lean_prover_reward(
+        messages=messages, ground_truth=None, statement=statement
+    )
+    assert hasattr(result, "score")
 
     # Get completeness score from metrics if available
     if result.metrics and "completeness" in result.metrics:
@@ -60,8 +77,10 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement)
-    assert hasattr(result, 'score')
+    result = lean_prover_reward(
+        messages=messages, ground_truth=None, statement=statement
+    )
+    assert hasattr(result, "score")
     assert result.score >= 0.5
 
 
@@ -74,8 +93,10 @@ begin
 end
     """
     messages = create_messages(statement, response)
-    result = lean_prover_reward(messages=messages, ground_truth=None, statement=statement, verbose=True)
-    assert hasattr(result, 'score')
+    result = lean_prover_reward(
+        messages=messages, ground_truth=None, statement=statement, verbose=True
+    )
+    assert hasattr(result, "score")
     assert result.metrics is not None
     assert "syntax" in result.metrics
     assert result.metrics["syntax"].score > 0
@@ -83,7 +104,9 @@ end
 
 def test_deepseek_prover_v2_reward():
     """Test deepseek_prover_v2_reward with a sample containing subgoals"""
-    statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    statement = (
+        "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    )
     response = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
 begin
   -- We'll prove this by induction on n
@@ -91,7 +114,7 @@ begin
   -- Base case: n = 0
   { simp, },
   -- Inductive step: assume true for n = d, prove for n = d + 1
-  { 
+  {
     have step1 : ∑ i in range (d + 1), i = (∑ i in range d, i) + d,
       by simp [sum_range_succ],
     have step2 : (∑ i in range d, i) + d = d * (d + 1) / 2 + d,
@@ -108,8 +131,10 @@ end
     """
     messages = create_messages(statement, response)
     # expected_proof is None for this test as it's focused on subgoal detection
-    result = deepseek_prover_v2_reward(messages=messages, ground_truth=None, statement=statement, verbose=True)
-    assert hasattr(result, 'score')
+    result = deepseek_prover_v2_reward(
+        messages=messages, ground_truth=None, statement=statement, verbose=True
+    )
+    assert hasattr(result, "score")
     assert result.score > 0.7  # Should be high due to good subgoals
 
     # Check for subgoal analysis in metrics
@@ -118,9 +143,7 @@ end
     assert "hierarchical_structure" in result.metrics
 
 
-@pytest.mark.skip(
-    reason="Requires Hugging Face datasets package and internet access"
-)
+@pytest.mark.skip(reason="Requires Hugging Face datasets package and internet access")
 def test_deepseek_huggingface_prover_benchmark_mock():
     """Test deepseek_huggingface_prover_benchmark with mocked dataset"""
     statement = "If a and b are positive real numbers, then the arithmetic mean is greater than or equal to the geometric mean."
@@ -137,8 +160,8 @@ begin
   have step4 : (a + b)^2 / 4 ≥ a*b,
     by { apply div_le_div_of_le; linarith; apply step3 },
   have step5 : (a + b) / 2 ≥ sqrt (a * b),
-    by { apply le_of_sq_le_sq; apply sqrt_nonneg; apply div_nonneg; 
-         apply add_nonneg; apply le_of_lt ha; apply le_of_lt hb; norm_num; 
+    by { apply le_of_sq_le_sq; apply sqrt_nonneg; apply div_nonneg;
+         apply add_nonneg; apply le_of_lt ha; apply le_of_lt hb; norm_num;
          rwa [sq_sqrt (mul_nonneg (le_of_lt ha) (le_of_lt hb)), sq_div, sq] },
   exact step5,
 end
@@ -154,13 +177,13 @@ end
     try:
         ground_truth_dict = {
             "statement": statement,
-            "dataset_item": dataset_item
+            "dataset_item": dataset_item,
             # expected_proof and answer would be inside dataset_item or could be top-level here
         }
         result = deepseek_huggingface_prover_benchmark(
             messages=messages, ground_truth=ground_truth_dict, verbose=True
         )
-        assert hasattr(result, 'score')
+        assert hasattr(result, "score")
         assert result.score >= 0.8  # Should be high for good proof
     except ImportError:
         pytest.skip("Hugging Face datasets package not installed")

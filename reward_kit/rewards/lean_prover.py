@@ -1,17 +1,16 @@
-import re
 import json
-from typing import Dict, Optional, Any, List
+import re
+from typing import Any, Dict, List, Optional
 
-from reward_kit.reward_function import reward_function
+from reward_kit.models import Message  # Import Message model
 from reward_kit.models import EvaluateResult, MetricResult
+from reward_kit.reward_function import reward_function
 
-
-from reward_kit.models import Message # Import Message model
 
 @reward_function
 def lean_prover_reward(
-    messages: List[Message],        # Full conversation, model's response is messages[-1]
-    ground_truth: Optional[str],    # This is the expected_answer (proof string)
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    ground_truth: Optional[str],  # This is the expected_answer (proof string)
     # statement is still expected via kwargs as per original logic
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -22,7 +21,7 @@ def lean_prover_reward(
     Args:
         messages: List of conversation messages. The last message is the assistant's response.
         ground_truth: The expected proof string. Corresponds to 'expected_answer' in original kwargs.
-        **kwargs: Must include 'statement' (str). Optional: 
+        **kwargs: Must include 'statement' (str). Optional:
                   'lean_version' (str, default "4"), 'check_partial_progress' (bool, default True),
                   'verbose' (bool, default False).
 
@@ -37,18 +36,45 @@ def lean_prover_reward(
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
-        return EvaluateResult(score=0.0, reason="Statement not provided in kwargs.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided.")})
+        return EvaluateResult(
+            score=0.0,
+            reason="Statement not provided in kwargs.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Statement not provided."
+                )
+            },
+        )
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
+            },
         )
-    
+
     response = messages[-1].content
-    if not response: # Check if content is empty string
-        return EvaluateResult(score=0.0, reason="Assistant response content is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response content.")})
+    if not response:  # Check if content is empty string
+        return EvaluateResult(
+            score=0.0,
+            reason="Assistant response content is empty.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Empty assistant response content."
+                )
+            },
+        )
 
     # Define patterns for Lean syntax validation
     patterns = {
@@ -126,9 +152,7 @@ def lean_prover_reward(
         # Add up to 0.4 more based on tactics complexity
         if tactics_count >= 5:
             score += 0.4
-            reason = (
-                f"Complete proof with good complexity ({tactics_count} tactics)"
-            )
+            reason = f"Complete proof with good complexity ({tactics_count} tactics)"
         else:
             score += (tactics_count / 5) * 0.4
             reason = f"Complete proof with {tactics_count} tactics"
@@ -161,7 +185,7 @@ def lean_prover_reward(
             ),
             "tactics": MetricResult(
                 score=min(1.0, tactics_count / 10),
-                success=tactics_count > 0, # Basic success if any tactics used
+                success=tactics_count > 0,  # Basic success if any tactics used
                 reason=f"Used {tactics_count} tactics",
             ),
         }
@@ -181,15 +205,15 @@ def lean_prover_reward(
     # Create and return result
     return EvaluateResult(
         score=score,
-        reason=reason, # Use the existing reason variable
+        reason=reason,  # Use the existing reason variable
         metrics=metrics,
     )
 
 
 @reward_function
 def deepseek_prover_v2_reward(
-    messages: List[Message],        # Full conversation, model's response is messages[-1]
-    ground_truth: Optional[str],    # This is the expected_proof
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    ground_truth: Optional[str],  # This is the expected_proof
     # statement is still expected via kwargs
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -200,7 +224,7 @@ def deepseek_prover_v2_reward(
     Args:
         messages: List of conversation messages. The last message is the assistant's response.
         ground_truth: The expected proof string. Corresponds to 'expected_proof' in original kwargs.
-        **kwargs: Must include 'statement' (str). Optional: 
+        **kwargs: Must include 'statement' (str). Optional:
                   'check_subgoals' (bool, default True), 'verbose' (bool, default False).
     Returns:
         EvaluateResult with score and metrics
@@ -212,31 +236,37 @@ def deepseek_prover_v2_reward(
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
-        return EvaluateResult(score=0.0, reason="Statement not provided in kwargs for deepseek_prover_v2_reward.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided.")})
+        return EvaluateResult(
+            score=0.0,
+            reason="Statement not provided in kwargs for deepseek_prover_v2_reward.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Statement not provided."
+                )
+            },
+        )
 
     # The model's response is in messages[-1].content.
     # lean_prover_reward will handle checking messages[-1].
     # No need for a separate check here if lean_prover_reward does it.
-    
+
     # Prepare kwargs for lean_prover_reward.
     # The `ground_truth` for lean_prover_reward is `expected_proof`.
     lean_prover_kwargs_for_call = {
         "statement": statement,
         # "expected_answer" for lean_prover_reward is our expected_proof (now ground_truth for this func)
         # This will be passed as the ground_truth argument to lean_prover_reward directly.
-        "check_partial_progress": True, # Default from original call structure
+        "check_partial_progress": True,  # Default from original call structure
         "verbose": verbose,
     }
-    
+
     # Call the refactored lean_prover_reward.
     # messages (full convo) is passed as messages.
     # expected_proof (this function's ground_truth) is passed as ground_truth to lean_prover_reward.
     base_evaluate_result: EvaluateResult = lean_prover_reward(
-        messages=messages,
-        ground_truth=expected_proof, 
-        **lean_prover_kwargs_for_call
+        messages=messages, ground_truth=expected_proof, **lean_prover_kwargs_for_call
     )
-    
+
     base_score = base_evaluate_result.score
     base_reason = base_evaluate_result.reason or "Formal proof evaluation"
     base_metrics = base_evaluate_result.metrics or {}
@@ -258,7 +288,12 @@ def deepseek_prover_v2_reward(
     # Ensure messages[-1] is valid before accessing content (already done by lean_prover_reward if it was called)
     # If lean_prover_reward returned due to invalid messages, base_score would be 0 and this part might not run or matter.
     response_content = ""
-    if messages and isinstance(messages[-1], Message) and messages[-1].role == "assistant" and messages[-1].content is not None:
+    if (
+        messages
+        and isinstance(messages[-1], Message)
+        and messages[-1].role == "assistant"
+        and messages[-1].content is not None
+    ):
         response_content = messages[-1].content
     # If response_content is empty here, subgoal checks will yield 0, which is fine.
 
@@ -268,7 +303,7 @@ def deepseek_prover_v2_reward(
     subgoal_score = 0
     hierarchy_score = 0
 
-    if check_subgoals and response_content: # Check response_content
+    if check_subgoals and response_content:  # Check response_content
         # Count subgoal patterns
         subgoal_count = 0
         for pattern_name, pattern in subgoal_patterns.items():
@@ -300,16 +335,21 @@ def deepseek_prover_v2_reward(
             final_score = base_score
 
         # Add subgoal metrics
-        subgoal_decomposition_score_normalized = subgoal_score / 0.3 if subgoal_score > 0 else 0.0
+        subgoal_decomposition_score_normalized = (
+            subgoal_score / 0.3 if subgoal_score > 0 else 0.0
+        )
         metrics["subgoal_decomposition"] = MetricResult(
-            score=min(1.0, subgoal_decomposition_score_normalized), # Ensure score is <= 1.0
+            score=min(
+                1.0, subgoal_decomposition_score_normalized
+            ),  # Ensure score is <= 1.0
             success=subgoal_decomposition_score_normalized > 0.5,
             reason=f"Found {subgoal_count} subgoal patterns",
         )
 
         metrics["hierarchical_structure"] = MetricResult(
             score=hierarchy_depth,
-            success=hierarchy_depth > 0.5, # Mark success if structure is reasonably deep
+            success=hierarchy_depth
+            > 0.5,  # Mark success if structure is reasonably deep
             reason=f"Hierarchical depth: {hierarchy_depth:.2f}",
         )
         # top_level_reason is already updated if base_score >= 0.5
@@ -324,8 +364,10 @@ def deepseek_prover_v2_reward(
 
 @reward_function
 def deepseek_huggingface_prover_benchmark(
-    messages: List[Message],        # Full conversation, model's response is messages[-1]
-    ground_truth: Dict[str, Any],   # Expected to contain 'statement', and optionally 'dataset_item' or its components
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    ground_truth: Dict[
+        str, Any
+    ],  # Expected to contain 'statement', and optionally 'dataset_item' or its components
     # Other specific args like dataset_name, check_for_answer, verbose can remain in kwargs
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -357,18 +399,47 @@ def deepseek_huggingface_prover_benchmark(
     verbose: bool = kwargs.get("verbose", False)
 
     if not statement:
-        return EvaluateResult(score=0.0, reason="Statement not found in ground_truth dict for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Statement not provided in ground_truth.")})
+        return EvaluateResult(
+            score=0.0,
+            reason="Statement not found in ground_truth dict for HuggingFace benchmark.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Statement not provided in ground_truth.",
+                )
+            },
+        )
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
+            },
         )
-    
-    response = messages[-1].content # This is the model's proof attempt
-    if not response: 
-        return EvaluateResult(score=0.0, reason="Assistant response content is empty for HuggingFace benchmark.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty assistant response content.")})
+
+    response = messages[-1].content  # This is the model's proof attempt
+    if not response:
+        return EvaluateResult(
+            score=0.0,
+            reason="Assistant response content is empty for HuggingFace benchmark.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Empty assistant response content."
+                )
+            },
+        )
 
     try:
         from datasets import load_dataset
@@ -401,16 +472,14 @@ def deepseek_huggingface_prover_benchmark(
             from difflib import SequenceMatcher
 
             best_ratio = 0
-            matched_ratio = 0.0 # Ensure float
+            matched_ratio = 0.0  # Ensure float
 
             for split in dataset.keys():
                 for item in dataset[split]:
                     ratio = SequenceMatcher(
                         None, statement.strip(), item.get("statement", "")
                     ).ratio()
-                    if (
-                        ratio > best_ratio and ratio > 0.7
-                    ):  # 70% similarity threshold
+                    if ratio > best_ratio and ratio > 0.7:  # 70% similarity threshold
                         best_ratio = ratio
                         matched_item = item
                         matched_ratio = ratio
@@ -431,7 +500,7 @@ def deepseek_huggingface_prover_benchmark(
             # Add fuzzy match info to metrics
             metrics["dataset_match"] = MetricResult(
                 score=matched_ratio,
-                success=matched_ratio > 0.7, # Success if similarity is above threshold
+                success=matched_ratio > 0.7,  # Success if similarity is above threshold
                 reason=f"Found similar problem with {matched_ratio:.2f} similarity",
             )
         else:
@@ -443,11 +512,11 @@ def deepseek_huggingface_prover_benchmark(
         dataset_item = matched_item
 
     # Extract expected proof if available from dataset_item or directly from ground_truth
-    expected_proof = expected_proof_from_gt # Prioritize direct key from ground_truth
+    expected_proof = expected_proof_from_gt  # Prioritize direct key from ground_truth
     reference_solution = None
     if dataset_item:
-        if not expected_proof: # If not in ground_truth directly, try from dataset_item
-             expected_proof = dataset_item.get("expected_proof", None)
+        if not expected_proof:  # If not in ground_truth directly, try from dataset_item
+            expected_proof = dataset_item.get("expected_proof", None)
         reference_solution = dataset_item.get("reference_solution", None)
 
     # Use the expected proof or reference solution if available
@@ -462,7 +531,7 @@ def deepseek_huggingface_prover_benchmark(
 
     if check_for_answer and answer_to_check:
         expected_answer_str = str(answer_to_check)
-        answer_found = expected_answer_str in response 
+        answer_found = expected_answer_str in response
 
         if not answer_found:
             metrics["answer_match"] = MetricResult(
@@ -470,7 +539,11 @@ def deepseek_huggingface_prover_benchmark(
                 success=False,
                 reason=f"Expected answer '{expected_answer_str}' not found in response",
             )
-            return EvaluateResult(score=0.2, reason=f"Expected answer '{expected_answer_str}' not found.", metrics=metrics)
+            return EvaluateResult(
+                score=0.2,
+                reason=f"Expected answer '{expected_answer_str}' not found.",
+                metrics=metrics,
+            )
         else:
             metrics["answer_match"] = MetricResult(
                 score=1.0, success=True, reason="Expected answer found in response"
@@ -484,32 +557,28 @@ def deepseek_huggingface_prover_benchmark(
         "statement": statement,
         # "expected_proof" for deepseek_prover_v2_reward is our proof_reference
         # This will be passed as the ground_truth argument to deepseek_prover_v2_reward.
-        "check_subgoals": True, # Default from original call structure
+        "check_subgoals": True,  # Default from original call structure
         "verbose": verbose,
     }
     eval_result_from_deepseek: EvaluateResult = deepseek_prover_v2_reward(
-        messages=messages,
-        ground_truth=proof_reference, 
-        **deepseek_kwargs_for_call
+        messages=messages, ground_truth=proof_reference, **deepseek_kwargs_for_call
     )
-    
+
     result_score = eval_result_from_deepseek.score
     result_reason = eval_result_from_deepseek.reason
     result_metrics = eval_result_from_deepseek.metrics or {}
 
-
     # Combine metrics
     combined_metrics = {**metrics, **result_metrics}
-    
+
     if result_reason and result_reason not in current_top_level_reason:
         current_top_level_reason += f" Sub-evaluation: {result_reason}"
-
 
     # Add dataset information as additional metrics
     if verbose:
         combined_metrics["dataset_info"] = MetricResult(
             score=1.0,  # Not an evaluative score
-            success=True, # Informational metric
+            success=True,  # Informational metric
             reason=json.dumps(
                 {
                     "id": dataset_item.get("id", ""),
@@ -521,4 +590,6 @@ def deepseek_huggingface_prover_benchmark(
         )
 
     # Create and return final result
-    return EvaluateResult(score=result_score, reason=current_top_level_reason, metrics=combined_metrics)
+    return EvaluateResult(
+        score=result_score, reason=current_top_level_reason, metrics=combined_metrics
+    )

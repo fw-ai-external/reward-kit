@@ -3,22 +3,30 @@ Command-line interface for reward-kit.
 """
 
 import argparse
-import sys
-import os
+import asyncio
 import json
 import logging
-import asyncio
+import os
+import sys
 import traceback
 import uuid
 from pathlib import Path
 
+from reward_kit.evaluation import create_evaluation, preview_evaluation
+
+from .cli_commands.agent_eval_cmd import (  # Now points to the V2 logic
+    agent_eval_command,
+)
+from .cli_commands.common import (
+    check_agent_environment,
+    check_environment,
+    setup_logging,
+)
+from .cli_commands.deploy import deploy_command
+from .cli_commands.preview import preview_command
+
 # importlib.util was unused
 
-from reward_kit.evaluation import preview_evaluation, create_evaluation
-from .cli_commands.common import setup_logging, check_environment, check_agent_environment
-from .cli_commands.preview import preview_command
-from .cli_commands.deploy import deploy_command
-from .cli_commands.agent_eval_cmd import agent_eval_command # Now points to the V2 logic
 
 # Note: validate_task_bundle, find_task_dataset, get_toolset_config, export_tool_specs
 # were helpers for the old agent_eval_command and are now moved into agent_eval_cmd.py
@@ -93,9 +101,7 @@ def parse_args(args=None):
     deploy_parser = subparsers.add_parser(
         "deploy", help="Create and deploy an evaluator"
     )
-    deploy_parser.add_argument(
-        "--id", required=True, help="ID for the evaluator"
-    )
+    deploy_parser.add_argument("--id", required=True, help="ID for the evaluator")
     deploy_parser.add_argument(
         "--metrics-folders",
         "-m",
@@ -107,9 +113,7 @@ def parse_args(args=None):
         "--display-name",
         help="Display name for the evaluator (defaults to ID if not provided)",
     )
-    deploy_parser.add_argument(
-        "--description", help="Description for the evaluator"
-    )
+    deploy_parser.add_argument("--description", help="Description for the evaluator")
     deploy_parser.add_argument(
         "--force",
         "-f",
@@ -118,9 +122,7 @@ def parse_args(args=None):
     )
 
     # Add HuggingFace dataset options to deploy command
-    hf_deploy_group = deploy_parser.add_argument_group(
-        "HuggingFace Dataset Options"
-    )
+    hf_deploy_group = deploy_parser.add_argument_group("HuggingFace Dataset Options")
     hf_deploy_group.add_argument(
         "--huggingface-dataset",
         "--hf",
@@ -187,7 +189,9 @@ def main():
         # This case should ideally not be reached if subparsers are required.
         # If a command is not matched, argparse usually shows help or an error.
         # Keeping this for safety or if top-level `reward-kit` without command is allowed.
-        parser = argparse.ArgumentParser() # This might need to be the main parser instance
+        parser = (
+            argparse.ArgumentParser()
+        )  # This might need to be the main parser instance
         parser.print_help()
         return 0
 

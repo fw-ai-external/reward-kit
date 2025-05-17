@@ -1,13 +1,14 @@
-import pyarrow.feather as feather
-import json
-import yaml
-import os
-from datasets import load_from_disk
-import importlib
-import copy
 import ast
+import copy
+import importlib
+import inspect  # Import inspect for method signature
+import json
+import os
 import sys
-import inspect # Import inspect for method signature
+
+import pyarrow.feather as feather
+import yaml
+from datasets import load_from_disk
 
 # Add the root directory and verifiers directory to the Python path
 sys.path.append("/home/bchen/home/reward-kit")
@@ -15,6 +16,7 @@ sys.path.append("references/verifiers")
 
 # Import BFCLSimAPIResource
 from reward_kit.agent_v2.resources.bfcl_sim_api_resource import BFCLSimAPIResource
+
 
 # Helper function to parse function calls - Corrected to handle positional and keyword arguments
 def _parse_function_call(func_call_str: str):
@@ -27,7 +29,7 @@ def _parse_function_call(func_call_str: str):
     """
     try:
         # Parse the function call string into an AST node
-        tree = ast.parse(func_call_str, mode='eval')
+        tree = ast.parse(func_call_str, mode="eval")
 
         # Ensure it is a function call
         if not isinstance(tree.body, ast.Call):
@@ -50,10 +52,7 @@ def _parse_function_call(func_call_str: str):
             # Use a generic name for positional arguments
             args_dict[f"pos_arg_{i}"] = ast.literal_eval(arg)
 
-        json_obj = {
-            "name": func_name,
-            "args": args_dict
-        }
+        json_obj = {"name": func_name, "args": args_dict}
 
         return json_obj
 
@@ -74,38 +73,49 @@ dataset = load_from_disk(input_dataset_dir)
 
 # Iterate through the dataset rows and create task definition files
 for row in dataset:
-    task_id = row['id']
-    question = row['question']
-    initial_config_str = row['initial_config']
-    involved_classes = row['involved_classes']
-    answer_str = row['answer']
-    original_prompt_messages = row['prompt'] # This is List[Dict]
-    user_question_bank_str = row['user_question_bank']
+    task_id = row["id"]
+    question = row["question"]
+    initial_config_str = row["initial_config"]
+    involved_classes = row["involved_classes"]
+    answer_str = row["answer"]
+    original_prompt_messages = row["prompt"]  # This is List[Dict]
+    user_question_bank_str = row["user_question_bank"]
 
     # Parse JSON strings
     initial_config = json.loads(initial_config_str) if initial_config_str else {}
     ground_truth_function_calls = json.loads(answer_str) if answer_str else []
-    user_question_bank = json.loads(user_question_bank_str) if user_question_bank_str else []
+    user_question_bank = (
+        json.loads(user_question_bank_str) if user_question_bank_str else []
+    )
 
     # Construct the messages list for the YAML: sequence of user turns only.
     # The original BFCL prompt_messages usually has [system_prompt, first_user_message_dict]
     # We only want the user messages.
     messages_for_yaml = []
-    
+
     # Extract first user message if original_prompt_messages has at least two messages
     # and the second one is a user message.
     if isinstance(original_prompt_messages, list) and len(original_prompt_messages) > 1:
         first_user_message_candidate = original_prompt_messages[1]
-        if isinstance(first_user_message_candidate, dict) and first_user_message_candidate.get("role") == "user":
+        if (
+            isinstance(first_user_message_candidate, dict)
+            and first_user_message_candidate.get("role") == "user"
+        ):
             messages_for_yaml.append(first_user_message_candidate)
         else:
             # If the structure is different, log a warning and potentially add all non-system prompts
-            print(f"Warning: Unexpected structure in original_prompt_messages for task {task_id}. Expected [system, user], got: {original_prompt_messages}")
+            print(
+                f"Warning: Unexpected structure in original_prompt_messages for task {task_id}. Expected [system, user], got: {original_prompt_messages}"
+            )
             for msg_dict in original_prompt_messages:
                 if isinstance(msg_dict, dict) and msg_dict.get("role") == "user":
                     messages_for_yaml.append(msg_dict)
-    elif isinstance(original_prompt_messages, list) and len(original_prompt_messages) == 1 and \
-         isinstance(original_prompt_messages[0], dict) and original_prompt_messages[0].get("role") == "user":
+    elif (
+        isinstance(original_prompt_messages, list)
+        and len(original_prompt_messages) == 1
+        and isinstance(original_prompt_messages[0], dict)
+        and original_prompt_messages[0].get("role") == "user"
+    ):
         # Handle cases where prompt_messages might only contain a single user message
         messages_for_yaml.append(original_prompt_messages[0])
 
@@ -115,15 +125,24 @@ for row in dataset:
     for turn_message_list in user_question_bank:
         if isinstance(turn_message_list, list):
             for user_msg_dict in turn_message_list:
-                 if isinstance(user_msg_dict, dict) and user_msg_dict.get("role") == "user":
+                if (
+                    isinstance(user_msg_dict, dict)
+                    and user_msg_dict.get("role") == "user"
+                ):
                     messages_for_yaml.append(user_msg_dict)
-                 else:
-                    print(f"Warning: Skipping non-user message or invalid format in user_question_bank for task {task_id}: {user_msg_dict}")
-        elif isinstance(turn_message_list, dict) and turn_message_list.get("role") == "user": # If a turn is a single message dict
+                else:
+                    print(
+                        f"Warning: Skipping non-user message or invalid format in user_question_bank for task {task_id}: {user_msg_dict}"
+                    )
+        elif (
+            isinstance(turn_message_list, dict)
+            and turn_message_list.get("role") == "user"
+        ):  # If a turn is a single message dict
             messages_for_yaml.append(turn_message_list)
         else:
-            print(f"Warning: Unexpected item format in user_question_bank for task {task_id}: {turn_message_list}")
-
+            print(
+                f"Warning: Unexpected item format in user_question_bank for task {task_id}: {turn_message_list}"
+            )
 
     # --- Generate Ground Truth Final State ---
     gt_env_instances = {}
@@ -167,29 +186,38 @@ for row in dataset:
 
                                 # Let's try a different approach: inspect the method signature and map positional args.
                                 sig = inspect.signature(tool_func)
-                                bound_args = sig.bind(**tool_args) # Try binding with extracted args
-                                bound_args.apply_defaults() # Apply default values
+                                bound_args = sig.bind(
+                                    **tool_args
+                                )  # Try binding with extracted args
+                                bound_args.apply_defaults()  # Apply default values
 
                                 # Execute the tool call with bound arguments
                                 tool_func(*bound_args.args, **bound_args.kwargs)
 
                             except TypeError as e:
-                                print(f"TypeError executing ground truth tool {tool_name} with args {tool_args}: {e}")
+                                print(
+                                    f"TypeError executing ground truth tool {tool_name} with args {tool_args}: {e}"
+                                )
                                 pass
                             except Exception as e:
-                                print(f"Error executing ground truth tool {tool_name} with args {tool_args}: {e}")
+                                print(
+                                    f"Error executing ground truth tool {tool_name} with args {tool_args}: {e}"
+                                )
                                 pass
                             break
                     if not found_method:
-                         print(f"Ground truth tool {tool_name} not found in env instances.")
+                        print(
+                            f"Ground truth tool {tool_name} not found in env instances."
+                        )
 
-                except ValueError as e: # Catch errors from _parse_function_call
+                except ValueError as e:  # Catch errors from _parse_function_call
                     print(f"Parsing error for ground truth call '{func_call_str}': {e}")
                     pass
                 except Exception as e:
-                    print(f"Unexpected error during ground truth call processing '{func_call_str}': {e}")
+                    print(
+                        f"Unexpected error during ground truth call processing '{func_call_str}': {e}"
+                    )
                     pass
-
 
     execute_gt_calls(gt_env_instances, ground_truth_function_calls)
 
@@ -198,7 +226,6 @@ for row in dataset:
     ground_truth_comparable_state = temp_gt_resource.get_comparable_state()
     # --- End Generate Ground Truth Final State ---
 
-
     # Construct the v2 task definition dictionary
     task_definition = {
         "name": task_id,
@@ -206,15 +233,15 @@ for row in dataset:
         "resource_type": "BFCLSimAPIResource",
         "base_resource_config": {
             "involved_classes": involved_classes,
-            "initial_config": initial_config
+            "initial_config": initial_config,
         },
         "evaluation_criteria": {
             # Populate the new explicit fields
             "ground_truth_function_calls": ground_truth_function_calls,
-            "ground_truth_comparable_state": ground_truth_comparable_state
+            "ground_truth_comparable_state": ground_truth_comparable_state,
         },
-        "messages": messages_for_yaml, # Use the cleaned messages list
-        "reward_function_path": "reward_kit.rewards.bfcl_reward"
+        "messages": messages_for_yaml,  # Use the cleaned messages list
+        "reward_function_path": "reward_kit.rewards.bfcl_reward",
         # Add poc_max_turns based on the number of user turns, or a default
         # This ensures the orchestrator processes all defined user turns if poc_max_turns is not explicitly set lower.
         # "poc_max_turns": len(messages_for_yaml) # Or a fixed default like 10 if preferred
@@ -224,9 +251,11 @@ for row in dataset:
     output_file = os.path.join(output_dir, f"{task_id}.yaml")
 
     # Write the task definition to a YAML file
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         yaml.dump(task_definition, f, indent=2)
 
     # print(f"Created task definition: {output_file}") # Suppress successful creation messages for clarity
 
-print("Dataset conversion complete (errors during ground truth execution logged above).")
+print(
+    "Dataset conversion complete (errors during ground truth execution logged above)."
+)

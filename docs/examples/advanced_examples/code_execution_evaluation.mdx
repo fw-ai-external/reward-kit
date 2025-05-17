@@ -119,10 +119,10 @@ messages = [
 function isPalindrome(str) {
     // Remove non-alphanumeric characters and convert to lowercase
     const cleanStr = str.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
+
     // Compare with its reverse
     const reversedStr = cleanStr.split('').reverse().join('');
-    
+
     return cleanStr === reversedStr;
 }
 
@@ -307,7 +307,7 @@ primes = []
 for num in range(2, 100):
     if is_prime(num):
         primes.append(num)
-        
+
 print(len(primes))
 """
 
@@ -317,13 +317,13 @@ def sieve_of_eratosthenes(limit):
     primes = []
     sieve = [True] * (limit + 1)
     sieve[0] = sieve[1] = False
-    
+
     for num in range(2, limit + 1):
         if sieve[num]:
             primes.append(num)
             for multiple in range(num * num, limit + 1, num):
                 sieve[multiple] = False
-    
+
     return primes
 
 print(len(sieve_of_eratosthenes(99)))
@@ -341,7 +341,7 @@ for i, solution in enumerate(solutions, 1):
         {"role": "user", "content": "Find all prime numbers less than 100 and print the count."},
         {"role": "assistant", "content": f"```python\n{solution}\n```"}
     ]
-    
+
     start_time = time.time()
     result = local_code_execution_reward(
         messages=messages,
@@ -350,7 +350,7 @@ for i, solution in enumerate(solutions, 1):
         timeout=10
     )
     execution_time = time.time() - start_time
-    
+
     results.append({
         "solution": i,
         "score": result.score,
@@ -401,13 +401,13 @@ for lang, solution in zip(languages, solutions):
         {"role": "user", "content": problem},
         {"role": "assistant", "content": f"```{lang}\n{solution}\n```"}
     ]
-    
+
     result = local_code_execution_reward(
         messages=messages,
         expected_output=expected_output,
         language=lang
     )
-    
+
     print(f"{lang.capitalize()} solution score: {result.score}")
 ```
 

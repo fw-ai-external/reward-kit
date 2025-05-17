@@ -2,23 +2,21 @@
 Tests for accuracy reward function.
 """
 
-import sys
 import os
+import sys
 import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from reward_kit.models import EvaluateResult, Message
 from reward_kit.rewards.accuracy import (
     accuracy_reward,
-    normalize_text,
-    extract_math_expression,
     compare_math_expressions,
+    extract_math_expression,
+    normalize_text,
     string_similarity,
 )
-from reward_kit.models import Message, EvaluateResult
 
 
 class TestAccuracyReward(unittest.TestCase):
@@ -31,7 +29,7 @@ class TestAccuracyReward(unittest.TestCase):
         3x + 5 = 17
         3x = 12
         x = 4
-        
+
         Therefore, the answer is 4.
         """
 
@@ -40,7 +38,9 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
+        result = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "4"}]
+        )
 
         # Check for exact match (score = 1.0)
         self.assertIsInstance(result, EvaluateResult)
@@ -48,15 +48,15 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["answer_accuracy"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
 
     def test_numeric_approximation(self):
         """Test approximate numeric matches."""
         content = """
         To calculate this, I need to divide 10 by 3:
         10 ÷ 3 = 3.33333...
-        
+
         The answer is approximately 3.33.
         """
 
@@ -90,8 +90,8 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["answer_accuracy"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
 
     def test_from_context_ground_truth(self):
         """Test extracting ground truth from context."""
@@ -100,7 +100,7 @@ class TestAccuracyReward(unittest.TestCase):
         2x + 8 = 16
         2x = 8
         x = 4
-        
+
         Therefore, x = 4.
         """
 
@@ -114,15 +114,17 @@ class TestAccuracyReward(unittest.TestCase):
 
         # For this test, we explicitly provide the ground truth
         # to avoid relying on extraction from the context
-        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
+        result = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "4"}]
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["answer_accuracy"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
 
     def test_incorrect_answer(self):
         """Test behavior with incorrect answers."""
@@ -138,7 +140,9 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "3.5"}])
+        result = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "3.5"}]
+        )
 
         # Check for low score
         self.assertIsInstance(result, EvaluateResult)
@@ -146,8 +150,8 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertLess(result.score, 0.9)
         self.assertFalse(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertLess(result['score'], 0.9)
-        self.assertFalse(result['metrics']["answer_accuracy"]['success'])
+        self.assertLess(result["score"], 0.9)
+        self.assertFalse(result["metrics"]["answer_accuracy"]["success"])
 
     def test_custom_extract_function(self):
         """Test with custom extraction function."""
@@ -176,7 +180,9 @@ class TestAccuracyReward(unittest.TestCase):
             return ""
 
         result = accuracy_reward(
-            messages=messages, ground_truth=[{"role": "assistant", "content": "7"}], extract_fn=custom_extract
+            messages=messages,
+            ground_truth=[{"role": "assistant", "content": "7"}],
+            extract_fn=custom_extract,
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -184,8 +190,8 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["answer_accuracy"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
 
     def test_non_numeric_answer(self):
         """Test non-numeric answer comparison."""
@@ -198,25 +204,27 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "Paris"}])
+        result = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "Paris"}]
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["answer_accuracy"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["answer_accuracy"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
 
     def test_latex_expression(self):
         """Test extraction and comparison of LaTeX expressions."""
         content = """
         The solution to the quadratic equation is:
         $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$
-        
+
         With a=1, b=-3, c=-4:
         $x = \\frac{3 \\pm \\sqrt{9 + 16}}{2} = \\frac{3 \\pm 5}{2}$
-        
+
         So $x = 4$ or $x = -1$
         """
 
@@ -226,10 +234,14 @@ class TestAccuracyReward(unittest.TestCase):
         ]
 
         # Test for x = 4
-        result1 = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
+        result1 = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "4"}]
+        )
 
         # Test for x = -1
-        result2 = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "-1"}])
+        result2 = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "-1"}]
+        )
 
         self.assertIsInstance(result1, EvaluateResult)
         self.assertIsInstance(result2, EvaluateResult)
@@ -242,8 +254,8 @@ class TestAccuracyReward(unittest.TestCase):
         )
         # Dictionary access
         self.assertTrue(
-            result1['metrics']["answer_accuracy"]['success']
-            or result2['metrics']["answer_accuracy"]['success']
+            result1["metrics"]["answer_accuracy"]["success"]
+            or result2["metrics"]["answer_accuracy"]["success"]
         )
 
     def test_no_ground_truth(self):
@@ -262,7 +274,6 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIn("Ground truth not provided", result_none_gt.reason)
         self.assertFalse(result_none_gt.metrics["accuracy"].success)
 
-
         # Test case 2: ground_truth is an empty list
         result_empty_list_gt = accuracy_reward(messages=messages_valid, ground_truth=[])
         self.assertIsInstance(result_empty_list_gt, EvaluateResult)
@@ -272,18 +283,20 @@ class TestAccuracyReward(unittest.TestCase):
 
         # Test case 3: ground_truth is a list with a message that has no content
         result_no_content_gt = accuracy_reward(
-            messages=messages_valid, 
-            ground_truth=[{"role": "assistant"}] # No "content" key
+            messages=messages_valid,
+            ground_truth=[{"role": "assistant"}],  # No "content" key
         )
         self.assertIsInstance(result_no_content_gt, EvaluateResult)
         self.assertEqual(result_no_content_gt.score, 0.0)
-        self.assertIn("has no content", result_no_content_gt.reason) # Or similar message from function
+        self.assertIn(
+            "has no content", result_no_content_gt.reason
+        )  # Or similar message from function
         self.assertFalse(result_no_content_gt.metrics["accuracy"].success)
 
         # Test case 4: ground_truth is a list with a message that has None content
         result_none_content_gt = accuracy_reward(
-            messages=messages_valid, 
-            ground_truth=[{"role": "assistant", "content": None}]
+            messages=messages_valid,
+            ground_truth=[{"role": "assistant", "content": None}],
         )
         self.assertIsInstance(result_none_content_gt, EvaluateResult)
         self.assertEqual(result_none_content_gt.score, 0.0)
@@ -301,7 +314,9 @@ class TestAccuracyReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = accuracy_reward(messages=messages, ground_truth=[{"role": "assistant", "content": "4"}])
+        result = accuracy_reward(
+            messages=messages, ground_truth=[{"role": "assistant", "content": "4"}]
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Answer extraction should fail
@@ -309,8 +324,8 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertEqual(result.metrics["answer_extraction"].score, 0.0)
         self.assertFalse(result.metrics["answer_extraction"].success)
         # Dictionary access
-        self.assertEqual(result['metrics']["answer_extraction"]['score'], 0.0)
-        self.assertFalse(result['metrics']["answer_extraction"]['success'])
+        self.assertEqual(result["metrics"]["answer_extraction"]["score"], 0.0)
+        self.assertFalse(result["metrics"]["answer_extraction"]["success"])
 
     def test_normalize_text(self):
         """Test text normalization function."""

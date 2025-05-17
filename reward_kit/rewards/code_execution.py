@@ -12,21 +12,21 @@ Available reward functions:
 - fractional_code_reward: Execute code and return exact pass rate
 """
 
-import os
-import re
-import sys
-import json
-import signal
-import platform
-import tempfile
-import resource
-import subprocess
 import faulthandler
+import json
 import multiprocessing
+import os
+import platform
+import re
+import resource
+import shlex  # Added for robust splitting of arguments
+import signal
+import subprocess
+import sys
+import tempfile
 import traceback
-import shlex # Added for robust splitting of arguments
 from io import StringIO
-from typing import Dict, List, Any, Optional, Tuple, Callable, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # Try to import from e2b_code_interpreter first (preferred)
 try:
@@ -45,13 +45,9 @@ except ImportError:
         _E2B_SOURCE = "e2b"
     except ImportError:
         _HAS_E2B = False
-        _E2B_SOURCE = None
+        _E2B_SOURCE = ""  # Use empty string instead of None
 
-from ..models import (
-    Message,
-    EvaluateResult,
-    MetricResult,
-)
+from ..models import EvaluateResult, Message, MetricResult
 from ..reward_function import reward_function
 
 
@@ -132,7 +128,7 @@ def extract_code_blocks(
 
 @reward_function
 def local_code_execution_reward(
-    messages: List[Message],             # Full conversation, last message is model's response
+    messages: List[Message],  # Full conversation, last message is model's response
     ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 5,
@@ -161,17 +157,28 @@ def local_code_execution_reward(
     # Initialize metrics dictionary for tracking various aspects of the execution
     metrics: Dict[str, MetricResult] = {}
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
             },
         )
-    
+
     response_content = messages[-1].content
-    expected_output_str = ground_truth # Use the new ground_truth parameter as expected_output_str
+    expected_output_str = (
+        ground_truth  # Use the new ground_truth parameter as expected_output_str
+    )
 
     # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
@@ -208,7 +215,9 @@ def local_code_execution_reward(
 
     # Execute the code based on language
     if language.lower() == "python":
-        execution_result = execute_python_code(code, timeout) # max_memory_mb is handled inside _execute_python_in_subprocess
+        execution_result = execute_python_code(
+            code, timeout
+        )  # max_memory_mb is handled inside _execute_python_in_subprocess
     elif language.lower() in ["javascript", "js"]:
         execution_result = execute_javascript_code(code, timeout)
     else:
@@ -244,9 +253,7 @@ def local_code_execution_reward(
 
         # No expected output provided, score based on successful execution
         final_reason = "Execution successful. No expected output to compare."
-        return EvaluateResult(
-            score=1.0, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
     else:
         # Execution failed
         error = execution_result["error"]
@@ -257,9 +264,7 @@ def local_code_execution_reward(
             success=False,
         )
         final_reason = f"Code execution failed: {error}"
-        return EvaluateResult(
-            score=0.0, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
 def _execute_code_in_process(
@@ -943,7 +948,7 @@ def execute_code_with_e2b(
 
 @reward_function
 def e2b_code_execution_reward(
-    messages: List[Message],             # Full conversation, last message is model's response
+    messages: List[Message],  # Full conversation, last message is model's response
     ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 30,
@@ -998,17 +1003,28 @@ def e2b_code_execution_reward(
     # Initialize metrics dictionary for tracking various aspects of the execution
     metrics: Dict[str, MetricResult] = {}
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
             },
         )
-    
+
     response_content = messages[-1].content
-    expected_output_str = ground_truth # Use the new ground_truth parameter as expected_output_str
+    expected_output_str = (
+        ground_truth  # Use the new ground_truth parameter as expected_output_str
+    )
 
     # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
@@ -1075,9 +1091,7 @@ def e2b_code_execution_reward(
 
         # No expected output provided, score based on successful execution
         final_reason = "E2B execution successful. No expected output to compare."
-        return EvaluateResult(
-            score=1.0, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
     else:
         # Execution failed
         error = execution_result["error"]
@@ -1088,15 +1102,15 @@ def e2b_code_execution_reward(
             success=False,
         )
         final_reason = f"E2B code execution failed: {error}"
-        return EvaluateResult(
-            score=0.0, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
 @reward_function
 def fractional_code_reward(
     messages: List[Message],  # Full conversation, last message is model's response
-    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # Expected output string OR list of test_cases
+    ground_truth: Union[
+        Optional[str], Optional[List[Dict[str, Any]]]
+    ],  # Expected output string OR list of test_cases
     language: str = "python",
     timeout: int = 30,
     environment: str = "local",
@@ -1126,17 +1140,26 @@ def fractional_code_reward(
         EvaluateResult with score between 0 and 1 representing the exact pass rate.
     """
     # Initialize metrics dictionary
-    metrics_strings: Dict[str, str] = {} # Store string reasons first
+    metrics_strings: Dict[str, str] = {}  # Store string reasons first
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages for fractional code reward.",
             metrics={
-                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
             },
         )
-    
+
     response_content = messages[-1].content
 
     # Determine if ground_truth is expected_output_str or test_cases
@@ -1154,13 +1177,21 @@ def fractional_code_reward(
             return EvaluateResult(
                 score=0.0,
                 reason="Invalid ground_truth format: expected string or list of test case dicts.",
-                metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
+                metrics={
+                    "error": MetricResult(
+                        score=0.0, success=False, reason="Invalid ground_truth format."
+                    )
+                },
             )
-    elif ground_truth is not None: # Not str, not list, not None - unsupported
+    elif ground_truth is not None:  # Not str, not list, not None - unsupported
         return EvaluateResult(
             score=0.0,
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Invalid ground_truth format."
+                )
+            },
         )
     # If ground_truth is None, both expected_output_str_from_gt and test_cases_from_gt will remain None.
 
@@ -1187,7 +1218,9 @@ def fractional_code_reward(
 
     # Add expected output to metrics if available and not using test cases
     if expected_output_str_from_gt and not test_cases_from_gt:
-        metrics_strings["expected_output"] = f"Expected output:\n{expected_output_str_from_gt}"
+        metrics_strings["expected_output"] = (
+            f"Expected output:\n{expected_output_str_from_gt}"
+        )
 
     # Handle multiple test cases if provided
     if test_cases_from_gt:
@@ -1195,11 +1228,11 @@ def fractional_code_reward(
         return _run_test_cases(
             code=code,
             language=language,
-            test_cases=test_cases_from_gt, # Use derived test_cases
+            test_cases=test_cases_from_gt,  # Use derived test_cases
             timeout=timeout,
             environment=environment,
             api_key=api_key,
-            **kwargs, 
+            **kwargs,
         )
 
     # This part handles single expected_output_str if test_cases_from_gt are not provided
@@ -1229,7 +1262,8 @@ def fractional_code_reward(
         else:
             # Convert string metrics to MetricResult objects before returning
             final_metrics_on_error: Dict[str, MetricResult] = {
-                k: MetricResult(score=0.0, reason=v, success=(k=="extracted_code")) for k, v in metrics_strings.items()
+                k: MetricResult(score=0.0, reason=v, success=(k == "extracted_code"))
+                for k, v in metrics_strings.items()
             }
             final_metrics_on_error["error"] = MetricResult(
                 score=0.0,
@@ -1244,7 +1278,14 @@ def fractional_code_reward(
 
     # Convert initial string metrics to MetricResult objects
     metric_results: Dict[str, MetricResult] = {
-        k: MetricResult(score=0.0, reason=v, success=(k=="extracted_code" or (k=="expected_output" and expected_output_str_from_gt is not None))) 
+        k: MetricResult(
+            score=0.0,
+            reason=v,
+            success=(
+                k == "extracted_code"
+                or (k == "expected_output" and expected_output_str_from_gt is not None)
+            ),
+        )
         for k, v in metrics_strings.items()
     }
 
@@ -1256,7 +1297,9 @@ def fractional_code_reward(
             success=True,
         )
 
-        if expected_output_str_from_gt: # Only compare if expected_output_str_from_gt is available
+        if (
+            expected_output_str_from_gt
+        ):  # Only compare if expected_output_str_from_gt is available
             similarity = compare_outputs(output, expected_output_str_from_gt)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str_from_gt}\n\nActual:\n{output}"
             metric_results["output_match"] = MetricResult(
@@ -1266,11 +1309,11 @@ def fractional_code_reward(
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metric_results
             )
-        else: # Successful execution, but no expected_output_str_from_gt to compare against
+        else:  # Successful execution, but no expected_output_str_from_gt to compare against
             final_reason = "Fractional code execution successful. No expected output string to compare."
             return EvaluateResult(
-                score=1.0, reason=final_reason, metrics=metric_results 
-            ) # Score 1.0 for successful execution if no expected output
+                score=1.0, reason=final_reason, metrics=metric_results
+            )  # Score 1.0 for successful execution if no expected output
     else:
         # Execution failed
         error = execution_result["error"]
@@ -1280,9 +1323,7 @@ def fractional_code_reward(
             success=False,
         )
         final_reason = f"Fractional code execution failed: {error}"
-        return EvaluateResult(
-            score=0.0, reason=final_reason, metrics=metric_results
-        )
+        return EvaluateResult(score=0.0, reason=final_reason, metrics=metric_results)
 
 
 def _run_test_cases(
@@ -1335,10 +1376,10 @@ def _run_test_cases(
         if function_to_call:
             # Mode 1: Function Call Harness (Python)
             def prepare_test_code(
-                user_code: str, test_input_str: str, func_name: str
+                user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
-                import json  # For json.loads and json.JSONDecodeError
                 import ast  # For ast.literal_eval
+                import json  # For json.loads and json.JSONDecodeError
 
                 # Helper function to refine evaluated values
                 def refine_evaluated_value(val: Any) -> Any:
@@ -1405,8 +1446,10 @@ def _run_test_cases(
                         # Handles inputs like "1 'foo' \"[1, 2]\"" or "item1 item2".
                         try:
                             arg_parts = shlex.split(args_str_stripped)
-                        except ValueError: # Handle shlex errors e.g. unmatched quotes
-                            arg_parts = [args_str_stripped] # Fallback to treating as a single, possibly problematic, part
+                        except ValueError:  # Handle shlex errors e.g. unmatched quotes
+                            arg_parts = [
+                                args_str_stripped
+                            ]  # Fallback to treating as a single, possibly problematic, part
 
                         for part_str in arg_parts:
                             try:
@@ -1445,6 +1488,7 @@ except Exception as e:
 
         else:
             # Mode 2: Stdin/Stdout Harness (Python) - Fallback
+            # Make sure the signature is identical to the function defined in if branch
             def prepare_test_code(
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
@@ -1475,7 +1519,7 @@ print(captured_stdout.getvalue(), end='')
         if function_to_call:
             # Mode 1: Function Call Harness (JavaScript) - Basic implementation
             def prepare_test_code(
-                user_code: str, test_input_str: str, func_name: str
+                user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
                 # Basic input parsing for JS (similar to Python, less robust)
                 args_str = test_input_str.strip()
@@ -1515,9 +1559,9 @@ try {{
         else:
             # Mode 2: Stdin/Stdout Harness (JavaScript) - Fallback
             def prepare_test_code(
-                user_code: str, test_input: str, func_name: Optional[str]
+                user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
-                input_lines = test_input.strip().split("\n")
+                input_lines = test_input_str.strip().split("\n")
                 input_setup = "const inputs = " + json.dumps(input_lines) + ";\n"
                 input_setup += "let inputIndex = 0;\n"
                 input_setup += "const readline = () => inputs[inputIndex++];\n"
@@ -1657,7 +1701,12 @@ process.stdout.write(output); // Write directly to avoid extra newline
     # Calculate the final score as the fraction of passing tests
     score = passed / total if total > 0 else 0.0
 
-    metrics["test_results"] = results  # results is List[Dict], not MetricResult
+    # Ensure results is treated as a list of dicts
+    if isinstance(results, list):
+        metrics["test_results"] = results  # results is List[Dict], not MetricResult
+    else:
+        # If somehow results is a string, convert it to a list with one dict
+        metrics["test_results"] = [{"error": "Invalid results format"}]
     metrics["pass_rate"] = f"{passed}/{total} tests passed ({score:.2%})"
 
     # Convert metrics to MetricResult objects

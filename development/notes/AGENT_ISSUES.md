@@ -37,7 +37,7 @@
 2. **Resolved Issues**:
 
    - **OpenAI Client Error**: Fixed the error `Client.__init__() got an unexpected keyword argument 'proxies'` by improving client initialization with proper error handling and fallback mechanisms for different OpenAI SDK versions.
-   
+
    - **Agent Integration**: Enhanced the CLI with robust testing capabilities:
      - Added proper `--test-mode` flag for testing without requiring API keys
      - Implemented `--mock-response` flag to simulate basic agent responses
@@ -657,7 +657,7 @@ These two tests may require:
 *   Investigation into potential subtle interactions between `inspect.getmembers`, `unittest.mock.AsyncMock` (specifically attributes that are mocks themselves), and the `pytest-asyncio` environment.
 *   Consideration of an alternative mocking strategy for `tools_module` in these specific tests if the current approach with `AsyncMock` attributes on a custom object remains problematic for discovery. For example, using a dynamically created actual module with real `async def` functions that are then individually patched for assertion if needed.
 
-After that, we should actually try to test all the models end to end. Right now we have only ran 
+After that, we should actually try to test all the models end to end. Right now we have only ran
 
 ```
 export PYTHONPATH="references/verifiers:$PYTHONPATH" && export MODEL_AGENT="test_model" && reward-kit agent-eval-v2 --task-def evaluations/bfcl/tasks/multi_turn_base_0.yaml

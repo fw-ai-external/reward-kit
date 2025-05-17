@@ -7,10 +7,10 @@ reward score.
 """
 
 import math
-from typing import Dict, List, Any, Union, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 from .accuracy import accuracy_reward
 from .length import count_tokens
 
@@ -68,7 +68,7 @@ def cosine_scaled_accuracy_length_reward(
             },
         )
 
-    response = messages[-1] # response is a Message object
+    response = messages[-1]  # response is a Message object
 
     # Extract response text
     if response.role != "assistant" or not response.content:
@@ -89,8 +89,8 @@ def cosine_scaled_accuracy_length_reward(
     # The accuracy_reward function is expected to be refactored to handle
     # messages: List[Message] (prompt + generated) and ground_truth: Optional[List[Message]] (target)
     accuracy_eval_result = accuracy_reward(
-        messages=messages, # Pass the full messages list
-        ground_truth=ground_truth, # Pass the ground_truth list
+        messages=messages,  # Pass the full messages list
+        ground_truth=ground_truth,  # Pass the ground_truth list
         extract_fn=extract_fn,
         compare_fn=compare_fn,
     )
@@ -99,7 +99,8 @@ def cosine_scaled_accuracy_length_reward(
     accuracy_score = accuracy_eval_result.score
     # Ensure answer_accuracy metric exists, provide a default if not
     answer_accuracy_metric = accuracy_eval_result.metrics.get(
-        "answer_accuracy", MetricResult(score=0.0, success=False, reason="Accuracy metric not found")
+        "answer_accuracy",
+        MetricResult(score=0.0, success=False, reason="Accuracy metric not found"),
     )
     accuracy_success = answer_accuracy_metric.success
     accuracy_reason = accuracy_eval_result.reason or "No reason from accuracy_reward"
@@ -174,6 +175,4 @@ def cosine_scaled_accuracy_length_reward(
         ),
     }
 
-    return EvaluateResult(
-        score=combined_score, reason=combined_reason, metrics=metrics
-    )
+    return EvaluateResult(score=combined_score, reason=combined_reason, metrics=metrics)

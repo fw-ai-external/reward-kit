@@ -25,13 +25,19 @@ This will start the server, send a test request, and then exit.
 """
 
 import argparse
+import json
 import threading
 import time
-import json
+from typing import Any, Dict, List, Optional, Union
+
 import requests
-from typing import List, Dict, Any, Optional, Union
-from reward_kit import reward_function # RewardOutput and MetricRewardOutput removed
-from reward_kit.models import Message, EvaluateResult, MetricResult # MetricResult added
+
+from reward_kit import reward_function  # RewardOutput and MetricRewardOutput removed
+from reward_kit.models import (  # MetricResult added
+    EvaluateResult,
+    Message,
+    MetricResult,
+)
 from reward_kit.server import serve
 
 
@@ -75,7 +81,9 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         length_reason = "Response is comprehensive"
         length_success = True
 
-    metrics["length"] = MetricResult(score=length_score, success=length_success, reason=length_reason)
+    metrics["length"] = MetricResult(
+        score=length_score, success=length_success, reason=length_reason
+    )
 
     # 2. Informativeness score
     # Keywords that suggest an informative response about RLHF
@@ -89,9 +97,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         "training",
     ]
 
-    found_keywords = [
-        kw for kw in keywords if kw.lower() in last_response.lower()
-    ]
+    found_keywords = [kw for kw in keywords if kw.lower() in last_response.lower()]
     informativeness_score = min(
         len(found_keywords) / 4, 1.0
     )  # Cap at 1.0 for ≥4 keywords
@@ -118,19 +124,20 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
     clarity_success = False
     if has_structure:
         clarity_score += 0.5
-        clarity_reason = (
-            "Response has good structure with paragraphs or bullet points"
-        )
+        clarity_reason = "Response has good structure with paragraphs or bullet points"
         clarity_success = True
     else:
         clarity_reason = "Response could be improved with better structure"
 
-    metrics["clarity"] = MetricResult(score=clarity_score, success=clarity_success, reason=clarity_reason)
+    metrics["clarity"] = MetricResult(
+        score=clarity_score, success=clarity_success, reason=clarity_reason
+    )
 
     # Calculate final score (weighted average)
     weights = {"length": 0.2, "informativeness": 0.5, "clarity": 0.3}
     final_score = sum(
-        metrics[key].score * weight for key, weight in weights.items() # Access .score attribute
+        metrics[key].score * weight
+        for key, weight in weights.items()  # Access .score attribute
     )
     overall_reason = f"Final score based on weighted average of length ({metrics['length'].score:.2f}), informativeness ({metrics['informativeness'].score:.2f}), and clarity ({metrics['clarity'].score:.2f})."
 
@@ -208,9 +215,7 @@ def test_mode():
 
 if __name__ == "__main__":
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Reward function server example"
-    )
+    parser = argparse.ArgumentParser(description="Reward function server example")
     parser.add_argument(
         "--test-mode",
         action="store_true",

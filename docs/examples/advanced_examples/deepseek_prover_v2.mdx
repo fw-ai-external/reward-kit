@@ -72,7 +72,7 @@ begin
   -- Base case: n = 0
   { simp, },
   -- Inductive step: assume true for n = d, prove for n = d + 1
-  { 
+  {
     have step1 : ∑ i in range (d + 1), i = (∑ i in range d, i) + d,
       by simp [sum_range_succ],
     have step2 : (∑ i in range d, i) + d = d * (d + 1) / 2 + d,
@@ -143,20 +143,20 @@ Verbose output with `verbose=True` includes detailed breakdown of the evaluation
 # Example of accessing metrics in verbose output
 if result.metrics:
     print(f"Score: {result.score}")
-    
+
     # Basic syntax metrics
     syntax_score = result.metrics["syntax"].score
     print(f"Syntax score: {syntax_score}")
-    
+
     # Completeness metrics
     completeness = result.metrics["completeness"].score
     print(f"Completeness: {completeness}")
-    
+
     # For DeepSeek-specific metrics
     if "subgoal_decomposition" in result.metrics:
         subgoal_score = result.metrics["subgoal_decomposition"].score
         print(f"Subgoal quality: {subgoal_score}")
-        
+
     if "hierarchical_structure" in result.metrics:
         hierarchy_score = result.metrics["hierarchical_structure"].score
         print(f"Hierarchical structure: {hierarchy_score}")
@@ -187,7 +187,7 @@ statements = [item["statement"] for item in dataset["train"][:5]]
 for statement in statements:
     # Your model generates a proof for the statement
     lean_proof = generate_proof_with_your_model(statement)
-    
+
     # Evaluate against the dataset
     result = deepseek_huggingface_prover_benchmark(
         response=lean_proof,
@@ -195,10 +195,10 @@ for statement in statements:
         dataset_name="deepseek-ai/DeepSeek-ProverBench",
         verbose=True
     )
-    
+
     print(f"Statement: {statement[:50]}...")
     print(f"Score: {result.score}")
-    
+
     # Check if the dataset matched successfully
     if "dataset_match" in result.metrics:
         match_score = result.metrics["dataset_match"].score

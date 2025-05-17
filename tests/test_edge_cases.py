@@ -1,14 +1,16 @@
-import pytest
-from unittest.mock import MagicMock, patch
 import json
-from typing import List, Dict, Any, Optional
-import sys # Import sys
+import sys  # Import sys
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, patch
 
-from reward_kit.models import EvaluateResult, MetricResult # Changed
+import pytest
+
 # Ensure the module is loaded (though RewardFunction import likely does this)
-import reward_kit.reward_function 
+import reward_kit.reward_function
+from reward_kit.models import EvaluateResult, MetricResult  # Changed
+
 # Get a direct reference to the module object
-reward_function_module_obj = sys.modules['reward_kit.reward_function']
+reward_function_module_obj = sys.modules["reward_kit.reward_function"]
 from reward_kit.reward_function import RewardFunction
 
 
@@ -22,7 +24,9 @@ class TestEdgeCases:
             """Function that expects non-empty messages."""
             if not messages or not original_messages:
                 raise ValueError("Messages cannot be empty")
-            return EvaluateResult(score=0.5, reason="Test reason", metrics={}) # Changed
+            return EvaluateResult(
+                score=0.5, reason="Test reason", metrics={}
+            )  # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -48,7 +52,9 @@ class TestEdgeCases:
             for msg in messages + original_messages:
                 if "role" not in msg or "content" not in msg:
                     raise ValueError("Invalid message structure")
-            return EvaluateResult(score=0.5, reason="Test reason", metrics={}) # Changed
+            return EvaluateResult(
+                score=0.5, reason="Test reason", metrics={}
+            )  # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -68,7 +74,9 @@ class TestEdgeCases:
 
     def test_remote_error_handling(self):
         """Test error handling in remote mode."""
-        with patch.object(reward_function_module_obj, "requests") as mock_requests_module:
+        with patch.object(
+            reward_function_module_obj, "requests"
+        ) as mock_requests_module:
             # Mock the response to simulate an error
             mock_response = MagicMock()
             mock_response.status_code = 500
@@ -95,13 +103,15 @@ class TestEdgeCases:
             content_length = len(messages[-1]["content"])
             length_score = min(content_length / 10000.0, 1.0)
             metrics = {
-                "length": MetricResult( # Changed
+                "length": MetricResult(  # Changed
                     score=length_score,
                     reason=f"Message length: {content_length} chars",
-                    success=length_score == 1.0
+                    success=length_score == 1.0,
                 )
             }
-            return EvaluateResult(score=0.5, reason="Large message processed", metrics=metrics) # Changed
+            return EvaluateResult(
+                score=0.5, reason="Large message processed", metrics=metrics
+            )  # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -129,11 +139,15 @@ class TestEdgeCases:
             # Just return a simple score and the message
             content = messages[-1]["content"]
             metrics = {
-                "content": MetricResult( # Changed
-                    score=0.5, reason=f"Processed: {content}", success=True # Assuming success for this metric
+                "content": MetricResult(  # Changed
+                    score=0.5,
+                    reason=f"Processed: {content}",
+                    success=True,  # Assuming success for this metric
                 )
             }
-            return EvaluateResult(score=0.5, reason="Unicode message processed", metrics=metrics) # Changed
+            return EvaluateResult(
+                score=0.5, reason="Unicode message processed", metrics=metrics
+            )  # Changed
 
         reward_fn = RewardFunction(func=reward_func, mode="local")
 
@@ -155,9 +169,6 @@ class TestEdgeCases:
         assert unicode_message in result.metrics["content"].reason
 
         # Ensure the output can be serialized to JSON and back
-        json_str = json.dumps(result.model_dump()) # Changed to model_dump()
+        json_str = json.dumps(result.model_dump())  # Changed to model_dump()
         parsed = json.loads(json_str)
-        assert (
-            parsed["metrics"]["content"]["reason"]
-            == f"Processed: {unicode_message}"
-        )
+        assert parsed["metrics"]["content"]["reason"] == f"Processed: {unicode_message}"

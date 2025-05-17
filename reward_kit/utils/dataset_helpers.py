@@ -1,18 +1,33 @@
 import json
-from typing import List, Dict, Any, Optional, Callable
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
+if TYPE_CHECKING:
+    # For type checking only
+    from datasets import Dataset
+
+# Try to import at runtime
 try:
     from datasets import Dataset
+
     HAS_DATASETS_LIB = True
 except ImportError:
     HAS_DATASETS_LIB = False
+    # Create a placeholder for runtime when dataset is not available
+    if not TYPE_CHECKING:
+
+        class Dataset:
+            """Placeholder for HuggingFace Dataset for when the library is not installed."""
+
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                pass
+
 
 def load_jsonl_to_hf_dataset(
     dataset_path: str,
     transform_fn: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
     prompt_column: str = "prompt",
     required_columns: Optional[List[str]] = None,
-    dataset_filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None
+    dataset_filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> Optional["Dataset"]:
     """
     Loads a JSONL file into a HuggingFace Dataset, optionally applying a
@@ -36,38 +51,46 @@ def load_jsonl_to_hf_dataset(
         or if an error occurs.
     """
     if not HAS_DATASETS_LIB:
-        print("The 'datasets' library is not installed. Please install it with 'pip install datasets'.")
+        print(
+            "The 'datasets' library is not installed. Please install it with 'pip install datasets'."
+        )
         return None
 
     processed_samples: List[Dict[str, Any]] = []
     try:
-        with open(dataset_path, 'r', encoding='utf-8') as f:
+        with open(dataset_path, "r", encoding="utf-8") as f:
             for line_number, line in enumerate(f, 1):
                 try:
                     raw_sample = json.loads(line.strip())
-                    
+
                     transformed_sample: Optional[Dict[str, Any]]
                     if transform_fn:
                         transformed_sample = transform_fn(raw_sample)
                     else:
                         transformed_sample = raw_sample
-                    
-                    if transformed_sample is None: # transform_fn might return None to skip
+
+                    if (
+                        transformed_sample is None
+                    ):  # transform_fn might return None to skip
                         continue
 
                     if dataset_filter_fn and not dataset_filter_fn(transformed_sample):
                         continue
-                        
+
                     processed_samples.append(transformed_sample)
 
                 except json.JSONDecodeError as e:
-                    print(f"Warning: Skipping line {line_number} in {dataset_path} due to JSON decode error: {e}")
+                    print(
+                        f"Warning: Skipping line {line_number} in {dataset_path} due to JSON decode error: {e}"
+                    )
                 except Exception as e:
-                    print(f"Warning: Skipping line {line_number} in {dataset_path} due to error in transform_fn or filter_fn: {e}")
-        
+                    print(
+                        f"Warning: Skipping line {line_number} in {dataset_path} due to error in transform_fn or filter_fn: {e}"
+                    )
+
         if not processed_samples:
             print(f"Warning: No samples were processed from {dataset_path}.")
-            return Dataset.from_list([]) # Return empty dataset
+            return Dataset.from_list([])  # Return empty dataset
 
         hf_dataset = Dataset.from_list(processed_samples)
 
@@ -76,7 +99,7 @@ def load_jsonl_to_hf_dataset(
             raise ValueError(
                 f"Dataset from {dataset_path} must contain a '{prompt_column}' column after transformation."
             )
-        
+
         final_required_columns = set(required_columns or [])
         # The prompt_column is implicitly required by TRL, ensure it's in the check list
         final_required_columns.add(prompt_column)
@@ -86,13 +109,13 @@ def load_jsonl_to_hf_dataset(
                 raise ValueError(
                     f"Dataset from {dataset_path} must contain a '{col}' column after transformation for the reward function/TRL."
                 )
-        
+
         return hf_dataset
 
     except FileNotFoundError:
         print(f"Error: Dataset file not found at {dataset_path}")
         return None
-    except ValueError as ve: # Catch column validation errors
+    except ValueError as ve:  # Catch column validation errors
         print(f"Error: {ve}")
         return None
     except Exception as e:

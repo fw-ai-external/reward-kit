@@ -1,10 +1,11 @@
-import pytest
-from unittest.mock import MagicMock, patch
-import sys
-import os
 import argparse
+import os
+import sys
+from unittest.mock import MagicMock, patch
 
-from reward_kit.cli import parse_args, preview_command, deploy_command, main
+import pytest
+
+from reward_kit.cli import deploy_command, main, parse_args, preview_command
 
 
 class TestCLI:
@@ -27,9 +28,13 @@ class TestCLI:
         assert args.metrics_folders == ["test=./test"]
         assert not args.force  # default value
 
-    @patch("reward_kit.cli_commands.preview.check_environment", return_value=True) # Patched where preview_command looks it up
+    @patch(
+        "reward_kit.cli_commands.preview.check_environment", return_value=True
+    )  # Patched where preview_command looks it up
     @patch("reward_kit.cli_commands.preview.preview_evaluation")
-    def test_preview_command(self, mock_preview_eval, mock_preview_check_env): # Renamed mock args for clarity
+    def test_preview_command(
+        self, mock_preview_eval, mock_preview_check_env
+    ):  # Renamed mock args for clarity
         """Test the preview command."""
         # Setup mock
         mock_preview_result = MagicMock()
@@ -49,13 +54,15 @@ class TestCLI:
         args.huggingface_key_map = None
 
         # Mock Path.exists to return True
-        with patch("reward_kit.cli_commands.preview.Path.exists", return_value=True): # Corrected patch target
+        with patch(
+            "reward_kit.cli_commands.preview.Path.exists", return_value=True
+        ):  # Corrected patch target
             # Run the command
             result = preview_command(args)
 
             # Check result
             assert result == 0
-            mock_preview_check_env.assert_called_once() # Check this specific mock
+            mock_preview_check_env.assert_called_once()  # Check this specific mock
             mock_preview_eval.assert_called_once_with(
                 metric_folders=["test=./test"],
                 sample_file="test.jsonl",
@@ -68,9 +75,13 @@ class TestCLI:
             )
             mock_preview_result.display.assert_called_once()
 
-    @patch("reward_kit.cli_commands.deploy.check_environment", return_value=True) # Patched where deploy_command looks it up
+    @patch(
+        "reward_kit.cli_commands.deploy.check_environment", return_value=True
+    )  # Patched where deploy_command looks it up
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
-    def test_deploy_command(self, mock_create_eval, mock_deploy_check_env): # Renamed mock args for clarity
+    def test_deploy_command(
+        self, mock_create_eval, mock_deploy_check_env
+    ):  # Renamed mock args for clarity
         """Test the deploy command."""
         # Setup mock
         mock_create_eval.return_value = {"name": "test-evaluator"}
@@ -94,7 +105,7 @@ class TestCLI:
 
         # Check result
         assert result == 0
-        mock_deploy_check_env.assert_called_once() # Check this specific mock
+        mock_deploy_check_env.assert_called_once()  # Check this specific mock
         mock_create_eval.assert_called_once_with(
             evaluator_id="test-eval",
             metric_folders=["test=./test"],
@@ -108,27 +119,36 @@ class TestCLI:
             huggingface_response_key="response",
         )
 
-    @patch("reward_kit.cli_commands.deploy.check_environment", return_value=False) # Patch for deploy_command's check
-    @patch("reward_kit.cli_commands.preview.check_environment", return_value=False) # Patch for preview_command's check
-    def test_command_environment_check(self, mock_preview_check_env, mock_deploy_check_env):
+    @patch(
+        "reward_kit.cli_commands.deploy.check_environment", return_value=False
+    )  # Patch for deploy_command's check
+    @patch(
+        "reward_kit.cli_commands.preview.check_environment", return_value=False
+    )  # Patch for preview_command's check
+    def test_command_environment_check(
+        self, mock_preview_check_env, mock_deploy_check_env
+    ):
         """Test that commands check the environment."""
         # Create args with essential attributes needed by the commands
         # before or around the check_environment call.
         preview_args = argparse.Namespace()
-        preview_args.metrics_folders = ["test=./test"] # Added
-        preview_args.samples = "test.jsonl"           # Added
-        preview_args.max_samples = 1                  # Added, as it's often used with samples
-        preview_args.huggingface_dataset = None       # Add other relevant args from test_preview_command
+        preview_args.metrics_folders = ["test=./test"]  # Added
+        preview_args.samples = "test.jsonl"  # Added
+        preview_args.max_samples = 1  # Added, as it's often used with samples
+        preview_args.huggingface_dataset = (
+            None  # Add other relevant args from test_preview_command
+        )
         preview_args.huggingface_split = "train"
         preview_args.huggingface_prompt_key = "prompt"
         preview_args.huggingface_response_key = "response"
         preview_args.huggingface_key_map = None
 
-
         deploy_args = argparse.Namespace()
-        deploy_args.metrics_folders = ["test=./test"] # Added
-        deploy_args.id = "test-eval"                  # Added
-        deploy_args.display_name = None               # Add other relevant args from test_deploy_command
+        deploy_args.metrics_folders = ["test=./test"]  # Added
+        deploy_args.id = "test-eval"  # Added
+        deploy_args.display_name = (
+            None  # Add other relevant args from test_deploy_command
+        )
         deploy_args.description = None
         deploy_args.force = False
         deploy_args.huggingface_dataset = None

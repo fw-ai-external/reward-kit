@@ -45,9 +45,9 @@ jobs:
       run: |
         pip install mypy types-docker
         # Install stubs for dependencies
-        python -m pip install types-requests types-PyYAML
-        # Run mypy but don't fail the build on errors for now
-        mypy reward_kit --ignore-missing-imports || echo "Mypy found issues that should be fixed in the future"
+        python -m pip install types-requests types-PyYAML types-setuptools
+        # Run mypy and make the CI fail on errors to enforce type checking
+        mypy reward_kit
 
     - name: Test with pytest
       run: |

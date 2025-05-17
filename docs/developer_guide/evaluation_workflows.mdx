@@ -30,16 +30,16 @@ def helpfulness_reward(
     """Evaluate the helpfulness of a response."""
     # Get the assistant's response
     response = messages[-1].get("content", "").lower()
-    
+
     # Define helpful keywords
     helpful_keywords = ["help", "assist", "solve", "solution", "answer", "explain"]
-    
+
     # Count helpful keywords
     keyword_count = sum(1 for keyword in helpful_keywords if keyword in response)
-    
+
     # Calculate score based on keyword presence (simple example)
     score = min(keyword_count / 3, 1.0)  # Cap at 1.0
-    
+
     return RewardOutput(
         score=score,
         metrics={
@@ -90,14 +90,14 @@ def load_test_cases(file_path):
 def main():
     # Load test cases
     test_cases = load_test_cases("samples/test_conversations.jsonl")
-    
+
     print(f"Testing helpfulness reward on {len(test_cases)} cases...")
-    
+
     # Test each case
     for i, case in enumerate(test_cases):
         messages = case.get("messages", [])
         result = helpfulness_reward(messages=messages)
-        
+
         print(f"\nCase {i+1}:")
         print(f"User: {messages[0].get('content', '')[:50]}...")
         print(f"Assistant: {messages[-1].get('content', '')[:50]}...")

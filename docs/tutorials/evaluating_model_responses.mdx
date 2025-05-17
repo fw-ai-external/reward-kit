@@ -33,26 +33,26 @@ from typing import List, Optional
 def evaluate(messages: List[Message], original_messages: List[Message] = list(), **kwargs) -> EvaluateResult:
     """
     Evaluate the informativeness of a response.
-    
+
     Args:
         messages: List of conversation messages
         original_messages: Original messages (context)
         **kwargs: Additional parameters
-        
+
     Returns:
         EvaluateResult with score and metrics
     """
     # Validate input
     if not messages or len(messages) < 2:
         return EvaluateResult(score=0.0, reason="Insufficient messages", metrics={})
-    
+
     # Get the query and response
     user_query = None
     for msg in messages:
         if msg.role == "user":
             user_query = msg.content
             break
-    
+
     response = messages[-1].content or ""
     if messages[-1].role != "assistant":
         return EvaluateResult(
@@ -60,28 +60,28 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
             reason="Last message is not from assistant",
             metrics={}
         )
-    
+
     # Simple word count metric
     word_count = len(response.split())
     word_count_score = min(word_count / 100, 1.0)
-    
+
     # Check for specific keywords related to informativeness
     info_keywords = ["example", "specifically", "consider", "research", "study", "data"]
     keyword_count = sum(1 for keyword in info_keywords if keyword.lower() in response.lower())
     keyword_score = min(keyword_count / 3, 1.0)
-    
+
     # Check for uncertainty markers (lower score for more uncertainty)
     uncertainty_markers = ["maybe", "might", "possibly", "I think", "not sure", "could be"]
     uncertainty_count = sum(1 for marker in uncertainty_markers if marker.lower() in response.lower())
     certainty_score = max(0.0, 1.0 - (uncertainty_count * 0.2))
-    
+
     # Calculate informativeness score (weighted average)
     informativeness_score = (
         word_count_score * 0.3 +
         keyword_score * 0.4 +
         certainty_score * 0.3
     )
-    
+
     metrics = {
         "word_count": MetricResult(
             score=word_count_score,
@@ -96,7 +96,7 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
             reason=f"Certainty score: {certainty_score:.2f} (found {uncertainty_count} uncertainty markers)"
         )
     }
-    
+
     return EvaluateResult(
         score=informativeness_score,
         reason=f"Informativeness score: {informativeness_score:.2f}",
@@ -143,25 +143,25 @@ def load_samples(file_path: str) -> List[Dict]:
 def evaluate_samples(samples: List[Dict]) -> None:
     """Evaluate each sample using our evaluator."""
     print(f"Evaluating {len(samples)} samples...\n")
-    
+
     results = []
-    
+
     for i, sample in enumerate(samples):
         messages = sample.get("messages", [])
-        
+
         # Find user and assistant messages
         user_msg = next((msg for msg in messages if msg.get("role") == "user"), None)
         assistant_msg = next((msg for msg in messages if msg.get("role") == "assistant"), None)
-        
+
         if user_msg and assistant_msg:
             print(f"Sample {i+1}:")
             print(f"User: {user_msg.get('content', '')[:50]}...")
             print(f"Assistant: {assistant_msg.get('content', '')[:50]}...")
-            
+
             # Evaluate the sample
             result = evaluate(messages=messages)
             results.append(result)
-            
+
             # Print the results
             print(f"Overall Score: {result.score:.2f}")
             print(f"Reason: {result.reason}")
@@ -172,7 +172,7 @@ def evaluate_samples(samples: List[Dict]) -> None:
         else:
             print(f"Sample {i+1}: Invalid (missing user or assistant message)")
             print()
-    
+
     # Calculate average score
     if results:
         avg_score = sum(r.score for r in results) / len(results)
@@ -184,7 +184,7 @@ def main():
     if not samples_path.exists():
         print(f"Error: Sample file {samples_path} not found.")
         return
-    
+
     samples = load_samples(samples_path)
     evaluate_samples(samples)
 
@@ -261,26 +261,26 @@ def main():
     current_dir = Path(__file__).parent
     metrics_path = current_dir / "evaluators" / "informativeness"
     samples_path = current_dir / "samples.jsonl"
-    
+
     # Verify paths exist
     if not metrics_path.exists():
         print(f"Error: Metrics folder {metrics_path} not found.")
         return
-    
+
     if not samples_path.exists():
         print(f"Error: Samples file {samples_path} not found.")
         return
-    
+
     print(f"Previewing evaluation with metric: {metrics_path}")
     print(f"Using samples from: {samples_path}")
-    
+
     # Preview the evaluation
     preview_result = preview_evaluation(
         metric_folders=[f"informativeness={metrics_path}"],
         sample_file=str(samples_path),
         max_samples=10  # Limit to 10 samples max
     )
-    
+
     # Display the results
     preview_result.display()
 
@@ -316,36 +316,36 @@ def load_samples_by_model(base_dir: str) -> Dict[str, str]:
     """Load sample files for different models."""
     sample_files = {}
     base_path = Path(base_dir)
-    
+
     for file_path in base_path.glob("*.jsonl"):
         model_name = file_path.stem
         sample_files[model_name] = str(file_path)
-    
+
     return sample_files
 
 def compare_models(metric_path: str, sample_files: Dict[str, str]) -> None:
     """Compare multiple models using the same metric."""
     results = {}
-    
+
     print(f"Comparing {len(sample_files)} models using metric: {metric_path}\n")
-    
+
     for model_name, sample_file in sample_files.items():
         print(f"Evaluating model: {model_name}")
-        
+
         # Preview evaluation for this model
         preview_result = preview_evaluation(
             metric_folders=[f"informativeness={metric_path}"],
             sample_file=sample_file
         )
-        
+
         # Store results
         avg_score = preview_result.average_score
         results[model_name] = avg_score
-        
+
         print(f"  Average score: {avg_score:.3f}")
         print(f"  Total samples: {preview_result.total_samples}")
         print()
-    
+
     # Print comparison summary
     print("Model Comparison Summary:")
     print("------------------------")
@@ -357,23 +357,23 @@ def main():
     current_dir = Path(__file__).parent
     metrics_path = current_dir / "evaluators" / "informativeness"
     samples_dir = current_dir / "model_samples"
-    
+
     # Verify paths exist
     if not metrics_path.exists():
         print(f"Error: Metrics folder {metrics_path} not found.")
         return
-    
+
     if not samples_dir.exists():
         print(f"Error: Samples directory {samples_dir} not found.")
         return
-    
+
     # Load sample files for different models
     sample_files = load_samples_by_model(samples_dir)
-    
+
     if not sample_files:
         print(f"Error: No sample files found in {samples_dir}")
         return
-    
+
     # Compare models
     compare_models(str(metrics_path), sample_files)
 
@@ -413,7 +413,7 @@ def save_results(preview_result, output_path: str) -> None:
         "total_runtime_ms": preview_result.total_runtime_ms,
         "samples": []
     }
-    
+
     # Add individual sample results
     for i, sample in enumerate(preview_result.sample_results):
         sample_data = {
@@ -422,11 +422,11 @@ def save_results(preview_result, output_path: str) -> None:
             "metrics": {name: metric.dict() for name, metric in sample.metrics.items()}
         }
         results_data["samples"].append(sample_data)
-    
+
     # Save to file
     with open(output_path, 'w') as f:
         json.dump(results_data, f, indent=2)
-    
+
     print(f"Results saved to {output_path}")
 
 def main():
@@ -435,23 +435,23 @@ def main():
     metrics_path = current_dir / "evaluators" / "informativeness"
     samples_path = current_dir / "samples.jsonl"
     results_dir = current_dir / "evaluation_results"
-    
+
     # Create results directory if it doesn't exist
     results_dir.mkdir(exist_ok=True)
-    
+
     # Generate output filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = results_dir / f"evaluation_{timestamp}.json"
-    
+
     # Preview evaluation
     preview_result = preview_evaluation(
         metric_folders=[f"informativeness={metrics_path}"],
         sample_file=str(samples_path)
     )
-    
+
     # Display results
     preview_result.display()
-    
+
     # Save results
     save_results(preview_result, output_path)
 
@@ -494,46 +494,46 @@ def batch_process(metric_path: str, samples_path: str, batch_size: int = 100) ->
     # Load all samples
     with open(samples_path, 'r') as f:
         all_samples = [json.loads(line) for line in f if line.strip()]
-    
+
     total_samples = len(all_samples)
     print(f"Processing {total_samples} samples in batches of {batch_size}")
-    
+
     # Create temporary batch files
     temp_dir = Path("temp_batches")
     temp_dir.mkdir(exist_ok=True)
-    
+
     try:
         all_results = []
-        
+
         # Process in batches
         for i in range(0, total_samples, batch_size):
             batch = all_samples[i:i+batch_size]
             batch_file = temp_dir / f"batch_{i}.jsonl"
-            
+
             # Write batch to temp file
             with open(batch_file, 'w') as f:
                 for sample in batch:
                     f.write(json.dumps(sample) + '\n')
-            
+
             print(f"Processing batch {i//batch_size + 1}/{(total_samples+batch_size-1)//batch_size}")
-            
+
             # Evaluate batch
             batch_result = preview_evaluation(
                 metric_folders=[f"informativeness={metric_path}"],
                 sample_file=str(batch_file)
             )
-            
+
             # Collect results
             all_results.extend(batch_result.sample_results)
-            
+
             # Clean up batch file
             batch_file.unlink()
-        
+
         # Calculate aggregate statistics
         avg_score = sum(r.score for r in all_results) / len(all_results)
         print(f"\nProcessed {len(all_results)} samples")
         print(f"Average Score: {avg_score:.3f}")
-        
+
     finally:
         # Clean up temp directory
         if temp_dir.exists():
@@ -546,7 +546,7 @@ def main():
     current_dir = Path(__file__).parent
     metrics_path = current_dir / "evaluators" / "informativeness"
     samples_path = current_dir / "large_samples.jsonl"
-    
+
     # Batch process
     batch_process(str(metrics_path), str(samples_path), batch_size=50)
 
@@ -574,17 +574,17 @@ def visualize_results(results: dict) -> None:
     """Create visualizations of evaluation results."""
     # Extract scores
     scores = [sample["score"] for sample in results["samples"]]
-    
+
     # Create figure with multiple subplots
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     fig.suptitle("Evaluation Results Analysis", fontsize=16)
-    
+
     # 1. Score distribution histogram
     axes[0, 0].hist(scores, bins=10, color='skyblue', edgecolor='black')
     axes[0, 0].set_title("Score Distribution")
     axes[0, 0].set_xlabel("Score")
     axes[0, 0].set_ylabel("Frequency")
-    
+
     # 2. Score range breakdown
     score_ranges = {
         "Excellent (0.8-1.0)": len([s for s in scores if 0.8 <= s <= 1.0]),
@@ -593,24 +593,24 @@ def visualize_results(results: dict) -> None:
         "Poor (0.2-0.4)": len([s for s in scores if 0.2 <= s < 0.4]),
         "Very Poor (0-0.2)": len([s for s in scores if 0 <= s < 0.2])
     }
-    
+
     categories = list(score_ranges.keys())
     counts = list(score_ranges.values())
-    
+
     axes[0, 1].bar(categories, counts, color='lightgreen', edgecolor='black')
     axes[0, 1].set_title("Score Quality Breakdown")
     axes[0, 1].set_ylabel("Number of Samples")
     plt.setp(axes[0, 1].get_xticklabels(), rotation=45, ha="right")
-    
+
     # 3. Individual metrics comparison (if available)
     try:
         # Get all metric names
         metric_names = set()
         for sample in results["samples"]:
             metric_names.update(sample["metrics"].keys())
-        
+
         metric_names = list(metric_names)
-        
+
         if metric_names:
             # Calculate average scores for each metric
             metric_avgs = {}
@@ -621,21 +621,21 @@ def visualize_results(results: dict) -> None:
                         values.append(sample["metrics"][metric].get("score", 0))
                 if values:
                     metric_avgs[metric] = sum(values) / len(values)
-            
+
             # Plot metric averages
             metric_labels = list(metric_avgs.keys())
             metric_scores = list(metric_avgs.values())
-            
+
             axes[1, 0].bar(metric_labels, metric_scores, color='salmon', edgecolor='black')
             axes[1, 0].set_title("Average Metric Scores")
             axes[1, 0].set_ylabel("Average Score")
             axes[1, 0].set_ylim(0, 1)
             plt.setp(axes[1, 0].get_xticklabels(), rotation=45, ha="right")
-            
+
     except Exception as e:
-        axes[1, 0].text(0.5, 0.5, f"Could not generate metric comparison: {str(e)}", 
+        axes[1, 0].text(0.5, 0.5, f"Could not generate metric comparison: {str(e)}",
                      horizontalalignment='center', verticalalignment='center')
-    
+
     # 4. Summary statistics
     axes[1, 1].axis('off')
     summary_text = (
@@ -647,15 +647,15 @@ def visualize_results(results: dict) -> None:
         f"Standard Deviation: {np.std(scores):.3f}\n"
         f"Total Runtime: {results['total_runtime_ms']/1000:.2f} seconds"
     )
-    axes[1, 1].text(0.1, 0.5, summary_text, fontsize=12, 
+    axes[1, 1].text(0.1, 0.5, summary_text, fontsize=12,
                  verticalalignment='center')
     axes[1, 1].set_title("Summary Statistics")
-    
+
     # Adjust layout and save
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig("evaluation_results_visualization.png", dpi=300)
     print("Visualization saved as evaluation_results_visualization.png")
-    
+
     # Show plot
     plt.show()
 
@@ -663,16 +663,16 @@ def main():
     # Define paths
     current_dir = Path(__file__).parent
     results_dir = current_dir / "evaluation_results"
-    
+
     # Find the most recent results file
     results_files = list(results_dir.glob("evaluation_*.json"))
     if not results_files:
         print("No evaluation results found.")
         return
-    
+
     latest_results_file = max(results_files, key=lambda x: x.stat().st_mtime)
     print(f"Visualizing results from: {latest_results_file}")
-    
+
     # Load and visualize results
     results = load_results(latest_results_file)
     visualize_results(results)

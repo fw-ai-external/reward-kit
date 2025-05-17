@@ -28,12 +28,12 @@ def clarity_reward(
     """
     Evaluates the clarity of a response based on sentence structure,
     vocabulary complexity, and use of explanatory language.
-    
+
     Args:
         messages: List of conversation messages
         original_messages: Original context messages
         **kwargs: Additional parameters
-        
+
     Returns:
         RewardOutput with score and metrics
     """
@@ -43,50 +43,50 @@ def clarity_reward(
             score=0.0,
             metrics={"error": MetricRewardOutput(score=0.0, reason="No assistant response found")}
         )
-    
+
     response = messages[-1].get("content", "")
     metrics = {}
-    
+
     # 1. Sentence length analysis (prefer shorter sentences for clarity)
     sentences = [s.strip() for s in response.split(".") if s.strip()]
     avg_sentence_length = sum(len(s.split()) for s in sentences) / max(len(sentences), 1)
-    
+
     sentence_score = 1.0 if avg_sentence_length < 15 else (25.0 - avg_sentence_length) / 10.0
     sentence_score = max(0.0, min(1.0, sentence_score))
-    
+
     metrics["sentence_length"] = MetricRewardOutput(
         score=sentence_score,
         reason=f"Average sentence length: {avg_sentence_length:.1f} words"
     )
-    
+
     # 2. Check for explanatory language
     explanatory_markers = ["because", "for example", "in other words", "specifically", "this means"]
     explanatory_count = sum(1 for marker in explanatory_markers if marker.lower() in response.lower())
-    
+
     explanation_score = min(explanatory_count / 2.0, 1.0)  # Cap at 1.0
     metrics["explanation"] = MetricRewardOutput(
         score=explanation_score,
         reason=f"Found {explanatory_count} explanatory markers"
     )
-    
+
     # 3. Jargon and complex language check (simplified approach)
     words = response.lower().split()
     long_words = sum(1 for word in words if len(word) > 8)  # Words longer than 8 chars
     long_word_ratio = long_words / max(len(words), 1)
-    
+
     vocabulary_score = 1.0 - min(long_word_ratio * 5, 1.0)  # Lower score for more complex vocabulary
     metrics["vocabulary"] = MetricRewardOutput(
         score=vocabulary_score,
         reason=f"Complex word ratio: {long_word_ratio:.2f}"
     )
-    
+
     # Calculate final score (weighted average)
     final_score = (
         sentence_score * 0.4 +      # 40% weight to sentence structure
         explanation_score * 0.4 +    # 40% weight to explanatory language
         vocabulary_score * 0.2       # 20% weight to vocabulary complexity
     )
-    
+
     return RewardOutput(score=final_score, metrics=metrics)
 
 
@@ -97,13 +97,13 @@ def test_clarity_reward():
         {"role": "user", "content": "What is machine learning?"},
         {"role": "assistant", "content": "Machine learning is a type of artificial intelligence. It uses data to learn patterns. For example, it can learn to recognize images of cats. This means computers can improve without being explicitly programmed."}
     ]
-    
+
     # Example conversation 2: Less clear explanation
     complex_messages = [
         {"role": "user", "content": "What is machine learning?"},
         {"role": "assistant", "content": "Machine learning represents a computational methodology within the artificial intelligence domain that facilitates algorithmic pattern recognition through statistical approximation functions utilizing high-dimensional datasets for predictive extrapolation and classification tasks."}
     ]
-    
+
     # Test with clear explanation
     clear_result = clarity_reward(messages=clear_messages)
     print("Clear Explanation Result:")
@@ -112,7 +112,7 @@ def test_clarity_reward():
     for name, metric in clear_result.metrics.items():
         print(f"  {name}: {metric.score:.2f} - {metric.reason}")
     print()
-    
+
     # Test with complex explanation
     complex_result = clarity_reward(messages=complex_messages)
     print("Complex Explanation Result:")
@@ -136,7 +136,7 @@ def deploy_reward():
 if __name__ == "__main__":
     # Test the reward function
     test_clarity_reward()
-    
+
     # Deploy the reward function (uncomment to use)
     # deploy_reward()
 ```

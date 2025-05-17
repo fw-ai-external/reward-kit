@@ -332,13 +332,13 @@ for model in models:
   // Missing required field: available
 }
 ```"""
-    
+
     # Create message
     messages = [
         {"role": "user", "content": "Generate JSON for wireless headphones product"},
         {"role": "assistant", "content": response}
     ]
-    
+
     # Validate against schema
     result = json_schema_reward(messages=messages, schema=product_schema)
     model_scores[model] = result.score

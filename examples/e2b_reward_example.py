@@ -13,14 +13,13 @@ You can get an E2B API key from https://e2b.dev/dashboard
 
 import argparse
 import os
+
 from reward_kit.rewards.code_execution import e2b_code_execution_reward
 
 
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="E2B code execution reward example"
-    )
+    parser = argparse.ArgumentParser(description="E2B code execution reward example")
     parser.add_argument(
         "--api-key",
         help="E2B API key (or set E2B_API_KEY environment variable)",

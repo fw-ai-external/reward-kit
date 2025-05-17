@@ -9,28 +9,28 @@ Run with:
 """
 
 import json
-import sys
 import os
+import sys
 
 # Add project directory to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from reward_kit.rewards.lean_prover import (
-    lean_prover_reward,
-    deepseek_prover_v2_reward,
-)
-from reward_kit.models import Message # Import Message
+from reward_kit.models import Message  # Import Message
+from reward_kit.rewards.lean_prover import deepseek_prover_v2_reward, lean_prover_reward
+
 
 # Helper to create messages list for the runner
 def create_runner_messages(statement_content: str, assistant_response: str):
     # The decorator expects list of dicts or list of Message objects.
     # For direct calls in this runner, using dicts is fine.
     return [
-        {"role": "user", "content": f"Prove the following statement: {statement_content}"},
+        {
+            "role": "user",
+            "content": f"Prove the following statement: {statement_content}",
+        },
         {"role": "assistant", "content": assistant_response},
     ]
+
 
 def run_tests():
     """Run basic tests for the Lean Prover reward functions"""
@@ -41,9 +41,11 @@ def run_tests():
     print("\nTest: Empty response")
     empty_statement = "Any statement"
     empty_response_messages = create_runner_messages(empty_statement, "")
-    result = lean_prover_reward(messages=empty_response_messages, ground_truth=None, statement=empty_statement)
+    result = lean_prover_reward(
+        messages=empty_response_messages, ground_truth=None, statement=empty_statement
+    )
     print(f"Score: {result['score']}")
-    assert result['score'] == 0.0
+    assert result["score"] == 0.0
 
     # Skip to complete proof and subgoal tests for basic functionality
 
@@ -56,20 +58,27 @@ begin
 end
     """
     messages_complete = create_runner_messages(statement_complete, response_complete)
-    result = lean_prover_reward(messages=messages_complete, ground_truth=None, statement=statement_complete, verbose=True)
+    result = lean_prover_reward(
+        messages=messages_complete,
+        ground_truth=None,
+        statement=statement_complete,
+        verbose=True,
+    )
     print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
-    if "metrics" in result and result['metrics']:
+    if "metrics" in result and result["metrics"]:
         print(
             f"Metrics: {json.dumps({k: {'score': v['score'], 'reason': v['reason']} for k, v in result['metrics'].items()}, indent=2)}"
         )
-    assert result['score'] >= 0.5
+    assert result["score"] >= 0.5
 
     print("\nTesting deepseek_prover_v2_reward...")
 
     # Test with a complex proof with subgoals
     print("\nTest: Complex proof with subgoals")
-    statement_complex = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    statement_complex = (
+        "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    )
     response_complex = """theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
 begin
   -- We'll prove this by induction on n
@@ -77,7 +86,7 @@ begin
   -- Base case: n = 0
   { simp, },
   -- Inductive step: assume true for n = d, prove for n = d + 1
-  { 
+  {
     have step1 : ∑ i in range (d + 1), i = (∑ i in range d, i) + d,
       by simp [sum_range_succ],
     have step2 : (∑ i in range d, i) + d = d * (d + 1) / 2 + d,
@@ -93,14 +102,19 @@ begin
 end
     """
     messages_complex = create_runner_messages(statement_complex, response_complex)
-    result = deepseek_prover_v2_reward(messages=messages_complex, ground_truth=None, statement=statement_complex, verbose=True)
+    result = deepseek_prover_v2_reward(
+        messages=messages_complex,
+        ground_truth=None,
+        statement=statement_complex,
+        verbose=True,
+    )
     print(f"Score: {result['score']}")
     # Print metrics if verbose mode was enabled
-    if "metrics" in result and result['metrics']:
+    if "metrics" in result and result["metrics"]:
         print(
             f"Metrics: {json.dumps({k: {'score': v['score'], 'reason': v['reason']} for k, v in result['metrics'].items()}, indent=2)}"
         )
-    assert result['score'] > 0.7
+    assert result["score"] > 0.7
 
     print("\nAll tests passed!")
 

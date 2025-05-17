@@ -22,13 +22,13 @@ Reward function datasets, typically in `.jsonl` format, will adhere to the follo
 *   **`ground_truth`: Can be `List[Message]` or `str` Any**
     *   This field contains a complete list of message object representing the expected or target response from the assistant for the given `messages` prompt.
     *   Each object includes all relevant attributes of an assistant's turn, such as `role` (which will be "assistant"), `content`, `tool_calls`, `function_call`, etc.
-    *   Example: 
-        * `{"role": "assistant", "content": "Hi there!", "tool_calls": null}` or 
+    *   Example:
+        * `{"role": "assistant", "content": "Hi there!", "tool_calls": null}` or
         * just some simple integer for math questions.
     *   It can also be Anything else, for example for math or coding, it is cleaner to just have one string as the output.
     *   This would **not** be the model output, it will be the ground truth that the model output should be compared against.
 *   **`original_messages`: (Deprecated)**
-    *   This field is **deprecated** and must be removed from all datasets. 
+    *   This field is **deprecated** and must be removed from all datasets.
 
 **Example `.jsonl` line:**
 ```json

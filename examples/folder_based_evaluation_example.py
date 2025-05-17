@@ -4,22 +4,17 @@ This demonstrates how to preview and deploy evaluations directly from a folder,
 with automatic detection of multi-metrics vs single-metrics.
 """
 
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
 from pathlib import Path
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import folder-based evaluation functions
-from reward_kit.evaluation import (
-    preview_folder_evaluation,
-    deploy_folder_evaluation,
-)
+from reward_kit.evaluation import deploy_folder_evaluation, preview_folder_evaluation
 
 
 def setup_sample_evaluator():
@@ -48,20 +43,20 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
             "score": 0.0,
             "reason": "No messages found"
         }
-    
+
     last_message = messages[-1]
     content = last_message.get("content", "")
-    
+
     # Simple quality metric based on length and quality markers
     word_count = len(content.split())
     quality_score = min(word_count / 100, 1.0)  # Cap at 1.0
-    
+
     quality_markers = ["specifically", "example", "detailed", "importantly"]
     marker_count = sum(1 for marker in quality_markers if marker.lower() in content.lower())
-    
+
     if marker_count > 0:
         quality_score = (quality_score + marker_count / len(quality_markers)) / 2
-    
+
     return {
         "success": quality_score > 0.6,
         "score": quality_score,
@@ -83,44 +78,44 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
             "score": 0.0,
             "reason": "No messages found"
         }
-    
+
     # Get the query and the response
     query = ""
     for msg in original_messages or messages[:-1]:
         if msg.get("role") == "user":
             query = msg.get("content", "")
             break
-    
+
     last_message = messages[-1]
     response = last_message.get("content", "")
-    
+
     if not query:
         return {
             "success": False,
             "score": 0.5,
             "reason": "Could not find a user query"
         }
-    
+
     # Simple relevance check - do words from the query appear in the response?
     query_words = set(query.lower().split())
     response_words = set(response.lower().split())
-    
+
     # Remove common words
-    common_words = {"a", "an", "the", "is", "are", "was", "were", "be", "been", "being", 
+    common_words = {"a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
                    "in", "on", "at", "to", "for", "with", "by", "about", "like"}
     query_words = query_words - common_words
-    
+
     if not query_words:
         return {
             "success": True,
             "score": 0.7,
             "reason": "Query contained only common words"
         }
-    
+
     # Calculate overlap
     overlap_words = query_words.intersection(response_words)
     overlap_score = len(overlap_words) / len(query_words)
-    
+
     return {
         "success": overlap_score > 0.3,
         "score": overlap_score,
@@ -182,9 +177,7 @@ def clean_up(eval_folder, sample_file):
 
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Folder-based evaluation example"
-    )
+    parser = argparse.ArgumentParser(description="Folder-based evaluation example")
     parser.add_argument(
         "--auto-mode",
         action="store_true",
@@ -221,14 +214,10 @@ def main():
             if should_deploy:
                 print("\nAuto-deploying evaluator (--deploy flag set)")
             else:
-                print(
-                    "\nSkipping deployment in auto-mode (--deploy flag not set)"
-                )
+                print("\nSkipping deployment in auto-mode (--deploy flag not set)")
         else:
             # In interactive mode, ask the user
-            deploy_answer = input(
-                "\nDo you want to deploy this evaluator? (y/n): "
-            )
+            deploy_answer = input("\nDo you want to deploy this evaluator? (y/n): ")
             should_deploy = deploy_answer.lower() == "y"
 
         if should_deploy:
@@ -246,9 +235,7 @@ def main():
                 )
             except Exception as e:
                 print(f"Error deploying evaluator: {str(e)}")
-                print(
-                    "Make sure you have proper Fireworks API credentials set up."
-                )
+                print("Make sure you have proper Fireworks API credentials set up.")
     finally:
         # Clean up
         clean_up(eval_folder, sample_file)

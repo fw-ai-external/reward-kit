@@ -97,7 +97,7 @@ def my_reward_function(messages, original_messages=None, **kwargs):
     # Your evaluation logic here
     response = messages[-1].get("content", "")
     score = calculate_score(response)
-    
+
     return RewardOutput(
         score=score,
         metrics={

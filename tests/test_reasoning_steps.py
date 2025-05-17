@@ -2,20 +2,15 @@
 Tests for reasoning steps reward function.
 """
 
-import sys
 import os
+import sys
 import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from reward_kit.rewards.reasoning_steps import (
-    reasoning_steps_reward,
-    sequence_reward,
-)
-from reward_kit.models import Message, EvaluateResult
+from reward_kit.models import EvaluateResult, Message
+from reward_kit.rewards.reasoning_steps import reasoning_steps_reward, sequence_reward
 
 
 class TestReasoningStepsReward(unittest.TestCase):
@@ -25,18 +20,18 @@ class TestReasoningStepsReward(unittest.TestCase):
         """Test detection of explicitly numbered steps."""
         content = """
         To solve this problem, I'll use a step-by-step approach:
-        
+
         Step 1: Identify the relevant variables
         Let's call the unknown quantity x.
-        
+
         Step 2: Set up the equation
         We know that 2x + 3 = 7
-        
+
         Step 3: Solve for x
         2x + 3 = 7
         2x = 4
         x = 2
-        
+
         Therefore, x = 2 is the solution.
         """
 
@@ -54,20 +49,20 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertTrue(result.metrics["reasoning_steps"].success)
         self.assertIn("explicit_steps", result.metrics)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
-        self.assertIn("explicit_steps", result['metrics'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertIn("explicit_steps", result["metrics"])
 
     def test_numbered_list(self):
         """Test detection of numbered list items."""
         content = """
         I'll break down the algorithm into steps:
-        
+
         1. Initialize a counter variable to 0
         2. Iterate through each element in the array
         3. For each element, increment the counter if it meets the condition
         4. Return the final counter value
-        
+
         This algorithm has a time complexity of O(n).
         """
 
@@ -88,21 +83,21 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertTrue(result.metrics["reasoning_steps"].success)
         self.assertIn("numbered_lists", result.metrics)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
-        self.assertIn("numbered_lists", result['metrics'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertIn("numbered_lists", result["metrics"])
 
     def test_bullet_points(self):
         """Test detection of bullet points."""
         content = """
         To implement this feature, follow these steps:
-        
+
         * First, create a new component file
         * Add the necessary imports at the top
         * Implement the component's logic
         * Export the component
         * Import and use it in your main application
-        
+
         This pattern ensures maintainability and modularity.
         """
 
@@ -123,20 +118,20 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertTrue(result.metrics["reasoning_steps"].success)
         self.assertIn("bullet_points", result.metrics)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
-        self.assertIn("bullet_points", result['metrics'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertIn("bullet_points", result["metrics"])
 
     def test_transition_phrases(self):
         """Test detection of transition phrases."""
         content = """
         Let me walk you through the process of solving this:
-        
+
         First, I need to identify what we're looking for.
         Second, I'll analyze the constraints given in the problem.
         Third, I'll apply the formula that relates these variables.
         Finally, I'll calculate the answer and verify it matches the constraints.
-        
+
         The solution is 42.
         """
 
@@ -154,20 +149,20 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertTrue(result.metrics["reasoning_steps"].success)
         self.assertIn("transition_phrases", result.metrics)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
-        self.assertIn("transition_phrases", result['metrics'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertIn("transition_phrases", result["metrics"])
 
     def test_custom_pattern(self):
         """Test with custom pattern."""
         content = """
         Let me think about this problem:
-        
+
         STEP-A: Define what we're looking for
         STEP-B: Recall relevant formulas
         STEP-C: Apply the formulas to our problem
         STEP-D: Calculate the final answer
-        
+
         The answer is 42.
         """
 
@@ -190,8 +185,8 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["reasoning_steps"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
 
     def test_insufficient_steps(self):
         """Test with insufficient reasoning steps."""
@@ -212,15 +207,15 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertEqual(result.score, 0.0)
         self.assertFalse(result.metrics["reasoning_steps"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertFalse(result['metrics']["reasoning_steps"]['success'])
+        self.assertEqual(result["score"], 0.0)
+        self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
 
     def test_partial_score(self):
         """Test with partial reasoning steps."""
         content = """
         Step 1: Figure out what we're solving for
         Step 2: Apply the formula
-        
+
         The answer is 42.
         """
 
@@ -238,15 +233,15 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertLess(result.score, 1.0)
         self.assertFalse(result.metrics["reasoning_steps"].success)
         # Dictionary access
-        self.assertGreater(result['score'], 0.0)
-        self.assertLess(result['score'], 1.0)
-        self.assertFalse(result['metrics']["reasoning_steps"]['success'])
+        self.assertGreater(result["score"], 0.0)
+        self.assertLess(result["score"], 1.0)
+        self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
 
     def test_max_steps(self):
         """Test with maximum steps parameter."""
         content = """
         I'll use a detailed approach:
-        
+
         Step 1: Identify variables
         Step 2: Set up equations
         Step 3: Simplify
@@ -260,9 +255,7 @@ class TestReasoningStepsReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = reasoning_steps_reward(
-            messages=messages, min_steps=3, max_steps=5
-        )
+        result = reasoning_steps_reward(messages=messages, min_steps=3, max_steps=5)
 
         self.assertIsInstance(result, EvaluateResult)
         # Should be max score even with more than max_steps
@@ -270,8 +263,8 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["reasoning_steps"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["reasoning_steps"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
 
     def test_sequence_reward_basic(self):
         """Test sequence reward with default terms."""
@@ -280,7 +273,7 @@ class TestReasoningStepsReward(unittest.TestCase):
         Second, we need to formulate the equation.
         Third, we'll solve for the unknown.
         Finally, we verify our answer.
-        
+
         The solution is correct.
         """
 
@@ -297,8 +290,8 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["sequence_reasoning"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["sequence_reasoning"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
 
     def test_sequence_reward_custom(self):
         """Test sequence reward with custom terms."""
@@ -307,7 +300,7 @@ class TestReasoningStepsReward(unittest.TestCase):
         Continue by identifying logical connections.
         Proceed to draw preliminary conclusions.
         End with a final deduction.
-        
+
         The argument is valid.
         """
 
@@ -328,15 +321,15 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["sequence_reasoning"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["sequence_reasoning"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
 
     def test_sequence_reward_partial(self):
         """Test sequence reward with partial matches."""
         content = """
         First I'll analyze the problem.
         Then I'll formulate a solution approach.
-        
+
         The answer is 42.
         """
 
@@ -354,9 +347,9 @@ class TestReasoningStepsReward(unittest.TestCase):
         self.assertLess(result.score, 1.0)
         self.assertFalse(result.metrics["sequence_reasoning"].success)
         # Dictionary access
-        self.assertGreater(result['score'], 0.0)
-        self.assertLess(result['score'], 1.0)
-        self.assertFalse(result['metrics']["sequence_reasoning"]['success'])
+        self.assertGreater(result["score"], 0.0)
+        self.assertLess(result["score"], 1.0)
+        self.assertFalse(result["metrics"]["sequence_reasoning"]["success"])
 
 
 if __name__ == "__main__":

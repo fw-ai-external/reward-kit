@@ -90,24 +90,24 @@ Complex reward functions often evaluate multiple aspects of a response:
 def comprehensive_evaluation(messages, original_messages=None, **kwargs):
     response = messages[-1]["content"]
     metrics = {}
-    
+
     # Evaluate clarity
     clarity_score = evaluate_clarity(response)
     metrics["clarity"] = MetricRewardOutput(
         score=clarity_score,
         reason=f"Clarity score: {clarity_score:.2f}"
     )
-    
+
     # Evaluate accuracy
     accuracy_score = evaluate_accuracy(response)
     metrics["accuracy"] = MetricRewardOutput(
         score=accuracy_score,
         reason=f"Accuracy score: {accuracy_score:.2f}"
     )
-    
+
     # Combine scores (weighted average)
     final_score = clarity_score * 0.4 + accuracy_score * 0.6
-    
+
     return RewardOutput(score=final_score, metrics=metrics)
 ```
 
@@ -148,10 +148,10 @@ def safe_evaluation(messages, original_messages=None, **kwargs):
                     reason="No assistant response found"
                 )}
             )
-            
+
         # Your evaluation logic here
         # ...
-        
+
     except Exception as e:
         # Handle any unexpected errors
         return RewardOutput(
@@ -172,18 +172,18 @@ You can pass additional configuration through the `**kwargs` parameter:
 def configurable_evaluation(messages, original_messages=None, metadata=None, **kwargs):
     """Reward function that supports configuration via metadata."""
     metadata = metadata or {}
-    
+
     # Get configurable thresholds from metadata
     min_length = metadata.get("min_length", 50)
     max_score = metadata.get("max_score", 1.0)
     weight_factor = metadata.get("weight_factor", 1.0)
-    
+
     # Use these parameters in your evaluation
     # ...
-    
+
     # Apply any metadata-based adjustments to the final score
     final_score = base_score * weight_factor
-    
+
     return RewardOutput(score=final_score, metrics=metrics)
 ```
 

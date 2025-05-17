@@ -28,11 +28,11 @@ from reward_kit.rewards.math import math_reward
 # Example conversation with a math problem
 messages = [
     {
-        "role": "user", 
+        "role": "user",
         "content": "Calculate 15% of 80."
     },
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "To calculate 15% of 80, I'll multiply 80 by 0.15:\n\n80 × 0.15 = 12\n\nTherefore, 15% of 80 is 12."
     }
 ]
@@ -123,11 +123,11 @@ from reward_kit.rewards.math import math_reward
 # Messages with LaTeX formatted answer
 messages = [
     {
-        "role": "user", 
+        "role": "user",
         "content": "What is the area of a circle with radius 3 cm?"
     },
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "To find the area of a circle, I'll use the formula:\n\nArea = πr²\n\nSubstituting r = 3 cm:\n\nArea = π × 3² = 9π cm²\n\nCalculating with π ≈ 3.14159:\n\nArea ≈ 28.27 cm²\n\nTherefore, the area of a circle with radius 3 cm is \n\n$$\\boxed{28.27 \\text{ cm}^2}$$"
     }
 ]
@@ -152,11 +152,11 @@ from reward_kit.rewards.math import math_reward
 # Message with fraction answer
 messages = [
     {
-        "role": "user", 
+        "role": "user",
         "content": "What is 1/4 + 1/6?"
     },
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "To add fractions with different denominators, I need to find a common denominator.\n\n1/4 + 1/6\n\nLCD = 12\n\n1/4 = 3/12\n1/6 = 2/12\n\n3/12 + 2/12 = 5/12\n\nTherefore, 1/4 + 1/6 = 5/12"
     }
 ]
@@ -179,7 +179,7 @@ from reward_kit.rewards.math import math_reward
 # Original conversation with correct answer
 original_messages = [
     {
-        "role": "user", 
+        "role": "user",
         "content": "Solve the equation 2x + 5 = 15. The answer is x = 5."
     }
 ]
@@ -187,11 +187,11 @@ original_messages = [
 # Generated response to evaluate
 generated_messages = [
     {
-        "role": "user", 
+        "role": "user",
         "content": "Solve the equation 2x + 5 = 15."
     },
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "To solve the equation 2x + 5 = 15, I'll isolate the variable x.\n\n2x + 5 = 15\n2x = 15 - 5\n2x = 10\nx = 10/2\nx = 5\n\nTherefore, the solution is x = 5."
     }
 ]

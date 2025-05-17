@@ -1,9 +1,9 @@
-from typing import Dict, List, Any, Optional, Set, Tuple, Union
 import json
-import re
 
 # from collections import defaultdict # Unused import
 import os
+import re
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Import OpenAI at module level for mocking in tests
 try:
@@ -13,12 +13,14 @@ except ImportError:
     # Type to mock in tests
     OpenAI = None  # type: ignore
 
-from ..models import EvaluateResult, MetricResult, Message # Added Message
-from ..typed_interface import reward_function # Added reward_function
+from ..models import EvaluateResult, Message, MetricResult  # Added Message
+from ..typed_interface import reward_function  # Added reward_function
 
 
 def match_function_call(
-    messages: List[Dict[str, str]], # messages is for context if needed, not directly used here for func call parts
+    messages: List[
+        Dict[str, str]
+    ],  # messages is for context if needed, not directly used here for func call parts
     # original_messages: List[Dict[str, str]], # Removed
     function_name: str,
     parsed_arguments: Dict[str, Any],
@@ -81,9 +83,7 @@ def match_function_call(
                     f"Type mismatch for {arg_name}: expected string, got {type(arg_value).__name__}"
                 )
                 type_matched = False
-            elif expected_type == "number" and not isinstance(
-                arg_value, (int, float)
-            ):
+            elif expected_type == "number" and not isinstance(arg_value, (int, float)):
                 type_mismatches.append(arg_name)
                 arg_details.append(
                     f"Type mismatch for {arg_name}: expected number, got {type(arg_value).__name__}"
@@ -156,7 +156,9 @@ def match_function_call(
 
     arg_reason = "\n".join(arg_details)
     metrics["arguments_match"] = MetricResult(
-        score=arg_score, reason=arg_reason, success=arg_score == 1.0 if len(expected_args) > 0 else True
+        score=arg_score,
+        reason=arg_reason,
+        success=arg_score == 1.0 if len(expected_args) > 0 else True,
     )
 
     # 3. Calculate final score (equally weighted between name and args)
@@ -265,10 +267,10 @@ def normalize_schema(schema: Union[Dict[str, Any], str]) -> Dict[str, Any]:
     return schema
 
 
-@reward_function # Added decorator
+@reward_function  # Added decorator
 def schema_jaccard_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
@@ -316,19 +318,33 @@ def schema_jaccard_reward(
                 elif last_message.tool_calls:
                     for tc in last_message.tool_calls:
                         if tc.type == "function":
-                            extracted_fc_from_message = tc.function # Assuming tc.function is a dict {name, arguments}
-                            if isinstance(extracted_fc_from_message, dict): # Ensure it's a dict
-                                break 
-                            else: # If tc.function is not a dict (e.g. pydantic model), convert or handle
-                                extracted_fc_from_message = {"name": getattr(extracted_fc_from_message, "name", ""), "arguments": getattr(extracted_fc_from_message, "arguments", "{}")}
+                            extracted_fc_from_message = (
+                                tc.function
+                            )  # Assuming tc.function is a dict {name, arguments}
+                            if isinstance(
+                                extracted_fc_from_message, dict
+                            ):  # Ensure it's a dict
                                 break
-
+                            else:  # If tc.function is not a dict (e.g. pydantic model), convert or handle
+                                extracted_fc_from_message = {
+                                    "name": getattr(
+                                        extracted_fc_from_message, "name", ""
+                                    ),
+                                    "arguments": getattr(
+                                        extracted_fc_from_message, "arguments", "{}"
+                                    ),
+                                }
+                                break
 
         elif isinstance(last_message, dict):
             if last_message.get("role") == "assistant":
-                if "function_call" in last_message and isinstance(last_message["function_call"], dict):
+                if "function_call" in last_message and isinstance(
+                    last_message["function_call"], dict
+                ):
                     extracted_fc_from_message = last_message["function_call"]
-                elif "tool_calls" in last_message and isinstance(last_message["tool_calls"], list):
+                elif "tool_calls" in last_message and isinstance(
+                    last_message["tool_calls"], list
+                ):
                     for tc in last_message["tool_calls"]:
                         if isinstance(tc, dict) and tc.get("type") == "function":
                             if "function" in tc and isinstance(tc["function"], dict):
@@ -338,19 +354,27 @@ def schema_jaccard_reward(
             return EvaluateResult(
                 score=0.0,
                 reason=f"Unexpected type for last message: {type(last_message)}.",
-                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for function call extraction.", success=False)}
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        reason="Invalid message type for function call extraction.",
+                        success=False,
+                    )
+                },
             )
 
         if extracted_fc_from_message:
             function_call = extracted_fc_from_message
 
-        if not function_call: # Check again if function_call is still None or empty
+        if not function_call:  # Check again if function_call is still None or empty
             return EvaluateResult(
                 score=0.0,
                 reason="No function call found in messages.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, reason="No function call found in messages", success=False
+                        score=0.0,
+                        reason="No function call found in messages",
+                        success=False,
                     )
                 },
             )
@@ -404,7 +428,7 @@ def schema_jaccard_reward(
     # If function name doesn't match, return low score immediately
     if not name_match:
         return EvaluateResult(
-            score=0.1, # Some small score for partial matching attempts
+            score=0.1,  # Some small score for partial matching attempts
             reason=name_reason,
             metrics=metrics,
         )
@@ -460,9 +484,7 @@ def schema_jaccard_reward(
     expected_properties = extract_schema_properties(
         {"properties": expected_args_schema}
     )
-    actual_properties = extract_schema_properties(
-        {"properties": actual_args_schema}
-    )
+    actual_properties = extract_schema_properties({"properties": actual_args_schema})
 
     # 4. Calculate Jaccard similarity
     schema_similarity = calculate_jaccard_similarity(
@@ -477,9 +499,7 @@ def schema_jaccard_reward(
     comparison_details = []
 
     if matching_props:
-        comparison_details.append(
-            f"Matching properties ({len(matching_props)}):"
-        )
+        comparison_details.append(f"Matching properties ({len(matching_props)}):")
         for prop, prop_type in sorted(matching_props):
             comparison_details.append(f"  - {prop}: {prop_type}")
 
@@ -498,7 +518,7 @@ def schema_jaccard_reward(
     metrics["schema_similarity"] = MetricResult(
         score=schema_similarity,
         reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
-        success=schema_similarity == 1.0
+        success=schema_similarity == 1.0,
     )
 
     # 6. Calculate final score
@@ -509,10 +529,10 @@ def schema_jaccard_reward(
     return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
-@reward_function # Added decorator
+@reward_function  # Added decorator
 def llm_judge_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -585,13 +605,24 @@ def llm_judge_reward(
                             if isinstance(extracted_fc_from_message, dict):
                                 break
                             else:
-                                extracted_fc_from_message = {"name": getattr(extracted_fc_from_message, "name", ""), "arguments": getattr(extracted_fc_from_message, "arguments", "{}")}
+                                extracted_fc_from_message = {
+                                    "name": getattr(
+                                        extracted_fc_from_message, "name", ""
+                                    ),
+                                    "arguments": getattr(
+                                        extracted_fc_from_message, "arguments", "{}"
+                                    ),
+                                }
                                 break
         elif isinstance(last_message, dict):
             if last_message.get("role") == "assistant":
-                if "function_call" in last_message and isinstance(last_message["function_call"], dict):
+                if "function_call" in last_message and isinstance(
+                    last_message["function_call"], dict
+                ):
                     extracted_fc_from_message = last_message["function_call"]
-                elif "tool_calls" in last_message and isinstance(last_message["tool_calls"], list):
+                elif "tool_calls" in last_message and isinstance(
+                    last_message["tool_calls"], list
+                ):
                     for tc in last_message["tool_calls"]:
                         if isinstance(tc, dict) and tc.get("type") == "function":
                             if "function" in tc and isinstance(tc["function"], dict):
@@ -601,19 +632,27 @@ def llm_judge_reward(
             return EvaluateResult(
                 score=0.0,
                 reason=f"Unexpected type for last message: {type(last_message)}.",
-                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for function call extraction.", success=False)}
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        reason="Invalid message type for function call extraction.",
+                        success=False,
+                    )
+                },
             )
-        
+
         if extracted_fc_from_message:
             function_call = extracted_fc_from_message
 
-        if not function_call: # Check again if function_call is still None or empty
+        if not function_call:  # Check again if function_call is still None or empty
             return EvaluateResult(
                 score=0.0,
                 reason="No function call found in messages.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, reason="No function call found in messages", success=False
+                        score=0.0,
+                        reason="No function call found in messages",
+                        success=False,
                     )
                 },
             )
@@ -673,7 +712,7 @@ def llm_judge_reward(
         if conversation_parts:
             conversation_msg = "\n".join(conversation_parts)
 
-    prompt = f"""You are evaluating the quality of a function call made by an AI assistant. 
+    prompt = f"""You are evaluating the quality of a function call made by an AI assistant.
 Your job is to assess whether the function call is appropriate, correctly formatted, and follows the expected behavior.
 
 CONVERSATION CONTEXT:
@@ -681,7 +720,7 @@ CONVERSATION CONTEXT:
 
 FUNCTION CALL:
 Name: {function_name}
-Arguments: 
+Arguments:
 {arguments_str}
 
 EXPECTED SCHEMA:
@@ -716,9 +755,7 @@ EXPLANATION: [your detailed explanation]
 
         # Parse the score and explanation
         score_match = re.search(r"SCORE:\s*([\d.]+)", llm_response)
-        explanation_match = re.search(
-            r"EXPLANATION:\s*(.*)", llm_response, re.DOTALL
-        )
+        explanation_match = re.search(r"EXPLANATION:\s*(.*)", llm_response, re.DOTALL)
 
         if score_match:
             try:
@@ -738,7 +775,9 @@ EXPLANATION: [your detailed explanation]
 
         # Create metrics
         metrics["llm_judge"] = MetricResult(
-            score=score, reason=explanation, success=score >= 0.8 # Assuming high score means success
+            score=score,
+            reason=explanation,
+            success=score >= 0.8,  # Assuming high score means success
         )
 
         return EvaluateResult(score=score, reason=explanation, metrics=metrics)
@@ -749,16 +788,18 @@ EXPLANATION: [your detailed explanation]
             reason=f"Error calling OpenAI API: {str(e)}",
             metrics={
                 "error": MetricResult(
-                    score=0.0, reason=f"Error calling OpenAI API: {str(e)}", success=False
+                    score=0.0,
+                    reason=f"Error calling OpenAI API: {str(e)}",
+                    success=False,
                 )
             },
         )
 
 
-@reward_function # Added decorator
+@reward_function  # Added decorator
 def composite_function_call_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -796,7 +837,7 @@ def composite_function_call_reward(
     # Run schema validation
     schema_result = schema_jaccard_reward(
         messages=messages,
-        ground_truth=ground_truth, # Pass through
+        ground_truth=ground_truth,  # Pass through
         function_call=function_call,
         expected_schema=expected_schema,
         **kwargs,
@@ -806,7 +847,7 @@ def composite_function_call_reward(
     if expected_behavior:
         llm_result = llm_judge_reward(
             messages=messages,
-            ground_truth=ground_truth, # Pass through
+            ground_truth=ground_truth,  # Pass through
             function_call=function_call,
             expected_schema=expected_schema,
             expected_behavior=expected_behavior,
@@ -821,7 +862,9 @@ def composite_function_call_reward(
             reason="LLM judge skipped: No expected behavior provided.",
             metrics={
                 "llm_judge": MetricResult(
-                    score=0.0, reason="Skipped: No expected behavior provided", success=True # Success because it's an expected skip
+                    score=0.0,
+                    reason="Skipped: No expected behavior provided",
+                    success=True,  # Success because it's an expected skip
                 )
             },
         )
@@ -830,24 +873,27 @@ def composite_function_call_reward(
     combined_metrics = {}
 
     # Add schema metrics with "schema_" prefix
-    for key, metric_val in schema_result.metrics.items(): # Renamed to metric_val to avoid conflict
+    for (
+        key,
+        metric_val,
+    ) in schema_result.metrics.items():  # Renamed to metric_val to avoid conflict
         combined_metrics[f"schema_{key}"] = metric_val
 
     # Add llm metrics with "llm_" prefix
-    for key, metric_val in llm_result.metrics.items(): # Renamed to metric_val
+    for key, metric_val in llm_result.metrics.items():  # Renamed to metric_val
         combined_metrics[f"llm_{key}"] = metric_val
 
     # Add summary metrics
     combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
-        success=schema_result.score == 1.0
+        success=schema_result.score == 1.0,
     )
 
     combined_metrics["llm_score"] = MetricResult(
         score=llm_result.score,
         reason=f"LLM judge score: {llm_result.score:.2f}",
-        success=llm_result.score >= 0.8 # Assuming high score means success
+        success=llm_result.score >= 0.8,  # Assuming high score means success
     )
 
     # Calculate weighted final score
@@ -859,15 +905,16 @@ def composite_function_call_reward(
     )
     final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_result.score:.2f} * {llm_weight:.2f})."
 
-
     # Add weight information
     combined_metrics["weights"] = MetricResult(
         score=0.0,  # Not a real score
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
-        success=True # Informational metric
+        success=True,  # Informational metric
     )
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=combined_metrics)
+    return EvaluateResult(
+        score=final_score, reason=final_reason, metrics=combined_metrics
+    )
 
 
 # JSON schema reward functions have been moved to json_schema.py module

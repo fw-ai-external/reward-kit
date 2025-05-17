@@ -1,15 +1,12 @@
-import os
 import json
+import os
 import tempfile
 from pathlib import Path
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from reward_kit.evaluation import (
-    Evaluator,
-    preview_evaluation,
-    create_evaluation,
-)
+import pytest
+
+from reward_kit.evaluation import Evaluator, create_evaluation, preview_evaluation
 
 
 def create_test_folder():
@@ -23,13 +20,13 @@ def create_test_folder():
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
-    
+
     last_message = messages[-1]
     content = last_message.get('content', '')
-    
+
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)
-    
+
     return {
         'score': score,
         'reason': f'Word count: {word_count}'
@@ -303,11 +300,9 @@ def test_integration_multi_metrics(mock_env_variables, mock_requests_post):
 
 
 @patch("sys.exit")
-def test_integration_cli_commands(
-    mock_exit, mock_env_variables, mock_requests_post
-):
+def test_integration_cli_commands(mock_exit, mock_env_variables, mock_requests_post):
     """Test CLI integration by directly calling the CLI command functions"""
-    from reward_kit.cli import preview_command, deploy_command
+    from reward_kit.cli import deploy_command, preview_command
 
     # Make sys.exit a pass-through instead of raising an exception
     mock_exit.return_value = None
@@ -318,7 +313,9 @@ def test_integration_cli_commands(
 
     try:
         # Test preview command
-        with patch("reward_kit.cli_commands.preview.preview_evaluation") as mock_preview: # Corrected patch target
+        with patch(
+            "reward_kit.cli_commands.preview.preview_evaluation"
+        ) as mock_preview:  # Corrected patch target
             # Create mock preview result
             mock_preview_result = MagicMock()
             mock_preview_result.display = MagicMock()
@@ -337,7 +334,9 @@ def test_integration_cli_commands(
             args.huggingface_key_map = None
 
             # Run preview command
-            with patch("reward_kit.cli_commands.preview.Path.exists", return_value=True): # Corrected patch target for Path
+            with patch(
+                "reward_kit.cli_commands.preview.Path.exists", return_value=True
+            ):  # Corrected patch target for Path
                 result = preview_command(args)
 
                 # Verify the result
@@ -355,7 +354,9 @@ def test_integration_cli_commands(
                 mock_preview_result.display.assert_called_once()
 
         # Test deploy command
-        with patch("reward_kit.cli_commands.deploy.create_evaluation") as mock_create: # Corrected patch target
+        with patch(
+            "reward_kit.cli_commands.deploy.create_evaluation"
+        ) as mock_create:  # Corrected patch target
             # Configure the mock
             mock_create.return_value = {
                 "name": "accounts/test_account/evaluators/test-eval",

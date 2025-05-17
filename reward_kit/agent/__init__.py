@@ -6,14 +6,15 @@ agent evaluation framework, including the ForkableResource ABC, Orchestrator,
 and concrete resource implementations.
 """
 
+from .orchestrator import Orchestrator
+
 # Make key components easily importable from reward_kit.agent
 from .resource_abc import ForkableResource
-from .orchestrator import Orchestrator
 from .resources import (
+    DockerResource,
+    FileSystemResource,
     PythonStateResource,
     SQLResource,
-    FileSystemResource,
-    DockerResource,
 )
 
 __all__ = [

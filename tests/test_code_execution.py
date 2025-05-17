@@ -2,21 +2,25 @@
 Tests for code execution reward functions.
 """
 
+import json  # Added import for json.loads
+
 import pytest
-import json # Added import for json.loads
+
+from reward_kit.models import EvaluateResult, Message  # Added for new tests
 from reward_kit.rewards.code_execution import (
-    extract_code_blocks,
-    local_code_execution_reward,
-    execute_python_code,
-    execute_javascript_code,
+    fractional_code_reward,  # Added for new tests
+)
+from reward_kit.rewards.code_execution import (
+    _HAS_E2B,
     compare_outputs,
-    string_similarity,
     e2b_code_execution_reward,
     execute_code_with_e2b,
-    _HAS_E2B,
-    fractional_code_reward, # Added for new tests
+    execute_javascript_code,
+    execute_python_code,
+    extract_code_blocks,
+    local_code_execution_reward,
+    string_similarity,
 )
-from reward_kit.models import Message, EvaluateResult # Added for new tests
 
 
 @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
@@ -25,10 +29,13 @@ class TestE2BCodeExecution:
         # Patch _HAS_E2B to False to simulate missing E2B package
         monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", False)
 
-        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Write a function to add two numbers",
+        }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """Here's a function to add two numbers:
+            "role": "assistant",
+            "content": """Here's a function to add two numbers:
 
 ```python
 def add(a, b):
@@ -39,26 +46,22 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = e2b_code_execution_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="python"
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "E2B package not installed" in result.metrics['error'].reason
+        assert "E2B package not installed" in result.metrics["error"].reason
         # assert result['score'] == 0.0 # Use attribute access
         # assert "E2B package not installed" in result['metrics']['error']['reason'] # Use attribute access
 
         # Restore _HAS_E2B to its original value
-        monkeypatch.setattr(
-            "reward_kit.rewards.code_execution._HAS_E2B", _HAS_E2B
-        )
+        monkeypatch.setattr("reward_kit.rewards.code_execution._HAS_E2B", _HAS_E2B)
 
     @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
     def test_execute_code_with_e2b_authentication(self, monkeypatch):
@@ -78,18 +81,21 @@ This will output `5`.
         # Ensure E2B_API_KEY is not set in environment
         monkeypatch.delenv("E2B_API_KEY", raising=False)
 
-        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Write a function to add two numbers",
+        }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """```python
+            "role": "assistant",
+            "content": """```python
 def add(a, b):
     return a + b
 
 print(add(2, 3))
 ```""",
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = e2b_code_execution_reward(
             messages=messages_arg,
@@ -100,7 +106,7 @@ print(add(2, 3))
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "API key is required" in result.metrics['error'].reason
+        assert "API key is required" in result.metrics["error"].reason
         # assert result['score'] == 0.0 # Use attribute access
         # assert "API key is required" in result['metrics']['error']['reason'] # Use attribute access
 
@@ -108,11 +114,11 @@ print(add(2, 3))
 class TestExtractCodeBlocks:
     def test_extract_python_code(self):
         text = """Here's a simple Python function:
-        
+
 ```python
 def add(a, b):
     return a + b
-    
+
 print(add(2, 3))
 ```
 
@@ -127,7 +133,7 @@ This will output `5`."""
 
     def test_extract_javascript_code(self):
         text = """Here's a simple JavaScript function:
-        
+
 ```javascript
 function add(a, b) {
     return a + b;
@@ -147,7 +153,7 @@ This will output `5`."""
 
     def test_extract_multiple_code_blocks(self):
         text = """Here are some code examples:
-        
+
 ```python
 print("Hello from Python")
 ```
@@ -167,7 +173,7 @@ console.log("Hello from JavaScript");
 
     def test_extract_with_language_filter(self):
         text = """Here are some code examples:
-        
+
 ```python
 print("Hello from Python")
 ```
@@ -187,7 +193,7 @@ console.log("Hello from JavaScript");
 
     def test_extract_with_no_language_specified(self):
         text = """Here's a code block with no language specified:
-        
+
 ```
 print("Hello, world!")
 ```
@@ -249,8 +255,7 @@ class TestExecuteJavaScriptCode:
         assert result["output"] is None
         # Our improved sandbox may return different error messages
         assert (
-            "undefined" in result["error"].lower()
-            or "error" in result["error"].lower()
+            "undefined" in result["error"].lower() or "error" in result["error"].lower()
         )
 
     def test_javascript_execution_with_timeout(self):
@@ -322,10 +327,13 @@ class TestCompareOutputs:
 
 class TestLocalCodeExecutionReward:
     def test_python_success_match(self):
-        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Write a function to add two numbers",
+        }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """Here's a function to add two numbers:
+            "role": "assistant",
+            "content": """Here's a function to add two numbers:
 
 ```python
 def add(a, b):
@@ -336,14 +344,12 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="python"
         )
 
         assert isinstance(result, EvaluateResult)
@@ -362,8 +368,9 @@ def another_func(x):
 # Dummy messages for fractional_code_reward
 DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD = [
     Message(role="user", content="Call arg_collector"),
-    Message(role="assistant", content=f"```python\n{CODE_WITH_ARG_COLLECTOR}\n```")
+    Message(role="assistant", content=f"```python\n{CODE_WITH_ARG_COLLECTOR}\n```"),
 ]
+
 
 class TestFractionalCodeRewardArgParsing:
     @pytest.mark.parametrize(
@@ -371,98 +378,155 @@ class TestFractionalCodeRewardArgParsing:
         [
             # Test case format: (input_string_for_function, expected_args_as_list, expected_kwargs_as_dict)
             ("5", [5], {}),  # Single integer
-            ("\"hello\"", ["hello"], {}),  # Single JSON string
+            ('"hello"', ["hello"], {}),  # Single JSON string
             ("[1, 2, 3]", [[1, 2, 3]], {}),  # JSON array of ints
-            ("['a', 'b', 'c']", [['a', 'b', 'c']], {}),  # Python list repr with single quotes
+            (
+                "['a', 'b', 'c']",
+                [["a", "b", "c"]],
+                {},
+            ),  # Python list repr with single quotes
             ("1 'foo'", [1, "foo"], {}),  # Space-separated multiple args (int, string)
-            ("\"[1,2,3]\"", [[1,2,3]], {}), # JSON string whose content is list-like (refined)
-            ("\"5\"", [5], {}), # JSON string whose content is number-like (refined)
+            (
+                '"[1,2,3]"',
+                [[1, 2, 3]],
+                {},
+            ),  # JSON string whose content is list-like (refined)
+            ('"5"', [5], {}),  # JSON string whose content is number-like (refined)
             ("", [], {}),  # Empty string for no-arg call
-            ("True None", [True, None], {}), # Boolean and None
-            ("{'key': 'value'}", [{"key": "value"}], {}), # Python dict repr
-            ("1.0 \"[1, \\\"a\\\"]\"", [1.0, [1, "a"]], {}), # Float and JSON string with escaped quotes
-            ("arg1 arg2 arg3", ["arg1", "arg2", "arg3"], {}), # Multiple unquoted strings
+            ("True None", [True, None], {}),  # Boolean and None
+            ("{'key': 'value'}", [{"key": "value"}], {}),  # Python dict repr
+            (
+                '1.0 "[1, \\"a\\"]"',
+                [1.0, [1, "a"]],
+                {},
+            ),  # Float and JSON string with escaped quotes
+            (
+                "arg1 arg2 arg3",
+                ["arg1", "arg2", "arg3"],
+                {},
+            ),  # Multiple unquoted strings
         ],
     )
     def test_python_function_arg_parsing(
         self, test_input_str, expected_args_list, expected_kwargs_dict
     ):
-        expected_return_val = {"args": expected_args_list, "kwargs": expected_kwargs_dict}
-        
+        expected_return_val = {
+            "args": expected_args_list,
+            "kwargs": expected_kwargs_dict,
+        }
+
         test_cases = [
             {"input": test_input_str, "expected_output": repr(expected_return_val)}
         ]
 
         # messages_arg combines prompt and assistant's code response
         messages_arg = [
-            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[0], # User message
-            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[1]  # Assistant message with code
+            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[0],  # User message
+            DUMMY_MESSAGES_FOR_FRACTIONAL_REWARD[1],  # Assistant message with code
         ]
         # test_cases are now passed via the ground_truth parameter
         ground_truth_arg = test_cases
 
         result = fractional_code_reward(
             messages=messages_arg,
-            ground_truth=ground_truth_arg, # This now takes the test_cases
+            ground_truth=ground_truth_arg,  # This now takes the test_cases
             language="python",
             # test_cases=test_cases, # Removed, passed via ground_truth
-            environment="local", # Ensure local execution for direct testing of parsing
+            environment="local",  # Ensure local execution for direct testing of parsing
             function_to_call="arg_collector",
         )
 
-        assert isinstance(result, EvaluateResult), "Result should be an EvaluateResult object"
-        assert hasattr(result, "score"), "Result object must contain a 'score' attribute"
-        
+        assert isinstance(
+            result, EvaluateResult
+        ), "Result should be an EvaluateResult object"
+        assert hasattr(
+            result, "score"
+        ), "Result object must contain a 'score' attribute"
+
         # Detailed assertion for debugging if something fails
         # Attribute access for score
         if result.score != 1.0:
             print(f"Test failed for input: {test_input_str}")
             print(f"Expected return: {repr(expected_return_val)}")
             # Attribute access for metrics
-            test_results_metric_data = result.metrics.get('test_results') if result.metrics else None
-            if test_results_metric_data: # MetricResult object
+            test_results_metric_data = (
+                result.metrics.get("test_results") if result.metrics else None
+            )
+            if test_results_metric_data:  # MetricResult object
                 try:
-                    actual_test_run_details_list = json.loads(test_results_metric_data.reason)
-                    if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
+                    actual_test_run_details_list = json.loads(
+                        test_results_metric_data.reason
+                    )
+                    if (
+                        actual_test_run_details_list
+                        and isinstance(actual_test_run_details_list, list)
+                        and len(actual_test_run_details_list) > 0
+                    ):
                         first_test_detail = actual_test_run_details_list[0]
-                        print(f"Actual output from execution: {first_test_detail.get('actual_output')}")
-                        print(f"Test result details: {first_test_detail.get('details')}")
+                        print(
+                            f"Actual output from execution: {first_test_detail.get('actual_output')}"
+                        )
+                        print(
+                            f"Test result details: {first_test_detail.get('details')}"
+                        )
                     else:
-                        print(f"Test results reason content not as expected: {actual_test_run_details_list}")
+                        print(
+                            f"Test results reason content not as expected: {actual_test_run_details_list}"
+                        )
                 except json.JSONDecodeError:
                     # Accessing reason from MetricResult object
-                    print(f"Could not parse test_results metric reason (JSONDecodeError): {test_results_metric_data.reason}")
+                    print(
+                        f"Could not parse test_results metric reason (JSONDecodeError): {test_results_metric_data.reason}"
+                    )
             else:
-                print(f"Full result (object): {result.model_dump()}") # Dump object for full view
+                print(
+                    f"Full result (object): {result.model_dump()}"
+                )  # Dump object for full view
 
         assert result.score == 1.0, f"Test case for input '{test_input_str}' failed."
         # assert result['score'] == 1.0, f"Test case for input '{test_input_str}' failed (dictionary access)." # Use attribute access
-        
+
         # Additionally, check the actual output if available in metrics
-        test_results_metric = result.metrics.get('test_results') if result.metrics else None
-        if test_results_metric: # MetricResult object
+        test_results_metric = (
+            result.metrics.get("test_results") if result.metrics else None
+        )
+        if test_results_metric:  # MetricResult object
             try:
                 # The reason for test_results metric is a JSON string of the list of test results
                 actual_test_run_details_list = json.loads(test_results_metric.reason)
-                if actual_test_run_details_list and isinstance(actual_test_run_details_list, list) and len(actual_test_run_details_list) > 0:
-                    actual_output_str = actual_test_run_details_list[0].get('actual_output')
-                    assert actual_output_str == repr(expected_return_val), \
-                        f"Actual output '{actual_output_str}' did not match expected '{repr(expected_return_val)}' for input '{test_input_str}'"
-            except json.JSONDecodeError: # Catch specifically json.JSONDecodeError
+                if (
+                    actual_test_run_details_list
+                    and isinstance(actual_test_run_details_list, list)
+                    and len(actual_test_run_details_list) > 0
+                ):
+                    actual_output_str = actual_test_run_details_list[0].get(
+                        "actual_output"
+                    )
+                    assert actual_output_str == repr(
+                        expected_return_val
+                    ), f"Actual output '{actual_output_str}' did not match expected '{repr(expected_return_val)}' for input '{test_input_str}'"
+            except json.JSONDecodeError:  # Catch specifically json.JSONDecodeError
                 # Accessing reason from MetricResult object
-                print(f"Could not parse test_results metric reason (JSONDecodeError) for input '{test_input_str}': {test_results_metric.reason}")
+                print(
+                    f"Could not parse test_results metric reason (JSONDecodeError) for input '{test_input_str}': {test_results_metric.reason}"
+                )
             except IndexError:
-                print(f"test_results metric reason list was empty for input '{test_input_str}'")
+                print(
+                    f"test_results metric reason list was empty for input '{test_input_str}'"
+                )
         # The 'execution_result' metric might not be present if tests pass but output mismatches,
         # as it's typically for code execution status itself, not output comparison.
         # The primary check is result.score == 1.0 and the actual_output comparison.
         # If result.score == 1.0, it implies successful execution.
 
     def test_python_success_mismatch(self):
-        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Write a function to add two numbers",
+        }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """Here's a function to add two numbers:
+            "role": "assistant",
+            "content": """Here's a function to add two numbers:
 
 ```python
 def add(a, b):
@@ -473,27 +537,28 @@ print(add(1, 3))
 
 This will output `4`.
 """,
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="python"
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score < 1.0
-        assert "Output similarity:" in result.metrics['output_match'].reason
+        assert "Output similarity:" in result.metrics["output_match"].reason
         # assert result['score'] < 1.0 # Use attribute access
         # assert "Output similarity:" in result['metrics']['output_match']['reason'] # Use attribute access
 
     def test_code_execution_failure(self):
-        prompt_message_dict = {"role": "user", "content": "Write a function to add two numbers"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Write a function to add two numbers",
+        }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """Here's a function to add two numbers:
+            "role": "assistant",
+            "content": """Here's a function to add two numbers:
 
 ```python
 def add(a, b):
@@ -504,30 +569,28 @@ print(add(undeclared_variable, 3))
 
 This will output `5`.
 """,
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = local_code_execution_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python"
+            messages=messages_arg, ground_truth=ground_truth_arg, language="python"
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "failed with error" in result.metrics['execution_result'].reason
+        assert "failed with error" in result.metrics["execution_result"].reason
         # assert result['score'] == 0.0 # Use attribute access
         # assert "failed with error" in result['metrics']['execution_result']['reason'] # Use attribute access
 
     def test_extract_expected_output_from_message(self):
         prompt_message_dict = {
-                "role": "user",
-                "content": "Write a function to add two numbers. Expected output: 5",
+            "role": "user",
+            "content": "Write a function to add two numbers. Expected output: 5",
         }
         assistant_message_dict = {
-                "role": "assistant",
-                "content": """Here's a function to add two numbers:
+            "role": "assistant",
+            "content": """Here's a function to add two numbers:
 
 ```python
 def add(a, b):
@@ -538,9 +601,9 @@ print(add(2, 3))
 
 This will output `5`.
 """,
-            }
+        }
         messages_arg = [prompt_message_dict, assistant_message_dict]
-        ground_truth_arg = "5" # This is the expected_output_str
+        ground_truth_arg = "5"  # This is the expected_output_str
 
         result = local_code_execution_reward(
             messages=messages_arg,

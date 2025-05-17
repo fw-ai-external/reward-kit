@@ -8,7 +8,7 @@
 python scripts/convert_hf_math_to_openai_jsonl.py open-r1/OpenR1-Math-220k ./runs/openr1_numeric.jsonl --filter_by_match --math_type numeric
 ```
 
-for example this row passed 
+for example this row passed
 
 ```
 {
@@ -59,7 +59,7 @@ The example script is therefore broken and needs to be updated to use the V2 age
 
 # Low pri issues
 
-## Delete all legacy_reward_function 
+## Delete all legacy_reward_function
 Should not be needed at this point
 
 ## Fix the E2B unittest

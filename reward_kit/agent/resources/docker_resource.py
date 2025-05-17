@@ -1,27 +1,67 @@
 """
 DockerResource: A ForkableResource for managing Docker container states.
 """
-import uuid
+
 import io
+import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from ..resource_abc import ForkableResource
 
 # Attempt to import Docker SDK with error handling
 try:
     import docker
-    from docker.errors import DockerException, NotFound, APIError
-    from docker.models.containers import Container
+
+    if TYPE_CHECKING:
+        from docker.errors import APIError, DockerException, NotFound
+        from docker.models.containers import Container
+    else:
+        from docker.errors import APIError, DockerException, NotFound
+        from docker.models.containers import Container
+
     DOCKER_SDK_AVAILABLE = True
 except ImportError:
     DOCKER_SDK_AVAILABLE = False
+
     # Create dummy classes/exceptions if docker SDK is not available
     # to allow type hinting and basic structure, but operations will fail.
-    class DockerException(Exception): pass
-    class NotFound(DockerException): pass
-    class APIError(DockerException): pass
-    class Container: pass
+    # These classes are used at runtime when docker is not available
+    from typing import Any, Dict, List, Optional, Tuple, Union
+
+    class DockerException(Exception):
+        pass
+
+    class NotFound(DockerException):
+        pass
+
+    class APIError(DockerException):
+        pass
+
+    class Container:
+        id: str = ""
+        name: str = ""
+        image: Any = None
+        status: str = ""
+        ports: Dict[str, Any] = {}
+
+        def remove(self, force: bool = False, v: bool = False) -> None:
+            pass
+
+        def commit(self, **kwargs: Any) -> Any:
+            return None
+
+        def reload(self) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def exec_run(self, **kwargs: Any) -> Tuple[int, bytes]:
+            return (0, b"")
+
+        def logs(self, **kwargs: Any) -> bytes:
+            return b""
 
 
 class DockerResource(ForkableResource):
@@ -44,8 +84,10 @@ class DockerResource(ForkableResource):
         self._client = docker.from_env()
         self._config: Dict[str, Any] = {}
         self._container: Optional[Container] = None
-        self._image_id_for_fork_or_checkpoint: Optional[str] = None # Stores the ID of the image used for the current container
-        self._is_closed = False # To prevent operations on closed resource
+        self._image_id_for_fork_or_checkpoint: Optional[str] = (
+            None  # Stores the ID of the image used for the current container
+        )
+        self._is_closed = False  # To prevent operations on closed resource
 
     def _generate_name(self, prefix: str) -> str:
         return f"rk_{prefix}_{uuid.uuid4().hex}"
@@ -53,13 +95,14 @@ class DockerResource(ForkableResource):
     def _cleanup_container(self, container: Optional[Container]) -> None:
         if container:
             try:
-                container.remove(force=True, v=True) # v=True to remove volumes
+                container.remove(force=True, v=True)  # v=True to remove volumes
                 # print(f"DockerResource: Removed container {container.id[:12]}")
             except NotFound:
-                pass # Already removed
+                pass  # Already removed
             except APIError as e:
-                print(f"DockerResource: Error removing container {container.id[:12]}: {e}")
-
+                print(
+                    f"DockerResource: Error removing container {container.id[:12]}: {e}"
+                )
 
     def _cleanup_image(self, image_id: Optional[str]) -> None:
         if image_id:
@@ -67,11 +110,10 @@ class DockerResource(ForkableResource):
                 self._client.images.remove(image=image_id, force=True)
                 # print(f"DockerResource: Removed image {image_id[:12]}")
             except NotFound:
-                pass # Already removed
+                pass  # Already removed
             except APIError as e:
                 # Often "image is being used by stopped container" if cleanup order is tricky
                 print(f"DockerResource: Error removing image {image_id[:12]}: {e}")
-
 
     async def setup(self, config: Dict[str, Any]) -> None:
         """
@@ -88,7 +130,7 @@ class DockerResource(ForkableResource):
         if self._is_closed:
             raise RuntimeError("Cannot setup a closed DockerResource.")
         self._config = config.copy()
-        
+
         image_name = self._config.get("image_name")
         if not image_name:
             raise ValueError("Missing 'image_name' in DockerResource config.")
@@ -101,15 +143,21 @@ class DockerResource(ForkableResource):
             try:
                 self._client.images.pull(image_name)
             except APIError as e:
-                raise DockerException(f"Failed to pull image '{image_name}': {e}") from e
-        
-        self._image_id_for_fork_or_checkpoint = image_name # Base image for the first container
+                raise DockerException(
+                    f"Failed to pull image '{image_name}': {e}"
+                ) from e
 
-        container_name = self._config.get("container_name", self._generate_name("container"))
+        self._image_id_for_fork_or_checkpoint = (
+            image_name  # Base image for the first container
+        )
+
+        container_name = self._config.get(
+            "container_name", self._generate_name("container")
+        )
         run_options = self._config.get("docker_run_options", {}).copy()
-        run_options["detach"] = True # Must be detached for this model
+        run_options["detach"] = True  # Must be detached for this model
         run_options["name"] = container_name
-        
+
         # Clean up any existing container with the same name (e.g. from a failed previous run)
         try:
             existing_container = self._client.containers.get(container_name)
@@ -119,11 +167,12 @@ class DockerResource(ForkableResource):
 
         try:
             self._container = self._client.containers.run(image_name, **run_options)
-            self._container.reload() # Ensure state is up-to-date
+            self._container.reload()  # Ensure state is up-to-date
             # print(f"DockerResource setup: Started container {self._container.id[:12]} ({self._container.name}) from image {image_name}")
         except APIError as e:
-            raise DockerException(f"Failed to start container '{container_name}' from image '{image_name}': {e}") from e
-
+            raise DockerException(
+                f"Failed to start container '{container_name}' from image '{image_name}': {e}"
+            ) from e
 
     async def fork(self) -> "DockerResource":
         """
@@ -139,16 +188,18 @@ class DockerResource(ForkableResource):
             committed_image = self._container.commit(repository=fork_image_tag)
             # print(f"DockerResource fork: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({fork_image_tag})")
         except APIError as e:
-            raise DockerException(f"Failed to commit container {self._container.id[:12]} for fork: {e}") from e
+            raise DockerException(
+                f"Failed to commit container {self._container.id[:12]} for fork: {e}"
+            ) from e
 
         # 2. Create new DockerResource instance
         forked_resource = DockerResource()
-        forked_resource._config = self._config.copy() # Inherit original config
-        
+        forked_resource._config = self._config.copy()  # Inherit original config
+
         # Modify config for the new container if needed (e.g., new name)
         forked_container_name = self._generate_name("fork_container")
         forked_resource._config["container_name"] = forked_container_name
-        
+
         # The new container will run from the committed image
         forked_resource._image_id_for_fork_or_checkpoint = committed_image.id
 
@@ -157,15 +208,20 @@ class DockerResource(ForkableResource):
         run_options["name"] = forked_container_name
 
         try:
-            forked_resource._container = self._client.containers.run(committed_image.id, **run_options)
+            forked_resource._container = self._client.containers.run(
+                committed_image.id, **run_options
+            )
             forked_resource._container.reload()
             # print(f"DockerResource fork: Started new container {forked_resource._container.id[:12]} from image {committed_image.id[:12]}")
         except APIError as e:
-            self._cleanup_image(committed_image.id) # Cleanup committed image if run fails
-            raise DockerException(f"Failed to start forked container from image {committed_image.id[:12]}: {e}") from e
-        
-        return forked_resource
+            self._cleanup_image(
+                committed_image.id
+            )  # Cleanup committed image if run fails
+            raise DockerException(
+                f"Failed to start forked container from image {committed_image.id[:12]}: {e}"
+            ) from e
 
+        return forked_resource
 
     async def checkpoint(self) -> Dict[str, Any]:
         """
@@ -181,8 +237,9 @@ class DockerResource(ForkableResource):
             # print(f"DockerResource checkpoint: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({checkpoint_image_tag})")
             return {"type": "docker_image_id", "image_id": committed_image.id}
         except APIError as e:
-            raise DockerException(f"Failed to commit container {self._container.id[:12]} for checkpoint: {e}") from e
-
+            raise DockerException(
+                f"Failed to commit container {self._container.id[:12]} for checkpoint: {e}"
+            ) from e
 
     async def restore(self, state_data: Dict[str, Any]) -> None:
         """
@@ -194,25 +251,33 @@ class DockerResource(ForkableResource):
 
         image_id = state_data.get("image_id")
         if state_data.get("type") != "docker_image_id" or not image_id:
-            raise ValueError("Invalid state_data for DockerResource restore. Expected {'type': 'docker_image_id', 'image_id': '...'}")
+            raise ValueError(
+                "Invalid state_data for DockerResource restore. Expected {'type': 'docker_image_id', 'image_id': '...'}"
+            )
 
         # Ensure the checkpointed image exists
         try:
             self._client.images.get(image_id)
         except NotFound:
-            raise DockerException(f"Checkpoint image ID '{image_id}' not found.") from None
-        
+            raise DockerException(
+                f"Checkpoint image ID '{image_id}' not found."
+            ) from None
+
         # Cleanup existing container before restoring
         if self._container:
             self._cleanup_container(self._container)
             self._container = None
-        
+
         # Update current image ID to the one we are restoring from
         self._image_id_for_fork_or_checkpoint = image_id
 
-        restored_container_name = self._config.get("container_name", self._generate_name("restored_container"))
+        restored_container_name = self._config.get(
+            "container_name", self._generate_name("restored_container")
+        )
         # If a container_name was in original config, we might want to reuse it or ensure uniqueness
-        self._config["container_name"] = restored_container_name # Update config for consistency
+        self._config["container_name"] = (
+            restored_container_name  # Update config for consistency
+        )
 
         run_options = self._config.get("docker_run_options", {}).copy()
         run_options["detach"] = True
@@ -223,8 +288,9 @@ class DockerResource(ForkableResource):
             self._container.reload()
             # print(f"DockerResource restore: Started container {self._container.id[:12]} from checkpoint image {image_id[:12]}")
         except APIError as e:
-            raise DockerException(f"Failed to start container from checkpoint image {image_id[:12]}: {e}") from e
-
+            raise DockerException(
+                f"Failed to start container from checkpoint image {image_id[:12]}: {e}"
+            ) from e
 
     async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
@@ -240,30 +306,35 @@ class DockerResource(ForkableResource):
         """
         if self._is_closed or not self._container:
             raise RuntimeError("Cannot execute step: resource is closed or not set up.")
-        
+
         self._container.reload()
         if self._container.status != "running":
-            try: # Attempt to start if stopped
+            try:  # Attempt to start if stopped
                 self._container.start()
                 self._container.reload()
                 if self._container.status != "running":
-                     raise DockerException(f"Container {self._container.id[:12]} is not running (status: {self._container.status}). Cannot execute step.")
+                    raise DockerException(
+                        f"Container {self._container.id[:12]} is not running (status: {self._container.status}). Cannot execute step."
+                    )
             except APIError as e:
-                raise DockerException(f"Failed to start container {self._container.id[:12]} for step: {e}") from e
-
+                raise DockerException(
+                    f"Failed to start container {self._container.id[:12]} for step: {e}"
+                ) from e
 
         if action_name == "exec_command":
             command = action_params.get("command")
             if not command:
-                raise ValueError("Missing 'command' in action_params for 'exec_command'.")
-            
+                raise ValueError(
+                    "Missing 'command' in action_params for 'exec_command'."
+                )
+
             exec_options = {
                 "cmd": command,
                 "stdout": True,
                 "stderr": True,
                 "workdir": action_params.get("workdir"),
                 "user": action_params.get("user"),
-                "demux": False, # Get stdout and stderr interleaved as a single stream
+                "demux": False,  # Get stdout and stderr interleaved as a single stream
             }
             # Filter out None values for docker SDK
             exec_options = {k: v for k, v in exec_options.items() if v is not None}
@@ -271,9 +342,14 @@ class DockerResource(ForkableResource):
             try:
                 exit_code, output_stream = self._container.exec_run(**exec_options)
                 output_bytes = output_stream if output_stream else b""
-                return {"exit_code": exit_code, "output": output_bytes.decode('utf-8', errors='replace')}
+                return {
+                    "exit_code": exit_code,
+                    "output": output_bytes.decode("utf-8", errors="replace"),
+                }
             except APIError as e:
-                raise DockerException(f"Failed to execute command in container {self._container.id[:12]}: {e}") from e
+                raise DockerException(
+                    f"Failed to execute command in container {self._container.id[:12]}: {e}"
+                ) from e
 
         elif action_name == "get_logs":
             log_options = {
@@ -284,12 +360,15 @@ class DockerResource(ForkableResource):
             }
             try:
                 logs_bytes = self._container.logs(**log_options)
-                return logs_bytes.decode('utf-8', errors='replace')
+                return logs_bytes.decode("utf-8", errors="replace")
             except APIError as e:
-                raise DockerException(f"Failed to get logs for container {self._container.id[:12]}: {e}") from e
+                raise DockerException(
+                    f"Failed to get logs for container {self._container.id[:12]}: {e}"
+                ) from e
         else:
-            raise NotImplementedError(f"Action '{action_name}' not supported by DockerResource.")
-
+            raise NotImplementedError(
+                f"Action '{action_name}' not supported by DockerResource."
+            )
 
     async def get_observation(self) -> Dict[str, Any]:
         """
@@ -297,13 +376,17 @@ class DockerResource(ForkableResource):
         """
         if self._is_closed or not self._container:
             return {"status": "closed or not_initialized"}
-        
+
         self._container.reload()
         return {
             "type": "docker",
             "container_id": self._container.id,
             "container_name": self._container.name,
-            "image_id": self._container.image.id if hasattr(self._container, 'image') and self._container.image else self._image_id_for_fork_or_checkpoint,
+            "image_id": (
+                self._container.image.id
+                if hasattr(self._container, "image") and self._container.image
+                else self._image_id_for_fork_or_checkpoint
+            ),
             "status": self._container.status,
             "ports": self._container.ports,
         }
@@ -322,15 +405,24 @@ class DockerResource(ForkableResource):
                         "type": "object",
                         "properties": {
                             "command": {
-                                "oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}],
-                                "description": "The command to execute (string or list of strings)."
+                                "oneOf": [
+                                    {"type": "string"},
+                                    {"type": "array", "items": {"type": "string"}},
+                                ],
+                                "description": "The command to execute (string or list of strings).",
                             },
-                            "workdir": {"type": "string", "description": "Working directory inside the container (optional)."},
-                            "user": {"type": "string", "description": "User to run command as (optional)."}
+                            "workdir": {
+                                "type": "string",
+                                "description": "Working directory inside the container (optional).",
+                            },
+                            "user": {
+                                "type": "string",
+                                "description": "User to run command as (optional).",
+                            },
                         },
-                        "required": ["command"]
-                    }
-                }
+                        "required": ["command"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -340,16 +432,28 @@ class DockerResource(ForkableResource):
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "stdout": {"type": "boolean", "default": True, "description": "Include stdout."},
-                            "stderr": {"type": "boolean", "default": True, "description": "Include stderr."},
+                            "stdout": {
+                                "type": "boolean",
+                                "default": True,
+                                "description": "Include stdout.",
+                            },
+                            "stderr": {
+                                "type": "boolean",
+                                "default": True,
+                                "description": "Include stderr.",
+                            },
                             "tail": {
-                                "oneOf": [{"type": "integer"}, {"type": "string", "enum": ["all"]}],
-                                "default": "all", "description": "Number of lines from end of logs or 'all'."
-                            }
+                                "oneOf": [
+                                    {"type": "integer"},
+                                    {"type": "string", "enum": ["all"]},
+                                ],
+                                "default": "all",
+                                "description": "Number of lines from end of logs or 'all'.",
+                            },
                         },
-                    }
-                }
-            }
+                    },
+                },
+            },
         ]
 
     async def close(self) -> None:
@@ -364,7 +468,7 @@ class DockerResource(ForkableResource):
         # print(f"DockerResource close called for container: {self._container.id[:12] if self._container else 'None'}")
         self._cleanup_container(self._container)
         self._container = None
-        
+
         # Cleanup the image that this container was based on, IF it was a result of a fork/checkpoint
         # and not the original user-provided image_name from config.
         # This logic is a bit tricky: we only want to remove images we created.
@@ -372,16 +476,20 @@ class DockerResource(ForkableResource):
         # If this ID is different from self._config.get("image_name") (the very first image),
         # then it's an image we created via commit.
         original_base_image_name = self._config.get("image_name")
-        if self._image_id_for_fork_or_checkpoint and self._image_id_for_fork_or_checkpoint != original_base_image_name:
+        if (
+            self._image_id_for_fork_or_checkpoint
+            and self._image_id_for_fork_or_checkpoint != original_base_image_name
+        ):
             # Check if the image ID is a full ID or a tag like the original.
             # This check might need refinement if original_base_image_name is an ID itself.
             try:
                 img_obj = self._client.images.get(original_base_image_name)
                 if img_obj.id != self._image_id_for_fork_or_checkpoint:
                     self._cleanup_image(self._image_id_for_fork_or_checkpoint)
-            except NotFound: # Original image name might not be an ID, or might have been removed.
-                 self._cleanup_image(self._image_id_for_fork_or_checkpoint)
-
+            except (
+                NotFound
+            ):  # Original image name might not be an ID, or might have been removed.
+                self._cleanup_image(self._image_id_for_fork_or_checkpoint)
 
         self._image_id_for_fork_or_checkpoint = None
         self._is_closed = True

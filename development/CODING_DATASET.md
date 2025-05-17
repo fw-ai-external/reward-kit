@@ -133,7 +133,7 @@ def normalize_problem_to_openai_format(problem_json: dict, filename: str, is_mul
 
         raw_user_field_content = None # Content from the field like 'prompt' or 'content'
         # ... (logic to find raw_user_field_content using user_content_keys) ...
-        
+
         raw_assistant_content = None
         # ... (logic to find raw_assistant_content using assistant_content_keys) ...
 
@@ -182,7 +182,7 @@ def normalize_problem_to_openai_format(problem_json: dict, filename: str, is_mul
                     # ... (other newline handling) ...
             else:
                 final_user_content = raw_user_field_content
-        
+
         # ... (rest of the validation, label processing, multilingual filtering) ...
 
         if not final_user_content.strip() or not final_assistant_content.strip():

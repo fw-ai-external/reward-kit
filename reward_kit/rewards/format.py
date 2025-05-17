@@ -7,16 +7,18 @@ in the correct order.
 """
 
 import re
-from typing import Dict, List, Any, Union, Optional # Added Optional
+from typing import Any, Dict, List, Optional, Union  # Added Optional
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 @reward_function
 def format_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Not used by this function but part of standard signature
     format_regex: str = r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$",
     require_exact_match: bool = True,
     **kwargs: Any
@@ -83,7 +85,7 @@ def format_reward(
                 },
             )
         text = response.get("content", "")
-    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",

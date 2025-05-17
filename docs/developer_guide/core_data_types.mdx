@@ -126,14 +126,14 @@ The Reward Kit provides built-in methods for converting between types:
 ```python
 # Convert EvaluateResult to RewardOutput (for backwards compatibility)
 evaluate_result = EvaluateResult(
-    score=0.8, 
+    score=0.8,
     metrics={"quality": MetricResult(score=0.8, reason="Good quality")}
 )
 reward_output = evaluate_result.to_reward_output()
 
 # Convert RewardOutput to EvaluateResult
 reward_output = RewardOutput(
-    score=0.9, 
+    score=0.9,
     metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")}
 )
 evaluate_result = reward_output.to_evaluate_result()
@@ -159,13 +159,13 @@ def my_reward_function(
     """
     # Default values
     metadata = metadata or {}
-    
+
     # Get the assistant's response
     response = messages[-1].get("content", "")
-    
+
     # Evaluate the response
     clarity_score = evaluate_clarity(response)
-    
+
     # Create metrics
     metrics = {
         "clarity": MetricResult(
@@ -174,9 +174,9 @@ def my_reward_function(
             success=clarity_score >= 0.7  # Optional success indicator
         )
     }
-    
+
     return EvaluateResult(
-        score=clarity_score, 
+        score=clarity_score,
         reason=f"Overall quality assessment: {clarity_score:.2f}",
         metrics=metrics
     )
@@ -218,7 +218,7 @@ def my_reward(messages, **kwargs):
         reason="Overall assessment",  # Add an overall reason
         metrics={
             "clarity": MetricResult(
-                score=0.8, 
+                score=0.8,
                 reason="Clear explanation",
                 success=True  # Add success flag if applicable
             )

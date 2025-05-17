@@ -6,10 +6,10 @@ specified XML/HTML-like tags in correct quantities.
 """
 
 import re
-from typing import Dict, List, Any, Union, Set
+from typing import Any, Dict, List, Set, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 @reward_function
@@ -48,7 +48,7 @@ def tag_count_reward(
             },
         )
 
-    response = messages[-1] # response is a Message object
+    response = messages[-1]  # response is a Message object
 
     # Check if it's an assistant message with content
     if response.role != "assistant" or not response.content:
@@ -110,9 +110,7 @@ def tag_count_reward(
                 if (opening_count > 0 and closing_count > 0 and is_balanced)
                 else 0.0
             )
-            tag_success = (
-                opening_count > 0 and closing_count > 0 and is_balanced
-            )
+            tag_success = opening_count > 0 and closing_count > 0 and is_balanced
         else:
             has_tags = opening_count > 0 or closing_count > 0
             tag_score = 1.0 if has_tags else 0.0
@@ -121,9 +119,7 @@ def tag_count_reward(
         tag_metrics[f"tag_{tag}"] = MetricResult(
             score=tag_score,
             success=tag_success,
-            reason=_get_tag_reason(
-                tag, opening_count, closing_count, require_balanced
-            ),
+            reason=_get_tag_reason(tag, opening_count, closing_count, require_balanced),
         )
 
     # Calculate overall score

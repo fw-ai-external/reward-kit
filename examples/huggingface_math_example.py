@@ -7,9 +7,7 @@ import sys
 from pathlib import Path
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
@@ -22,12 +20,9 @@ if not os.environ.get("FIREWORKS_API_KEY"):
     )
 
 # Import the evaluation functions
-from reward_kit.evaluation import (
-    preview_evaluation,
-    huggingface_dataset_to_jsonl,
-)
-from reward_kit.rewards.math import math_reward
+from reward_kit.evaluation import huggingface_dataset_to_jsonl, preview_evaluation
 from reward_kit.rewards.length import length_reward
+from reward_kit.rewards.math import math_reward
 
 
 def main():
@@ -63,9 +58,7 @@ def main():
             {"role": "assistant", "content": custom_solution},
         ]
         math_result = math_reward(messages=messages, original_messages=messages)
-        length_result = length_reward(
-            messages=messages, original_messages=messages
-        )
+        length_result = length_reward(messages=messages, original_messages=messages)
 
         print(f"Problem: {problem}")
         print(f"Problem: {problem}")
@@ -74,9 +67,7 @@ def main():
         if math_result.get("metrics"):
             print("Detailed math metrics:")
             for metric_name, metric_value in math_result["metrics"].items():
-                print(
-                    f"  {metric_name}: {metric_value.score} - {metric_value.reason}"
-                )
+                print(f"  {metric_name}: {metric_value.score} - {metric_value.reason}")
         if length_result.get("metrics"):
             print("Detailed length metrics:")
             for metric_name, metric_value in length_result["metrics"].items():
@@ -85,9 +76,7 @@ def main():
                 )
 
     except ImportError:
-        print(
-            "Could not load datasets package. Install with: pip install 'datasets'"
-        )
+        print("Could not load datasets package. Install with: pip install 'datasets'")
 
 
 if __name__ == "__main__":

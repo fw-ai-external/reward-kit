@@ -11,15 +11,17 @@ Requirements:
 """
 
 from reward_kit.rewards.lean_prover import (
-    lean_prover_reward,
-    deepseek_prover_v2_reward,
     deepseek_huggingface_prover_benchmark,
+    deepseek_prover_v2_reward,
+    lean_prover_reward,
 )
 
 
 def main():
     # Example statement and response
-    statement = "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    statement = (
+        "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
+    )
 
     # Example of a partial proof with "sorry"
     partial_response = """
@@ -40,7 +42,7 @@ def main():
       -- Base case: n = 0
       { simp, },
       -- Inductive step: assume true for n = d, prove for n = d + 1
-      { 
+      {
         have step1 : ∑ i in range (d + 1), i = (∑ i in range d, i) + d,
           by simp [sum_range_succ],
         have step2 : (∑ i in range d, i) + d = d * (d + 1) / 2 + d,
@@ -95,30 +97,21 @@ def main():
     # Print results
     print("Basic evaluation (partial proof):")
     print(f"Score: {basic_partial_result.score}")
-    if (
-        hasattr(basic_partial_result, "metrics")
-        and basic_partial_result.metrics
-    ):
+    if hasattr(basic_partial_result, "metrics") and basic_partial_result.metrics:
         print("Metrics:")
         for metric_name, metric in basic_partial_result.metrics.items():
             print(f"  {metric_name}: {metric.score} - {metric.reason}")
 
     print("\nBasic evaluation (complete proof):")
     print(f"Score: {basic_complete_result.score}")
-    if (
-        hasattr(basic_complete_result, "metrics")
-        and basic_complete_result.metrics
-    ):
+    if hasattr(basic_complete_result, "metrics") and basic_complete_result.metrics:
         print("Metrics:")
         for metric_name, metric in basic_complete_result.metrics.items():
             print(f"  {metric_name}: {metric.score} - {metric.reason}")
 
     print("\nAdvanced evaluation (partial proof):")
     print(f"Score: {advanced_partial_result.score}")
-    if (
-        hasattr(advanced_partial_result, "metrics")
-        and advanced_partial_result.metrics
-    ):
+    if hasattr(advanced_partial_result, "metrics") and advanced_partial_result.metrics:
         print("Metrics:")
         for metric_name, metric in advanced_partial_result.metrics.items():
             print(f"  {metric_name}: {metric.score} - {metric.reason}")
@@ -153,20 +146,14 @@ def main():
         )
 
         # 2. Second approach: Use the HuggingFace dataset directly
-        print(
-            "\n\nLoading actual DeepSeek-ProverBench dataset from HuggingFace..."
-        )
+        print("\n\nLoading actual DeepSeek-ProverBench dataset from HuggingFace...")
 
         try:
             # Load the actual dataset (this will download it if not already available)
-            dataset = load_dataset(
-                "deepseek-ai/DeepSeek-ProverBench", split="train"
-            )
+            dataset = load_dataset("deepseek-ai/DeepSeek-ProverBench", split="train")
 
             if len(dataset) > 0:
-                print(
-                    f"Successfully loaded dataset with {len(dataset)} examples"
-                )
+                print(f"Successfully loaded dataset with {len(dataset)} examples")
 
                 # Get a sample statement from the dataset
                 sample_idx = 0
@@ -205,9 +192,7 @@ def main():
                 print(f"  {metric_name}: {metric.score} - {metric.reason}")
 
     except ImportError:
-        print(
-            "\nSkipping benchmark evaluation - 'datasets' package not installed."
-        )
+        print("\nSkipping benchmark evaluation - 'datasets' package not installed.")
         print("Install with: pip install reward-kit[deepseek]")
 
 

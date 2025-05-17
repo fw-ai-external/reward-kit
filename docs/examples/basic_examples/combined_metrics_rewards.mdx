@@ -83,7 +83,7 @@ An `EvaluateResult` object with:
 - **metrics**:
   - **combined_reward**: Overall evaluation result
   - **accuracy**: Accuracy component evaluation
-  - **length**: Length component evaluation 
+  - **length**: Length component evaluation
   - **token_count**: Token count details
 
 #### Example
@@ -140,8 +140,8 @@ from reward_kit import reward_function, RewardOutput, MetricRewardOutput
 
 @reward_function
 def accuracy_reasoning_reward(
-    messages, 
-    ground_truth=None, 
+    messages,
+    ground_truth=None,
     accuracy_weight=0.6,
     reasoning_weight=0.4,
     **kwargs
@@ -152,19 +152,19 @@ def accuracy_reasoning_reward(
         messages=messages,
         ground_truth=ground_truth
     )
-    
+
     # Evaluate reasoning steps
     reasoning_result = reasoning_steps_reward(
         messages=messages,
         min_steps=3
     )
-    
+
     # Calculate combined score
     combined_score = (
-        accuracy_weight * accuracy_result["score"] + 
+        accuracy_weight * accuracy_result["score"] +
         reasoning_weight * reasoning_result["score"]
     )
-    
+
     # Combine metrics
     metrics = {
         "accuracy": MetricRewardOutput(
@@ -176,7 +176,7 @@ def accuracy_reasoning_reward(
             reason=reasoning_result["reason"]
         )
     }
-    
+
     return RewardOutput(score=combined_score, metrics=metrics)
 ```
 

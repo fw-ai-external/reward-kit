@@ -33,35 +33,35 @@ def comprehensive_evaluation(messages, original_messages=None, **kwargs):
     """Evaluates response quality using multiple component metrics."""
     response = messages[-1].get("content", "")
     metrics = {}
-    
+
     # Clarity component
     clarity_score = evaluate_clarity(response)
     metrics["clarity"] = MetricRewardOutput(
         score=clarity_score,
         reason=f"Clarity score: {clarity_score:.2f}"
     )
-    
+
     # Accuracy component
     accuracy_score = evaluate_accuracy(response)
     metrics["accuracy"] = MetricRewardOutput(
         score=accuracy_score,
         reason=f"Accuracy score: {accuracy_score:.2f}"
     )
-    
+
     # Helpfulness component
     helpfulness_score = evaluate_helpfulness(response)
     metrics["helpfulness"] = MetricRewardOutput(
         score=helpfulness_score,
         reason=f"Helpfulness score: {helpfulness_score:.2f}"
     )
-    
+
     # Weighted combination
     final_score = (
         clarity_score * 0.3 +
         accuracy_score * 0.4 +
         helpfulness_score * 0.3
     )
-    
+
     return RewardOutput(score=final_score, metrics=metrics)
 ```
 
@@ -133,7 +133,7 @@ def robust_reward(messages, original_messages=None, **kwargs):
                 reason="No messages provided"
             )}
         )
-    
+
     # Check for assistant message
     if messages[-1].get("role") != "assistant":
         return RewardOutput(
@@ -143,7 +143,7 @@ def robust_reward(messages, original_messages=None, **kwargs):
                 reason="Last message is not from assistant"
             )}
         )
-    
+
     # Check for missing content
     response = messages[-1].get("content")
     if not response:
@@ -154,7 +154,7 @@ def robust_reward(messages, original_messages=None, **kwargs):
                 reason="Assistant message has no content"
             )}
         )
-    
+
     # Now process the valid input
     # ...
 ```
@@ -201,7 +201,7 @@ def safe_evaluation(messages, original_messages=None, **kwargs):
     except Exception as e:
         # Log the error (in a real implementation)
         print(f"Error in evaluation: {str(e)}")
-        
+
         # Return a fallback result
         return RewardOutput(
             score=0.0,
@@ -248,22 +248,22 @@ Cache results for reuse within the same evaluation:
 def optimized_reward(messages, original_messages=None, **kwargs):
     """Reward function with optimized calculations."""
     response = messages[-1].get("content", "")
-    
+
     # Calculate expensive operations once
     words = response.lower().split()
     word_count = len(words)
     unique_words = set(words)
-    
+
     # Reuse these calculations in multiple metrics
     metrics = {}
-    
+
     # Length metric
     length_score = min(word_count / 100, 1.0)
     metrics["length"] = MetricRewardOutput(
         score=length_score,
         reason=f"Word count: {word_count}"
     )
-    
+
     # Vocabulary metric (reuses words and unique_words)
     vocabulary_richness = len(unique_words) / max(word_count, 1)
     vocabulary_score = min(vocabulary_richness * 5, 1.0)
@@ -271,7 +271,7 @@ def optimized_reward(messages, original_messages=None, **kwargs):
         score=vocabulary_score,
         reason=f"Vocabulary richness: {vocabulary_richness:.2f}"
     )
-    
+
     # ...
 ```
 
@@ -332,16 +332,16 @@ def early_return_reward(messages, original_messages=None, **kwargs):
     # Early return for empty input
     if not messages:
         return RewardOutput(score=0.0, metrics={})
-    
+
     response = messages[-1].get("content", "")
-    
+
     # Early return for very short responses
     if len(response) < 10:
         return RewardOutput(
             score=0.1,
             metrics={"length": MetricRewardOutput(score=0.1, reason="Response too short")}
         )
-    
+
     # Only continue with full evaluation for non-trivial responses
     # ...
 ```
@@ -385,7 +385,7 @@ def test_reward_function():
             {"role": "assistant", "content": None, "function_call": {"name": "get_weather", "arguments": '{"location": "Paris"}'}}
         ]}
     ]
-    
+
     for i, case in enumerate(test_cases):
         print(f"Test case {i+1}:")
         result = my_reward_function(messages=case["messages"])
@@ -409,21 +409,21 @@ import logging
 def loggable_reward(messages, original_messages=None, **kwargs):
     """Reward function with detailed logging."""
     logging.debug("Starting evaluation with %d messages", len(messages))
-    
+
     response = messages[-1].get("content", "")
     logging.debug("Response length: %d characters", len(response))
-    
+
     # Component calculations with logging
     clarity_score = evaluate_clarity(response)
     logging.debug("Clarity score: %.2f", clarity_score)
-    
+
     accuracy_score = evaluate_accuracy(response)
     logging.debug("Accuracy score: %.2f", accuracy_score)
-    
+
     # Final calculation
     final_score = (clarity_score + accuracy_score) / 2
     logging.debug("Final score: %.2f", final_score)
-    
+
     # Return result
     return RewardOutput(
         score=final_score,
@@ -447,7 +447,7 @@ from reward_kit import RewardOutput
 from my_rewards import clarity_reward
 
 class TestClarityReward(unittest.TestCase):
-    
+
     def test_perfect_clarity(self):
         """Test with a perfectly clear response."""
         messages = [
@@ -456,7 +456,7 @@ class TestClarityReward(unittest.TestCase):
         ]
         result = clarity_reward(messages=messages)
         self.assertGreaterEqual(result.score, 0.8, "Perfect clarity example should score highly")
-    
+
     def test_poor_clarity(self):
         """Test with a response that lacks clarity."""
         messages = [
@@ -465,7 +465,7 @@ class TestClarityReward(unittest.TestCase):
         ]
         result = clarity_reward(messages=messages)
         self.assertLessEqual(result.score, 0.5, "Poor clarity example should score lower")
-    
+
     def test_empty_response(self):
         """Test with an empty response."""
         messages = [
@@ -474,7 +474,7 @@ class TestClarityReward(unittest.TestCase):
         ]
         result = clarity_reward(messages=messages)
         self.assertEqual(result.score, 0.0, "Empty response should score 0")
-    
+
     def test_component_metrics(self):
         """Test that component metrics are present."""
         messages = [
@@ -505,12 +505,12 @@ def documented_reward(
 ) -> RewardOutput:
     """
     Evaluates the helpfulness of a response based on content relevance and specificity.
-    
+
     This reward function assesses:
     1. Query relevance: How well the response addresses the user's question
     2. Specificity: Whether the response provides specific details rather than general information
     3. Actionability: Whether the response provides clear, actionable advice when appropriate
-    
+
     Args:
         messages: List of conversation messages, with the last one being evaluated
         original_messages: Previous messages for context (defaults to all but last message)
@@ -519,12 +519,12 @@ def documented_reward(
             - min_length: int - Minimum expected response length (defaults to 50)
             - max_length: int - Maximum expected response length (defaults to 500)
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         RewardOutput object containing:
             - score: Overall helpfulness score from 0.0 to 1.0
             - metrics: Component metrics with individual scores and explanations
-    
+
     Example:
         >>> messages = [
         ...     {"role": "user", "content": "How do I reset my password?"},
@@ -549,25 +549,25 @@ def calculate_relevance_score(query, response):
     # Tokenize query and response
     query_words = set(query.lower().split())
     response_words = set(response.lower().split())
-    
+
     # Remove common stop words to focus on meaningful terms
     stop_words = {"the", "a", "an", "in", "on", "at", "to", "for", "with", "by"}
     query_words = query_words - stop_words
     response_words = response_words - stop_words
-    
+
     # If no meaningful query words, return middle score since we can't assess
     if not query_words:
         return 0.5
-    
+
     # Calculate overlap between query and response terms
     # This is a simple keyword matching approach
     common_words = query_words.intersection(response_words)
     overlap_ratio = len(common_words) / len(query_words)
-    
+
     # Apply non-linear scaling to emphasize higher overlap
     # This rewards responses that cover most query terms
     relevance_score = min(overlap_ratio ** 0.8, 1.0)
-    
+
     return relevance_score
 ```
 
@@ -612,11 +612,11 @@ def typed_reward(
     """Reward function with proper type annotations."""
     # Extract the response
     response: str = messages[-1].get("content", "")
-    
+
     # Calculate component scores
     clarity_score: float = calculate_clarity(response)
     helpfulness_score: float = calculate_helpfulness(response)
-    
+
     # Create metrics dictionary
     metrics: Dict[str, MetricRewardOutput] = {
         "clarity": MetricRewardOutput(
@@ -628,10 +628,10 @@ def typed_reward(
             reason=f"Helpfulness score: {helpfulness_score:.2f}"
         )
     }
-    
+
     # Calculate final score
     final_score: float = (clarity_score + helpfulness_score) / 2
-    
+
     return RewardOutput(score=final_score, metrics=metrics)
 
 def calculate_clarity(text: str) -> float:

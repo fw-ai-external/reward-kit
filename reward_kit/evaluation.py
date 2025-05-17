@@ -138,6 +138,9 @@ def huggingface_dataset_to_jsonl(
     return output_file
 
 
+import types  # Ensure this is at the top with other imports
+
+
 class EvaluatorPreviewResult:
     """Class to store preview results for an evaluator"""
 
@@ -148,14 +151,14 @@ class EvaluatorPreviewResult:
 
     def add_result(self, sample_index, success, score, per_metric_evals):
         """Add a result for a specific sample"""
-        self.results.append(
-            {
-                "index": sample_index,
-                "success": success,
-                "score": score,
-                "per_metric_evals": per_metric_evals,
-            }
+        # Store as a SimpleNamespace to allow attribute access
+        result_obj = types.SimpleNamespace(
+            index=sample_index,
+            success=success,
+            score=score,
+            per_metric_evals=per_metric_evals,
         )
+        self.results.append(result_obj)
 
     def display(self):
         """Display formatted results"""

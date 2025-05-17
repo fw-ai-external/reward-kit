@@ -2,6 +2,27 @@
 
 # High pri issues
 
+## Developer have an hard time understanding error types
+
+```
+bennychen@Bennys-MacBook-Air reward-kit % PYTHONPATH=. python3 examples/math_example/fireworks_regenerate.py --regenerate-recorded-data
+....
+
+--- Regeneration & Evaluation Summary ---
+Total samples attempted in this run: 100
+Samples passed (among attempted): 86
+Samples failed (among attempted): 14
+
+Some samples failed or an error occurred during regeneration/evaluation for this run.
+
+Successfully saved recorded API calls to /Users/bennychen/Documents/reward-kit/examples/math_example/fireworks_regenerate_recorded_data.jsonl
+```
+
+We need to help people classify the error types.
+
+## TRL ref model
+I think I need to pick a reasonable ref mode for GRPO? Let's make sure we dig to come up with a reasonable default here.
+
 ## Data filtering script still not filtering things properly
 
 ```

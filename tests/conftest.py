@@ -2,14 +2,17 @@
 Pytest configuration file for reward-kit tests.
 """
 
-import pytest
 import sys
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import pytest
+
 from reward_kit.models import EvaluateResult, MetricResult
 
 # Check if e2b is available and skip related tests if not
 try:
     import e2b
+
     HAS_E2B = True
 except ImportError:
     HAS_E2B = False

@@ -13,6 +13,7 @@ You can get an E2B API key from https://e2b.dev/dashboard
 
 import argparse
 import os
+
 from reward_kit.rewards.code_execution import e2b_code_execution_reward
 
 
@@ -50,10 +51,10 @@ def main():
 function isPalindrome(str) {
     // Remove non-alphanumeric characters and convert to lowercase
     const cleanStr = str.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
+
     // Compare with its reverse
     const reversedStr = cleanStr.split('').reverse().join('');
-    
+
     return cleanStr === reversedStr;
 }
 

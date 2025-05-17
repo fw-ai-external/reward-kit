@@ -1,10 +1,11 @@
 """
 FileSystemResource: A ForkableResource for managing a directory structure as state.
 """
-import shutil
+
 import os
-import uuid
+import shutil
 import tarfile
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -30,8 +31,12 @@ class FileSystemResource(ForkableResource):
     def __init__(self) -> None:
         self._config: Dict[str, Any] = {}
         self._managed_dir_path: Optional[Path] = None
-        self._base_managed_dir_path: Optional[Path] = None # Stores the path of the initial setup
-        self._temp_base_dir = Path("./.rk_temp_fs").resolve() # Resolve to absolute path
+        self._base_managed_dir_path: Optional[Path] = (
+            None  # Stores the path of the initial setup
+        )
+        self._temp_base_dir = Path(
+            "./.rk_temp_fs"
+        ).resolve()  # Resolve to absolute path
         self._temp_base_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_new_managed_path(self, prefix: str = "fs_") -> Path:
@@ -52,23 +57,31 @@ class FileSystemResource(ForkableResource):
                     Example: {"subdir/file.txt": "Hello", "root_file.py": "print('world')"}
         """
         self._config = config.copy()
-        
+
         base_dir_name = self._config.get("base_dir_name", f"fs_base_{uuid.uuid4().hex}")
         self._base_managed_dir_path = self._temp_base_dir / base_dir_name
-        self._managed_dir_path = self._base_managed_dir_path # Initially, current is base
+        self._managed_dir_path = (
+            self._base_managed_dir_path
+        )  # Initially, current is base
 
-        if self._base_managed_dir_path.exists():
-            shutil.rmtree(self._base_managed_dir_path) # Clean start
-        self._base_managed_dir_path.mkdir(parents=True)
+        if (
+            self._base_managed_dir_path is not None
+            and self._base_managed_dir_path.exists()
+        ):
+            shutil.rmtree(self._base_managed_dir_path)  # Clean start
+        if self._base_managed_dir_path is not None:
+            self._base_managed_dir_path.mkdir(parents=True)
 
         initial_files = self._config.get("initial_files", {})
         for rel_path_str, content in initial_files.items():
-            abs_path = self._base_managed_dir_path / Path(rel_path_str)
+            if self._base_managed_dir_path is not None:
+                abs_path = self._base_managed_dir_path / Path(rel_path_str)
+            else:
+                raise ValueError("Base managed directory path is not set")
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with open(abs_path, "w", encoding="utf-8") as f:
                 f.write(content)
         # print(f"FileSystemResource setup. Base dir: {self._base_managed_dir_path}")
-
 
     async def fork(self) -> "FileSystemResource":
         """
@@ -76,7 +89,9 @@ class FileSystemResource(ForkableResource):
         current managed directory state.
         """
         if not self._managed_dir_path or not self._managed_dir_path.exists():
-            raise RuntimeError("Cannot fork: managed directory does not exist or setup was not called.")
+            raise RuntimeError(
+                "Cannot fork: managed directory does not exist or setup was not called."
+            )
 
         forked_resource = FileSystemResource()
         forked_resource._config = self._config.copy()
@@ -84,15 +99,17 @@ class FileSystemResource(ForkableResource):
 
         # The new fork's "base" is the current state of this resource
         # forked_resource._base_managed_dir_path = self._managed_dir_path
-        
+
         forked_dir_path = self._get_new_managed_path(prefix="fs_fork_")
         shutil.copytree(self._managed_dir_path, forked_dir_path)
-        
+
         forked_resource._managed_dir_path = forked_dir_path
         # The concept of _base_managed_dir_path for a fork is tricky.
         # For now, a fork doesn't have its own "base template" in the same way the first instance does.
         # It's just a live copy. If it forks again, its current state is copied.
-        forked_resource._base_managed_dir_path = None # Or perhaps self._managed_dir_path?
+        forked_resource._base_managed_dir_path = (
+            None  # Or perhaps self._managed_dir_path?
+        )
 
         # print(f"FileSystemResource forked. New dir: {forked_resource._managed_dir_path} from {self._managed_dir_path}")
         return forked_resource
@@ -104,13 +121,15 @@ class FileSystemResource(ForkableResource):
         if not self._managed_dir_path or not self._managed_dir_path.exists():
             raise RuntimeError("Cannot checkpoint: managed directory does not exist.")
 
-        checkpoint_filename = f"checkpoint_fs_{self._managed_dir_path.name}_{uuid.uuid4().hex}.tar.gz"
+        checkpoint_filename = (
+            f"checkpoint_fs_{self._managed_dir_path.name}_{uuid.uuid4().hex}.tar.gz"
+        )
         checkpoint_path = self._temp_base_dir / checkpoint_filename
-        
+
         with tarfile.open(checkpoint_path, "w:gz") as tar:
             # Add files relative to the managed_dir_path so they extract correctly
             tar.add(str(self._managed_dir_path), arcname=".")
-            
+
         # print(f"FileSystemResource checkpointed. Dir: {self._managed_dir_path} to {checkpoint_path}")
         return {"type": "filesystem_tar_gz", "checkpoint_path": str(checkpoint_path)}
 
@@ -131,31 +150,34 @@ class FileSystemResource(ForkableResource):
 
         if not self._managed_dir_path:
             self._managed_dir_path = self._get_new_managed_path(prefix="fs_restored_")
-        
+
         if self._managed_dir_path.exists():
-            shutil.rmtree(self._managed_dir_path) # Clean before restore
+            shutil.rmtree(self._managed_dir_path)  # Clean before restore
         self._managed_dir_path.mkdir(parents=True)
 
         with tarfile.open(checkpoint_path, "r:gz") as tar:
             tar.extractall(path=str(self._managed_dir_path))
-        
+
         # The restored state becomes the new "base" for subsequent forks from this instance
         # self._base_managed_dir_path = self._managed_dir_path
         # print(f"FileSystemResource restored. Dir: {self._managed_dir_path} from {checkpoint_path}")
-
 
     # _resolve_path is a synchronous helper, no need to make it async unless it performs async I/O
     def _resolve_path(self, rel_path: Union[str, Path]) -> Path:
         """Resolves a relative path against the managed directory and ensures it's within."""
         if not self._managed_dir_path:
             raise RuntimeError("Managed directory path not set.")
-        
+
         abs_path = (self._managed_dir_path / rel_path).resolve()
-        
+
         # Security check: ensure the path is within the managed directory
-        if self._managed_dir_path.resolve() not in abs_path.parents and \
-           abs_path != self._managed_dir_path.resolve():
-            raise ValueError(f"Path '{rel_path}' attempts to access outside the managed directory.")
+        if (
+            self._managed_dir_path.resolve() not in abs_path.parents
+            and abs_path != self._managed_dir_path.resolve()
+        ):
+            raise ValueError(
+                f"Path '{rel_path}' attempts to access outside the managed directory."
+            )
         return abs_path
 
     async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
@@ -177,65 +199,114 @@ class FileSystemResource(ForkableResource):
             Params: {'path': str}
         """
         path_str = action_params.get("path")
-        if path_str is None and action_name not in []: # Some actions might not need a path
-             raise ValueError(f"Missing 'path' in action_params for '{action_name}'.")
-        
+        if (
+            path_str is None and action_name not in []
+        ):  # Some actions might not need a path
+            raise ValueError(f"Missing 'path' in action_params for '{action_name}'.")
+
         abs_path = self._resolve_path(path_str) if path_str else None
 
         if action_name == "create_file" or action_name == "write_file":
-            if not abs_path: raise ValueError("Path is required for create/write_file")
+            if not abs_path:
+                raise ValueError("Path is required for create/write_file")
             content = action_params.get("content", "")
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with open(abs_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            return {"status": "success", "path": str(abs_path.relative_to(self._managed_dir_path))}
-        
+            return {
+                "status": "success",
+                "path": (
+                    str(abs_path.relative_to(self._managed_dir_path))
+                    if self._managed_dir_path is not None
+                    else str(abs_path)
+                ),
+            }
+
         elif action_name == "read_file":
-            if not abs_path: raise ValueError("Path is required for read_file")
+            if not abs_path:
+                raise ValueError("Path is required for read_file")
             if not abs_path.is_file():
                 raise FileNotFoundError(f"File not found: {path_str}")
             with open(abs_path, "r", encoding="utf-8") as f:
                 return f.read()
 
         elif action_name == "delete_file":
-            if not abs_path: raise ValueError("Path is required for delete_file")
+            if not abs_path:
+                raise ValueError("Path is required for delete_file")
             if not abs_path.is_file():
                 raise FileNotFoundError(f"File not found: {path_str}")
             abs_path.unlink()
-            return {"status": "success", "path": str(abs_path.relative_to(self._managed_dir_path))}
+            return {
+                "status": "success",
+                "path": (
+                    str(abs_path.relative_to(self._managed_dir_path))
+                    if self._managed_dir_path is not None
+                    else str(abs_path)
+                ),
+            }
 
         elif action_name == "list_dir":
-            if not abs_path: raise ValueError("Path is required for list_dir")
+            if not abs_path:
+                raise ValueError("Path is required for list_dir")
             if not abs_path.is_dir():
                 raise NotADirectoryError(f"Not a directory: {path_str}")
-            
+
             recursive = action_params.get("recursive", False)
             items = []
             if recursive:
                 for item in abs_path.rglob("*"):
-                    items.append(str(item.relative_to(self._managed_dir_path)))
+                    items.append(
+                        str(item.relative_to(self._managed_dir_path))
+                        if self._managed_dir_path is not None
+                        else str(item)
+                    )
             else:
                 for item in abs_path.iterdir():
-                    items.append(str(item.relative_to(self._managed_dir_path)))
+                    items.append(
+                        str(item.relative_to(self._managed_dir_path))
+                        if self._managed_dir_path is not None
+                        else str(item)
+                    )
             return items
-            
+
         elif action_name == "create_dir":
-            if not abs_path: raise ValueError("Path is required for create_dir")
+            if not abs_path:
+                raise ValueError("Path is required for create_dir")
             abs_path.mkdir(parents=True, exist_ok=True)
-            return {"status": "success", "path": str(abs_path.relative_to(self._managed_dir_path))}
+            return {
+                "status": "success",
+                "path": (
+                    str(abs_path.relative_to(self._managed_dir_path))
+                    if self._managed_dir_path is not None
+                    else str(abs_path)
+                ),
+            }
 
         elif action_name == "delete_dir":
-            if not abs_path: raise ValueError("Path is required for delete_dir")
+            if not abs_path:
+                raise ValueError("Path is required for delete_dir")
             if not abs_path.is_dir():
                 raise NotADirectoryError(f"Not a directory: {path_str}")
-            if abs_path == self._managed_dir_path: # Safety: don't delete the root managed dir itself via step
-                raise ValueError("Cannot delete the root managed directory via 'delete_dir' action.")
+            if (
+                abs_path == self._managed_dir_path
+            ):  # Safety: don't delete the root managed dir itself via step
+                raise ValueError(
+                    "Cannot delete the root managed directory via 'delete_dir' action."
+                )
             shutil.rmtree(abs_path)
-            return {"status": "success", "path": str(abs_path.relative_to(self._managed_dir_path))}
-            
-        else:
-            raise NotImplementedError(f"Action '{action_name}' not supported by FileSystemResource.")
+            return {
+                "status": "success",
+                "path": (
+                    str(abs_path.relative_to(self._managed_dir_path))
+                    if self._managed_dir_path is not None
+                    else str(abs_path)
+                ),
+            }
 
+        else:
+            raise NotImplementedError(
+                f"Action '{action_name}' not supported by FileSystemResource."
+            )
 
     async def get_observation(self) -> Dict[str, Any]:
         """
@@ -243,8 +314,14 @@ class FileSystemResource(ForkableResource):
         """
         return {
             "type": "filesystem",
-            "managed_dir_path": str(self._managed_dir_path) if self._managed_dir_path else None,
-            "status": "ready" if self._managed_dir_path and self._managed_dir_path.exists() else "uninitialized"
+            "managed_dir_path": (
+                str(self._managed_dir_path) if self._managed_dir_path else None
+            ),
+            "status": (
+                "ready"
+                if self._managed_dir_path and self._managed_dir_path.exists()
+                else "uninitialized"
+            ),
         }
 
     async def get_tools_spec(self) -> List[Dict[str, Any]]:
@@ -261,12 +338,18 @@ class FileSystemResource(ForkableResource):
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string", "description": "Relative path to the file."},
-                            "content": {"type": "string", "description": "Content to write to the file."}
+                            "path": {
+                                "type": "string",
+                                "description": "Relative path to the file.",
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "Content to write to the file.",
+                            },
                         },
-                        "required": ["path", "content"]
-                    }
-                }
+                        "required": ["path", "content"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -275,10 +358,15 @@ class FileSystemResource(ForkableResource):
                     "description": "Reads the content of a file from the managed directory.",
                     "parameters": {
                         "type": "object",
-                        "properties": {"path": {"type": "string", "description": "Relative path to the file."}},
-                        "required": ["path"]
-                    }
-                }
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "Relative path to the file.",
+                            }
+                        },
+                        "required": ["path"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -288,13 +376,19 @@ class FileSystemResource(ForkableResource):
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string", "description": "Relative path to the directory."},
-                            "recursive": {"type": "boolean", "description": "List recursively (default: false)."}
+                            "path": {
+                                "type": "string",
+                                "description": "Relative path to the directory.",
+                            },
+                            "recursive": {
+                                "type": "boolean",
+                                "description": "List recursively (default: false).",
+                            },
                         },
-                        "required": ["path"]
-                    }
-                }
-            }
+                        "required": ["path"],
+                    },
+                },
+            },
             # Add more tools: delete_file, create_dir, delete_dir etc.
         ]
 
@@ -310,7 +404,7 @@ class FileSystemResource(ForkableResource):
                 # print(f"FileSystemResource closed. Deleted dir: {self._managed_dir_path}")
             except OSError as e:
                 print(f"Error deleting managed directory {self._managed_dir_path}: {e}")
-        
+
         # self._base_managed_dir_path might also need cleanup if it's different and temporary.
         self._managed_dir_path = None
         self._base_managed_dir_path = None

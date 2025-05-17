@@ -1,14 +1,17 @@
-
-import sys
 import os
-from typing import List, Dict, Any, Optional
+import sys
+from typing import Any, Dict, List, Optional
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+)
 from examples.basic_reward import combined_reward
+
 # Assuming combined_reward from basic_reward.py expects messages as List[Message]
 # and returns an EvaluateResult (which can be accessed like a dict).
 # The 'messages' here would be List[Dict[str, Any]] if this 'evaluate' is called
 # before Pydantic conversion by a decorator. If combined_reward handles that, it's fine.
+
 
 def evaluate(messages: List[Dict[str, Any]], **kwargs: Any) -> Dict[str, Any]:
     """
@@ -28,14 +31,11 @@ def evaluate(messages: List[Dict[str, Any]], **kwargs: Any) -> Dict[str, Any]:
     # this implies 'messages' here should conform or be convertible.
     # For simplicity, assuming combined_reward handles List[Dict[str, Any]] input
     # due to its own @reward_function decorator.
-    result = combined_reward(
-        messages=messages, # type: ignore 
-        **kwargs
-    )
-    
+    result = combined_reward(messages=messages, **kwargs)  # type: ignore
+
     # result is an EvaluateResult, which supports dict-like access.
     return {
-        "score": result['score'],
-        "reason": result['reason'], # Changed from "reasoning"
-        "metrics": result['metrics']
+        "score": result["score"],
+        "reason": result["reason"],  # Changed from "reasoning"
+        "metrics": result["metrics"],
     }

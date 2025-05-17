@@ -13,12 +13,12 @@ Options:
     --list            List all available examples
 """
 
-import os
-import sys
-import subprocess
 import argparse
-from pathlib import Path
 import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -207,9 +207,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--skip-e2b", action="store_true", help="Skip examples that use E2B"
     )
-    parser.add_argument(
-        "--only", type=str, help="Run only this specific example"
-    )
+    parser.add_argument("--only", type=str, help="Run only this specific example")
     parser.add_argument(
         "--list", action="store_true", help="List all available examples"
     )

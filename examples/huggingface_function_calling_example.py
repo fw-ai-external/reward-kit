@@ -6,9 +6,7 @@ import os
 import sys
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
@@ -81,9 +79,7 @@ def main():
     if result.metrics:
         print("Detailed metrics:")
         for metric_name, metric_value in result.metrics.items():
-            print(
-                f"  {metric_name}: {metric_value.score} - {metric_value.reason}"
-            )
+            print(f"  {metric_name}: {metric_value.score} - {metric_value.reason}")
 
 
 if __name__ == "__main__":

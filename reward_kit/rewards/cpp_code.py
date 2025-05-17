@@ -7,15 +7,16 @@ This module provides functions to evaluate the correctness of C/C++ code by:
 3. Comparing the output with expected results or running against test cases
 """
 
+import asyncio
+import json
 import os
 import re
-import json
-import asyncio
-import aiohttp
-from typing import Dict, List, Any, Optional, Union  # Tuple removed
 from dataclasses import dataclass  # field removed
+from typing import Any, Dict, List, Optional, Union  # Tuple removed
 
-from ..models import EvaluateResult, MetricResult, Message
+import aiohttp
+
+from ..models import EvaluateResult, Message, MetricResult
 from ..reward_function import reward_function
 
 
@@ -78,9 +79,7 @@ class PistonClient:
 
     async def get_runtimes(self) -> List[Dict[str, Any]]:
         """Get list of supported runtimes."""
-        async with self.session.get(
-            f"{self.base_endpoint}/runtimes"
-        ) as response:
+        async with self.session.get(f"{self.base_endpoint}/runtimes") as response:
             if response.status != 200:
                 raise PistonError(f"Error getting runtimes: {response.status}")
             return await response.json()
@@ -162,9 +161,7 @@ def get_piston_client(endpoint: Optional[str] = None) -> PistonClient:
     return PistonClient(base_endpoint=piston_endpoint)
 
 
-def extract_code_blocks(
-    text: str, language: str = "cpp"
-) -> List[Dict[str, str]]:
+def extract_code_blocks(text: str, language: str = "cpp") -> List[Dict[str, str]]:
     """
     Extract code blocks from text.
 
@@ -342,9 +339,7 @@ async def execute_cpp_code(
                 return {
                     "success": False,
                     "output": (
-                        result["run"]["stdout"]
-                        if result["run"]["stdout"]
-                        else None
+                        result["run"]["stdout"] if result["run"]["stdout"] else None
                     ),
                     "error": f"Runtime error (exit code {result['run']['code']}): {result['run']['stderr']}",
                 }
@@ -550,9 +545,7 @@ async def run_cpp_test_cases(
         )
 
         # Process the result
-        test_result = TestResult(
-            test_name=test_name, expected_output=expected_output
-        )
+        test_result = TestResult(test_name=test_name, expected_output=expected_output)
 
         if execution_result["success"]:
             actual_output = execution_result["output"]
@@ -573,9 +566,7 @@ async def run_cpp_test_cases(
             test_result.feedback = f"Similarity: {similarity:.2f}"
         else:
             test_result.status = (
-                "CE"
-                if "Compilation error" in execution_result["error"]
-                else "RE"
+                "CE" if "Compilation error" in execution_result["error"] else "RE"
             )
             test_result.feedback = execution_result["error"]
             test_result.score = 0.0
@@ -592,7 +583,9 @@ async def run_cpp_test_cases(
 @reward_function
 def ioi_cpp_code_reward(
     messages: List[Message],
-    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth type
+    ground_truth: Union[
+        Optional[str], Optional[List[Dict[str, Any]]]
+    ],  # New ground_truth type
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -613,7 +606,7 @@ def ioi_cpp_code_reward(
         # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         return _ioi_cpp_code_reward_impl(
             messages=messages,
-            ground_truth=ground_truth, # Pass the new combined ground_truth
+            ground_truth=ground_truth,  # Pass the new combined ground_truth
             # expected_output_str and test_cases are now derived inside _impl
             language=language,
             version=version,
@@ -628,8 +621,10 @@ def ioi_cpp_code_reward(
 
 
 def _ioi_cpp_code_reward_impl(
-    messages: List[Message], # Full conversation, model's response is messages[-1]
-    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    ground_truth: Union[
+        Optional[str], Optional[List[Dict[str, Any]]]
+    ],  # New ground_truth
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -661,17 +656,26 @@ def _ioi_cpp_code_reward_impl(
         RewardOutput with score and metrics
     """
     # Initialize metrics dictionary
-    metrics: Dict[str, MetricResult] = {} # Explicitly type hint
+    metrics: Dict[str, MetricResult] = {}  # Explicitly type hint
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
             metrics={
-                "error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
             },
         )
-    
+
     response_content = messages[-1].content
 
     # Determine if ground_truth is expected_output_str or test_cases
@@ -681,22 +685,32 @@ def _ioi_cpp_code_reward_impl(
     if isinstance(ground_truth, str):
         expected_output_str_from_gt = ground_truth
     elif isinstance(ground_truth, list):
-        if all(isinstance(item, dict) for item in ground_truth): # Basic check
+        if all(isinstance(item, dict) for item in ground_truth):  # Basic check
             test_cases_from_gt = ground_truth
         else:
             return EvaluateResult(
                 score=0.0,
                 reason="Invalid ground_truth format: if list, must be list of test case dicts.",
-                metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth list format.")}
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Invalid ground_truth list format.",
+                    )
+                },
             )
-    elif ground_truth is not None: # Not str, not list, not None - unsupported
+    elif ground_truth is not None:  # Not str, not list, not None - unsupported
         return EvaluateResult(
             score=0.0,
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Invalid ground_truth format.")}
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Invalid ground_truth format."
+                )
+            },
         )
     # If ground_truth is None, both derived vars remain None.
-    
+
     # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
 
@@ -738,7 +752,7 @@ def _ioi_cpp_code_reward_impl(
         results = asyncio.get_event_loop().run_until_complete(
             run_cpp_test_cases(
                 code=code,
-                test_cases=test_cases_from_gt, # Use derived test_cases
+                test_cases=test_cases_from_gt,  # Use derived test_cases
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -756,7 +770,7 @@ def _ioi_cpp_code_reward_impl(
         # Add test results to metrics
         metrics["test_results"] = MetricResult(
             score=overall_score,
-            success=overall_score >= pass_threshold, # Success if pass_threshold is met
+            success=overall_score >= pass_threshold,  # Success if pass_threshold is met
             reason=json.dumps(
                 [
                     {
@@ -773,7 +787,7 @@ def _ioi_cpp_code_reward_impl(
 
         metrics["pass_rate"] = MetricResult(
             score=overall_score,
-            success=overall_score == 1.0, # Full success if all pass
+            success=overall_score == 1.0,  # Full success if all pass
             reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
 
@@ -784,7 +798,7 @@ def _ioi_cpp_code_reward_impl(
         # Execute the code against the expected_output_str_from_gt
         execution_result = asyncio.get_event_loop().run_until_complete(
             execute_cpp_code(
-                code=code, # stdin is empty by default for this path
+                code=code,  # stdin is empty by default for this path
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -809,17 +823,23 @@ def _ioi_cpp_code_reward_impl(
             final_reason += f" Output similarity: {similarity:.2f}."
 
             metrics["output_match"] = MetricResult(
-                score=similarity, success=similarity >= pass_threshold, reason=match_reason
+                score=similarity,
+                success=similarity >= pass_threshold,
+                reason=match_reason,
             )
 
-            return EvaluateResult(score=similarity, reason=final_reason, metrics=metrics)
+            return EvaluateResult(
+                score=similarity, reason=final_reason, metrics=metrics
+            )
         else:
             # Execution failed
             error = execution_result["error"]
             final_reason = f"Code execution failed: {error}"
 
             metrics["execution_result"] = MetricResult(
-                score=0.0, success=False, reason=f"Code execution failed with error:\n{error}"
+                score=0.0,
+                success=False,
+                reason=f"Code execution failed with error:\n{error}",
             )
 
             return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
@@ -840,7 +860,9 @@ def _ioi_cpp_code_reward_impl(
 
         if execution_result["success"]:
             output = execution_result["output"]
-            final_reason = "Code executed successfully (no expected output for comparison)."
+            final_reason = (
+                "Code executed successfully (no expected output for comparison)."
+            )
 
             metrics["execution_result"] = MetricResult(
                 score=1.0,
@@ -854,7 +876,9 @@ def _ioi_cpp_code_reward_impl(
             error = execution_result["error"]
             final_reason = f"Code execution failed: {error}"
             metrics["execution_result"] = MetricResult(
-                score=0.0, success=False, reason=f"Code execution failed with error:\n{error}"
+                score=0.0,
+                success=False,
+                reason=f"Code execution failed with error:\n{error}",
             )
 
             return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
@@ -863,7 +887,9 @@ def _ioi_cpp_code_reward_impl(
 @reward_function
 def binary_cpp_code_reward(
     messages: List[Message],
-    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]], # New ground_truth type
+    ground_truth: Union[
+        Optional[str], Optional[List[Dict[str, Any]]]
+    ],  # New ground_truth type
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -903,7 +929,7 @@ def binary_cpp_code_reward(
         # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         reward_output = _ioi_cpp_code_reward_impl(
             messages=messages,
-            ground_truth=ground_truth, # Pass the new combined ground_truth
+            ground_truth=ground_truth,  # Pass the new combined ground_truth
             # expected_output_str and test_cases are now derived inside _impl
             language=language,
             version=version,
@@ -921,7 +947,7 @@ def binary_cpp_code_reward(
         binary_score = 1.0 if score >= pass_threshold else 0.0
 
         # Add binary result to metrics
-        metrics = dict(reward_output.metrics) # Ensure metrics is a new dict
+        metrics = dict(reward_output.metrics)  # Ensure metrics is a new dict
         final_reason = f"Binary score based on threshold {pass_threshold:.2f}. Original score: {score:.2f}."
         metrics["binary_result"] = MetricResult(
             score=binary_score,

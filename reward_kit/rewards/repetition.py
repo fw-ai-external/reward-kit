@@ -6,10 +6,10 @@ encouraging more diverse and information-rich outputs.
 """
 
 import re
-from typing import Dict, List, Any, Union, Optional, Set, Callable, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 def get_ngrams(
@@ -53,7 +53,9 @@ def get_ngrams(
 @reward_function
 def repetition_penalty_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Not used by this function but part of standard signature
     ngram_size: int = 3,
     max_penalty: float = 0.5,
     language: str = "en",
@@ -120,7 +122,7 @@ def repetition_penalty_reward(
                 },
             )
         text = response.get("content", "")
-    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",
@@ -149,7 +151,7 @@ def repetition_penalty_reward(
                     reason="Empty response",
                 ),
                 "repetition_penalty": MetricResult(
-                    score=1.0, # No penalty means score is 1.0 for this metric
+                    score=1.0,  # No penalty means score is 1.0 for this metric
                     success=True,
                     reason="No penalty applied to empty response",
                 ),
@@ -211,7 +213,9 @@ def repetition_penalty_reward(
 @reward_function
 def diversity_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Not used by this function but part of standard signature
     ngram_sizes: List[int] = [1, 2, 3],
     weights: Optional[List[float]] = None,
     language: str = "en",
@@ -278,7 +282,7 @@ def diversity_reward(
                 },
             )
         text = response.get("content", "")
-    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",
@@ -289,16 +293,15 @@ def diversity_reward(
             },
         )
 
-
     # Empty response
     if not text.strip():
         return EvaluateResult(
-            score=0.0, # Or 1.0 if empty is considered perfectly diverse (no repetition)
+            score=0.0,  # Or 1.0 if empty is considered perfectly diverse (no repetition)
             reason="Empty response",
             metrics={
                 "diversity": MetricResult(
-                    score=0.0, # Or 1.0
-                    success=False, # Or True
+                    score=0.0,  # Or 1.0
+                    success=False,  # Or True
                     reason="Empty response",
                 )
             },
@@ -316,9 +319,7 @@ def diversity_reward(
             weights = weights[: len(ngram_sizes)]
         else:
             # Fill with equal weights for missing values
-            missing_weight = (1.0 - sum(weights)) / (
-                len(ngram_sizes) - len(weights)
-            )
+            missing_weight = (1.0 - sum(weights)) / (len(ngram_sizes) - len(weights))
             weights.extend([missing_weight] * (len(ngram_sizes) - len(weights)))
 
     # Normalize weights to sum to 1
@@ -373,5 +374,5 @@ def diversity_reward(
     return EvaluateResult(
         score=final_score,
         reason=f"Lexical diversity score: {final_score:.2f}",
-        metrics=metrics
+        metrics=metrics,
     )

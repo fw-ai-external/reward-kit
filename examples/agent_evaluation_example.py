@@ -5,12 +5,12 @@ This example demonstrates how to use the agent evaluation framework to evaluate
 an agent model on a flight booking task.
 """
 
-import os
 import asyncio
 import json
+import os
 from pathlib import Path
 
-from reward_kit.agent import load_task_from_file, AgentEvaluator
+from reward_kit.agent import AgentEvaluator, load_task_from_file
 
 
 async def run_evaluation():
@@ -78,9 +78,7 @@ async def run_evaluation():
     tools_spec = evaluator.tool_registry.get_openai_tools()
     print(f"Available tools ({len(tools_spec)}):")
     for tool in tools_spec:
-        print(
-            f"  - {tool['function']['name']}: {tool['function']['description']}"
-        )
+        print(f"  - {tool['function']['name']}: {tool['function']['description']}")
 
     # Get the initial messages
     messages = task.get("initial_messages", [])
@@ -103,9 +101,7 @@ async def run_evaluation():
 
         # Execute the tool
         try:
-            tool_result = await evaluator.execute_tool(
-                run_id, first_tool, params
-            )
+            tool_result = await evaluator.execute_tool(run_id, first_tool, params)
             print(f"Tool execution result: {json.dumps(tool_result, indent=2)}")
         except Exception as e:
             print(f"Tool execution failed: {str(e)}")

@@ -3,11 +3,13 @@ Tests for fractional code reward function.
 """
 
 import os
+from typing import Any, Dict, List, Optional
+
 import pytest
-from typing import List, Dict, Any, Optional
+
+from reward_kit.models import EvaluateResult  # Added import
 from reward_kit.rewards import fractional_code_reward
 from reward_kit.rewards.code_execution import _HAS_E2B
-from reward_kit.models import EvaluateResult # Added import
 
 
 class TestFractionalCodeReward:
@@ -38,12 +40,18 @@ This will output `5`.
         assert isinstance(result, EvaluateResult)
         # Attribute access
         assert result.score == 1.0
-        assert result.metrics["execution_result"].reason is not None and \
-            "Code executed successfully" in result.metrics["execution_result"].reason
+        assert (
+            result.metrics["execution_result"].reason is not None
+            and "Code executed successfully"
+            in result.metrics["execution_result"].reason
+        )
         # Dictionary access
-        assert result['score'] == 1.0
-        assert result['metrics']["execution_result"]['reason'] is not None and \
-            "Code executed successfully" in result['metrics']["execution_result"]['reason']
+        assert result["score"] == 1.0
+        assert (
+            result["metrics"]["execution_result"]["reason"] is not None
+            and "Code executed successfully"
+            in result["metrics"]["execution_result"]["reason"]
+        )
 
     def test_simple_python_partial_match(self):
         """Test with Python function that produces partially correct output."""
@@ -79,12 +87,16 @@ This will print a numbered list from 1 to 3.
         assert isinstance(result, EvaluateResult)
         # Attribute access
         assert 0.7 < result.score < 1.0  # Should be high but not perfect
-        assert result.metrics["output_match"].reason is not None and \
-            "Output similarity:" in result.metrics["output_match"].reason
+        assert (
+            result.metrics["output_match"].reason is not None
+            and "Output similarity:" in result.metrics["output_match"].reason
+        )
         # Dictionary access
-        assert 0.7 < result['score'] < 1.0
-        assert result['metrics']["output_match"]['reason'] is not None and \
-            "Output similarity:" in result['metrics']["output_match"]['reason']
+        assert 0.7 < result["score"] < 1.0
+        assert (
+            result["metrics"]["output_match"]["reason"] is not None
+            and "Output similarity:" in result["metrics"]["output_match"]["reason"]
+        )
 
     def test_python_execution_error(self):
         """Test with Python function that has an error."""
@@ -112,12 +124,18 @@ print(add(2, undefined_variable))
         assert isinstance(result, EvaluateResult)
         # Attribute access
         assert result.score == 0.0
-        assert result.metrics["execution_result"].reason is not None and \
-            "execution failed with error" in result.metrics["execution_result"].reason
+        assert (
+            result.metrics["execution_result"].reason is not None
+            and "execution failed with error"
+            in result.metrics["execution_result"].reason
+        )
         # Dictionary access
-        assert result['score'] == 0.0
-        assert result['metrics']["execution_result"]['reason'] is not None and \
-            "execution failed with error" in result['metrics']["execution_result"]['reason']
+        assert result["score"] == 0.0
+        assert (
+            result["metrics"]["execution_result"]["reason"] is not None
+            and "execution failed with error"
+            in result["metrics"]["execution_result"]["reason"]
+        )
 
     def test_no_code_blocks(self):
         """Test with message that doesn't contain code blocks."""
@@ -136,12 +154,17 @@ print(add(2, undefined_variable))
         assert isinstance(result, EvaluateResult)
         # Attribute access
         assert result.score == 0.0
-        assert result.metrics["error"].reason is not None and \
-            "no python code blocks found" in result.metrics["error"].reason.lower()
+        assert (
+            result.metrics["error"].reason is not None
+            and "no python code blocks found" in result.metrics["error"].reason.lower()
+        )
         # Dictionary access
-        assert result['score'] == 0.0
-        assert result['metrics']["error"]['reason'] is not None and \
-            "no python code blocks found" in result['metrics']["error"]['reason'].lower()
+        assert result["score"] == 0.0
+        assert (
+            result["metrics"]["error"]["reason"] is not None
+            and "no python code blocks found"
+            in result["metrics"]["error"]["reason"].lower()
+        )
 
     def test_extract_expected_output(self):
         """Test extracting expected output from original messages."""
@@ -167,7 +190,7 @@ print(add(2, 3))
         # The user message implies "5" is the expected output.
         result = fractional_code_reward(
             messages=messages,
-            ground_truth="5", 
+            ground_truth="5",
             language="python",
         )
 
@@ -175,7 +198,7 @@ print(add(2, 3))
         # Attribute access
         assert result.score == 1.0
         # Dictionary access
-        assert result['score'] == 1.0
+        assert result["score"] == 1.0
 
     @pytest.mark.skip(reason="Skipping E2B tests due to intermittent service issues")
     @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
@@ -207,7 +230,7 @@ print(add(2, 3))
             # Attribute access
             assert result.score == 1.0
             # Dictionary access
-            assert result['score'] == 1.0
+            assert result["score"] == 1.0
 
     def test_multiple_test_cases(self):
         """Test with multiple test cases."""
@@ -254,12 +277,16 @@ if __name__ == "__main__":
         # Test case behavior may vary depending on Python environment, so just check it's between 0 and 1
         assert 0 <= result.score <= 1.0
         # Should contain pass_rate indicator
-        assert result.metrics["pass_rate"].reason is not None and \
-            "tests passed" in result.metrics["pass_rate"].reason
+        assert (
+            result.metrics["pass_rate"].reason is not None
+            and "tests passed" in result.metrics["pass_rate"].reason
+        )
         # Dictionary access
-        assert 0 <= result['score'] <= 1.0
-        assert result['metrics']["pass_rate"]['reason'] is not None and \
-            "tests passed" in result['metrics']["pass_rate"]['reason']
+        assert 0 <= result["score"] <= 1.0
+        assert (
+            result["metrics"]["pass_rate"]["reason"] is not None
+            and "tests passed" in result["metrics"]["pass_rate"]["reason"]
+        )
 
     def test_javascript_execution(self):
         """Test with JavaScript code."""
@@ -288,4 +315,4 @@ console.log(add(2, 3));
         # Attribute access
         assert result.score > 0.9  # Should be very high or 1.0
         # Dictionary access
-        assert result['score'] > 0.9
+        assert result["score"] > 0.9

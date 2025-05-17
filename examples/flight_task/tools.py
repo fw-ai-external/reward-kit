@@ -118,7 +118,7 @@ async def create_booking(flight_id, passenger, db):
     # Return booking details
     booking = await db.fetch_one(
         """
-        SELECT b.id as booking_id, b.status, b.price, 
+        SELECT b.id as booking_id, b.status, b.price,
                f.airline, f.origin, f.dest, f.depart, f.arrive
         FROM bookings b
         JOIN flights f ON b.flight_id = f.id

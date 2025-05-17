@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 -- Insert sample flights
 -- SFO to JFK
 INSERT INTO flights (airline, origin, dest, depart, arrive, price, seats_available)
-VALUES 
+VALUES
     ('United', 'SFO', 'JFK', '2023-09-15T08:00:00', '2023-09-15T16:30:00', 299.99, 5),
     ('Delta', 'SFO', 'JFK', '2023-09-15T10:15:00', '2023-09-15T18:45:00', 349.99, 3),
     ('American', 'SFO', 'JFK', '2023-09-15T13:30:00', '2023-09-15T22:00:00', 279.99, 7),
@@ -51,7 +51,7 @@ VALUES
 
 -- SFO to LAX
 INSERT INTO flights (airline, origin, dest, depart, arrive, price, seats_available)
-VALUES 
+VALUES
     ('Southwest', 'SFO', 'LAX', '2023-09-15T07:30:00', '2023-09-15T09:15:00', 129.99, 12),
     ('United', 'SFO', 'LAX', '2023-09-15T11:00:00', '2023-09-15T12:45:00', 149.99, 8),
     ('Delta', 'SFO', 'LAX', '2023-09-15T14:30:00', '2023-09-15T16:15:00', 139.99, 5),
@@ -59,14 +59,14 @@ VALUES
 
 -- JFK to SFO
 INSERT INTO flights (airline, origin, dest, depart, arrive, price, seats_available)
-VALUES 
+VALUES
     ('United', 'JFK', 'SFO', '2023-09-16T09:00:00', '2023-09-16T12:30:00', 319.99, 4),
     ('Delta', 'JFK', 'SFO', '2023-09-16T13:15:00', '2023-09-16T16:45:00', 329.99, 6),
     ('American', 'JFK', 'SFO', '2023-09-16T17:30:00', '2023-09-16T21:00:00', 299.99, 9);
 
 -- Next day flights: SFO to JFK for tomorrow
 INSERT INTO flights (airline, origin, dest, depart, arrive, price, seats_available)
-VALUES 
+VALUES
     ('United', 'SFO', 'JFK', '2023-09-16T07:00:00', '2023-09-16T15:30:00', 319.99, 8),
     ('Delta', 'SFO', 'JFK', '2023-09-16T09:15:00', '2023-09-16T17:45:00', 369.99, 5),
     ('American', 'SFO', 'JFK', '2023-09-16T12:30:00', '2023-09-16T21:00:00', 299.99, 10),

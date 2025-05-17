@@ -1,10 +1,11 @@
-import os
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
-import json
 import importlib.util
+import json
+import os
+import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Load the deploy_example module directly from the examples folder
@@ -76,20 +77,18 @@ def test_informativeness_reward(deploy_example):
     )
 
     # Verify results
-    assert isinstance(result['score'], float)
-    assert 0.0 <= result['score'] <= 1.0
-    assert "length" in result['metrics']
-    assert "specificity" in result['metrics']
-    assert "content_density" in result['metrics']
+    assert isinstance(result["score"], float)
+    assert 0.0 <= result["score"] <= 1.0
+    assert "length" in result["metrics"]
+    assert "specificity" in result["metrics"]
+    assert "content_density" in result["metrics"]
 
 
 def test_deploy_to_fireworks(
     deploy_example, mock_env_variables, mock_requests_post, mock_requests_get
 ):
     """Test the deployment function"""
-    with patch(
-        "reward_kit.auth.get_authentication"
-    ) as mock_get_auth, patch.object(
+    with patch("reward_kit.auth.get_authentication") as mock_get_auth, patch.object(
         deploy_example, "deploy_to_fireworks"
     ) as mock_deploy:
 

@@ -2,11 +2,13 @@
 Reward function for comparing lists of numbers, often found in math answers
 like sets of divisors, roots, etc.
 """
-import re
-from typing import Dict, List, Any, Union, Optional, Tuple, Set
 
+import re
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
+
 
 def parse_number_list_from_string(s: str) -> Optional[List[float]]:
     """
@@ -17,22 +19,24 @@ def parse_number_list_from_string(s: str) -> Optional[List[float]]:
     numbers = []
     # Remove common math delimiters like $ and spaces around commas
     s = s.replace("$", "").strip()
-    
+
     # Split by comma, then try to parse each part
-    parts = re.split(r'\s*,\s*', s)
-    if not parts or not any(p.strip() for p in parts): # Handle empty or whitespace-only strings
+    parts = re.split(r"\s*,\s*", s)
+    if not parts or not any(
+        p.strip() for p in parts
+    ):  # Handle empty or whitespace-only strings
         return None
 
     for part in parts:
         part = part.strip()
-        if not part: # Skip empty strings resulting from multiple commas, e.g. "1,,2"
+        if not part:  # Skip empty strings resulting from multiple commas, e.g. "1,,2"
             continue
         try:
             # Attempt to convert to float. Handles integers and decimals.
             numbers.append(float(part))
         except ValueError:
             # If any part is not a valid number, the list is considered invalid for this parser
-            return None 
+            return None
     return numbers if numbers else None
 
 
@@ -51,7 +55,7 @@ def extract_number_list(text: str) -> List[List[float]]:
         Example: "\\boxed{1,2,3}, $4,5$" -> [[1.0, 2.0, 3.0], [4.0, 5.0]]
     """
     extracted_lists: List[List[float]] = []
-    
+
     # Priority 1: Boxed LaTeX expressions
     # Search for all \boxed{content}
     boxed_contents = re.findall(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}", text)
@@ -60,7 +64,7 @@ def extract_number_list(text: str) -> List[List[float]]:
             parsed_list = parse_number_list_from_string(content)
             if parsed_list:
                 extracted_lists.append(parsed_list)
-        if extracted_lists: # If any list found in boxed expressions, return them
+        if extracted_lists:  # If any list found in boxed expressions, return them
             return extracted_lists
 
     # Priority 2: Content within $...$ or $$...$$
@@ -68,28 +72,30 @@ def extract_number_list(text: str) -> List[List[float]]:
     dollar_contents = re.findall(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL)
     if dollar_contents:
         for group_match in dollar_contents:
-            content = group_match[0] if group_match[0] else group_match[1] # Get content from either $$ or $
+            content = (
+                group_match[0] if group_match[0] else group_match[1]
+            )  # Get content from either $$ or $
             if content:
                 parsed_list = parse_number_list_from_string(content.strip())
                 if parsed_list:
                     extracted_lists.append(parsed_list)
-        if extracted_lists: # If any list found in dollar expressions, return them
+        if extracted_lists:  # If any list found in dollar expressions, return them
             return extracted_lists
-            
+
     # Priority 3: Try parsing the whole text as a list if no delimiters found
     # This is a fallback and might be less reliable.
-    if not extracted_lists: # Only if nothing was found with delimiters
+    if not extracted_lists:  # Only if nothing was found with delimiters
         full_text_parsed_list = parse_number_list_from_string(text)
         if full_text_parsed_list:
             extracted_lists.append(full_text_parsed_list)
-            
+
     return extracted_lists
 
 
 @reward_function
 def list_comparison_math_reward(
-    messages: List[Message],      # Full conversation, model's response is messages[-1]
-    ground_truth: str,            # String representation of the expected list of numbers
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    ground_truth: str,  # String representation of the expected list of numbers
     order_matters: bool = False,
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -113,37 +119,82 @@ def list_comparison_math_reward(
     """
     metrics: Dict[str, MetricResult] = {}
 
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
-            metrics={"error": MetricResult(score=0.0, success=False, reason="Last message not a valid assistant response.")}
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
+                )
+            },
         )
-    
-    gen_content = messages[-1].content
-    orig_content = ground_truth # The new ground_truth parameter is the expected list string
 
-    if not gen_content: # Model's response content is empty
-        return EvaluateResult(score=0.0, reason="Assistant response content is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty generated message content.")})
-    if not orig_content: # Ground truth string is empty
-        return EvaluateResult(score=0.0, reason="Ground truth string (expected list) is empty.", metrics={"error": MetricResult(score=0.0, success=False, reason="Empty ground truth string.")})
+    gen_content = messages[-1].content
+    orig_content = (
+        ground_truth  # The new ground_truth parameter is the expected list string
+    )
+
+    if not gen_content:  # Model's response content is empty
+        return EvaluateResult(
+            score=0.0,
+            reason="Assistant response content is empty.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Empty generated message content."
+                )
+            },
+        )
+    if not orig_content:  # Ground truth string is empty
+        return EvaluateResult(
+            score=0.0,
+            reason="Ground truth string (expected list) is empty.",
+            metrics={
+                "error": MetricResult(
+                    score=0.0, success=False, reason="Empty ground truth string."
+                )
+            },
+        )
 
     gen_lists = extract_number_list(gen_content)
     orig_lists = extract_number_list(orig_content)
-    
-    metrics["extracted_original_lists"] = MetricResult(score=1.0 if orig_lists else 0.0, success=bool(orig_lists), reason=f"Original lists: {orig_lists}")
-    metrics["extracted_generated_lists"] = MetricResult(score=1.0 if gen_lists else 0.0, success=bool(gen_lists), reason=f"Generated lists: {gen_lists}")
+
+    metrics["extracted_original_lists"] = MetricResult(
+        score=1.0 if orig_lists else 0.0,
+        success=bool(orig_lists),
+        reason=f"Original lists: {orig_lists}",
+    )
+    metrics["extracted_generated_lists"] = MetricResult(
+        score=1.0 if gen_lists else 0.0,
+        success=bool(gen_lists),
+        reason=f"Generated lists: {gen_lists}",
+    )
 
     if not orig_lists:
-        return EvaluateResult(score=0.0, reason="Could not extract any number list from original message (ground truth).", metrics=metrics)
+        return EvaluateResult(
+            score=0.0,
+            reason="Could not extract any number list from original message (ground truth).",
+            metrics=metrics,
+        )
     if not gen_lists:
-        return EvaluateResult(score=0.0, reason="Could not extract any number list from generated message.", metrics=metrics)
+        return EvaluateResult(
+            score=0.0,
+            reason="Could not extract any number list from generated message.",
+            metrics=metrics,
+        )
 
     # For simplicity, compare the first valid list found in each.
     # Future improvement: handle multiple lists (e.g., if solution has multiple boxed lists)
     orig_list_to_compare = orig_lists[0]
     gen_list_to_compare = gen_lists[0]
-    
+
     score = 0.0
     match_reason = ""
 
@@ -175,12 +226,20 @@ def list_comparison_math_reward(
             # Provide more details on mismatch for sets
             missing_in_gen = orig_set - gen_set
             extra_in_gen = gen_set - orig_set
-            match_reason_parts = [f"Set mismatch (order does not matter). Gen: {sorted(list(gen_set))} vs Orig: {sorted(list(orig_set))}."]
+            match_reason_parts = [
+                f"Set mismatch (order does not matter). Gen: {sorted(list(gen_set))} vs Orig: {sorted(list(orig_set))}."
+            ]
             if missing_in_gen:
-                match_reason_parts.append(f"Missing in generated: {sorted(list(missing_in_gen))}.")
+                match_reason_parts.append(
+                    f"Missing in generated: {sorted(list(missing_in_gen))}."
+                )
             if extra_in_gen:
-                match_reason_parts.append(f"Extra in generated: {sorted(list(extra_in_gen))}.")
+                match_reason_parts.append(
+                    f"Extra in generated: {sorted(list(extra_in_gen))}."
+                )
             match_reason = " ".join(match_reason_parts)
-            
-    metrics["list_comparison"] = MetricResult(score=score, success=(score == 1.0), reason=match_reason)
+
+    metrics["list_comparison"] = MetricResult(
+        score=score, success=(score == 1.0), reason=match_reason
+    )
     return EvaluateResult(score=score, reason=match_reason, metrics=metrics)

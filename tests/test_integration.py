@@ -1,29 +1,34 @@
-import pytest
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
-from fastapi.testclient import TestClient
-from typing import List, Dict, Any, Optional
 
-from reward_kit.models import EvaluateResult, MetricResult, Message # Changed
+import pytest
+from fastapi.testclient import TestClient
+
+from reward_kit.models import EvaluateResult, Message, MetricResult  # Changed
 from reward_kit.reward_function import RewardFunction, reward_function
 from reward_kit.server import create_app
 
 
 @reward_function
 def sample_reward_function(
-    messages: List[Message], # Changed: Use List[Message] for Pydantic conversion
+    messages: List[Message],  # Changed: Use List[Message] for Pydantic conversion
     **kwargs,
-) -> EvaluateResult: # Changed
+) -> EvaluateResult:  # Changed
     """Sample reward function that checks message length and keywords."""
     # The @reward_function decorator from typed_interface.py ensures 'messages'
     # are List[Message] Pydantic objects when this function is called.
     last_message_obj = messages[-1]
-    last_message_content = last_message_obj.content if last_message_obj.content is not None else ""
+    last_message_content = (
+        last_message_obj.content if last_message_obj.content is not None else ""
+    )
     metrics = {}
 
     # Check message length
     length_score = min(len(last_message_content) / 100.0, 1.0)
-    metrics["length"] = MetricResult( # Changed
-        score=length_score, reason=f"Message length: {len(last_message_content)} chars", success=length_score == 1.0
+    metrics["length"] = MetricResult(  # Changed
+        score=length_score,
+        reason=f"Message length: {len(last_message_content)} chars",
+        success=length_score == 1.0,
     )
 
     # Check for keywords
@@ -32,21 +37,23 @@ def sample_reward_function(
         for keyword in ["help", "assist", "support"]
     )
     keyword_score = 0.8 if has_helpful_keywords else 0.2
-    metrics["keywords"] = MetricResult( # Changed
+    metrics["keywords"] = MetricResult(  # Changed
         score=keyword_score,
         reason=(
             "Contains helpful keywords"
             if has_helpful_keywords
             else "Missing helpful keywords"
         ),
-        success=has_helpful_keywords
+        success=has_helpful_keywords,
     )
 
     # Calculate final score (70% keywords, 30% length)
     final_score = 0.7 * keyword_score + 0.3 * length_score
     final_reason = "Overall score based on keyword presence and message length."
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics) # Changed
+    return EvaluateResult(
+        score=final_score, reason=final_reason, metrics=metrics
+    )  # Changed
 
 
 class TestIntegration:
@@ -152,12 +159,12 @@ class TestIntegration:
         # It then constructs the full `messages` list for the reward function.
         # It does not seem to use `original_messages`.
         # So, removing `batch_original_messages` from the call should be fine.
-        scores = trl_adapter(prompts=batch_messages, completions=[msg[-1]['content'] for msg in batch_messages])
-
+        scores = trl_adapter(
+            prompts=batch_messages,
+            completions=[msg[-1]["content"] for msg in batch_messages],
+        )
 
         # Verify the results
         assert isinstance(scores, list)
         assert len(scores) == 2
-        assert (
-            scores[0] > scores[1]
-        )  # First message should score higher (has "assist")
+        assert scores[0] > scores[1]  # First message should score higher (has "assist")

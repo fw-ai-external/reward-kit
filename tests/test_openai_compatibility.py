@@ -2,23 +2,22 @@
 Tests for OpenAI message type compatibility.
 """
 
-import sys
 import os
+import sys
 import unittest
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
 )
 
-from reward_kit import Message, reward_function, EvaluateResult, MetricResult
-from openai.types.chat import ChatCompletionMessageParam
-from openai.types.chat import (
-    ChatCompletionUserMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionAssistantMessageParam,
-)
+from reward_kit import EvaluateResult, Message, MetricResult, reward_function
 
 
 class OpenAICompatibilityTest(unittest.TestCase):
@@ -37,17 +36,13 @@ class OpenAICompatibilityTest(unittest.TestCase):
         """Test that the reward_function decorator can handle OpenAI message types."""
 
         @reward_function
-        def sample_evaluator(
-            messages: List[Message], **kwargs: Any
-        ) -> EvaluateResult:
+        def sample_evaluator(messages: List[Message], **kwargs: Any) -> EvaluateResult:
             """Sample evaluator that uses OpenAI message types."""
             # Check if the last message is from the assistant
             last_message = messages[-1]
 
             # Simple evaluation - check if the response is not empty and from the assistant
-            success = (
-                last_message.role == "assistant" and last_message.content != ""
-            )
+            success = last_message.role == "assistant" and last_message.content != ""
 
             return EvaluateResult(
                 score=1.0 if success else 0.0,
@@ -69,9 +64,7 @@ class OpenAICompatibilityTest(unittest.TestCase):
         system_message = ChatCompletionSystemMessageParam(
             role="system", content="You are a helpful assistant."
         )
-        user_message = ChatCompletionUserMessageParam(
-            role="user", content="Hello!"
-        )
+        user_message = ChatCompletionUserMessageParam(role="user", content="Hello!")
         assistant_message = ChatCompletionAssistantMessageParam(
             role="assistant", content="Hi there!"
         )

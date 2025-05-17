@@ -10,28 +10,20 @@ tool-augmented models using self-contained task bundles.
 
 __version__ = "0.2.0"
 
+import warnings
+
 # Import everything from models
-from .models import (
-    Message,
-    MetricResult,
-    EvaluateResult,
-)
+from .models import EvaluateResult, Message, MetricResult
 
 # Import from reward_function
-from .reward_function import (
-    RewardFunction,
-    reward_function as legacy_reward_function,
-)  # Deprecated
+from .reward_function import RewardFunction
+from .reward_function import reward_function as legacy_reward_function  # Deprecated
 
 # Import the decorator from typed_interface (this is the one we want to expose)
 from .typed_interface import reward_function
 
-import warnings
-
 # Show deprecation warnings
-warnings.filterwarnings(
-    "default", category=DeprecationWarning, module="reward_kit"
-)
+warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 
 __all__ = [
     # Preferred interfaces

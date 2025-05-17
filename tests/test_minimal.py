@@ -5,12 +5,13 @@ This is a simple test to verify that the agent evaluation CLI command works
 with the minimum required parameters.
 """
 
-import os
-import pytest
-import tempfile
 import json
+import os
 import subprocess
+import tempfile
 from pathlib import Path
+
+import pytest
 
 
 def test_cli_help():
@@ -40,7 +41,7 @@ def test_cli_agent_eval_help():
 
     # Check that the help message includes essential parameters
     help_text = result.stdout
-    assert "--task-def" in help_text # Updated for new agent-eval command
+    assert "--task-def" in help_text  # Updated for new agent-eval command
 
 
 def setup_minimal_task_bundle():
@@ -92,9 +93,7 @@ def evaluate(messages, **kwargs):
                     {
                         "id": "test_task",
                         "toolset": "test_task.tools",
-                        "initial_messages": [
-                            {"role": "user", "content": "Hello"}
-                        ],
+                        "initial_messages": [{"role": "user", "content": "Hello"}],
                     }
                 )
             )

@@ -7,9 +7,7 @@ import sys
 from pathlib import Path
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Check for required environment variables
 if not os.environ.get("FIREWORKS_API_KEY"):
@@ -22,10 +20,7 @@ if not os.environ.get("FIREWORKS_API_KEY"):
     )
 
 # Import the evaluation functions
-from reward_kit.evaluation import (
-    preview_evaluation,
-    huggingface_dataset_to_jsonl,
-)
+from reward_kit.evaluation import huggingface_dataset_to_jsonl, preview_evaluation
 
 
 def main():
@@ -42,11 +37,11 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     assistant_messages = [m for m in messages if m.get("role") == "assistant"]
     if not assistant_messages:
         return {"score": 0.0, "reasoning": "No assistant messages found"}
-    
+
     # Get the length of the assistant's response
     response_text = assistant_messages[0].get("content", "")
     response_length = len(response_text.split())
-    
+
     # Calculate score based on length (normalize between 0-1)
     # Prefer responses between 50-200 words
     if response_length < 10:
@@ -64,7 +59,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     else:
         score = 0.7  # Too verbose
         reason = f"Response too verbose ({response_length} words)"
-    
+
     return {
         "score": score,
         "reasoning": reason
@@ -110,9 +105,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         print(f"Dataset converted to JSONL file: {jsonl_file}")
 
     except ImportError:
-        print(
-            "Could not load datasets package. Install with: pip install datasets"
-        )
+        print("Could not load datasets package. Install with: pip install datasets")
     except Exception as e:
         print(f"Error during evaluation: {str(e)}")
 

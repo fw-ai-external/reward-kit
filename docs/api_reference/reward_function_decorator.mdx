@@ -34,9 +34,9 @@ def my_reward_function(
 Functions decorated with `@reward_function` should accept the following parameters:
 
 - **`messages`** (`List[Dict[str, str]]`): Required. List of conversation messages, with the last message typically being the one evaluated.
-  
+
 - **`original_messages`** (`Optional[List[Dict[str, str]]]`): Optional. The conversation context, without the message being evaluated.
-  
+
 - **`**kwargs`**: Optional. Additional parameters (like metadata) that can be passed to the function.
 
 ## Return Value Requirements
@@ -77,15 +77,15 @@ evaluation_id = my_reward_function.deploy(
 #### Parameters
 
 - **`name`** (`str`): Required. ID for the deployed evaluator.
-  
+
 - **`description`** (`str`): Optional. Human-readable description of the evaluator.
-  
+
 - **`account_id`** (`Optional[str]`): Optional. Fireworks account ID. If not provided, will be read from config or environment.
-  
+
 - **`auth_token`** (`Optional[str]`): Optional. Authentication token. If not provided, will be read from config or environment.
-  
+
 - **`force`** (`bool`): Optional. Whether to overwrite an existing evaluator with the same name. Default is False.
-  
+
 - **`providers`** (`Optional[List[Dict[str, str]]]`): Optional. List of provider configurations. If not provided, uses a default provider.
 
 #### Returns
@@ -141,7 +141,7 @@ def word_count_reward(
     response = messages[-1].get("content", "")
     word_count = len(response.split())
     score = min(word_count / 100, 1.0)
-    
+
     return RewardOutput(
         score=score,
         metrics={
@@ -165,14 +165,14 @@ def configurable_reward(
 ) -> RewardOutput:
     """Reward function that accepts configuration via metadata."""
     metadata = metadata or {}
-    
+
     # Get threshold from metadata or use default
     threshold = metadata.get("threshold", 50)
-    
+
     response = messages[-1].get("content", "")
     word_count = len(response.split())
     score = min(word_count / threshold, 1.0)
-    
+
     return RewardOutput(
         score=score,
         metrics={

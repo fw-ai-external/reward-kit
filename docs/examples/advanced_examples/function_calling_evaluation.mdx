@@ -42,7 +42,7 @@ expected_schema = {
 messages = [
     {"role": "user", "content": "What's the weather in New York?"},
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "I'll check the weather for you.",
         "function_call": {
             "name": "get_weather",
@@ -111,7 +111,7 @@ This function should retrieve weather information for the specified location.
 messages = [
     {"role": "user", "content": "What's the weather in New York?"},
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "I'll check the weather for you.",
         "function_call": {
             "name": "get_weather",
@@ -186,7 +186,7 @@ This function should retrieve weather information for the specified location.
 messages = [
     {"role": "user", "content": "What's the weather in New York?"},
     {
-        "role": "assistant", 
+        "role": "assistant",
         "content": "I'll check the weather for you.",
         "function_call": {
             "name": "get_weather",
@@ -330,13 +330,13 @@ for model in models:
         {"role": "user", "content": user_query},
         {"role": "assistant", "function_call": model_responses[model]}
     ]
-    
+
     result = composite_function_call_reward(
         messages=messages,
         expected_schema=search_schema,
         expected_behavior=expected_behavior
     )
-    
+
     results[model] = result.score
 
 # Print the results

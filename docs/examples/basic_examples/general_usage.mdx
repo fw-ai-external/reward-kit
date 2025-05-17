@@ -78,11 +78,11 @@ def evaluate(messages, original_messages=None, **kwargs):
     # Get the last message (assistant's response)
     last_message = messages[-1]
     content = last_message.content or ''
-    
+
     # Count words and calculate score
     word_count = len(content.split())
     score = min(word_count / 100, 1.0)  # Cap at 1.0
-    
+
     return EvaluateResult(
         score=score,
         reason=f'Word count: {word_count}',
@@ -193,7 +193,7 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     """Custom evaluation metric."""
     # Your evaluation logic here
     # ...
-    
+
     return EvaluateResult(
         score=your_score,
         reason="Explanation of score",

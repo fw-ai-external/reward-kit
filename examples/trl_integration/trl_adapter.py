@@ -8,21 +8,17 @@ This module provides helper functions for:
 """
 
 import os
-import sys
 import re
-from typing import List, Dict, Any, Optional, Union, Callable
+import sys
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from reward_kit.models import EvaluateResult, MetricResult
 
 # Import reward-kit components
 from reward_kit.reward_function import RewardFunction, reward_function
-from reward_kit.models import (
-    EvaluateResult,
-    MetricResult,
-)
 
 
 def create_combined_reward(
@@ -48,18 +44,14 @@ def create_combined_reward(
     # Normalize weights if provided
     if weights:
         if len(weights) != len(reward_functions):
-            raise ValueError(
-                "Number of weights must match number of reward functions"
-            )
+            raise ValueError("Number of weights must match number of reward functions")
         if normalize:
             weight_sum = sum(weights)
             if weight_sum != 1.0:
                 weights = [w / weight_sum for w in weights]
     else:
         # Equal weights for all reward functions
-        weights = [
-            1.0 / len(reward_functions) for _ in range(len(reward_functions))
-        ]
+        weights = [1.0 / len(reward_functions) for _ in range(len(reward_functions))]
 
     # Create adapters for each reward function
     adapters = [rf.get_trl_adapter() for rf in reward_functions]
@@ -76,8 +68,7 @@ def create_combined_reward(
         combined_scores = []
         for i in range(len(all_scores[0])):
             weighted_sum = sum(
-                scores[i] * weight
-                for scores, weight in zip(all_scores, weights)
+                scores[i] * weight for scores, weight in zip(all_scores, weights)
             )
             combined_scores.append(weighted_sum)
 
@@ -137,7 +128,9 @@ def grpo_format_reward(
     think_pattern = (
         f"{re.escape(think_tag)}(.*?){re.escape(think_tag.replace('<', '</'))}"
     )
-    answer_pattern = f"{re.escape(answer_tag)}(.*?){re.escape(answer_tag.replace('<', '</'))}"
+    answer_pattern = (
+        f"{re.escape(answer_tag)}(.*?){re.escape(answer_tag.replace('<', '</'))}"
+    )
 
     think_match = re.search(think_pattern, text, re.DOTALL)
     answer_match = re.search(answer_pattern, text, re.DOTALL)
@@ -267,8 +260,7 @@ def apply_reward_to_responses(
     """
     # Convert responses to message format
     message_batches = [
-        prepare_grpo_message_format(response, system_prompt)
-        for response in responses
+        prepare_grpo_message_format(response, system_prompt) for response in responses
     ]
 
     # Check if we need to get the adapter

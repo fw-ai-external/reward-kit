@@ -2,10 +2,11 @@
 Tests for the typed interface functionality.
 """
 
-import pytest
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from reward_kit.models import Message, EvaluateResult, MetricResult
+import pytest
+
+from reward_kit.models import EvaluateResult, Message, MetricResult
 from reward_kit.typed_interface import reward_function
 
 
@@ -19,9 +20,7 @@ def test_typed_interface_basic():
             score=0.8,
             reason="Overall test reason",
             metrics={
-                "test": MetricResult(
-                    success=True, score=0.8, reason="Test reason"
-                )
+                "test": MetricResult(success=True, score=0.8, reason="Test reason")
             },
         )
 
@@ -46,15 +45,17 @@ def test_typed_interface_basic():
     assert metric_test.reason == "Test reason"
 
     # Check dictionary-style access
-    assert result['score'] == 0.8
-    assert result['reason'] == "Overall test reason"
-    assert result['metrics'] is not None # Accesses the dict of MetricResult objects
-    assert "test" in result['metrics']
-    metric_test_dict_access = result['metrics']["test"] # This is a MetricResult object
+    assert result["score"] == 0.8
+    assert result["reason"] == "Overall test reason"
+    assert result["metrics"] is not None  # Accesses the dict of MetricResult objects
+    assert "test" in result["metrics"]
+    metric_test_dict_access = result["metrics"]["test"]  # This is a MetricResult object
     assert isinstance(metric_test_dict_access, MetricResult)
-    assert metric_test_dict_access['success'] is True # MetricResult also has __getitem__
-    assert metric_test_dict_access['score'] == 0.8
-    assert metric_test_dict_access['reason'] == "Test reason"
+    assert (
+        metric_test_dict_access["success"] is True
+    )  # MetricResult also has __getitem__
+    assert metric_test_dict_access["score"] == 0.8
+    assert metric_test_dict_access["reason"] == "Test reason"
 
 
 def test_typed_interface_input_validation():
@@ -72,9 +73,7 @@ def test_typed_interface_input_validation():
         return EvaluateResult(
             score=0.5,
             reason="Overall test",
-            metrics={
-                "test": MetricResult(success=True, score=0.5, reason="Test")
-            },
+            metrics={"test": MetricResult(success=True, score=0.5, reason="Test")},
         )
 
     # Valid messages with required fields
@@ -90,8 +89,8 @@ def test_typed_interface_input_validation():
     assert result.metrics["test"].score == 0.5
 
     # Check dictionary-style access
-    assert result['score'] == 0.5
-    assert result['metrics']["test"]['score'] == 0.5
+    assert result["score"] == 0.5
+    assert result["metrics"]["test"]["score"] == 0.5
 
     # Test with invalid messages should raise an error
     invalid_messages = [{"content": "Hello without role"}]
@@ -116,8 +115,8 @@ def test_typed_interface_input_validation():
     assert result.metrics["test"].score == 0.5
 
     # Check dictionary-style access
-    assert result['score'] == 0.5
-    assert result['metrics']["test"]['score'] == 0.5
+    assert result["score"] == 0.5
+    assert result["metrics"]["test"]["score"] == 0.5
 
 
 def test_typed_interface_output_validation():
@@ -174,18 +173,12 @@ def test_typed_interface_kwargs():
     # Pydantic object access
     assert result.metrics is not None
     assert "test" in result.metrics
-    assert (
-        "Got kwargs: ['param1', 'param2']"
-        == result.metrics["test"].reason
-    )
+    assert "Got kwargs: ['param1', 'param2']" == result.metrics["test"].reason
 
     # Dictionary-style access
-    assert result['metrics'] is not None
-    assert "test" in result['metrics']
-    assert (
-        "Got kwargs: ['param1', 'param2']"
-        == result['metrics']["test"]['reason']
-    )
+    assert result["metrics"] is not None
+    assert "test" in result["metrics"]
+    assert "Got kwargs: ['param1', 'param2']" == result["metrics"]["test"]["reason"]
 
 
 def test_typed_interface_model_dump():
@@ -199,9 +192,7 @@ def test_typed_interface_model_dump():
             reason="Overall test reason",
             error="Sample error message",
             metrics={
-                "test": MetricResult(
-                    success=True, score=0.8, reason="Test reason"
-                )
+                "test": MetricResult(success=True, score=0.8, reason="Test reason")
             },
         )
 
@@ -226,13 +217,13 @@ def test_typed_interface_model_dump():
     assert metric_test.reason == "Test reason"
 
     # Check dictionary-style access
-    assert result['score'] == 0.8
-    assert result['reason'] == "Overall test reason"
-    assert result['error'] == "Sample error message"
-    assert result['metrics'] is not None
-    assert "test" in result['metrics']
-    metric_test_dict_access = result['metrics']["test"]
+    assert result["score"] == 0.8
+    assert result["reason"] == "Overall test reason"
+    assert result["error"] == "Sample error message"
+    assert result["metrics"] is not None
+    assert "test" in result["metrics"]
+    metric_test_dict_access = result["metrics"]["test"]
     assert isinstance(metric_test_dict_access, MetricResult)
-    assert metric_test_dict_access['success'] is True
-    assert metric_test_dict_access['score'] == 0.8
-    assert metric_test_dict_access['reason'] == "Test reason"
+    assert metric_test_dict_access["success"] is True
+    assert metric_test_dict_access["score"] == 0.8
+    assert metric_test_dict_access["reason"] == "Test reason"

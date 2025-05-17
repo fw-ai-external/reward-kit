@@ -33,17 +33,17 @@ RewardFunction(
 ### Parameters
 
 - **`func`** (`Optional[Callable]`): The local function to use (for mode="local").
-  
+
 - **`func_path`** (`Optional[str]`): A string path to a function (e.g., "module.submodule:function_name").
 
 - **`mode`** (`str`): The mode of operation. Options:
   - `"local"`: Run the function locally
   - `"remote"`: Call a remote endpoint
   - `"fireworks_hosted"`: Use a Fireworks-hosted model
-  
+
 - **`endpoint`** (`Optional[str]`): The URL of the remote endpoint (for mode="remote").
 
-- **`name`** (`Optional[str]`): The name of the deployed evaluator (for mode="remote"). 
+- **`name`** (`Optional[str]`): The name of the deployed evaluator (for mode="remote").
   If provided and endpoint is not, the endpoint will be constructed from the name.
 
 - **`model_id`** (`Optional[str]`): The ID of the Fireworks-hosted model (for mode="fireworks_hosted").
@@ -71,10 +71,10 @@ __call__(
 #### Parameters
 
 - **`messages`** (`List[Dict[str, str]]`): List of conversation messages, each with 'role' and 'content' keys.
-  
-- **`original_messages`** (`Optional[List[Dict[str, str]]]`): Original conversation messages (for context). 
+
+- **`original_messages`** (`Optional[List[Dict[str, str]]]`): Original conversation messages (for context).
   Defaults to all messages except the last one if not provided.
-  
+
 - **`**kwargs`**: Additional keyword arguments to pass to the function.
 
 #### Returns

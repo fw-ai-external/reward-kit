@@ -83,7 +83,7 @@ reward-kit/
 │   │   ├── function_calling.py # Function calling rewards
 │   │   ├── json_schema.py      # JSON schema validation
 │   │   ├── math.py             # Math evaluation
-│   │   ├── format.py           # Format validation 
+│   │   ├── format.py           # Format validation
 │   │   ├── tag_count.py        # Tag counting
 │   │   ├── accuracy.py         # Accuracy evaluation
 │   │   ├── language_consistency.py # Language consistency
@@ -126,18 +126,18 @@ def my_reward_function(
 ) -> EvaluateResult:
     """
     Evaluate responses based on custom criteria.
-    
+
     Args:
         messages: List of conversation messages
         ground_truth: Expected correct answer
         **kwargs: Additional arguments
-        
+
     Returns:
         EvaluateResult with evaluation score and metrics
     """
     # Your evaluation logic here
     # ...
-    
+
     return EvaluateResult(
         score=score,
         reason=reason,
@@ -255,9 +255,9 @@ class TestYourFunction(unittest.TestCase):
             {"role": "user", "content": "Test question"},
             {"role": "assistant", "content": "Test response"}
         ]
-        
+
         result = your_function(messages=messages)
-        
+
         # Assert expectations
         self.assertIsNotNone(result)
         self.assertIsInstance(result, dict)

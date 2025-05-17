@@ -27,15 +27,15 @@ message = Message(
   - `"user"`: Message from the user
   - `"assistant"`: Message from the assistant
   - `"system"`: System message providing context/instructions
-  
+
 - **`content`** (`str`): The text content of the message.
-  
+
 - **`name`** (`Optional[str]`): Optional name of the sender (for named system messages).
-  
+
 - **`tool_call_id`** (`Optional[str]`): Optional ID for a tool call (used in tool calling).
-  
+
 - **`tool_calls`** (`Optional[List[Dict[str, Any]]]`): Optional list of tool calls in the message.
-  
+
 - **`function_call`** (`Optional[Dict[str, Any]]`): Optional function call information (legacy format).
 
 #### Compatibility
@@ -63,15 +63,15 @@ result = RewardOutput(
 #### Attributes
 
 - **`score`** (`float`): The overall reward score, typically between 0.0 and 1.0.
-  
+
 - **`metrics`** (`Dict[str, MetricRewardOutput]`): Dictionary of component metrics, with metric names as keys and `MetricRewardOutput` objects as values.
 
 #### Methods
 
 - **`to_dict()`** → `Dict[str, Any]`: Converts the `RewardOutput` to a dictionary representation.
-  
+
 - **`from_dict(data: Dict[str, Any])`** → `RewardOutput`: Class method that creates a `RewardOutput` from a dictionary representation.
-  
+
 - **`__str__()`** → `str`: Returns a JSON string representation of the `RewardOutput`.
 
 ### MetricRewardOutput
@@ -90,7 +90,7 @@ metric = MetricRewardOutput(
 #### Attributes
 
 - **`score`** (`float`): The score for this specific metric, typically between 0.0 and 1.0.
-  
+
 - **`reason`** (`Optional[str]`): Optional explanation for why this score was assigned.
 
 ## Evaluation Models
@@ -116,11 +116,11 @@ result = EvaluateResult(
 #### Attributes
 
 - **`score`** (`float`): The overall evaluation score, typically between 0.0 and 1.0.
-  
+
 - **`reason`** (`Optional[str]`): Optional explanation for the overall score.
-  
+
 - **`metrics`** (`Dict[str, MetricResult]`): Dictionary of component metrics.
-  
+
 - **`error`** (`Optional[str]`): Optional error message if the evaluation encountered a problem.
 
 ### MetricResult
@@ -140,9 +140,9 @@ metric = MetricResult(
 #### Attributes
 
 - **`score`** (`float`): The score for this specific metric, typically between 0.0 and 1.0.
-  
+
 - **`reason`** (`str`): Explanation for why this score was assigned.
-  
+
 - **`success`** (`Optional[bool]`): Optional flag indicating whether this metric evaluation was successful.
 
 ## Example Usages

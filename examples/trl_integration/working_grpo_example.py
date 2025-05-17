@@ -7,35 +7,42 @@ This example:
 3. Runs a minimal training procedure to validate the integration
 """
 
-import os
-import sys
-import re
-import numpy as np
 import logging
-from typing import List, Dict, Any, Optional, Union, Callable
+import os
+import re
+import sys
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Ensure reward-kit is in the path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from reward_kit.adapters.trl import (  # Import the new generic TRL adapter
+    create_trl_adapter,
+)
+from reward_kit.models import (  # RewardOutput, MetricRewardOutput are legacy
+    EvaluateResult,
+    MetricResult,
 )
 
 # Import reward-kit components
-from reward_kit.reward_function import reward_function # RewardFunction class might not be needed
-from reward_kit.models import EvaluateResult, MetricResult # RewardOutput, MetricRewardOutput are legacy
-from reward_kit.adapters.trl import create_trl_adapter # Import the new generic TRL adapter
+from reward_kit.reward_function import (  # RewardFunction class might not be needed
+    reward_function,
+)
 
 # Import TRL components
 try:
     import torch
+    from datasets import load_dataset
+    from math_verify import LatexExtractionConfig, parse, verify
+    from peft import LoraConfig, get_peft_model
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from trl import GRPOConfig, GRPOTrainer
-    from datasets import load_dataset
-    from peft import LoraConfig, get_peft_model
-    from math_verify import LatexExtractionConfig, parse, verify
 
     HAS_TRL = True
 except ImportError as e:
@@ -80,7 +87,14 @@ def format_reward(
     # Extract response text from last message (assistant's response)
     # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.role != "assistant" or not response.content: # Access as attributes
+    # Handle both dict and Message object formats
+    if isinstance(response, dict):
+        role = response.get("role", "")
+        content = response.get("content", "")
+    else:
+        role = response.role
+        content = response.content
+    if role != "assistant" or not content:
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -91,13 +105,15 @@ def format_reward(
             },
         )
 
-    text = response.content if response.content is not None else "" # Access as attribute
+    text = content if content is not None else ""
 
     # Check for think/answer tags
     think_pattern = (
         f"{re.escape(think_tag)}(.*?){re.escape(think_tag.replace('<', '</'))}"
     )
-    answer_pattern = f"{re.escape(answer_tag)}(.*?){re.escape(answer_tag.replace('<', '</'))}"
+    answer_pattern = (
+        f"{re.escape(answer_tag)}(.*?){re.escape(answer_tag.replace('<', '</'))}"
+    )
 
     think_match = re.search(think_pattern, text, re.DOTALL)
     answer_match = re.search(answer_pattern, text, re.DOTALL)
@@ -183,7 +199,14 @@ def math_accuracy_reward(
     # Extract response text
     # After @reward_function decoration, 'messages' is List[Message] (Pydantic models)
     response = messages[-1]
-    if response.role != "assistant" or not response.content: # Access as attributes
+    # Handle both dict and Message object formats
+    if isinstance(response, dict):
+        role = response.get("role", "")
+        content = response.get("content", "")
+    else:
+        role = response.role
+        content = response.content
+    if role != "assistant" or not content:
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
@@ -194,7 +217,7 @@ def math_accuracy_reward(
             },
         )
 
-    text = response.content if response.content is not None else "" # Access as attribute
+    text = content if content is not None else ""
 
     # If solution is not provided, we can't evaluate accuracy
     if not solution:
@@ -243,11 +266,7 @@ def math_accuracy_reward(
     return EvaluateResult(
         score=score,
         reason=reason,
-        metrics={
-            "accuracy": MetricResult(
-                score=score, success=success, reason=reason
-            )
-        },
+        metrics={"accuracy": MetricResult(score=score, success=success, reason=reason)},
     )
 
 
@@ -304,9 +323,7 @@ def run_grpo_training_example():
         model_id = "Qwen/Qwen3-4B"  # Using Qwen3-4B as requested
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            torch_dtype=(
-                torch.float16 if torch.cuda.is_available() else torch.float32
-            ),
+            torch_dtype=(torch.float16 if torch.cuda.is_available() else torch.float32),
             device_map="auto",  # Let it decide based on available resources
         )
         tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -363,52 +380,63 @@ def run_grpo_training_example():
     # 5. Create TRL adapter for the format_reward function (defined at the top)
     print("Creating TRL adapter for format_reward...")
     adapted_format_reward = create_trl_adapter(
-        reward_fn=format_reward, # The @reward_function decorated one
-        dataset_to_reward_kwargs_map={}, # No dynamic kwargs from dataset
-        static_reward_kwargs={'think_tag': '<think>', 'answer_tag': '<answer>'}
+        reward_fn=format_reward,  # The @reward_function decorated one
+        dataset_to_reward_kwargs_map={},  # No dynamic kwargs from dataset
+        static_reward_kwargs={"think_tag": "<think>", "answer_tag": "<answer>"},
         # Prompts are strings, so default user_message_fn is fine.
     )
-    
+
     # (Optional) Create TRL adapter for math_accuracy_reward if it were to be used
     print("Creating TRL adapter for math_accuracy_reward...")
     adapted_math_accuracy_reward = create_trl_adapter(
-        reward_fn=math_accuracy_reward, # The @reward_function decorated one
-        dataset_to_reward_kwargs_map={"solution": "solution"}, # Map dataset 'solution' to 'solution' param
-        static_reward_kwargs={}
+        reward_fn=math_accuracy_reward,  # The @reward_function decorated one
+        dataset_to_reward_kwargs_map={
+            "solution": "solution"
+        },  # Map dataset 'solution' to 'solution' param
+        static_reward_kwargs={},
         # Prompts are strings, so default user_message_fn is fine.
     )
 
     # Combine the adapted rewards
     def combine_rewards(
-        reward_adapter_configs: List[Dict[str, Any]], # Each dict: {'adapter': callable, 'weight': float}
+        reward_adapter_configs: List[
+            Dict[str, Any]
+        ],  # Each dict: {'adapter': callable, 'weight': float}
     ) -> Callable[[List[Any], List[str], Dict[str, Any]], List[float]]:
-        
-        total_weight = sum(c['weight'] for c in reward_adapter_configs)
+
+        total_weight = sum(c["weight"] for c in reward_adapter_configs)
         if abs(total_weight - 1.0) > 1e-6:
             logger.warning(f"Sum of weights is {total_weight}, normalizing to 1.0.")
             for config in reward_adapter_configs:
-                config['weight'] /= total_weight
-        
-        def combined_adapter_pipeline(prompts: List[Any], completions: List[str], **kwargs) -> List[float]:
+                config["weight"] /= total_weight
+
+        def combined_adapter_pipeline(
+            prompts: List[Any], completions: List[str], **kwargs
+        ) -> List[float]:
             batch_size = len(prompts)
             final_scores = [0.0] * batch_size
 
             for config in reward_adapter_configs:
-                adapter_fn = config['adapter']
-                weight = config['weight']
-                
-                individual_scores = adapter_fn(prompts=prompts, completions=completions, **kwargs)
-                
+                adapter_fn = config["adapter"]
+                weight = config["weight"]
+
+                individual_scores = adapter_fn(
+                    prompts=prompts, completions=completions, **kwargs
+                )
+
                 for i in range(batch_size):
                     final_scores[i] += individual_scores[i] * weight
             return final_scores
+
         return combined_adapter_pipeline
 
     print("Creating combined TRL reward function (format + math_accuracy)...")
-    combined_reward_for_trainer = combine_rewards([
-        {'adapter': adapted_format_reward, 'weight': 0.3},
-        {'adapter': adapted_math_accuracy_reward, 'weight': 0.7}
-    ])
+    combined_reward_for_trainer = combine_rewards(
+        [
+            {"adapter": adapted_format_reward, "weight": 0.3},
+            {"adapter": adapted_math_accuracy_reward, "weight": 0.7},
+        ]
+    )
 
     # The custom 'format_reward_fn' has been removed.
     # We will use 'combined_reward_for_trainer'.
@@ -447,7 +475,9 @@ def run_grpo_training_example():
         print("\nInitializing GRPO trainer...")
         trainer = GRPOTrainer(
             model=model,
-            reward_funcs=[combined_reward_for_trainer],  # Use the combined reward function
+            reward_funcs=[
+                combined_reward_for_trainer
+            ],  # Use the combined reward function
             args=training_args,
             train_dataset=train_dataset,
         )
@@ -473,22 +503,16 @@ def run_grpo_training_example():
         import re
 
         pre_has_think = bool(
-            re.search(
-                r"<thinking>(.*?)</thinking>", pre_training_output, re.DOTALL
-            )
+            re.search(r"<thinking>(.*?)</thinking>", pre_training_output, re.DOTALL)
         )
         pre_has_answer = bool(
             re.search(r"<answer>(.*?)</answer>", pre_training_output, re.DOTALL)
         )
         post_has_think = bool(
-            re.search(
-                r"<thinking>(.*?)</thinking>", post_training_output, re.DOTALL
-            )
+            re.search(r"<thinking>(.*?)</thinking>", post_training_output, re.DOTALL)
         )
         post_has_answer = bool(
-            re.search(
-                r"<answer>(.*?)</answer>", post_training_output, re.DOTALL
-            )
+            re.search(r"<answer>(.*?)</answer>", post_training_output, re.DOTALL)
         )
 
         print(

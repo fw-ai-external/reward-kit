@@ -1,9 +1,13 @@
 """
 CLI command for creating and deploying an evaluator.
 """
+
 import json
+
 from reward_kit.evaluation import create_evaluation
+
 from .common import check_environment
+
 
 def deploy_command(args):
     """Create and deploy an evaluator"""

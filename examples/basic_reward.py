@@ -2,9 +2,10 @@
 Example of a basic reward function using the Reward Kit.
 """
 
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from reward_kit import reward_function
-from reward_kit.models import Message, EvaluateResult
+from reward_kit.models import EvaluateResult, Message
 
 
 @reward_function
@@ -28,9 +29,7 @@ def calculate_base_score(messages: List[Message], **kwargs) -> EvaluateResult:
     metrics["helpfulness"] = {
         "score": 0.5 if is_helpful else 0.0,
         "reason": (
-            "Contains helpful keyword"
-            if is_helpful
-            else "Missing helpful keyword"
+            "Contains helpful keyword" if is_helpful else "Missing helpful keyword"
         ),
     }
 
@@ -39,9 +38,7 @@ def calculate_base_score(messages: List[Message], **kwargs) -> EvaluateResult:
     metrics["length_bonus"] = {
         "score": 0.5 if is_long_enough else 0.0,
         "reason": (
-            "Response length sufficient"
-            if is_long_enough
-            else "Response too short"
+            "Response length sufficient" if is_long_enough else "Response too short"
         ),
     }
 

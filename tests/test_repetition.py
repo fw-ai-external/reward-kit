@@ -2,21 +2,19 @@
 Tests for repetition reward functions.
 """
 
-import sys
 import os
+import sys
 import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from reward_kit.models import EvaluateResult, Message
 from reward_kit.rewards.repetition import (
-    repetition_penalty_reward,
     diversity_reward,
     get_ngrams,
+    repetition_penalty_reward,
 )
-from reward_kit.models import Message, EvaluateResult
 
 
 class TestRepetitionReward(unittest.TestCase):
@@ -56,7 +54,9 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = repetition_penalty_reward(messages=messages, ground_truth=None, ngram_size=3)
+        result = repetition_penalty_reward(
+            messages=messages, ground_truth=None, ngram_size=3
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Should be high score (low penalty) for non-repetitive text
@@ -64,8 +64,8 @@ class TestRepetitionReward(unittest.TestCase):
         self.assertGreaterEqual(result.score, 0.9)
         self.assertTrue(result.metrics["repetition"].success)
         # Dictionary access
-        self.assertGreaterEqual(result['score'], 0.9)
-        self.assertTrue(result['metrics']["repetition"]['success'])
+        self.assertGreaterEqual(result["score"], 0.9)
+        self.assertTrue(result["metrics"]["repetition"]["success"])
 
     def test_high_repetition(self):
         """Test with highly repetitive text."""
@@ -80,7 +80,9 @@ class TestRepetitionReward(unittest.TestCase):
             {"role": "assistant", "content": content},
         ]
 
-        result = repetition_penalty_reward(messages=messages, ground_truth=None, ngram_size=3)
+        result = repetition_penalty_reward(
+            messages=messages, ground_truth=None, ngram_size=3
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Should be lower score (higher penalty) for repetitive text
@@ -88,8 +90,8 @@ class TestRepetitionReward(unittest.TestCase):
         self.assertLess(result.score, 0.8)
         self.assertFalse(result.metrics["repetition"].success)
         # Dictionary access
-        self.assertLess(result['score'], 0.8)
-        self.assertFalse(result['metrics']["repetition"]['success'])
+        self.assertLess(result["score"], 0.8)
+        self.assertFalse(result["metrics"]["repetition"]["success"])
 
     def test_moderate_repetition(self):
         """Test with moderately repetitive text."""
@@ -117,8 +119,8 @@ class TestRepetitionReward(unittest.TestCase):
         self.assertGreater(result.score, 0.5)
         self.assertLess(result.score, 1.0)
         # Dictionary access
-        self.assertGreater(result['score'], 0.5)
-        self.assertLess(result['score'], 1.0)
+        self.assertGreater(result["score"], 0.5)
+        self.assertLess(result["score"], 1.0)
 
     def test_different_ngram_sizes(self):
         """Test with different n-gram sizes."""
@@ -151,7 +153,7 @@ class TestRepetitionReward(unittest.TestCase):
         # Attribute access
         self.assertLess(result_1gram.score, result_3gram.score)
         # Dictionary access
-        self.assertLess(result_1gram['score'], result_3gram['score'])
+        self.assertLess(result_1gram["score"], result_3gram["score"])
 
     def test_max_penalty(self):
         """Test with different max_penalty values."""
@@ -181,7 +183,7 @@ class TestRepetitionReward(unittest.TestCase):
         # Attribute access
         self.assertGreater(result_low.score, result_high.score)
         # Dictionary access
-        self.assertGreater(result_low['score'], result_high['score'])
+        self.assertGreater(result_low["score"], result_high["score"])
 
     def test_empty_response(self):
         """Test with empty response."""
@@ -198,8 +200,8 @@ class TestRepetitionReward(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertTrue(result.metrics["repetition"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertTrue(result['metrics']["repetition"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertTrue(result["metrics"]["repetition"]["success"])
 
     def test_diversity_reward(self):
         """Test the diversity reward function."""
@@ -230,7 +232,9 @@ class TestRepetitionReward(unittest.TestCase):
         result_diverse = diversity_reward(messages=messages_diverse, ground_truth=None)
         self.assertIsInstance(result_diverse, EvaluateResult)
 
-        result_repetitive = diversity_reward(messages=messages_repetitive, ground_truth=None)
+        result_repetitive = diversity_reward(
+            messages=messages_repetitive, ground_truth=None
+        )
         self.assertIsInstance(result_repetitive, EvaluateResult)
 
         # Diverse content should score higher
@@ -239,9 +243,9 @@ class TestRepetitionReward(unittest.TestCase):
         self.assertTrue(result_diverse.metrics["diversity"].success)
         self.assertFalse(result_repetitive.metrics["diversity"].success)
         # Dictionary access
-        self.assertGreater(result_diverse['score'], result_repetitive['score'])
-        self.assertTrue(result_diverse['metrics']["diversity"]['success'])
-        self.assertFalse(result_repetitive['metrics']["diversity"]['success'])
+        self.assertGreater(result_diverse["score"], result_repetitive["score"])
+        self.assertTrue(result_diverse["metrics"]["diversity"]["success"])
+        self.assertFalse(result_repetitive["metrics"]["diversity"]["success"])
 
     def test_diversity_with_custom_weights(self):
         """Test diversity reward with custom n-gram weights."""
@@ -290,7 +294,7 @@ class TestRepetitionReward(unittest.TestCase):
         # Attribute access
         self.assertNotEqual(result_unigram.score, result_trigram.score)
         # Dictionary access
-        self.assertNotEqual(result_unigram['score'], result_trigram['score'])
+        self.assertNotEqual(result_unigram["score"], result_trigram["score"])
 
 
 if __name__ == "__main__":

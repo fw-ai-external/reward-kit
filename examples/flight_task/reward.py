@@ -5,13 +5,22 @@ This reward function evaluates if an agent successfully booked a flight by check
 for a paid booking record for the specified passenger.
 """
 
-from reward_kit import reward_function, Message, EvaluateResult, MetricResult
-from typing import List, Any, Dict
-from sqlalchemy.engine.base import Connection # Assuming db is an SQLAlchemy connection
+from typing import Any, Dict, List
+
+from sqlalchemy.engine.base import Connection  # Assuming db is an SQLAlchemy connection
+
+from reward_kit import EvaluateResult, Message, MetricResult, reward_function
 
 
 @reward_function
-def evaluate(messages: List[Message], *, db: Connection, end_goal_sql: str = None, passenger: str = "Alice", **kwargs: Any) -> EvaluateResult:
+def evaluate(
+    messages: List[Message],
+    *,
+    db: Connection,
+    end_goal_sql: str = None,
+    passenger: str = "Alice",
+    **kwargs: Any,
+) -> EvaluateResult:
     """
     Evaluate if a flight booking was successfully completed.
 

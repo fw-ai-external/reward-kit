@@ -9,10 +9,10 @@ like normalization and LaTeX parsing.
 import re
 
 # import math # Unused import
-from typing import Dict, List, Any, Union, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 def normalize_text(text: str) -> str:
@@ -101,9 +101,7 @@ def extract_math_expression(text: str) -> str:
                     # Handle pi symbols in the answer
                     if "π" in result or "pi" in result.lower():
                         result = (
-                            result.replace("π", "")
-                            .replace("Pi", "")
-                            .replace("pi", "")
+                            result.replace("π", "").replace("Pi", "").replace("pi", "")
                         )
                         try:
                             # If it's just a coefficient of pi, convert to decimal
@@ -137,21 +135,15 @@ def extract_math_expression(text: str) -> str:
     # Only use as a fallback for short responses with few numbers
     if len(text) < 200:  # Only for short answers
         # Count decimal numbers in text
-        numbers = re.findall(
-            r"(?:^|\s|[^\w])([-+]?\d+(?:\.\d+)?)(?:\s|$|[^\w])", text
-        )
-        if (
-            len(numbers) == 1
-        ):  # If there's only one number, it's likely the answer
+        numbers = re.findall(r"(?:^|\s|[^\w])([-+]?\d+(?:\.\d+)?)(?:\s|$|[^\w])", text)
+        if len(numbers) == 1:  # If there's only one number, it's likely the answer
             return numbers[0]
         elif numbers and len(text.split()) < 30:  # Very short text with numbers
             # Take the last number in a short response
             return numbers[-1]
 
     # Look for capitalized city names or other proper nouns as answers
-    if re.search(
-        r"capital|city|country|president|largest|smallest", text.lower()
-    ):
+    if re.search(r"capital|city|country|president|largest|smallest", text.lower()):
         noun_pattern = r"is\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)"
         match = re.search(noun_pattern, text)
         if match:
@@ -302,9 +294,7 @@ def compare_math_expressions(pred: str, gt: str) -> float:
         pred_value: float = (
             pred_decimal if pred_decimal is not None else float(pred_clean)
         )
-        gt_value: float = (
-            gt_decimal if gt_decimal is not None else float(gt_clean)
-        )
+        gt_value: float = gt_decimal if gt_decimal is not None else float(gt_clean)
 
         # Check if they're exactly equal
         if pred_value == gt_value:
@@ -387,8 +377,12 @@ def string_similarity(s1: str, s2: str) -> float:
 
 @reward_function
 def accuracy_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Last message is model's response
-    ground_truth: Union[List[Message], List[Dict[str, Any]]], # Expected assistant response trajectory
+    messages: Union[
+        List[Message], List[Dict[str, Any]]
+    ],  # Last message is model's response
+    ground_truth: Union[
+        List[Message], List[Dict[str, Any]]
+    ],  # Expected assistant response trajectory
     extract_fn: Optional[Callable[[str], str]] = None,
     compare_fn: Optional[Callable[[str, str], float]] = None,
     **kwargs: Any,
@@ -414,33 +408,57 @@ def accuracy_reward(
         return EvaluateResult(
             score=0.0,
             reason="No messages provided (cannot extract model response).",
-            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="No messages provided.")}
+            metrics={
+                "accuracy": MetricResult(
+                    score=0.0, success=False, reason="No messages provided."
+                )
+            },
         )
 
     model_last_message = messages[-1]
     if isinstance(model_last_message, Message):
-        if model_last_message.role == "assistant" and model_last_message.content is not None:
+        if (
+            model_last_message.role == "assistant"
+            and model_last_message.content is not None
+        ):
             model_response_text = model_last_message.content
         else:
             return EvaluateResult(
                 score=0.0,
                 reason="Last message is not a valid assistant response.",
-                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid assistant response.")}
+                metrics={
+                    "accuracy": MetricResult(
+                        score=0.0, success=False, reason="Invalid assistant response."
+                    )
+                },
             )
     elif isinstance(model_last_message, dict):
-        if model_last_message.get("role") == "assistant" and model_last_message.get("content") is not None:
+        if (
+            model_last_message.get("role") == "assistant"
+            and model_last_message.get("content") is not None
+        ):
             model_response_text = model_last_message.get("content", "")
         else:
             return EvaluateResult(
                 score=0.0,
                 reason="Last message is not a valid assistant response (dict format).",
-                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid assistant response (dict).")}
+                metrics={
+                    "accuracy": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Invalid assistant response (dict).",
+                    )
+                },
             )
     else:
         return EvaluateResult(
             score=0.0,
             reason=f"Unexpected type for last message: {type(model_last_message)}.",
-            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid message type.")}
+            metrics={
+                "accuracy": MetricResult(
+                    score=0.0, success=False, reason="Invalid message type."
+                )
+            },
         )
 
     ground_truth_comparison_text = ""
@@ -448,7 +466,11 @@ def accuracy_reward(
         return EvaluateResult(
             score=0.0,
             reason="Ground truth not provided or not in expected list format.",
-            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid ground truth format.")}
+            metrics={
+                "accuracy": MetricResult(
+                    score=0.0, success=False, reason="Invalid ground truth format."
+                )
+            },
         )
 
     # Assuming for simple accuracy, we compare against the content of the first ground truth message
@@ -461,7 +483,11 @@ def accuracy_reward(
             return EvaluateResult(
                 score=0.0,
                 reason="First ground truth message has no content.",
-                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Ground truth content missing.")}
+                metrics={
+                    "accuracy": MetricResult(
+                        score=0.0, success=False, reason="Ground truth content missing."
+                    )
+                },
             )
     elif isinstance(first_gt_message, dict):
         if first_gt_message.get("content") is not None:
@@ -471,15 +497,27 @@ def accuracy_reward(
             return EvaluateResult(
                 score=0.0,
                 reason="First ground truth message (dict) has no content.",
-                metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Ground truth content missing (dict).")}
+                metrics={
+                    "accuracy": MetricResult(
+                        score=0.0,
+                        success=False,
+                        reason="Ground truth content missing (dict).",
+                    )
+                },
             )
     else:
-         return EvaluateResult(
+        return EvaluateResult(
             score=0.0,
             reason=f"Unexpected type for first ground_truth message: {type(first_gt_message)}.",
-            metrics={"accuracy": MetricResult(score=0.0, success=False, reason="Invalid ground truth message type.")}
+            metrics={
+                "accuracy": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="Invalid ground truth message type.",
+                )
+            },
         )
-    
+
     # If ground_truth_comparison_text ended up empty (e.g. content was explicitly None and handled by .get default)
     # This check is important if None content is valid but means "empty string" for comparison.
     # However, the above checks for `is not None` should make this specific check less critical
@@ -494,11 +532,15 @@ def accuracy_reward(
         extracted_answer = extract_math_expression(model_response_text)
 
     # If extraction failed, try direct comparison using the full model_response_text
-    if not extracted_answer and model_response_text: # Check model_response_text to avoid error if it's empty
+    if (
+        not extracted_answer and model_response_text
+    ):  # Check model_response_text to avoid error if it's empty
         # For simple answers like "Paris", check if ground truth is in the model response text
-        if len(ground_truth_comparison_text) > 2:  # Avoid matching short strings like "a", "an"
+        if (
+            len(ground_truth_comparison_text) > 2
+        ):  # Avoid matching short strings like "a", "an"
             if ground_truth_comparison_text.lower() in model_response_text.lower():
-                extracted_answer = ground_truth_comparison_text # If GT is found in response, consider it "extracted"
+                extracted_answer = ground_truth_comparison_text  # If GT is found in response, consider it "extracted"
             # else, extracted_answer remains empty, and comparison will likely yield 0
 
     # Check extraction result
@@ -513,7 +555,7 @@ def accuracy_reward(
         )
 
     # Success is 1.0 for perfect match, otherwise based on threshold
-    success = similarity_score >= 0.9 # Assuming 0.9 is the threshold for success
+    success = similarity_score >= 0.9  # Assuming 0.9 is the threshold for success
 
     # Prepare reason text
     reason = (
@@ -539,6 +581,4 @@ def accuracy_reward(
         ),
     }
 
-    return EvaluateResult(
-        score=similarity_score, reason=reason, metrics=metrics
-    )
+    return EvaluateResult(score=similarity_score, reason=reason, metrics=metrics)

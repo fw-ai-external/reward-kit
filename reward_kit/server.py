@@ -1,13 +1,14 @@
-import os
 import importlib
 import json
 import logging
-from typing import Dict, List, Optional, Any, Union, Callable
+import os
+from typing import Any, Callable, Dict, List, Optional, Union
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .models import EvaluateResult # Changed
+from .models import EvaluateResult  # Changed
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -27,9 +28,7 @@ class Message(BaseModel):
 class RewardRequest(BaseModel):
     """Request model for reward endpoints."""
 
-    messages: List[Message] = Field(
-        ..., description="List of conversation messages"
-    )
+    messages: List[Message] = Field(..., description="List of conversation messages")
     original_messages: Optional[List[Message]] = Field(
         None, description="Original messages for context"
     )
@@ -79,9 +78,7 @@ class RewardServer:
             module = importlib.import_module(module_path)
             func = getattr(module, func_name)
 
-            logger.info(
-                f"Loaded reward function {func_name} from {module_path}"
-            )
+            logger.info(f"Loaded reward function {func_name} from {module_path}")
             return func
         except (ImportError, AttributeError) as e:
             raise ImportError(
@@ -133,12 +130,18 @@ class RewardServer:
                 # The self.reward_func is expected to be decorated by the new @reward_function,
                 # which returns a dictionary.
                 if isinstance(result, dict) and "score" in result:
-                    return result # Return the dictionary directly
-                elif isinstance(result, EvaluateResult): # Should not happen if func is from new decorator
-                    logger.warning("Reward function returned EvaluateResult object directly to server; expected dict.")
+                    return result  # Return the dictionary directly
+                elif isinstance(
+                    result, EvaluateResult
+                ):  # Should not happen if func is from new decorator
+                    logger.warning(
+                        "Reward function returned EvaluateResult object directly to server; expected dict."
+                    )
                     return result.model_dump()
-                elif isinstance(result, tuple) and len(result) == 2: # Legacy tuple
-                    logger.warning("Reward function returned legacy tuple format to server.")
+                elif isinstance(result, tuple) and len(result) == 2:  # Legacy tuple
+                    logger.warning(
+                        "Reward function returned legacy tuple format to server."
+                    )
                     score, components = result
                     return {"score": score, "metrics": components}
                 else:
@@ -204,7 +207,7 @@ def serve_tunnel(func_path: str, port: int = 8000):
     serve(func_path=func_path, host="0.0.0.0", port=port)
 
 
-def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI: # Changed
+def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Changed
     """
     Create a FastAPI app for the given reward function.
 
@@ -265,12 +268,18 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI: # Changed
             # The reward_func is expected to be decorated by the new @reward_function,
             # which returns a dictionary.
             if isinstance(result, dict) and "score" in result:
-                return result # Return the dictionary directly
-            elif isinstance(result, EvaluateResult): # Should not happen if func is from new decorator
-                logger.warning("Reward function passed to create_app returned EvaluateResult object directly; expected dict after decoration.")
+                return result  # Return the dictionary directly
+            elif isinstance(
+                result, EvaluateResult
+            ):  # Should not happen if func is from new decorator
+                logger.warning(
+                    "Reward function passed to create_app returned EvaluateResult object directly; expected dict after decoration."
+                )
                 return result.model_dump()
-            elif isinstance(result, tuple) and len(result) == 2: # Legacy tuple
-                logger.warning("Reward function passed to create_app returned legacy tuple format.")
+            elif isinstance(result, tuple) and len(result) == 2:  # Legacy tuple
+                logger.warning(
+                    "Reward function passed to create_app returned legacy tuple format."
+                )
                 score, components = result
                 return {"score": score, "metrics": components}
             else:

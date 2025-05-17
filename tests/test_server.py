@@ -1,10 +1,11 @@
-import pytest
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
-from fastapi.testclient import TestClient
-from typing import List, Dict, Any, Optional
 
-from reward_kit.server import create_app
+import pytest
+from fastapi.testclient import TestClient
+
 from reward_kit.models import EvaluateResult, MetricResult
+from reward_kit.server import create_app
 
 
 @pytest.fixture

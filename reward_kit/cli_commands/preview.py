@@ -1,10 +1,14 @@
 """
 CLI command for previewing an evaluator.
 """
+
 import json
 from pathlib import Path
+
 from reward_kit.evaluation import preview_evaluation
+
 from .common import check_environment
+
 
 def preview_command(args):
     """Preview an evaluator with sample data"""

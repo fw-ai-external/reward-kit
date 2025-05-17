@@ -78,28 +78,28 @@ def word_count_reward(
 ) -> RewardOutput:
     """
     Evaluate a response based on its word count.
-    
+
     Args:
         messages: List of conversation messages
         original_messages: Original messages (usually without the response being evaluated)
         **kwargs: Additional parameters
-        
+
     Returns:
         RewardOutput with score and metrics information
     """
     # Get the assistant's response (last message)
     if not messages or messages[-1].get("role") != "assistant":
         return RewardOutput(
-            score=0.0, 
+            score=0.0,
             metrics={"error": MetricRewardOutput(score=0.0, reason="No assistant response found")}
         )
-    
+
     response = messages[-1].get("content", "")
-    
+
     # Count words and calculate score
     word_count = len(response.split())
     score = min(word_count / 100, 1.0)  # Cap at 1.0
-    
+
     return RewardOutput(
         score=score,
         metrics={

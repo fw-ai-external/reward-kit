@@ -2,21 +2,19 @@
 Tests for language consistency reward function.
 """
 
-import sys
 import os
+import sys
 import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from reward_kit.models import EvaluateResult, Message
 from reward_kit.rewards.language_consistency import (
-    language_consistency_reward,
-    detect_dominant_language,
     count_words_by_language,
+    detect_dominant_language,
+    language_consistency_reward,
 )
-from reward_kit.models import Message, EvaluateResult
 
 
 class TestLanguageConsistencyReward(unittest.TestCase):
@@ -36,8 +34,8 @@ class TestLanguageConsistencyReward(unittest.TestCase):
 
         result = language_consistency_reward(
             messages=messages_arg,
-            ground_truth=None, # Dataset ground_truth not used by this reward logic directly
-            target_language="en"
+            ground_truth=None,  # Dataset ground_truth not used by this reward logic directly
+            target_language="en",
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -55,14 +53,15 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         La evaluación debería detectar esto como español consistente.
         """
 
-        prompt_message_dict = {"role": "user", "content": "Escribe una respuesta en español"}
+        prompt_message_dict = {
+            "role": "user",
+            "content": "Escribe una respuesta en español",
+        }
         assistant_message_dict = {"role": "assistant", "content": content}
         messages_arg = [prompt_message_dict, assistant_message_dict]
 
         result = language_consistency_reward(
-            messages=messages_arg,
-            ground_truth=None,
-            target_language="es"
+            messages=messages_arg, ground_truth=None, target_language="es"
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -83,17 +82,15 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         """
 
         prompt_message_dict = {
-                "role": "user",
-                "content": "Write a response that mixes English and Spanish",
+            "role": "user",
+            "content": "Write a response that mixes English and Spanish",
         }
         assistant_message_dict = {"role": "assistant", "content": content}
         messages_arg = [prompt_message_dict, assistant_message_dict]
 
         # Test with English as target
         result_en = language_consistency_reward(
-            messages=messages_arg,
-            ground_truth=None,
-            target_language="en"
+            messages=messages_arg, ground_truth=None, target_language="en"
         )
 
         self.assertIsInstance(result_en, EvaluateResult)
@@ -121,7 +118,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         result = language_consistency_reward(
             messages=messages_arg,
             ground_truth=None,
-            auto_detect=True  # Auto-detect from context
+            auto_detect=True,  # Auto-detect from context
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -151,9 +148,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         messages_arg = [prompt_message_dict, assistant_message_dict]
 
         result = language_consistency_reward(
-            messages=messages_arg,
-            ground_truth=None,
-            target_language="zh"
+            messages=messages_arg, ground_truth=None, target_language="zh"
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -170,9 +165,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         messages_arg = [prompt_message_dict, assistant_message_dict]
 
         result = language_consistency_reward(
-            messages=messages_arg,
-            ground_truth=None,
-            target_language="en"
+            messages=messages_arg, ground_truth=None, target_language="en"
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -186,26 +179,24 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         """Test with technical content containing code."""
         content = """
         Here's a Python function to add two numbers:
-        
+
         ```python
         def add(a, b):
             return a + b
         ```
-        
+
         This is a simple function that takes two parameters and returns their sum.
         """
 
         prompt_message_dict = {
-                "role": "user",
-                "content": "Write a Python function to add two numbers",
+            "role": "user",
+            "content": "Write a Python function to add two numbers",
         }
         assistant_message_dict = {"role": "assistant", "content": content}
         messages_arg = [prompt_message_dict, assistant_message_dict]
 
         result = language_consistency_reward(
-            messages=messages_arg,
-            ground_truth=None,
-            target_language="en"
+            messages=messages_arg, ground_truth=None, target_language="en"
         )
 
         self.assertIsInstance(result, EvaluateResult)
@@ -216,7 +207,9 @@ class TestLanguageConsistencyReward(unittest.TestCase):
     def test_detect_dominant_language(self):
         """Test the dominant language detection function."""
         # Test English
-        en_text = "The quick brown fox jumps over the lazy dog with a lot of English words"
+        en_text = (
+            "The quick brown fox jumps over the lazy dog with a lot of English words"
+        )
         lang_en, conf_en = detect_dominant_language(en_text)
         self.assertEqual(lang_en, "en")
         self.assertGreaterEqual(conf_en, 0.5)

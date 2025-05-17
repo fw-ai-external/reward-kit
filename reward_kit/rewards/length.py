@@ -8,10 +8,10 @@ token efficiency.
 
 import math
 import re
-from typing import Dict, List, Any, Union, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 def count_tokens(text: str, method: str = "whitespace") -> int:
@@ -40,7 +40,9 @@ def count_tokens(text: str, method: str = "whitespace") -> int:
 @reward_function
 def length_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Not used by this function but part of standard signature
     target_length: Optional[int] = None,
     min_length: Optional[int] = None,
     max_length: Optional[int] = None,
@@ -113,7 +115,7 @@ def length_reward(
                 },
             )
         text = response.get("content", "")
-    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",
@@ -123,7 +125,6 @@ def length_reward(
                 )
             },
         )
-
 
     # Count tokens in response
     token_count = count_tokens(text, method=token_method)
@@ -150,9 +151,7 @@ def length_reward(
             progress = min(1.0, normalized_diff)
             score = (
                 min_reward
-                + (max_reward - min_reward)
-                * (1.0 + math.cos(progress * math.pi))
-                / 2.0
+                + (max_reward - min_reward) * (1.0 + math.cos(progress * math.pi)) / 2.0
             )
         else:
             # Linear scaling (straight line falloff from target)
@@ -198,7 +197,9 @@ def length_reward(
                 # Linear scaling
                 score = max_reward - (max_reward - min_reward) * progress
 
-            reason = f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
+            reason = (
+                f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
+            )
             success = False
 
         else:
@@ -245,7 +246,9 @@ def length_reward(
                 # Linear scaling
                 score = max_reward - (max_reward - min_reward) * progress
 
-            reason = f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
+            reason = (
+                f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
+            )
             success = False
         else:
             # At or below maximum
@@ -267,9 +270,7 @@ def length_reward(
             progress = min(1.0, normalized_length)
             score = (
                 min_reward
-                + (max_reward - min_reward)
-                * (1.0 + math.cos(progress * math.pi))
-                / 2.0
+                + (max_reward - min_reward) * (1.0 + math.cos(progress * math.pi)) / 2.0
             )
         else:
             # Linear scaling
@@ -285,8 +286,7 @@ def length_reward(
         "token_count": MetricResult(
             score=min(
                 1.0,
-                float(token_count)
-                / (target_length or max_length or min_length or 100),
+                float(token_count) / (target_length or max_length or min_length or 100),
             ),
             success=success,
             reason=f"Token count: {token_count}",
@@ -299,7 +299,9 @@ def length_reward(
 @reward_function
 def cosine_length_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Not used by this function but part of standard signature
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Not used by this function but part of standard signature
     correctness: Optional[float] = None,
     is_correct: Optional[bool] = None,
     max_length: int = 1000,
@@ -379,7 +381,7 @@ def cosine_length_reward(
                 },
             )
         text = response.get("content", "")
-    else: # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",
@@ -431,9 +433,7 @@ def cosine_length_reward(
 
     # Prepare metrics
     metrics = {
-        "cosine_length": MetricResult(
-            score=score, success=success, reason=reason
-        ),
+        "cosine_length": MetricResult(score=score, success=success, reason=reason),
         "token_count": MetricResult(
             score=min(1.0, float(token_count) / max_length),
             success=success,

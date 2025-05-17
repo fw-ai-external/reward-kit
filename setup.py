@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="reward-kit",
@@ -14,7 +14,7 @@ setup(
         "openai==1.78.1",
         "aiosqlite",
         "aiohttp",
-        "PyYAML>=5.0", # Added PyYAML
+        "PyYAML>=5.0",  # Added PyYAML
     ],
     extras_require={
         "dev": [
@@ -26,8 +26,11 @@ setup(
             "flake8>=3.9.2",
             "autopep8>=1.5.0",
             "transformers>=4.0.0",
-            "pytest-asyncio", # Added pytest-asyncio
-            "types-setuptools", # For Mypy
+            "pytest-asyncio",  # Added pytest-asyncio
+            "types-setuptools",  # For Mypy
+            "types-requests",  # For Mypy
+            "types-PyYAML",  # For Mypy
+            "types-docker",  # For Mypy
         ],
         "deepseek": [
             "datasets>=2.12.0",
@@ -42,8 +45,8 @@ setup(
     },
     author="Fireworks AI",
     author_email="info@fireworks.ai",
-    description="A Python library for defining, testing, deploying, and using reward functions for LLM fine-tuning",
-    long_description="A Python library for defining, testing, deploying, and using reward functions for LLM fine-tuning",
+    description="A Python library for defining, testing, and using reward functions",
+    long_description="A library for defining, testing, and deploying reward functions",
     url="https://github.com/fireworks-ai/reward-kit",
     classifiers=[
         "Programming Language :: Python :: 3",

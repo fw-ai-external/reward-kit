@@ -3,15 +3,15 @@ Minimal example demonstrating the DeepCoder-style reward function
 with TRL's GRPO trainer.
 """
 
+import json
+import logging
 import os
 import sys
-import json
-from typing import List, Dict, Any, Optional
 from pathlib import Path
-import logging
+from typing import Any, Dict, List, Optional
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG) # Changed to DEBUG to see more logs
+logging.basicConfig(level=logging.DEBUG)  # Changed to DEBUG to see more logs
 logger = logging.getLogger(__name__)
 
 # Ensure reward-kit is in the path
@@ -19,51 +19,66 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 try:
     import torch
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    from trl import GRPOConfig, GRPOTrainer
-    from datasets import Dataset # To convert our list of dicts to HuggingFace Dataset
+    from datasets import Dataset  # To convert our list of dicts to HuggingFace Dataset
     from peft import LoraConfig, get_peft_model
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from trl import GRPOConfig, GRPOTrainer
+
     HAS_TRL_AND_TRANSFORMERS = True
 except ImportError as e:
-    print(f"TRL/Transformers/PEFT/Datasets not installed. Install with: pip install trl transformers torch peft datasets accelerate. Error: {e}")
+    print(
+        f"TRL/Transformers/PEFT/Datasets not installed. Install with: pip install trl transformers torch peft datasets accelerate. Error: {e}"
+    )
     HAS_TRL_AND_TRANSFORMERS = False
+
+# from reward_kit.models import Message # No longer directly needed here
+from reward_kit.adapters.trl import create_trl_adapter  # Import the new adapter
 
 # Import reward-kit components
 # from reward_kit.reward_function import RewardFunction # No longer strictly needed here
 from reward_kit.rewards import deepcoder_code_reward
-# from reward_kit.models import Message # No longer directly needed here
-from reward_kit.adapters.trl import create_trl_adapter # Import the new adapter
 from reward_kit.rewards.code_execution_utils import prepare_deepcoder_sample_for_trl
 from reward_kit.utils.dataset_helpers import load_jsonl_to_hf_dataset
 
-
 # Configuration
-MODEL_NAME = "Qwen/Qwen3-0.6B" # Small Qwen model for example
-DATASET_PATH = Path(__file__).parent / "data/simulated_deepcoder_raw_sample.jsonl" # This will be processed by prepare_deepcoder_sample_for_trl
+MODEL_NAME = "Qwen/Qwen3-0.6B"  # Small Qwen model for example
+DATASET_PATH = (
+    Path(__file__).parent / "data/simulated_deepcoder_raw_sample.jsonl"
+)  # This will be processed by prepare_deepcoder_sample_for_trl
 LANGUAGE = "python"
-ENVIRONMENT = "local" # "e2b" if configured
-TIMEOUT = 10 # seconds for code execution
+ENVIRONMENT = "local"  # "e2b" if configured
+TIMEOUT = 10  # seconds for code execution
+
 
 def load_and_prepare_dataset(raw_data_path: Path) -> Optional[Dataset]:
     """Loads and prepares the DeepCoder-style dataset into HuggingFace Dataset format using reward-kit utilities."""
-    
-    required_cols_for_reward = ["test_cases", "target_function"] # 'prompt' is handled by default by load_jsonl_to_hf_dataset
+
+    required_cols_for_reward = [
+        "test_cases",
+        "target_function",
+    ]  # 'prompt' is handled by default by load_jsonl_to_hf_dataset
 
     hf_dataset = load_jsonl_to_hf_dataset(
         dataset_path=str(raw_data_path),
         transform_fn=prepare_deepcoder_sample_for_trl,
-        required_columns=required_cols_for_reward
+        required_columns=required_cols_for_reward,
     )
 
     if hf_dataset is None:
-        logger.error(f"Failed to load dataset from {raw_data_path} using reward-kit utilities.")
-        return None
-    
-    if len(hf_dataset) == 0:
-        logger.error(f"No samples loaded from {raw_data_path}. Check dataset content and transform_fn.")
+        logger.error(
+            f"Failed to load dataset from {raw_data_path} using reward-kit utilities."
+        )
         return None
 
-    logger.info(f"Dataset loaded and prepared: {len(hf_dataset)} samples. Columns: {hf_dataset.column_names}")
+    if len(hf_dataset) == 0:
+        logger.error(
+            f"No samples loaded from {raw_data_path}. Check dataset content and transform_fn."
+        )
+        return None
+
+    logger.info(
+        f"Dataset loaded and prepared: {len(hf_dataset)} samples. Columns: {hf_dataset.column_names}"
+    )
     return hf_dataset
 
 
@@ -82,16 +97,17 @@ def generate_for_comparison(model, tokenizer, prompt_text: str, device) -> str:
     )
     messages_for_generation = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt_text} # The user prompt contains specific instructions
+        {
+            "role": "user",
+            "content": prompt_text,
+        },  # The user prompt contains specific instructions
     ]
     prompt_for_model = tokenizer.apply_chat_template(
-        messages_for_generation,
-        tokenize=False,
-        add_generation_prompt=True
+        messages_for_generation, tokenize=False, add_generation_prompt=True
     )
     inputs = tokenizer(prompt_for_model, return_tensors="pt").to(device)
     generation_kwargs = {
-        "max_new_tokens": 4000, # Increased from 250
+        "max_new_tokens": 4000,  # Increased from 250
         "pad_token_id": tokenizer.eos_token_id,
         "do_sample": True,
         "top_k": 10,
@@ -101,7 +117,9 @@ def generate_for_comparison(model, tokenizer, prompt_text: str, device) -> str:
     try:
         with torch.no_grad():
             outputs = model.generate(**inputs, **generation_kwargs)
-        response_text = tokenizer.decode(outputs[0, inputs.input_ids.shape[1]:], skip_special_tokens=True)
+        response_text = tokenizer.decode(
+            outputs[0, inputs.input_ids.shape[1] :], skip_special_tokens=True
+        )
     except Exception as e:
         logger.error(f"Error during comparison generation: {e}")
         response_text = f"Error generating: {e}"
@@ -119,7 +137,15 @@ def main():
     try:
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
-            torch_dtype=(torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float16) if torch.cuda.is_available() else torch.float32,
+            torch_dtype=(
+                (
+                    torch.bfloat16
+                    if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+                    else torch.float16
+                )
+                if torch.cuda.is_available()
+                else torch.float32
+            ),
             # device_map="auto" # Usually good, but can be problematic with small models / CPU
         )
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -128,7 +154,6 @@ def main():
         if tokenizer.chat_template is None:
             # A basic chat template for Qwen2-Instruct if not set
             tokenizer.chat_template = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
-
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -140,16 +165,26 @@ def main():
         lora_config = LoraConfig(
             task_type="CAUSAL_LM",
             r=8,
-            lora_alpha=16, # Often 2*r
-            lora_dropout=0.05, # Reduced dropout
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"], # Common for Qwen2
+            lora_alpha=16,  # Often 2*r
+            lora_dropout=0.05,  # Reduced dropout
+            target_modules=[
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+            ],  # Common for Qwen2
             bias="none",
         )
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
 
     except Exception as e:
-        logger.error(f"Error loading model/tokenizer or configuring LoRA: {e}", exc_info=True)
+        logger.error(
+            f"Error loading model/tokenizer or configuring LoRA: {e}", exc_info=True
+        )
         return
 
     # 2. Load and Prepare Dataset
@@ -157,7 +192,7 @@ def main():
     train_dataset = load_and_prepare_dataset(DATASET_PATH)
     if train_dataset is None:
         return
-    
+
     # For GRPO, the dataset should be a HuggingFace Dataset object
     # The load_and_prepare_dataset function now returns this.
 
@@ -167,13 +202,13 @@ def main():
         reward_fn=deepcoder_code_reward,
         dataset_to_reward_kwargs_map={
             "test_cases": "test_cases",  # dataset_column_name maps to reward_fn_param_name
-            "target_function": "target_function"
+            "target_function": "target_function",
         },
         static_reward_kwargs={
             "language": LANGUAGE,
             "environment": ENVIRONMENT,
-            "timeout": TIMEOUT
-        }
+            "timeout": TIMEOUT,
+        },
         # user_message_fn and assistant_message_fn can be omitted for default behavior
     )
 
@@ -182,32 +217,37 @@ def main():
     # Reduce batch size and steps for a quick test
     training_args = GRPOConfig(
         output_dir="./grpo_deepcoder_output",
-        per_device_train_batch_size=2, # Adjusted to be divisible by num_generations
-        gradient_accumulation_steps=1, # Keep small
-        learning_rate=1e-5, # GRPO often uses smaller LRs
-        num_train_epochs=1, # Minimal epochs for testing
-        max_steps=5, # Run very few steps for a quick test
-        remove_unused_columns=False, # We need 'test_cases' and 'target_function' for the reward
+        per_device_train_batch_size=2,  # Adjusted to be divisible by num_generations
+        gradient_accumulation_steps=1,  # Keep small
+        learning_rate=1e-5,  # GRPO often uses smaller LRs
+        num_train_epochs=1,  # Minimal epochs for testing
+        max_steps=5,  # Run very few steps for a quick test
+        remove_unused_columns=False,  # We need 'test_cases' and 'target_function' for the reward
         logging_steps=1,
-        report_to="none", # No wandb/tensorboard for this minimal example
-        max_prompt_length=4000, # Max length of prompt
-        max_completion_length=4000, # Max length of completion
-        num_generations=2, # Number of completions to generate per prompt
-        beta=0.1, # GRPO specific: KL divergence weight
+        report_to="none",  # No wandb/tensorboard for this minimal example
+        max_prompt_length=4000,  # Max length of prompt
+        max_completion_length=4000,  # Max length of completion
+        num_generations=2,  # Number of completions to generate per prompt
+        beta=0.1,  # GRPO specific: KL divergence weight
         # bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
         # fp16=torch.cuda.is_available() and not (torch.cuda.is_available() and torch.cuda.is_bf16_supported()),
         # Using fp32 for wider compatibility in this example, can enable bf16/fp16 if desired
     )
 
     # Select a sample prompt for before/after comparison
-    sample_prompt_for_comparison = train_dataset[0]["prompt"] if len(train_dataset) > 0 else "Write a Python function to add two numbers."
+    sample_prompt_for_comparison = (
+        train_dataset[0]["prompt"]
+        if len(train_dataset) > 0
+        else "Write a Python function to add two numbers."
+    )
 
     # Generate before training
     logger.info("\n--- Generating with model BEFORE training ---")
-    pre_train_response = generate_for_comparison(model, tokenizer, sample_prompt_for_comparison, device)
+    pre_train_response = generate_for_comparison(
+        model, tokenizer, sample_prompt_for_comparison, device
+    )
     logger.info(f"Prompt: {sample_prompt_for_comparison[:100]}...")
     logger.info(f"Response (before): {pre_train_response[:200]}...")
-
 
     # 5. Create and run GRPOTrainer
     try:
@@ -217,7 +257,7 @@ def main():
             args=training_args,
             # tokenizer=tokenizer, # Removed: GRPOTrainer likely infers tokenizer from model or args
             train_dataset=train_dataset,
-            reward_funcs=[adapted_reward_func], # Pass the new adapted reward function
+            reward_funcs=[adapted_reward_func],  # Pass the new adapted reward function
             # peft_config=lora_config, # Already applied with get_peft_model
         )
 
@@ -226,21 +266,28 @@ def main():
         logger.info("GRPO training completed.")
 
     except Exception as e:
-        logger.error(f"Error during GRPOTrainer initialization or training: {e}", exc_info=True)
+        logger.error(
+            f"Error during GRPOTrainer initialization or training: {e}", exc_info=True
+        )
         return
 
     # Generate after training
     logger.info("\n--- Generating with model AFTER training ---")
     # If using PEFT, ensure model is in eval mode or merged for inference if needed
     # model.eval() # Good practice, though generate might handle it
-    post_train_response = generate_for_comparison(model, tokenizer, sample_prompt_for_comparison, device)
+    post_train_response = generate_for_comparison(
+        model, tokenizer, sample_prompt_for_comparison, device
+    )
     logger.info(f"Prompt: {sample_prompt_for_comparison[:100]}...")
     logger.info(f"Response (after): {post_train_response[:200]}...")
-    
+
     logger.info("\nMinimal DeepCoder GRPO Example finished.")
+
 
 if __name__ == "__main__":
     if HAS_TRL_AND_TRANSFORMERS:
         main()
     else:
-        print("TRL/Transformers/PEFT/Datasets not found. Please install them to run this example: pip install trl transformers torch peft datasets accelerate")
+        print(
+            "TRL/Transformers/PEFT/Datasets not found. Please install them to run this example: pip install trl transformers torch peft datasets accelerate"
+        )

@@ -2,18 +2,16 @@
 Tests for format reward function.
 """
 
-import sys
 import os
-import unittest
 import re
+import sys
+import unittest
 
 # Add the parent directory to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from reward_kit.models import EvaluateResult, Message
 from reward_kit.rewards.format import format_reward
-from reward_kit.models import Message, EvaluateResult
 
 
 class TestFormatReward(unittest.TestCase):
@@ -47,9 +45,9 @@ I think the answer is 42.
         self.assertEqual(result.metrics["format_check"].score, 1.0)
         self.assertTrue(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 1.0)
-        self.assertTrue(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 1.0)
+        self.assertTrue(result["metrics"]["format_check"]["success"])
 
     def test_think_answer_format_mismatch(self):
         """Test that the format reward correctly identifies mismatched format."""
@@ -74,9 +72,9 @@ The answer is 42."""
         self.assertEqual(result.metrics["format_check"].score, 0.0)
         self.assertFalse(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 0.0)
-        self.assertFalse(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 0.0)
+        self.assertFalse(result["metrics"]["format_check"]["success"])
 
     def test_think_answer_format_wrong_order(self):
         """Test that the format reward fails when tags are in wrong order."""
@@ -106,9 +104,9 @@ I think the answer is 42.
         self.assertEqual(result.metrics["format_check"].score, 0.0)
         self.assertFalse(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 0.0)
-        self.assertFalse(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 0.0)
+        self.assertFalse(result["metrics"]["format_check"]["success"])
 
     def test_custom_format_regex(self):
         """Test that the format reward works with custom regex patterns."""
@@ -129,11 +127,11 @@ This is my reasoning process.
         ]
 
         # Use a custom regex pattern
-        custom_regex = (
-            r"^\[REASONING\].*?\[/REASONING\].*?\[RESULT\].*?\[/RESULT\]$"
-        )
+        custom_regex = r"^\[REASONING\].*?\[/REASONING\].*?\[RESULT\].*?\[/RESULT\]$"
 
-        result = format_reward(messages=messages, ground_truth=None, format_regex=custom_regex)
+        result = format_reward(
+            messages=messages, ground_truth=None, format_regex=custom_regex
+        )
 
         self.assertIsInstance(result, EvaluateResult)
         # Check the score is 1.0 for correct custom format
@@ -142,9 +140,9 @@ This is my reasoning process.
         self.assertEqual(result.metrics["format_check"].score, 1.0)
         self.assertTrue(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 1.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 1.0)
-        self.assertTrue(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 1.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 1.0)
+        self.assertTrue(result["metrics"]["format_check"]["success"])
 
     def test_no_messages(self):
         """Test that the format reward handles empty message list."""
@@ -157,9 +155,9 @@ This is my reasoning process.
         self.assertEqual(result.metrics["format_check"].score, 0.0)
         self.assertFalse(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 0.0)
-        self.assertFalse(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 0.0)
+        self.assertFalse(result["metrics"]["format_check"]["success"])
 
     def test_non_assistant_message(self):
         """Test that the format reward handles non-assistant messages."""
@@ -179,9 +177,9 @@ This is my reasoning process.
         self.assertEqual(result.metrics["format_check"].score, 0.0)
         self.assertFalse(result.metrics["format_check"].success)
         # Dictionary access
-        self.assertEqual(result['score'], 0.0)
-        self.assertEqual(result['metrics']["format_check"]['score'], 0.0)
-        self.assertFalse(result['metrics']["format_check"]['success'])
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["metrics"]["format_check"]["score"], 0.0)
+        self.assertFalse(result["metrics"]["format_check"]["success"])
 
     def test_partial_match_mode(self):
         """Test that the format reward works in partial match mode."""
@@ -212,12 +210,10 @@ Thanks for asking!"""
         # Attribute access
         self.assertEqual(result_exact.score, 0.0)
         # Dictionary access
-        self.assertEqual(result_exact['score'], 0.0)
+        self.assertEqual(result_exact["score"], 0.0)
 
         # Partial match should succeed with a pattern without anchors
-        pattern_without_anchors = (
-            r"<think>\n.*?</think>\n<answer>\n.*?</answer>"
-        )
+        pattern_without_anchors = r"<think>\n.*?</think>\n<answer>\n.*?</answer>"
         result_partial = format_reward(
             messages=messages,
             ground_truth=None,
@@ -228,7 +224,7 @@ Thanks for asking!"""
         # Attribute access
         self.assertEqual(result_partial.score, 1.0)
         # Dictionary access
-        self.assertEqual(result_partial['score'], 1.0)
+        self.assertEqual(result_partial["score"], 1.0)
 
 
 if __name__ == "__main__":

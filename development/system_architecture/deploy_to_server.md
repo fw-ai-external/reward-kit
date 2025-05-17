@@ -15,7 +15,7 @@ def helpfulness_reward(
     **kwargs
 ) -> EvaluateResult:
     """
-    Evaluates the helpfulness of an assistant response based on 
+    Evaluates the helpfulness of an assistant response based on
     length and keyword presence.
     """
     # Get the assistant's response
@@ -29,10 +29,10 @@ def helpfulness_reward(
                 }
             }
         )
-    
+
     response = messages[-1].content
     metrics = {}
-    
+
     # 1. Length check - reward longer responses up to a point
     length = len(response)
     length_score = min(length / 500.0, 1.0)  # Cap at 500 chars
@@ -40,7 +40,7 @@ def helpfulness_reward(
         "score": length_score * 0.3,  # 30% weight
         "reason": f"Response length: {length} chars"
     }
-    
+
     # 2. Keyword analysis for helpfulness indicators
     helpful_keywords = ["specifically", "example", "for instance", "steps", "how to"]
     keyword_count = sum(1 for kw in helpful_keywords if kw.lower() in response.lower())
@@ -49,10 +49,10 @@ def helpfulness_reward(
         "score": keyword_score * 0.7,  # 70% weight
         "reason": f"Found {keyword_count} helpful keywords"
     }
-    
+
     # Calculate final score as weighted sum of metrics
     final_score = sum(metric["score"] for metric in metrics.values())
-    
+
     return EvaluateResult(score=final_score, metrics=metrics)
 
 # Deploy the reward function to Fireworks
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         description="Evaluates response helpfulness based on length and keywords"
     )
     print(f"Deployed evaluation with ID: {evaluation_id}")
-    
+
     # Option 2: Advanced deployment with custom provider
     evaluation_id_advanced = helpfulness_reward.deploy(
         name="helpfulness-v1-claude",
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         ]
     )
     print(f"Deployed evaluation with custom provider: {evaluation_id_advanced}")
-    
+
     # The evaluation_id can now be used in Fireworks RL training jobs
     print("Use this in your RL training job:")
     print(f"firectl create rl-job --reward-endpoint \"https://api.fireworks.ai/v1/evaluations/{evaluation_id}\"")
@@ -146,7 +146,7 @@ Here are part of the fireworks.swagger.yaml file that is relevant to our case. A
       - Gateway
 ```
 
-the body is defined here: 
+the body is defined here:
 ```
   GatewayCreateEvaluationBody:
     type: object

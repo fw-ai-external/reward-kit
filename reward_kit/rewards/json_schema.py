@@ -1,20 +1,22 @@
-from typing import Dict, List, Any, Optional, Union
 import json
 import re
+from typing import Any, Dict, List, Optional, Union
 
-from ..models import EvaluateResult, MetricResult, Message # Added Message import
+from ..models import EvaluateResult, Message, MetricResult  # Added Message import
+from ..typed_interface import reward_function  # Added import
 from .function_calling import (
     calculate_jaccard_similarity,
     extract_schema_properties,
     normalize_schema,
 )
-from ..typed_interface import reward_function # Added import
 
 
-@reward_function # Added decorator
+@reward_function  # Added decorator
 def json_schema_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added, not used by core logic
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    ground_truth: Optional[
+        Union[List[Message], List[Dict[str, Any]]]
+    ] = None,  # Added, not used by core logic
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
@@ -55,31 +57,52 @@ def json_schema_reward(
             )
 
         last_message = messages[-1]
-        content_text = "" # Initialize to handle cases where content might be None or role isn't assistant
+        content_text = ""  # Initialize to handle cases where content might be None or role isn't assistant
 
         if isinstance(last_message, Message):
             if last_message.role == "assistant" and last_message.content is not None:
                 content_text = last_message.content
-            else: # Not an assistant message or no content
+            else:  # Not an assistant message or no content
                 return EvaluateResult(
                     score=0.0,
                     reason="Last message is not a valid assistant response to extract JSON from.",
-                    metrics={"error": MetricResult(score=0.0, reason="Invalid assistant message for JSON extraction.", success=False)}
+                    metrics={
+                        "error": MetricResult(
+                            score=0.0,
+                            reason="Invalid assistant message for JSON extraction.",
+                            success=False,
+                        )
+                    },
                 )
         elif isinstance(last_message, dict):
-            if last_message.get("role") == "assistant" and last_message.get("content") is not None:
+            if (
+                last_message.get("role") == "assistant"
+                and last_message.get("content") is not None
+            ):
                 content_text = last_message.get("content", "")
-            else: # Not an assistant message or no content
+            else:  # Not an assistant message or no content
                 return EvaluateResult(
                     score=0.0,
                     reason="Last message is not a valid assistant response (dict) to extract JSON from.",
-                    metrics={"error": MetricResult(score=0.0, reason="Invalid assistant message (dict) for JSON extraction.", success=False)}
+                    metrics={
+                        "error": MetricResult(
+                            score=0.0,
+                            reason="Invalid assistant message (dict) for JSON extraction.",
+                            success=False,
+                        )
+                    },
                 )
         else:
             return EvaluateResult(
                 score=0.0,
                 reason=f"Unexpected type for last message: {type(last_message)}.",
-                metrics={"error": MetricResult(score=0.0, reason="Invalid message type for JSON extraction.", success=False)}
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        reason="Invalid message type for JSON extraction.",
+                        success=False,
+                    )
+                },
             )
 
         # Try to extract JSON from the message content_text
@@ -94,27 +117,35 @@ def json_schema_reward(
                 else:
                     # Try to find JSON-like content in the message
                     # More robust regex to find a valid JSON object or array
-                    json_match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", content_text, re.DOTALL)
+                    json_match = re.search(
+                        r"(\{[\s\S]*\}|\[[\s\S]*\])", content_text, re.DOTALL
+                    )
                     if json_match:
                         # Attempt to parse to ensure it's valid before assigning
                         try:
                             json.loads(json_match.group(0))
                             extracted_json_str = json_match.group(0)
                         except json.JSONDecodeError:
-                            pass # Not a valid JSON object/array
-            except Exception: # Broad exception for regex or other issues
+                            pass  # Not a valid JSON object/array
+            except Exception:  # Broad exception for regex or other issues
                 pass
-        
-        if extracted_json_str:
-            json_content = extracted_json_str # Update json_content if successfully extracted
 
-        if not json_content: # Check again if json_content is still None or empty after extraction attempt
+        if extracted_json_str:
+            json_content = (
+                extracted_json_str  # Update json_content if successfully extracted
+            )
+
+        if (
+            not json_content
+        ):  # Check again if json_content is still None or empty after extraction attempt
             return EvaluateResult(
                 score=0.0,
                 reason="No JSON content found in messages.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, reason="No JSON content found in messages", success=False
+                        score=0.0,
+                        reason="No JSON content found in messages",
+                        success=False,
                     )
                 },
             )
@@ -145,7 +176,9 @@ def json_schema_reward(
             reason=f"Invalid JSON content: {json_content}",
             metrics={
                 "error": MetricResult(
-                    score=0.0, reason=f"Invalid JSON content: {json_content}", success=False
+                    score=0.0,
+                    reason=f"Invalid JSON content: {json_content}",
+                    success=False,
                 )
             },
         )
@@ -197,9 +230,7 @@ def json_schema_reward(
     comparison_details = []
 
     if matching_props:
-        comparison_details.append(
-            f"Matching properties ({len(matching_props)}):"
-        )
+        comparison_details.append(f"Matching properties ({len(matching_props)}):")
         for prop, prop_type in sorted(matching_props):
             comparison_details.append(f"  - {prop}: {prop_type}")
 
@@ -218,7 +249,7 @@ def json_schema_reward(
     metrics["schema_similarity"] = MetricResult(
         score=schema_similarity,
         reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
-        success=schema_similarity == 1.0
+        success=schema_similarity == 1.0,
     )
 
     # Calculate final score based on schema similarity
@@ -229,8 +260,8 @@ def json_schema_reward(
 
 
 def json_schema_reward_with_llm_judge(
-    messages: Union[List[Message], List[Dict[str, Any]]], # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None, # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -287,8 +318,8 @@ def json_schema_reward_with_llm_judge(
 
     # Run schema validation
     schema_result = json_schema_reward(
-        messages=messages, # Pass messages through
-        ground_truth=ground_truth, # Pass ground_truth through
+        messages=messages,  # Pass messages through
+        ground_truth=ground_truth,  # Pass ground_truth through
         json_content=json_content,
         expected_schema=expected_schema,
         **kwargs,
@@ -359,8 +390,8 @@ def json_schema_reward_with_llm_judge(
             if conversation_parts:
                 conversation_msg = "\n".join(conversation_parts)
 
-        prompt = f"""You are evaluating the quality of JSON content provided by an AI assistant. 
-Your job is to assess whether the JSON structure and content is appropriate, correctly formatted, 
+        prompt = f"""You are evaluating the quality of JSON content provided by an AI assistant.
+Your job is to assess whether the JSON structure and content is appropriate, correctly formatted,
 and follows the expected schema and behavior.
 
 CONVERSATION CONTEXT:
@@ -436,7 +467,7 @@ EXPLANATION: [your detailed explanation]
     combined_metrics = {}
 
     # Add schema metrics with "schema_" prefix
-    for key, metric_val in schema_result.metrics.items(): # Renamed to metric_val
+    for key, metric_val in schema_result.metrics.items():  # Renamed to metric_val
         if key != "schema_similarity":
             combined_metrics[f"schema_{key}"] = metric_val
         else:
@@ -444,34 +475,38 @@ EXPLANATION: [your detailed explanation]
 
     # Add llm metrics
     combined_metrics["llm_judge"] = MetricResult(
-        score=llm_score, reason=llm_reason, success=llm_score >= 0.8 # Assuming high score means success
+        score=llm_score,
+        reason=llm_reason,
+        success=llm_score >= 0.8,  # Assuming high score means success
     )
 
     # Add summary metrics
     combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
-        success=schema_result.score == 1.0
+        success=schema_result.score == 1.0,
     )
 
     combined_metrics["llm_score"] = MetricResult(
-        score=llm_score, reason=f"LLM judge score: {llm_score:.2f}", success=llm_score >= 0.8
+        score=llm_score,
+        reason=f"LLM judge score: {llm_score:.2f}",
+        success=llm_score >= 0.8,
     )
 
     # Calculate weighted final score
     schema_weight = normalized_weights.get("schema", 0.7)
     llm_weight = normalized_weights.get("llm", 0.3)
 
-    final_score = (schema_result.score * schema_weight) + (
-        llm_score * llm_weight
-    )
+    final_score = (schema_result.score * schema_weight) + (llm_score * llm_weight)
     final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_score:.2f} * {llm_weight:.2f})."
 
     # Add weight information
     combined_metrics["weights"] = MetricResult(
         score=0.0,  # Not a real score
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
-        success=True # Informational metric
+        success=True,  # Informational metric
     )
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=combined_metrics)
+    return EvaluateResult(
+        score=final_score, reason=final_reason, metrics=combined_metrics
+    )

@@ -1,9 +1,10 @@
 """
 SQLResource: A ForkableResource for managing SQL database states, initially focusing on SQLite.
 """
-import sqlite3
-import shutil
+
 import os
+import shutil
+import sqlite3
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,12 +32,14 @@ class SQLResource(ForkableResource):
         self._db_path: Optional[Path] = None
         self._base_db_path: Optional[Path] = None
         # Consider making temp_dir configurable or using a more robust temp solution
-        self._temp_dir = Path("./.rk_temp_dbs").resolve() # Ensure absolute path
+        self._temp_dir = Path("./.rk_temp_dbs").resolve()  # Ensure absolute path
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_db_connection(self) -> sqlite3.Connection:
         if not self._db_path:
-            raise ConnectionError("Database path not set. Call setup() or fork() first.")
+            raise ConnectionError(
+                "Database path not set. Call setup() or fork() first."
+            )
         # Set timeout to prevent indefinite hangs
         return sqlite3.connect(str(self._db_path), timeout=10)
 
@@ -60,10 +63,10 @@ class SQLResource(ForkableResource):
 
         db_name = self._config.get("db_name", f"db_{uuid.uuid4().hex}.sqlite")
         self._base_db_path = self._temp_dir / db_name
-        self._db_path = self._base_db_path # Initially, the current DB is the base DB
+        self._db_path = self._base_db_path  # Initially, the current DB is the base DB
 
         # Ensure a fresh start if the base DB file already exists from a previous run
-        if self._base_db_path.exists():
+        if self._base_db_path is not None and self._base_db_path.exists():
             self._base_db_path.unlink()
 
         conn = self._get_db_connection()
@@ -74,7 +77,7 @@ class SQLResource(ForkableResource):
                 if schema_file and Path(schema_file).exists():
                     with open(schema_file, "r") as f:
                         conn.executescript(f.read())
-                
+
                 schema_sql = self._config.get("schema_sql")
                 if schema_sql:
                     conn.executescript(schema_sql)
@@ -84,13 +87,13 @@ class SQLResource(ForkableResource):
                 if seed_data_file and Path(seed_data_file).exists():
                     with open(seed_data_file, "r") as f:
                         conn.executescript(f.read())
-                
+
                 seed_sql = self._config.get("seed_sql")
                 if seed_sql:
                     conn.executescript(seed_sql)
         finally:
             conn.close()
-        
+
         # print(f"SQLResource setup complete. Base DB at: {self._base_db_path}")
 
     async def fork(self) -> "SQLResource":
@@ -99,19 +102,21 @@ class SQLResource(ForkableResource):
         If called on an already forked resource, it forks from its current state.
         """
         if not self._db_path or not self._db_path.exists():
-            raise RuntimeError("Cannot fork: original database does not exist or setup was not called.")
+            raise RuntimeError(
+                "Cannot fork: original database does not exist or setup was not called."
+            )
 
         forked_resource = SQLResource()
         forked_resource._config = self._config.copy()
-        forked_resource._temp_dir = self._temp_dir # Share the same temp dir base
+        forked_resource._temp_dir = self._temp_dir  # Share the same temp dir base
 
         # The new fork's base is the current state of this resource
-        forked_resource._base_db_path = self._db_path 
-        
+        forked_resource._base_db_path = self._db_path
+
         # Create a new unique DB file for this fork
         forked_db_name = f"fork_{uuid.uuid4().hex}.sqlite"
         forked_resource._db_path = self._temp_dir / forked_db_name
-        
+
         shutil.copyfile(str(self._db_path), str(forked_resource._db_path))
         # print(f"SQLResource forked. New DB at: {forked_resource._db_path} from {self._db_path}")
         return forked_resource
@@ -148,12 +153,13 @@ class SQLResource(ForkableResource):
 
         # If current db_path is not set (e.g. fresh resource), assign one
         if not self._db_path:
-             self._db_path = self._temp_dir / f"restored_{uuid.uuid4().hex}.sqlite"
-        
-        shutil.copyfile(str(checkpoint_path), str(self._db_path))
-        self._base_db_path = self._db_path # The restored state becomes the new base for future forks
-        # print(f"SQLResource restored. DB at: {self._db_path} from {checkpoint_path}")
+            self._db_path = self._temp_dir / f"restored_{uuid.uuid4().hex}.sqlite"
 
+        shutil.copyfile(str(checkpoint_path), str(self._db_path))
+        self._base_db_path = (
+            self._db_path
+        )  # The restored state becomes the new base for future forks
+        # print(f"SQLResource restored. DB at: {self._db_path} from {checkpoint_path}")
 
     async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
@@ -170,21 +176,23 @@ class SQLResource(ForkableResource):
             Query result based on fetch_mode, or rowcount for DML.
         """
         if action_name != "execute_sql":
-            raise NotImplementedError(f"Action '{action_name}' not supported by SQLResource.")
+            raise NotImplementedError(
+                f"Action '{action_name}' not supported by SQLResource."
+            )
 
         query = action_params.get("query")
         if not query:
             raise ValueError("Missing 'query' in action_params for 'execute_sql'.")
 
         params = action_params.get("parameters", [])
-        fetch_mode = action_params.get("fetch_mode") # 'one', 'all', 'val'
+        fetch_mode = action_params.get("fetch_mode")  # 'one', 'all', 'val'
 
         conn = self._get_db_connection()
         try:
             with conn:
                 cursor = conn.cursor()
                 cursor.execute(query, params)
-                
+
                 if fetch_mode == "one":
                     columns = [desc[0] for desc in cursor.description]
                     row = cursor.fetchone()
@@ -196,7 +204,7 @@ class SQLResource(ForkableResource):
                 elif fetch_mode == "val":
                     row = cursor.fetchone()
                     return row[0] if row else None
-                else: # DML or no fetch needed
+                else:  # DML or no fetch needed
                     return {"rowcount": cursor.rowcount}
         finally:
             conn.close()
@@ -209,7 +217,9 @@ class SQLResource(ForkableResource):
         return {
             "db_type": "sqlite",
             "db_path": str(self._db_path) if self._db_path else None,
-            "status": "ready" if self._db_path and self._db_path.exists() else "uninitialized"
+            "status": (
+                "ready" if self._db_path and self._db_path.exists() else "uninitialized"
+            ),
         }
 
     async def get_tools_spec(self) -> List[Dict[str, Any]]:
@@ -221,26 +231,29 @@ class SQLResource(ForkableResource):
                 "type": "function",
                 "function": {
                     "name": "execute_sql",
-                    "description": "Executes a SQL query against the database. " \
-                                   "Use 'fetch_mode' to control return value: " \
-                                   "'one' for a single row, " \
-                                   "'all' for all rows, " \
-                                   "'val' for a single value from the first row. " \
-                                   "If 'fetch_mode' is not provided, returns rowcount for DML statements.",
+                    "description": "Executes a SQL query against the database. "
+                    "Use 'fetch_mode' to control return value: "
+                    "'one' for a single row, "
+                    "'all' for all rows, "
+                    "'val' for a single value from the first row. "
+                    "If 'fetch_mode' is not provided, returns rowcount for DML statements.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {"type": "string", "description": "The SQL query to execute."},
+                            "query": {
+                                "type": "string",
+                                "description": "The SQL query to execute.",
+                            },
                             "parameters": {
-                                "type": "array", # Or object for named parameters, sqlite3 supports both
+                                "type": "array",  # Or object for named parameters, sqlite3 supports both
                                 "description": "Parameters for the SQL query (optional).",
-                                "items": {"type": "any"}, 
+                                "items": {"type": "any"},
                             },
                             "fetch_mode": {
                                 "type": "string",
                                 "enum": ["one", "all", "val"],
-                                "description": "Specifies how to fetch results (optional)."
-                            }
+                                "description": "Specifies how to fetch results (optional).",
+                            },
                         },
                         "required": ["query"],
                     },
@@ -259,7 +272,7 @@ class SQLResource(ForkableResource):
                 # print(f"SQLResource closed. Deleted DB: {self._db_path}")
             except OSError as e:
                 print(f"Error deleting database file {self._db_path}: {e}")
-        
+
         # Potentially clean up base_db_path if it's different and also temporary
         # if self._base_db_path and self._base_db_path.exists() and self._base_db_path != self._db_path:
         #     try:

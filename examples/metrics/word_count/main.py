@@ -1,11 +1,10 @@
-from reward_kit import EvaluateResult, MetricResult, reward_function, Message
 from typing import List
+
+from reward_kit import EvaluateResult, Message, MetricResult, reward_function
 
 
 @reward_function
-def evaluate(
-    messages: List[Message], **kwargs
-) -> EvaluateResult:
+def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
     """
     Evaluate a sample entry by counting words in the response.
 
@@ -36,8 +35,6 @@ def evaluate(
         score=score,
         reason=f"Word count: {word_count}",
         metrics={
-            "word_count": MetricResult(
-                score=score, reason=f"Word count: {word_count}"
-            )
+            "word_count": MetricResult(score=score, reason=f"Word count: {word_count}")
         },
     )

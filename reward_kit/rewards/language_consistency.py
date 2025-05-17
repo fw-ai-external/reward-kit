@@ -7,11 +7,10 @@ are in the expected language.
 """
 
 import re
-from typing import Dict, List, Any, Union, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
-
 
 # Dictionary mapping language codes to common words/patterns in that language
 # These are high-frequency words that are distinctive for each language
@@ -473,9 +472,7 @@ def count_words_by_language(text: str) -> Dict[str, int]:
 
     # Remove special markdown-like patterns that might interfere with word counting
     text = re.sub(r"<[^>]+>", " ", text)  # Remove any XML/HTML-like tags
-    text = re.sub(
-        r"```.*?```", " ", text, flags=re.DOTALL
-    )  # Remove code blocks
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)  # Remove code blocks
 
     # Initialize counts for each language
     counts = {lang: 0 for lang in LANGUAGE_MARKERS.keys()}
@@ -553,8 +550,8 @@ def detect_dominant_language(text: str) -> Tuple[str, float]:
 
 @reward_function
 def language_consistency_reward(
-    messages: List[Message],      # Full conversation, last message is model's response
-    ground_truth: Any,            # Expected ground truth from dataset (may not be directly used by this function)
+    messages: List[Message],  # Full conversation, last message is model's response
+    ground_truth: Any,  # Expected ground truth from dataset (may not be directly used by this function)
     target_language: Optional[str] = None,
     min_consistency: float = 0.6,  # Lower threshold for easier passing
     auto_detect: bool = True,
@@ -581,17 +578,24 @@ def language_consistency_reward(
     Returns:
         EvaluateResult with score based on language consistency.
     """
-    if not messages or not isinstance(messages[-1], Message) or messages[-1].role != "assistant" or messages[-1].content is None:
+    if (
+        not messages
+        or not isinstance(messages[-1], Message)
+        or messages[-1].role != "assistant"
+        or messages[-1].content is None
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Invalid or missing assistant response in messages.",
             metrics={
                 "language_consistency": MetricResult(
-                    score=0.0, success=False, reason="Last message not a valid assistant response."
+                    score=0.0,
+                    success=False,
+                    reason="Last message not a valid assistant response.",
                 )
             },
         )
-    
+
     text_to_evaluate = messages[-1].content
 
     # For test_spanish_consistency - special handling for Spanish test case
@@ -612,8 +616,10 @@ def language_consistency_reward(
         # Check for explicit language hints in user messages (prompt part of messages)
         # Iterate up to messages[:-1] for the prompt context
         prompt_messages = messages[:-1]
-        for msg in prompt_messages: 
-            if isinstance(msg, Message) and msg.role == "user": # Decorator ensures msg is Message
+        for msg in prompt_messages:
+            if (
+                isinstance(msg, Message) and msg.role == "user"
+            ):  # Decorator ensures msg is Message
                 content_text: str = msg.content if msg.content is not None else ""
 
                 # Special handling for phrases in the test cases (from prompt)
@@ -628,16 +634,18 @@ def language_consistency_reward(
                     break
 
                 # Regular language detection as fallback from prompt
-                detected_lang, confidence = detect_dominant_language(
-                    content_text
-                )
+                detected_lang, confidence = detect_dominant_language(content_text)
                 if confidence > 0.4:  # Only use if reasonably confident
                     target_language = detected_lang
                     break
 
         # If still not determined, use first part of the model's response itself
         if not target_language:
-            first_part = text_to_evaluate.split("\n\n")[0] if "\n\n" in text_to_evaluate else text_to_evaluate[:200]
+            first_part = (
+                text_to_evaluate.split("\n\n")[0]
+                if "\n\n" in text_to_evaluate
+                else text_to_evaluate[:200]
+            )
             target_language, _ = detect_dominant_language(first_part)
 
     # Default to English if still no target language
@@ -691,9 +699,7 @@ def language_consistency_reward(
 
     # Calculate consistency ratio
     target_count = adjusted_lang_counts.get(target_language, 0)
-    consistency_ratio = (
-        target_count / total_counted if total_counted > 0 else 0.0
-    )
+    consistency_ratio = target_count / total_counted if total_counted > 0 else 0.0
 
     # Special handling for test cases to make sure they pass (based on model's response)
     if "中文写的回答" in text_to_evaluate and target_language == "zh":

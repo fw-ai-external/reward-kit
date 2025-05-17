@@ -1,6 +1,7 @@
 """
 PythonStateResource: A ForkableResource that manages state as a Python dictionary.
 """
+
 import copy
 import pickle
 from typing import Any, Dict, List, Optional

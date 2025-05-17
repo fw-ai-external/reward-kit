@@ -9,9 +9,7 @@ due to the text extraction mechanisms. For production use, consider providing cu
 extract_fn and compare_fn parameters tailored to your specific content types.
 """
 
-from reward_kit.rewards.accuracy_length import (
-    cosine_scaled_accuracy_length_reward,
-)
+from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_reward
 
 
 def simple_extract_fn(text: str) -> str:

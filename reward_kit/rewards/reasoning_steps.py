@@ -6,10 +6,10 @@ contains adequate step-by-step reasoning, rewarding structured thinking.
 """
 
 import re
-from typing import Dict, List, Any, Union, Optional, Set, Pattern
+from typing import Any, Dict, List, Optional, Pattern, Set, Union
 
+from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
-from ..models import Message, EvaluateResult, MetricResult
 
 
 @reward_function
@@ -51,7 +51,9 @@ def reasoning_steps_reward(
             },
         )
 
-    response = messages[-1] # response is a Message object due to type hint and decorator
+    response = messages[
+        -1
+    ]  # response is a Message object due to type hint and decorator
 
     # Extract response text
     if response.role != "assistant" or not response.content:
@@ -213,7 +215,7 @@ def sequence_reward(
             },
         )
 
-    response = messages[-1] # response is a Message object
+    response = messages[-1]  # response is a Message object
 
     # Extract response text
     if response.role != "assistant" or not response.content:

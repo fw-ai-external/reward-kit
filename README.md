@@ -42,11 +42,11 @@ def informativeness(messages, original_messages=None, **kwargs):
     """Evaluate the informativeness of a response."""
     # Get the assistant's response
     response = messages[-1].get("content", "")
-    
+
     # Simple evaluation: word count
     word_count = len(response.split())
     score = min(word_count / 100, 1.0)  # Cap at 1.0
-    
+
     return RewardOutput(
         score=score,
         reason=f"Word count: {word_count}",
@@ -124,19 +124,19 @@ Combine multiple metrics in a single reward function:
 def combined_reward(messages, original_messages=None, **kwargs):
     """Evaluate with multiple metrics."""
     response = messages[-1].get("content", "")
-    
+
     # Word count metric
     word_count = len(response.split())
     word_score = min(word_count / 100, 1.0)
-    
+
     # Specificity metric
     specificity_markers = ["specifically", "for example", "such as"]
     marker_count = sum(1 for marker in specificity_markers if marker.lower() in response.lower())
     specificity_score = min(marker_count / 2.0, 1.0)
-    
+
     # Combined score with weighted components
     final_score = word_score * 0.3 + specificity_score * 0.7
-    
+
     return RewardOutput(
         score=final_score,
         metrics={
@@ -196,6 +196,32 @@ reward-kit deploy --id my-evaluator --metrics-folders "metric=./path" --force
 *   **GitHub Issues**: For bug reports and feature requests, please use [GitHub Issues](https://github.com/fireworks-ai/reward-kit/issues).
 *   **GitHub Discussions**: (If enabled) For general questions, ideas, and discussions.
 *   Please also review our [Contributing Guidelines](development/CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Development
+
+### Type Checking
+
+The codebase uses mypy for static type checking. To run type checking:
+
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run mypy
+mypy reward_kit
+```
+
+Our CI pipeline enforces type checking, so please ensure your code passes mypy checks before submitting PRs.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+```
 
 ## Code of Conduct
 

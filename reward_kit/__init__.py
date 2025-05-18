@@ -17,21 +17,18 @@ from .models import EvaluateResult, Message, MetricResult
 
 # Import from reward_function
 from .reward_function import RewardFunction
-from .reward_function import reward_function as legacy_reward_function  # Deprecated
 
-# Import the decorator from typed_interface (this is the one we want to expose)
+# Import the decorator from typed_interface
 from .typed_interface import reward_function
 
 # Show deprecation warnings
 warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 
 __all__ = [
-    # Preferred interfaces
+    # Core interfaces
     "Message",
     "MetricResult",
     "EvaluateResult",
-    "reward_function",  # New decorator from typed_interface
+    "reward_function",
     "RewardFunction",
-    # Deprecated (will be removed in a future version)
-    "legacy_reward_function",
 ]

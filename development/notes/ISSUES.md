@@ -59,8 +59,8 @@ The example script is therefore broken and needs to be updated to use the V2 age
 
 # Low pri issues
 
-## Delete all legacy_reward_function
-Should not be needed at this point
+## ✅ Delete all legacy_reward_function
+Removed legacy_reward_function from reward_function.py and __init__.py since it's no longer needed.
 
 ## Fix the E2B unittest
 ```

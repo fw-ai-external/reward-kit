@@ -200,7 +200,6 @@ print(add(2, 3))
         # Dictionary access
         assert result["score"] == 1.0
 
-    @pytest.mark.skip(reason="Skipping E2B tests due to connection issues")
     @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
     def test_e2b_execution(self):
         """Test execution in E2B environment (skipped if E2B not installed)."""

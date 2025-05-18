@@ -239,7 +239,6 @@ class TestDeepCoderReward(unittest.TestCase):
         self.assertEqual(result.score, 0.0)
         # self.assertEqual(result['score'], 0.0) # Use attribute access
 
-    @unittest.skip("Skipping E2B tests due to connection issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_all_tests_pass_e2b(self):
         """Test Python code that passes all test cases in E2B."""
@@ -305,7 +304,6 @@ class TestDeepCoderReward(unittest.TestCase):
         #     details = json.loads(result['metrics']["test_results"]['reason'])
         #     self.assertTrue(all(tc.get("passed") for tc in details))
 
-    @unittest.skip("Skipping E2B tests due to connection issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_one_test_fails_e2b(self):
         """Test Python code where one test case fails in E2B."""

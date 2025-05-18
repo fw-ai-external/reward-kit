@@ -840,102 +840,106 @@ def execute_code_with_e2b(
         with Sandbox(api_key=api_key) as sandbox:
             # Capture stdout and stderr
             stdout = []
-        stderr = []
+            stderr = []
 
-        def capture_stdout(output):
-            if hasattr(output, "line"):
-                stdout.append(output.line)
+            def capture_stdout(output):
+                if hasattr(output, "line"):
+                    stdout.append(output.line)
+                else:
+                    stdout.append(str(output))
+
+            def capture_stderr(output):
+                if hasattr(output, "line"):
+                    stderr.append(output.line)
+                else:
+                    stderr.append(str(output))
+
+            # Create file based on language
+            if language.lower() in ["python", "py"]:
+                file_path = "/code/script.py"
+                cmd = "python3 /code/script.py"
+            elif language.lower() in ["javascript", "js"]:
+                file_path = "/code/script.js"
+                cmd = "node /code/script.js"
             else:
-                stdout.append(str(output))
-
-        def capture_stderr(output):
-            if hasattr(output, "line"):
-                stderr.append(output.line)
-            else:
-                stderr.append(str(output))
-
-        # Create file based on language
-        if language.lower() in ["python", "py"]:
-            file_path = "/code/script.py"
-            cmd = "python3 /code/script.py"
-        elif language.lower() in ["javascript", "js"]:
-            file_path = "/code/script.js"
-            cmd = "node /code/script.js"
-        else:
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Unsupported language for E2B: {language}",
-            }
-
-        # Write code to file in sandbox
-        try:
-            fs_handler = None
-            if _E2B_SOURCE == "e2b_code_interpreter":
-                if hasattr(sandbox, "filesystem"):
-                    fs_handler = sandbox.filesystem
-            elif _E2B_SOURCE == "e2b":  # Fallback for 'e2b'
-                if hasattr(sandbox, "_filesystem"):  # Older 'e2b' might use _filesystem
-                    fs_handler = sandbox._filesystem
-                elif hasattr(sandbox, "filesystem"):  # Or it might have been updated
-                    fs_handler = sandbox.filesystem
-
-            if not fs_handler:
                 return {
                     "success": False,
                     "output": None,
-                    "error": "Could not access E2B sandbox filesystem handler.",
+                    "error": f"Unsupported language for E2B: {language}",
                 }
 
-            # Create directory if it doesn't exist
+            # Write code to file in sandbox
             try:
-                fs_handler.make_dir("/code")
-            except Exception:
-                # Directory might already exist, or other error
-                pass  # Continue to attempt writing the file
+                fs_handler = None
+                if _E2B_SOURCE == "e2b_code_interpreter":
+                    if hasattr(sandbox, "filesystem"):
+                        fs_handler = sandbox.filesystem
+                elif _E2B_SOURCE == "e2b":  # Fallback for 'e2b'
+                    if hasattr(
+                        sandbox, "_filesystem"
+                    ):  # Older 'e2b' might use _filesystem
+                        fs_handler = sandbox._filesystem
+                    elif hasattr(
+                        sandbox, "filesystem"
+                    ):  # Or it might have been updated
+                        fs_handler = sandbox.filesystem
 
-            # Write code to file
-            fs_handler.write(file_path, code)
-        except Exception as e:
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Failed to write code to sandbox: {str(e)}",
-            }
+                if not fs_handler:
+                    return {
+                        "success": False,
+                        "output": None,
+                        "error": "Could not access E2B sandbox filesystem handler.",
+                    }
 
-        # Execute code
-        try:
-            # Use the commands interface to run the code
-            result = sandbox.commands.run(
-                cmd,
-                on_stdout=capture_stdout,
-                on_stderr=capture_stderr,
-                timeout=timeout,
-            )
+                # Create directory if it doesn't exist
+                try:
+                    fs_handler.make_dir("/code")
+                except Exception:
+                    # Directory might already exist, or other error
+                    pass  # Continue to attempt writing the file
 
-            # Combine captured output
-            output = "\n".join(stdout)
-            error_output = "\n".join(stderr)
-
-            # Sandbox is automatically closed by the 'with' statement
-
-            if result.exit_code == 0:
-                return {"success": True, "output": output, "error": None}
-            else:
+                # Write code to file
+                fs_handler.write(file_path, code)
+            except Exception as e:
                 return {
                     "success": False,
                     "output": None,
-                    "error": f"Process exited with code {result.exit_code}: {error_output}",
+                    "error": f"Failed to write code to sandbox: {str(e)}",
                 }
 
-        except Exception as e:
-            # Sandbox is automatically closed by the 'with' statement even on exception
+            # Execute code
+            try:
+                # Use the commands interface to run the code
+                result = sandbox.commands.run(
+                    cmd,
+                    on_stdout=capture_stdout,
+                    on_stderr=capture_stderr,
+                    timeout=timeout,
+                )
 
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Execution error: {str(e)}",
-            }
+                # Combine captured output
+                output = "\n".join(stdout)
+                error_output = "\n".join(stderr)
+
+                # Sandbox is automatically closed by the 'with' statement
+
+                if result.exit_code == 0:
+                    return {"success": True, "output": output, "error": None}
+                else:
+                    return {
+                        "success": False,
+                        "output": None,
+                        "error": f"Process exited with code {result.exit_code}: {error_output}",
+                    }
+
+            except Exception as e:
+                # Sandbox is automatically closed by the 'with' statement even on exception
+
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Execution error: {str(e)}",
+                }
 
     except Exception as e:
         error_traceback = traceback.format_exc()

@@ -239,7 +239,7 @@ class TestDeepCoderReward(unittest.TestCase):
         self.assertEqual(result.score, 0.0)
         # self.assertEqual(result['score'], 0.0) # Use attribute access
 
-    @unittest.skip("Skipping E2B tests due to intermittent service issues")
+    @unittest.skip("Skipping E2B tests due to connection issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_all_tests_pass_e2b(self):
         """Test Python code that passes all test cases in E2B."""
@@ -255,26 +255,57 @@ class TestDeepCoderReward(unittest.TestCase):
         messages_arg = [prompt_message, assistant_message]
         ground_truth_arg = sample["test_cases"]
 
-        result = deepcoder_code_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python",
-            environment="e2b",
-            api_key=E2B_API_KEY,
-        )
-        self.assertIsInstance(result, EvaluateResult)
-        self.assertEqual(result.score, 1.0)
-        self.assertIn("test_results", result.metrics)
-        if "test_results" in result.metrics and result.metrics["test_results"].reason:
-            details = json.loads(result.metrics["test_results"].reason)
-            self.assertTrue(all(tc.get("passed") for tc in details))
+        try:
+            result = deepcoder_code_reward(
+                messages=messages_arg,
+                ground_truth=ground_truth_arg,
+                language="python",
+                environment="e2b",
+                api_key=E2B_API_KEY,
+            )
+
+            # Check if we got a connection error
+            if hasattr(result, "metrics") and "error" in result.metrics:
+                reason = result.metrics["error"].reason
+                if (
+                    "502 Bad Gateway" in reason
+                    or "sandbox timeout" in reason
+                    or "sandbox was not found" in reason
+                ):
+                    self.skipTest("Skipping due to E2B connection issues")
+            elif hasattr(result, "reason") and isinstance(result.reason, str):
+                if (
+                    "502 Bad Gateway" in result.reason
+                    or "sandbox timeout" in result.reason
+                    or "sandbox was not found" in result.reason
+                ):
+                    self.skipTest("Skipping due to E2B connection issues")
+
+            self.assertIsInstance(result, EvaluateResult)
+            self.assertEqual(result.score, 1.0)
+            self.assertIn("test_results", result.metrics)
+            if (
+                "test_results" in result.metrics
+                and result.metrics["test_results"].reason
+            ):
+                details = json.loads(result.metrics["test_results"].reason)
+                self.assertTrue(all(tc.get("passed") for tc in details))
+        except Exception as e:
+            if (
+                "502 Bad Gateway" in str(e)
+                or "sandbox timeout" in str(e)
+                or "sandbox was not found" in str(e)
+            ):
+                self.skipTest(f"Skipping due to E2B connection issues: {e}")
+            else:
+                raise
         # self.assertEqual(result['score'], 1.0) # Use attribute access
         # self.assertIn("test_results", result['metrics']) # Use attribute access
         # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
         #     details = json.loads(result['metrics']["test_results"]['reason'])
         #     self.assertTrue(all(tc.get("passed") for tc in details))
 
-    @unittest.skip("Skipping E2B tests due to intermittent service issues")
+    @unittest.skip("Skipping E2B tests due to connection issues")
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_one_test_fails_e2b(self):
         """Test Python code where one test case fails in E2B."""
@@ -290,15 +321,43 @@ class TestDeepCoderReward(unittest.TestCase):
         messages_arg = [prompt_message, assistant_message]
         ground_truth_arg = sample["test_cases"]
 
-        result = deepcoder_code_reward(
-            messages=messages_arg,
-            ground_truth=ground_truth_arg,
-            language="python",
-            environment="e2b",
-            api_key=E2B_API_KEY,
-        )
-        self.assertIsInstance(result, EvaluateResult)
-        self.assertEqual(result.score, 0.0)
+        try:
+            result = deepcoder_code_reward(
+                messages=messages_arg,
+                ground_truth=ground_truth_arg,
+                language="python",
+                environment="e2b",
+                api_key=E2B_API_KEY,
+            )
+
+            # Check if we got a connection error
+            if hasattr(result, "metrics") and "error" in result.metrics:
+                reason = result.metrics["error"].reason
+                if (
+                    "502 Bad Gateway" in reason
+                    or "sandbox timeout" in reason
+                    or "sandbox was not found" in reason
+                ):
+                    self.skipTest("Skipping due to E2B connection issues")
+            elif hasattr(result, "reason") and isinstance(result.reason, str):
+                if (
+                    "502 Bad Gateway" in result.reason
+                    or "sandbox timeout" in result.reason
+                    or "sandbox was not found" in result.reason
+                ):
+                    self.skipTest("Skipping due to E2B connection issues")
+
+            self.assertIsInstance(result, EvaluateResult)
+            self.assertEqual(result.score, 0.0)
+        except Exception as e:
+            if (
+                "502 Bad Gateway" in str(e)
+                or "sandbox timeout" in str(e)
+                or "sandbox was not found" in str(e)
+            ):
+                self.skipTest(f"Skipping due to E2B connection issues: {e}")
+            else:
+                raise
         # self.assertEqual(result['score'], 0.0) # Use attribute access
 
     def test_empty_test_cases(self):

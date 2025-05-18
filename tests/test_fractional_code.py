@@ -200,10 +200,12 @@ print(add(2, 3))
         # Dictionary access
         assert result["score"] == 1.0
 
-    @pytest.mark.skip(reason="Skipping E2B tests due to intermittent service issues")
+    @pytest.mark.skip(reason="Skipping E2B tests due to connection issues")
     @pytest.mark.skipif(not _HAS_E2B, reason="E2B not installed")
     def test_e2b_execution(self):
         """Test execution in E2B environment (skipped if E2B not installed)."""
+        import pytest
+
         messages = [
             {"role": "user", "content": "Write a function to add two numbers"},
             {
@@ -219,18 +221,32 @@ print(add(2, 3))
 
         # This will be skipped if E2B is not installed or API key is not set
         if _HAS_E2B and "E2B_API_KEY" in [k.upper() for k in os.environ.keys()]:
-            result = fractional_code_reward(
-                messages=messages,
-                ground_truth="5",
-                language="python",
-                environment="e2b",
-            )
+            try:
+                result = fractional_code_reward(
+                    messages=messages,
+                    ground_truth="5",
+                    language="python",
+                    environment="e2b",
+                )
 
-            assert isinstance(result, EvaluateResult)
-            # Attribute access
-            assert result.score == 1.0
-            # Dictionary access
-            assert result["score"] == 1.0
+                assert isinstance(result, EvaluateResult)
+                # Check if we got a connection error
+                if (
+                    "execution_result" in result.metrics
+                    and not result.metrics["execution_result"].success
+                ):
+                    reason = result.metrics["execution_result"].reason
+                    if "502 Bad Gateway" in reason or "sandbox timeout" in reason:
+                        pytest.skip("Skipping due to E2B connection issues")
+
+                # If we get here, the test should pass
+                assert result.score == 1.0
+                assert result["score"] == 1.0
+            except Exception as e:
+                if "502 Bad Gateway" in str(e) or "sandbox timeout" in str(e):
+                    pytest.skip(f"Skipping due to E2B connection issues: {e}")
+                else:
+                    raise
 
     def test_multiple_test_cases(self):
         """Test with multiple test cases."""

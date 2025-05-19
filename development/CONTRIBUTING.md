@@ -141,10 +141,11 @@ def my_reward_function(
     return EvaluateResult(
         score=score,
         reason=reason,
+        is_score_valid=is_score_valid,
         metrics={
             "metric_name": MetricResult(
                 score=metric_score,
-                success=metric_success,
+                is_score_valid=metric_success,
                 reason=metric_reason
             )
         }

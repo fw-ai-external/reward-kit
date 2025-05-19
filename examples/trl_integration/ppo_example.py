@@ -67,9 +67,10 @@ def helpfulness_reward(
         return EvaluateResult(
             score=0.0,
             reason="No messages provided",
+            is_score_valid=False,
             metrics={
                 "helpfulness": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -88,9 +89,10 @@ def helpfulness_reward(
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
+            is_score_valid=False,
             metrics={
                 "helpfulness": MetricResult(
-                    score=0.0, success=False, reason="No assistant response"
+                    score=0.0, is_score_valid=False, reason="No assistant response"
                 )
             },
         )
@@ -145,15 +147,16 @@ def helpfulness_reward(
     return EvaluateResult(
         score=combined_score,
         reason=reason,
+        is_score_valid=True,
         metrics={
             "length": MetricResult(
                 score=length_score,
-                success=length_score > 0.7,
+                is_score_valid=length_score > 0.7,
                 reason=f"Response length: {word_count} words",
             ),
             "helpful_phrases": MetricResult(
                 score=helpfulness_score,
-                success=helpfulness_score > 0.5,
+                is_score_valid=helpfulness_score > 0.5,
                 reason=f"Helpful phrases: {helpful_count} found",
             ),
         },

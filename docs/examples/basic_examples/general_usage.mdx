@@ -86,10 +86,12 @@ def evaluate(messages, original_messages=None, **kwargs):
     return EvaluateResult(
         score=score,
         reason=f'Word count: {word_count}',
+        is_score_valid=True,
         metrics={
             'word_count': MetricResult(
                 score=score,
-                reason=f'Word count: {word_count}'
+                reason=f'Word count: {word_count}',
+                is_score_valid=True
             )
         }
     )
@@ -197,10 +199,12 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     return EvaluateResult(
         score=your_score,
         reason="Explanation of score",
+        is_score_valid=True,
         metrics={
             'your_metric': MetricResult(
                 score=your_score,
-                reason="Detailed explanation"
+                reason="Detailed explanation",
+                is_score_valid=True
             )
         }
     )

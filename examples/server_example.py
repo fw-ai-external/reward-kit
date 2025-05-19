@@ -82,7 +82,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         length_success = True
 
     metrics["length"] = MetricResult(
-        score=length_score, success=length_success, reason=length_reason
+        score=length_score, is_score_valid=length_success, reason=length_reason
     )
 
     # 2. Informativeness score
@@ -111,7 +111,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
 
     metrics["informativeness"] = MetricResult(
         score=informativeness_score,
-        success=info_success,
+        is_score_valid=info_success,
         reason=info_reason,
     )
 
@@ -130,7 +130,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         clarity_reason = "Response could be improved with better structure"
 
     metrics["clarity"] = MetricResult(
-        score=clarity_score, success=clarity_success, reason=clarity_reason
+        score=clarity_score, is_score_valid=clarity_success, reason=clarity_reason
     )
 
     # Calculate final score (weighted average)
@@ -141,7 +141,7 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
     )
     overall_reason = f"Final score based on weighted average of length ({metrics['length'].score:.2f}), informativeness ({metrics['informativeness'].score:.2f}), and clarity ({metrics['clarity'].score:.2f})."
 
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics, is_score_valid=True)
 
 
 def run_test_request():

@@ -63,7 +63,7 @@ def evaluate(
     metrics_dict: Dict[str, MetricResult] = {
         "task_complete": MetricResult(
             score=1.0 if success else 0.0,
-            success=success,
+            is_score_valid=success,
             reason=(
                 "Successfully booked and paid for flight"
                 if success
@@ -72,17 +72,17 @@ def evaluate(
         ),
         "search_flights": MetricResult(
             score=min(1.0, search_count / 1.0),
-            success=search_count > 0,
+            is_score_valid=search_count > 0,
             reason=f"Agent searched for flights {search_count} times",
         ),
         "create_booking": MetricResult(
             score=min(1.0, booking_count / 1.0),
-            success=booking_count > 0,
+            is_score_valid=booking_count > 0,
             reason=f"Agent created {booking_count} bookings",
         ),
         "pay_booking": MetricResult(
             score=min(1.0, payment_count / 1.0),
-            success=payment_count > 0,
+            is_score_valid=payment_count > 0,
             reason=f"Agent made {payment_count} payment attempts",
         ),
     }
@@ -102,4 +102,4 @@ def evaluate(
         reason = f"Task incomplete: {progress_score:.2f} progress score"
 
     # Return as an EvaluateResult object
-    return EvaluateResult(score=score, reason=reason, metrics=metrics_dict)
+    return EvaluateResult(score=score, reason=reason, metrics=metrics_dict, is_score_valid=success)

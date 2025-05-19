@@ -22,6 +22,7 @@ def helpfulness_reward(
     if not messages or messages[-1].role != "assistant":
         return EvaluateResult(
             score=0.0,
+            is_score_valid=False
             metrics={
                 "error": {
                     "score": 0.0,

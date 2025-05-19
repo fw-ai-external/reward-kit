@@ -51,7 +51,8 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         return EvaluateResult(
             score=0.0,
             reason="Insufficient messages",
-            metrics={}
+            metrics={},
+            is_score_valid=False
         )
 
     # Find the user query (most recent user message)
@@ -65,7 +66,8 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         return EvaluateResult(
             score=0.0,
             reason="No user query found",
-            metrics={}
+            metrics={},
+            is_score_valid=False
         )
 
     # Get the assistant's response (last message)
@@ -74,7 +76,8 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         return EvaluateResult(
             score=0.0,
             reason="Last message is not from assistant",
-            metrics={}
+            metrics={},
+            is_score_valid=False
         )
 
     # Calculate keyword overlap
@@ -90,7 +93,8 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         return EvaluateResult(
             score=0.5,
             reason="No significant keywords in user query",
-            metrics={}
+            metrics={},
+            is_score_valid=True
         )
 
     # Calculate overlap
@@ -117,18 +121,21 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     metrics = {
         "keyword_overlap": MetricResult(
             score=overlap_ratio,
-            reason=f"Keyword overlap ratio: {overlap_ratio:.2f} ({len(common_keywords)}/{len(user_keywords)} keywords)"
+            reason=f"Keyword overlap ratio: {overlap_ratio:.2f} ({len(common_keywords)}/{len(user_keywords)} keywords)",
+            is_score_valid=True
         ),
         "direct_answer": MetricResult(
             score=1.0 if has_direct_answer else 0.0,
-            reason="Response explicitly addresses the query" if has_direct_answer else "No explicit answer indicators"
+            reason="Response explicitly addresses the query" if has_direct_answer else "No explicit answer indicators",
+            is_score_valid=True
         )
     }
 
     return EvaluateResult(
         score=relevance_score,
         reason=f"Relevance score: {relevance_score:.2f}",
-        metrics=metrics
+        metrics=metrics,
+        is_score_valid=True
     )
 ```
 

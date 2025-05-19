@@ -157,7 +157,7 @@ def test_evaluate_result_dict_access():
     metrics_dict: Dict[str, MetricResult] = {
         "metric1": metric1_obj,
     }
-    result = EvaluateResult(score=0.6, reason="Overall assessment", metrics=metrics_dict, error="Test Error", is_score_valid=True)
+    result = EvaluateResult(score=0.6, reason="Overall assessment", metrics=metrics_dict, error="Test Error", is_score_valid=False)
 
     # __getitem__
     assert result["score"] == 0.6
@@ -187,7 +187,7 @@ def test_evaluate_result_dict_access():
     assert result.get("invalid_key", "default_val") == "default_val"
 
     # keys()
-    assert set(result.keys()) == {"score", "reason", "metrics", "error"}
+    assert set(result.keys()) == {"score", "reason", "metrics", "error", "is_score_valid"}
 
     # values() - check presence due to potential order variation of model_fields
     actual_values = list(result.values())
@@ -205,11 +205,14 @@ def test_evaluate_result_dict_access():
             ("reason", "Overall assessment"),
             ("metrics", metrics_dict),
             ("error", "Test Error"),
+            ("is_score_valid", False),
         ]
     )
     # result.items() returns a list of tuples, so convert to list then sort.
     actual_items_list = sorted(list(result.items()))
+    print(actual_items_list)
+    print(expected_items_list)
     assert actual_items_list == expected_items_list
 
     # __iter__
-    assert set(list(result)) == {"score", "reason", "metrics", "error"}
+    assert set(list(result)) == {"score", "reason", "metrics", "error", "is_score_valid"}

@@ -63,7 +63,7 @@ def cosine_scaled_accuracy_length_reward(
             reason="No messages provided",
             metrics={
                 "combined_reward": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -78,7 +78,7 @@ def cosine_scaled_accuracy_length_reward(
             metrics={
                 "combined_reward": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Message not from assistant or has no content",
                 )
             },
@@ -100,9 +100,9 @@ def cosine_scaled_accuracy_length_reward(
     # Ensure answer_accuracy metric exists, provide a default if not
     answer_accuracy_metric = accuracy_eval_result.metrics.get(
         "answer_accuracy",
-        MetricResult(score=0.0, success=False, reason="Accuracy metric not found"),
+        MetricResult(score=0.0, is_score_valid=False, reason="Accuracy metric not found"),
     )
-    accuracy_success = answer_accuracy_metric.success
+    accuracy_success = answer_accuracy_metric.is_score_valid
     accuracy_reason = accuracy_eval_result.reason or "No reason from accuracy_reward"
 
     # Step 2: Calculate length-based score
@@ -155,24 +155,24 @@ def cosine_scaled_accuracy_length_reward(
     metrics = {
         "combined_reward": MetricResult(
             score=combined_score,
-            success=success,
+            is_score_valid=success,
             reason=f"Combined score: {combined_score:.2f}",
         ),
         "accuracy": MetricResult(
             score=accuracy_score,
-            success=accuracy_success,
+            is_score_valid=accuracy_success,
             reason=f"Accuracy: {accuracy_score:.2f}",
         ),
         "length": MetricResult(
             score=length_score,
-            success=token_count <= max_length,
+            is_score_valid=token_count <= max_length,
             reason=f"Length: {token_count}/{max_length} tokens, score: {length_score:.2f}",  # noqa
         ),
         "token_count": MetricResult(
             score=min(1.0, max(0.0, 1.0 - progress)),
-            success=token_count <= max_length,
+            is_score_valid=token_count <= max_length,
             reason=f"Token count: {token_count}/{max_length}",
         ),
     }
 
-    return EvaluateResult(score=combined_score, reason=combined_reason, metrics=metrics)
+    return EvaluateResult(score=combined_score, reason=combined_reason, metrics=metrics, is_score_valid=combined_score > 0.0)

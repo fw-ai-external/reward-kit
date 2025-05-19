@@ -102,9 +102,10 @@ def grpo_format_reward(
         return EvaluateResult(
             score=0.0,
             reason="No messages provided",
+            is_score_valid=False,
             metrics={
                 "format": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -115,9 +116,10 @@ def grpo_format_reward(
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",
+            is_score_valid=False,
             metrics={
                 "format": MetricResult(
-                    score=0.0, success=False, reason="No assistant response"
+                    score=0.0, is_score_valid=False, reason="No assistant response"
                 )
             },
         )
@@ -166,22 +168,22 @@ def grpo_format_reward(
     metrics = {
         "has_think": MetricResult(
             score=1.0 if has_think else 0.0,
-            success=has_think,
+            is_score_valid=has_think,
             reason=f"{'Has' if has_think else 'Missing'} think tag",
         ),
         "has_answer": MetricResult(
             score=1.0 if has_answer else 0.0,
-            success=has_answer,
+            is_score_valid=has_answer,
             reason=f"{'Has' if has_answer else 'Missing'} answer tag",
         ),
         "correct_order": MetricResult(
             score=1.0 if correct_order else 0.0,
-            success=correct_order,
+            is_score_valid=correct_order,
             reason=f"Tags are in {'correct' if correct_order else 'incorrect'} order",
         ),
     }
 
-    return EvaluateResult(score=score, reason=reason, metrics=metrics)
+    return EvaluateResult(score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0)
 
 
 def create_grpo_reward(

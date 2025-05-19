@@ -14,6 +14,12 @@ This document outlines proposed changes to enhance the usability, clarity, and o
     *   **Rationale:** Consistency reduces confusion for users and contributors. `EvaluateResult` is a more generic and descriptive term for an evaluation outcome.
     *   **Detailed Plan & Progress:** [./improvements/01_unify_reward_result_objects.md](./improvements/01_unify_reward_result_objects.md)
 
+2.  **Remove `original_messages` Parameter:**
+    *   **Issue:** The `original_messages` parameter is used in some reward functions to provide conversational context separately from the main `messages` list. The new coding format aims to consolidate this by having `ground_truth` serve as the container for such context if it's a list of messages.
+    *   **Proposal:** Remove `original_messages` from reward functions, relying on `ground_truth` (when it's a list of messages) or the main `messages` list for necessary context. Update all related code, tests, and documentation.
+    *   **Rationale:** Simplifies the reward function API, reduces redundancy, and aligns with the evolving standard of using `ground_truth` as a flexible container for various forms of expected data, including conversational history.
+    *   **Detailed Plan & Progress:** [./improvements/02_remove_original_messages.md](./improvements/02_remove_original_messages.md)
+
 ## Proposed Action Items
 
 ### I. Project-Wide Consistency & Clarity (Continued)
@@ -149,4 +155,4 @@ Focus: Improve clarity, reduce redundancy, and ensure examples align with best p
 17. **Code Structure Diagram:**
     *   **Action:** Keep the ASCII tree in `CONTRIBUTING.md`; it's helpful. Ensure it stays up-to-date.
 
-This plan aims to make Reward Kit more polished and easier to engage with. Iterative implementation is recommended. 
+This plan aims to make Reward Kit more polished and easier to engage with. Iterative implementation is recommended.

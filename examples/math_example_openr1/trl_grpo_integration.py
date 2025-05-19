@@ -45,7 +45,6 @@ grpo_config = GRPOConfig(
     max_completion_length=50,  # Explicitly set, was in generation_kwargs before
     top_k=0.0,  # from generation_kwargs
     top_p=1.0,  # from generation_kwargs
-    do_sample=True,  # from generation_kwargs
 )
 
 

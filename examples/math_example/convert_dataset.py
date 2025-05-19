@@ -41,6 +41,29 @@ _NUM_REGEX_STR = r"-?\d+(\.\d+)?"
 _STRICTLY_NUMERIC_REGEX_STR = rf"^\s*({_NUM_REGEX_STR}(\s*,\s*{_NUM_REGEX_STR})*)?\s*$"
 _STRICTLY_NUMERIC_COMPILED_REGEX = re.compile(_STRICTLY_NUMERIC_REGEX_STR)
 
+# Regex for MCQ detection
+# This regex looks for patterns like A), (A), A., [A] that are preceded by a space or start of line,
+# and are followed by some text that looks like an option.
+# More aggressive MCQ_PATTERN_REGEX to catch more formats including TeX and numerical options.
+MCQ_PATTERN_REGEX = re.compile(
+    r"(\b(?:[A-Za-z]|[0-9]+)\s*[\)\.])|"  # Matches A) or 1.
+    r"([\(\[]\s*(?:[A-Za-z]|[0-9]+)\s*[\)\]])|"  # Matches (A) or [1]
+    r"(\(\s*\\mathrm\s*\{\s*[A-Za-z]\s*\}\s*\))"  # Matches (\mathrm{A})
+)
+
+# Regex for single letter choice detection (e.g., "A", "(B)", "C.")
+SINGLE_LETTER_CHOICE_REGEX = re.compile(r"^\s*\(?\s*([A-Z])\s*\)?\s*\.?\s*$")
+
+
+def is_multiple_choice_question(text: str) -> bool:
+    """
+    Detects if the text likely contains a multiple-choice question format.
+    Searches for patterns like A), (B), C. at the start of lines.
+    """
+    if MCQ_PATTERN_REGEX.search(text):
+        return True
+    return False
+
 
 def is_strictly_numeric(text: str) -> bool:
     """
@@ -172,6 +195,21 @@ def convert_math_dataset_to_openai_jsonl(
                     )
                     continue
 
+                # New MCQ Filtering Step
+                if is_multiple_choice_question(query_content):
+                    logger.info(
+                        f"Skipping example {example.get('uuid', 'N/A')} as query appears to be a multiple-choice question."
+                    )
+                    continue
+
+                # New filter: If math_type is numeric, but ground_truth_answer_column suggests a lettered choice
+                if math_type == "numeric":
+                    if SINGLE_LETTER_CHOICE_REGEX.fullmatch(gt_answer_content):
+                        logger.info(
+                            f"Skipping example {example.get('uuid', 'N/A')} for 'numeric' math_type as ground_truth_answer_column ('{gt_answer_content}') suggests a lettered choice."
+                        )
+                        continue
+                
                 messages = [
                     {"role": "user", "content": query_content},
                     {

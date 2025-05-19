@@ -57,15 +57,17 @@ async def generate_with_fireworks_inner(
             )
             return "A generic mocked math solution for OpenR1 that will likely result in a score of 0."
 
-    system_prompt = "IMPORTANT: You MUST provide your final numerical answer enclosed *only* in `\\boxed{answer}`. Do not include any other numbers or text within the box. Your entire response should be your reasoning, followed by the single, final boxed answer. Example: `\\boxed{123.45}`."
+    # there are some examples with multiple choice and model just answers with multiple choice instead.
+    # {"user_prompt": "Two is $10 \\%$ of $x$ and $20 \\%$ of $y$. What is $x - y$?\n$(\\mathrm {A}) \\ 1 \\qquad (\\mathrm {B}) \\ 2 \\qquad (\\mathrm {C})\\ 5 \\qquad (\\mathrm {D}) \\ 10 \\qquad (\\mathrm {E})\\ 20$", "original_assistant_content": "$2 = \\frac {1}{10}x \\Longrightarrow x = 20,\\quad 2 = \\frac{1}{5}y \\Longrightarrow y = 10,\\quad x-y = 20 - 10=10  \\mathrm{(D)}$.\n\nThe final answer is \\boxed{10}.", "regenerated_content": "<think>\nOkay, let's see. The problem says that two is 10% of x and 20% of y. I need to find x minus y. Hmm. Let me break this down step by step.\n\nFirst, let me translate the words into equations. If two is 10% of x, that means 2 equals 10% times x. Similarly, 2 is 20% of y, so 2 equals 20% times y. Let me write that out:\n\n2 = 10% * x  \n2 = 20% * y\n\nBut percentages can be converted to decimals. So 10% is 0.10 and 20% is 0.20. So substituting those in:\n\n2 = 0.10 * x  \n2 = 0.20 * y\n\nNow, I need to solve for x and y. Let me start with the first equation. If 2 equals 0.10 times x, then to find x, I can divide both sides by 0.10. Let me do that:\n\nx = 2 / 0.10\n\nDividing by 0.10 is the same as multiplying by 10, right? Because 0.10 is 1/10. So 2 divided by 1/10 is 2 * 10 = 20. So x is 20. Let me check that. 10% of 20 is 2, which matches the given information. Good.\n\nNow for the second equation: 2 = 0.20 * y. Similarly, to solve for y, I divide both sides by 0.20:\n\ny = 2 / 0.20\n\nHmm, 0.20 is 1/5, so dividing by 1/5 is the same as multiplying by 5. So 2 divided by 0.20 is 2 * 5 = 10. Therefore, y is 10. Let me check that. 20% of 10 is 2, which is correct. Perfect.\n\nNow the question asks for x minus y. So that's 20 minus 10. Which is 10. So x - y equals 10. Let me check the answer choices. Option D is 10. So the answer should be D.\n\nWait, but let me make sure I didn't mix up anything. The problem says two is 10% of x and 20% of y. So 2 = 0.1x and 2 = 0.2y. Solving for x gives 20, solving for y gives 10. Subtracting them gives 10. Yeah, that seems right. I don't think I made any mistakes here. The answer is D, 10.\n\n**Final Answer**\n\\boxed{D}\n</think>\n\nTo solve the problem, we start by translating the given information into mathematical equations.\n\nWe are told:\n\n- Two is 10% of $ x $, which translates to:\n  $$\n  2 = 0.10x\n  $$\n\n- Two is 20% of $ y $, which translates to:\n  $$\n  2 = 0.20y\n  $$\n\n---\n\n### Step 1: Solve for $ x $\n\nFrom the first equation:\n$$\n2 = 0.10x\n$$\nDivide both sides by 0.10:\n$$\nx = \\frac{2}{0.10} = 20\n$$\n\n---\n\n### Step 2: Solve for $ y $\n\nFrom the second equation:\n$$\n2 = 0.20y\n$$\nDivide both sides by 0.20:\n$$\ny = \\frac{2}{0.20} = 10\n$$\n\n---\n\n### Step 3: Compute $ x - y $\n\nNow that we have $ x = 20 $ and $ y = 10 $, we compute:\n$$\nx - y = 20 - 10 = 10\n$$\n\n---\n\n### Final Answer\n\n$$\n\\boxed{D}\n$$", "evaluation_score": 0.0, "evaluation_reason": "Strictness fail (Issue #2 - Ambiguity): Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted, even after potential leniency).", "error_category": "C"}
+    system_prompt = "IMPORTANT: You MUST provide your final numerical answer enclosed *only* in `\\boxed{answer}`. Do not include any other numbers or text within the box. Your entire response should be your reasoning, followed by the single, final boxed answer. Example: `\\boxed{123.45}`. If the question is a multiple choice question, please still provide the numerical answer."
     payload: Dict[str, Any] = {
         "model": FIREWORKS_MODEL_NAME,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "max_tokens": 4000,  # Consistent with gsm8k example
-        "temperature": 0.2,  # Consistent with gsm8k example
+        "max_tokens": 8000,
+        "temperature": 0.1,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
@@ -302,6 +304,9 @@ async def main(args):
             regenerated_contents_results = []
 
     actual_processed_count = 0
+    error_category_counts = {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "API_Error": 0}
+    category_c_indices: List[int] = []
+
     for i, result_or_exc in enumerate(regenerated_contents_results):
         if i >= len(valid_samples_for_tasks):
             print(f"Warning: Mismatch between results and processed samples. Index {i}")
@@ -311,6 +316,7 @@ async def main(args):
         item = item_info["data"]
         original_sample_index = item_info["index"]
         actual_processed_count += 1
+        error_category_for_sample = "N/A"  # For recording
 
         original_messages_data = item.get("messages")
         user_message_content = next(
@@ -331,88 +337,200 @@ async def main(args):
                 f"Sample (Original Index {original_sample_index + 1}): Skipping, no original assistant message found for ground truth."
             )
             all_passed = False
+            # Consider this an E type error for categorization purposes if needed, or skip categorization
             continue
 
         print(f"--- Sample (Original Index {original_sample_index + 1}) ---")
         print(f"User Prompt: {user_message_content[:100]}...")
 
+        regenerated_content_str = None
         if isinstance(result_or_exc, Exception):
-            regenerated_content = None
             print(f"Status: FAILED (API call resulted in exception: {result_or_exc})")
+            error_category_counts["API_Error"] += 1
+            error_category_for_sample = "API_Error"
+            all_passed = False
         else:
-            regenerated_content = result_or_exc
+            regenerated_content_str = result_or_exc
 
-        if regenerated_content is None:
-            if not isinstance(result_or_exc, Exception):
-                print(
-                    f"Status: FAILED (Could not get/regenerate response from Fireworks API for prompt: {user_message_content[:70]}...)"
-                )
+        if regenerated_content_str is None and not isinstance(result_or_exc, Exception):
+            # This case handles if generate_with_fireworks_inner returns None without raising an exception
+            # (e.g. API returns no choices, or other non-exception failure)
+            print(
+                f"Status: FAILED (Could not get/regenerate response from Fireworks API for prompt: {user_message_content[:70]}...)"
+            )
+            error_category_counts[
+                "API_Error"
+            ] += 1  # Or a new category like "LLM_No_Response"
+            error_category_for_sample = "API_Error"  # Or "LLM_No_Response"
             all_passed = False
             print("---------------------\n")
-            continue
-
-        print(f"Regenerated Assistant Response: {regenerated_content}")
-
-        messages_for_eval = [
-            Message(role="user", content=user_message_content),
-            Message(role="assistant", content=regenerated_content),
-        ]
-
-        try:
-            result = math_reward(
-                messages=messages_for_eval,
-                original_messages=messages_for_eval,
-                ground_truth=original_assistant_content,
-            )
-
-            print(f"Score (for regenerated): {result.score}")
-            print(f"Reason (for regenerated): {result.reason}")
-            if result.metrics:
-                print("Metrics (for regenerated):")
-                for (
-                    metric_name_key,
-                    metric_detail,
-                ) in result.metrics.items():  # Renamed metric_name to avoid conflict
-                    print(
-                        f"  {metric_name_key}: Score={metric_detail.score}, Success={metric_detail.success}, Reason='{metric_detail.reason}'"
-                    )
-
-            if result.score == 1.0:
-                print("Status: PASSED")
-                passed_samples += 1
-            else:
-                print("Status: FAILED")
-                all_passed = False
-
-            if args.regenerate_recorded_data and regenerated_content is not None:
+            if args.regenerate_recorded_data:
                 live_call_results_to_record.append(
                     {
                         "user_prompt": user_message_content,
                         "original_assistant_content": original_assistant_content,
-                        "regenerated_content": regenerated_content,
-                        "evaluation_score": result.score,
-                        "evaluation_reason": result.reason,
+                        "regenerated_content": None,
+                        "evaluation_score": 0.0,
+                        "evaluation_reason": "API/LLM No Response",
+                        "error_category": error_category_for_sample,
                     }
                 )
-            print("---------------------\n")
+            continue
 
-        except Exception as e:
-            print(
-                f"Sample {actual_processed_count}: Error during evaluation of regenerated response - {e}"
-            )
-            all_passed = False
-            print("---------------------\n")
+        if regenerated_content_str is not None:  # Only proceed if we have content
+            print(f"Regenerated Assistant Response: {regenerated_content_str}")
+
+            messages_for_eval = [
+                Message(role="user", content=user_message_content),
+                Message(role="assistant", content=regenerated_content_str),
+            ]
+
+            try:
+                result = math_reward(
+                    messages=messages_for_eval,
+                    original_messages=messages_for_eval,  # Using regenerated as original for this eval
+                    ground_truth=original_assistant_content,
+                )
+
+                print(f"Score (for regenerated): {result.score}")
+                print(f"Reason (for regenerated): {result.reason}")
+                if result.metrics:
+                    print("Metrics (for regenerated):")
+                    for (
+                        metric_name_key,
+                        metric_detail,
+                    ) in result.metrics.items():
+                        print(
+                            f"  {metric_name_key}: Score={metric_detail.score}, Success={metric_detail.success}, Reason='{metric_detail.reason}'"
+                        )
+
+                if result.score == 1.0:
+                    print("Status: PASSED")
+                    passed_samples += 1
+                    error_category_for_sample = "PASSED"
+                else:
+                    all_passed = False
+                    # Programmatic Error Categorization
+                    category_determined = False
+                    # Category A: Incomplete CoT / Truncated / Empty
+                    if (
+                        not regenerated_content_str.strip()
+                        or "</think>" not in regenerated_content_str
+                    ):
+                        error_category_counts["A"] += 1
+                        error_category_for_sample = "A"
+                        category_determined = True
+                        print("Status: FAILED (Category A - Incomplete CoT)")
+
+                    if not category_determined:
+                        reason_lower = result.reason.lower() if result.reason else ""
+                        # Category C: Formatting/Extraction Failure
+                        if any(
+                            err_str in reason_lower
+                            for err_str in [
+                                "strictness fail",
+                                "unboxed 'or'",
+                                "ambiguity",
+                                "could not extract",
+                                "no boxed answer",
+                                "malformed",
+                            ]
+                        ):
+                            error_category_counts["C"] += 1
+                            error_category_for_sample = "C"
+                            category_determined = True
+                            print("Status: FAILED (Category C - Formatting/Extraction)")
+                        # Category B: Incorrect CoT / Wrong Answer (well-formatted)
+                        elif "numeric mismatch" in reason_lower:
+                            error_category_counts["B"] += 1
+                            error_category_for_sample = "B"
+                            category_determined = True
+                            print("Status: FAILED (Category B - Numeric Mismatch)")
+
+                    if not category_determined:  # Fallback to E if not A, B, or C
+                        error_category_counts["E"] += 1
+                        error_category_for_sample = "E"
+                        print(f"Status: FAILED (Category E - Other: {result.reason})")
+
+                if error_category_for_sample == "C":
+                    category_c_indices.append(original_sample_index)
+
+                if args.regenerate_recorded_data:
+                    live_call_results_to_record.append(
+                        {
+                            "user_prompt": user_message_content,
+                            "original_assistant_content": original_assistant_content,
+                            "regenerated_content": regenerated_content_str,
+                            "evaluation_score": result.score,
+                            "evaluation_reason": result.reason,
+                            "error_category": error_category_for_sample,
+                        }
+                    )
+                print("---------------------\n")
+
+            except Exception as e:
+                print(
+                    f"Sample {actual_processed_count}: Error during evaluation of regenerated response - {e}"
+                )
+                all_passed = False
+                error_category_counts["E"] += 1  # Count as Other/Evaluation Error
+                error_category_for_sample = "E_EvalError"
+                if args.regenerate_recorded_data:
+                    live_call_results_to_record.append(
+                        {
+                            "user_prompt": user_message_content,
+                            "original_assistant_content": original_assistant_content,
+                            "regenerated_content": regenerated_content_str,
+                            "evaluation_score": 0.0,  # Failed due to exception
+                            "evaluation_reason": f"Evaluation Exception: {e}",
+                            "error_category": error_category_for_sample,
+                        }
+                    )
+                print("---------------------\n")
 
     print("\n--- Regeneration & Evaluation Summary ---")
     summary_total_processed = actual_processed_count
     print(f"Total samples attempted in this run: {summary_total_processed}")
     print(f"Samples passed (among attempted): {passed_samples}")
-    failed_count = (
-        summary_total_processed - passed_samples if summary_total_processed > 0 else 0
-    )
-    print(f"Samples failed (among attempted): {failed_count}")
 
-    if all_passed and summary_total_processed > 0:
+    failed_count = 0
+    for category_key in [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "API_Error",
+    ]:  # D is not used yet but kept for structure
+        failed_count += error_category_counts.get(category_key, 0)
+    # Ensure failed_count is consistent if some samples were skipped before eval
+    if (
+        summary_total_processed > 0
+        and (summary_total_processed - passed_samples) != failed_count
+    ):
+        # This might happen if a sample was skipped before categorization (e.g. no original_assistant_content)
+        # For now, we'll report the sum of categorized errors.
+        print(f"Samples failed (sum of categorized errors): {failed_count}")
+    else:
+        print(f"Samples failed (among attempted): {failed_count}")
+
+    print("\nError Category Counts:")
+    for category, count in error_category_counts.items():
+        if count > 0:  # Only print categories with errors
+            print(f"  Category {category}: {count}")
+
+    if category_c_indices:
+        print(f"\nIndices of samples with Category C errors: {sorted(list(set(category_c_indices)))}")
+    else:
+        print("\nNo samples found with Category C errors in this run.")
+
+    if summary_total_processed == 0:
+        print(
+            "\nNo samples were processed in this run (e.g., no matching mock data found or no samples selected)."
+        )
+    elif (
+        all_passed
+    ):  # all_passed would be true if summary_total_processed > 0 and all processed passed
         print(
             "\nAll samples processed in this run passed successfully with regenerated responses!"
         )

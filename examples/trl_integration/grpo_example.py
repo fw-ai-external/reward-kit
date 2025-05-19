@@ -411,8 +411,8 @@ def train_with_grpo_example():
     math_reward_config = {
         "func": rk_math_reward,
         "map": {
-            "solution": "original_messages"
-        },  # Map 'solution' dataset column to 'original_messages' param
+            "solution": "ground_truth"
+        },  # Map 'solution' dataset column to 'ground_truth' param for rk_math_reward
         "static_kwargs": {},
         # user_msg_fn will default to _extract_user_content_from_messages
     }
@@ -572,15 +572,17 @@ def train_with_grpo_example():
         messages_test_case_1, think_tag="<think>", answer_tag="<answer>"
     )
     accuracy_result_1 = rk_math_reward(
-        messages=messages_test_case_1, original_messages=original_messages_for_test
+        messages=messages_test_case_1,
+        ground_truth=ground_truth_full_solution_text,
+        original_messages=original_messages_for_test,
     )
     print(
-        f"Format reward (perfect mock): {format_result_1['score']} - {format_result_1.get('reason', 'N/A')}"
+        f"Format reward (perfect mock): {format_result_1.score} - {format_result_1.get('reason', 'N/A')}"
     )
     print(
-        f"Accuracy reward (perfect mock): {accuracy_result_1['score']} - {accuracy_result_1.get('reason', 'N/A')}"
+        f"Accuracy reward (perfect mock): {accuracy_result_1.score} - {accuracy_result_1.get('reason', 'N/A')}"
     )
-    combined_score_1 = 0.3 * format_result_1["score"] + 0.7 * accuracy_result_1["score"]
+    combined_score_1 = 0.3 * format_result_1.score + 0.7 * accuracy_result_1.score
     print(f"Combined reward (perfect mock): {combined_score_1}")
 
     # Test case 2: No box in answer (model's response)
@@ -592,15 +594,17 @@ def train_with_grpo_example():
         messages_test_case_2, think_tag="<think>", answer_tag="<answer>"
     )
     accuracy_result_2 = rk_math_reward(
-        messages=messages_test_case_2, original_messages=original_messages_for_test
+        messages=messages_test_case_2,
+        ground_truth=ground_truth_full_solution_text,
+        original_messages=original_messages_for_test,
     )
     print(
-        f"Format reward (no box): {format_result_2['score']} - {format_result_2.get('reason', 'N/A')}"
+        f"Format reward (no box): {format_result_2.score} - {format_result_2.get('reason', 'N/A')}"
     )
     print(
-        f"Accuracy reward (no box): {accuracy_result_2['score']} - {accuracy_result_2.get('reason', 'N/A')}"
+        f"Accuracy reward (no box): {accuracy_result_2.score} - {accuracy_result_2.get('reason', 'N/A')}"
     )
-    combined_score_2 = 0.3 * format_result_2["score"] + 0.7 * accuracy_result_2["score"]
+    combined_score_2 = 0.3 * format_result_2.score + 0.7 * accuracy_result_2.score
     print(f"Combined reward (no box): {combined_score_2}")
 
     # Test case 3: No think tag
@@ -612,15 +616,17 @@ def train_with_grpo_example():
         messages_test_case_3, think_tag="<think>", answer_tag="<answer>"
     )
     accuracy_result_3 = rk_math_reward(
-        messages=messages_test_case_3, original_messages=original_messages_for_test
+        messages=messages_test_case_3,
+        ground_truth=ground_truth_full_solution_text,
+        original_messages=original_messages_for_test,
     )
     print(
-        f"Format reward (no think): {format_result_3['score']} - {format_result_3.get('reason', 'N/A')}"
+        f"Format reward (no think): {format_result_3.score} - {format_result_3.get('reason', 'N/A')}"
     )
     print(
-        f"Accuracy reward (no think): {accuracy_result_3['score']} - {accuracy_result_3.get('reason', 'N/A')}"
+        f"Accuracy reward (no think): {accuracy_result_3.score} - {accuracy_result_3.get('reason', 'N/A')}"
     )
-    combined_score_3 = 0.3 * format_result_3["score"] + 0.7 * accuracy_result_3["score"]
+    combined_score_3 = 0.3 * format_result_3.score + 0.7 * accuracy_result_3.score
     print(f"Combined reward (no think): {combined_score_3}")
 
 

@@ -89,6 +89,7 @@ def evaluate(messages, original_messages=None, **kwargs):
         metrics={
             'word_count': MetricResult(
                 score=score,
+                success=score > 0.5, # Example: success if score is above 0.5
                 reason=f'Word count: {word_count}'
             )
         }
@@ -200,6 +201,7 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         metrics={
             'your_metric': MetricResult(
                 score=your_score,
+                success=your_score > 0.7, # Example: success if score is above 0.7
                 reason="Detailed explanation"
             )
         }

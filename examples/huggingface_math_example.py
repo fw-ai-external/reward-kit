@@ -57,7 +57,10 @@ def main():
             {"role": "user", "content": problem},
             {"role": "assistant", "content": custom_solution},
         ]
-        math_result = math_reward(messages=messages, original_messages=messages)
+        # The ground_truth for "2 + 2 = 4" is "4"
+        math_result = math_reward(
+            messages=messages, ground_truth="4", original_messages=messages
+        )
         length_result = length_reward(messages=messages, original_messages=messages)
 
         print(f"Problem: {problem}")
@@ -71,9 +74,7 @@ def main():
         if length_result.get("metrics"):
             print("Detailed length metrics:")
             for metric_name, metric_value in length_result["metrics"].items():
-                print(
-                    f"  {metric_name}: {metric_value['score']} - {metric_value['reason']}"
-                )
+                print(f"  {metric_name}: {metric_value.score} - {metric_value.reason}")
 
     except ImportError:
         print("Could not load datasets package. Install with: pip install 'datasets'")

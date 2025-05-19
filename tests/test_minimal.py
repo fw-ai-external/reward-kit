@@ -70,14 +70,17 @@ def echo(text):
         with open(os.path.join(task_dir, "reward.py"), "w") as f:
             f.write(
                 """
-from reward_kit import reward_function, RewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult
 
 @reward_function
-def evaluate(messages, **kwargs):
-    return RewardOutput(
+def evaluate(messages, **kwargs) -> EvaluateResult:
+    \"\"\"
+    Minimal reward function that always returns a score of 1.0.
+    \"\"\"
+    return EvaluateResult(
         score=1.0,
-        reason="Test evaluation",
-        metrics={"test": {"score": 1.0, "reason": "Test"}}
+        reason="Minimal evaluation always returns 1.0",
+        metrics={}
     )
 """
             )

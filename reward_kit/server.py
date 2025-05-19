@@ -106,7 +106,7 @@ class RewardServer:
                 request: RewardRequest object with messages and optional parameters
 
             Returns:
-                RewardOutput object with score and metrics
+                EvaluateResult object with score and metrics
             """
             try:
                 # Extract kwargs from the request
@@ -237,7 +237,7 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Change
             request_data: RewardRequest object with messages and optional parameters
 
         Returns:
-            RewardOutput object with score and metrics
+            EvaluateResult object with score and metrics
         """
         try:
             # Convert Pydantic models to dictionaries using model_dump (Pydantic v2)

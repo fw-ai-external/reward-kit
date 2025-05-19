@@ -23,10 +23,14 @@ def my_reward_function(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     # Your evaluation logic here
     score = 0.75  # Example score
-    return RewardOutput(score=score, metrics={...})
+    return EvaluateResult(
+        score=score,
+        reason="Overall evaluation reason",
+        metrics={"example_metric": MetricResult(score=score, success=True, reason="Metric reason")}
+    )
 ```
 
 ## Parameter Requirements
@@ -41,15 +45,16 @@ Functions decorated with `@reward_function` should accept the following paramete
 
 ## Return Value Requirements
 
-Functions must return a `RewardOutput` object or a compatible tuple format:
+Functions must return an `EvaluateResult` object or a compatible tuple format:
 
 ```python
 # Preferred return format
-return RewardOutput(
+return EvaluateResult(
     score=0.75,  # Overall score
+    reason="Overall evaluation reason",
     metrics={
-        "clarity": MetricRewardOutput(score=0.8, reason="Good clarity"),
-        "accuracy": MetricRewardOutput(score=0.7, reason="Minor errors")
+        "clarity": MetricResult(score=0.8, success=True, reason="Good clarity"),
+        "accuracy": MetricResult(score=0.7, success=False, reason="Minor errors")
     }
 )
 
@@ -103,7 +108,7 @@ evaluation_id = my_reward_function.deploy(
 
 The decorator performs the following validations:
 1. Ensures the decorated function has the expected parameters
-2. Validates that the return value is a `RewardOutput` or a compatible tuple
+2. Validates that the return value is an `EvaluateResult` or a compatible tuple
 3. Handles exceptions that occur during function execution
 
 ### Backward Compatibility
@@ -113,7 +118,7 @@ For backward compatibility, the decorator supports the legacy tuple return forma
 return score, component_scores_dict
 ```
 
-This gets automatically converted to a `RewardOutput` object.
+This gets automatically converted to an `EvaluateResult` object.
 
 ### Deployment Process
 
@@ -128,7 +133,7 @@ When `.deploy()` is called, the decorator:
 ### Basic Usage
 
 ```python
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult
 from typing import List, Dict, Optional
 
 @reward_function
@@ -136,17 +141,20 @@ def word_count_reward(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """Evaluate response based on word count."""
     response = messages[-1].get("content", "")
     word_count = len(response.split())
-    score = min(word_count / 100, 1.0)
+    score = min(word_count / 100.0, 1.0)
+    success = word_count > 10 # Example: success if more than 10 words
 
-    return RewardOutput(
+    return EvaluateResult(
         score=score,
+        reason=f"Overall word count evaluation: {word_count} words.",
         metrics={
-            "word_count": MetricRewardOutput(
+            "word_count": MetricResult(
                 score=score,
+                success=success,
                 reason=f"Word count: {word_count}"
             )
         }
@@ -162,7 +170,7 @@ def configurable_reward(
     original_messages: Optional[List[Dict[str, str]]] = None,
     metadata: Optional[Dict[str, any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult:
     """Reward function that accepts configuration via metadata."""
     metadata = metadata or {}
 
@@ -171,13 +179,16 @@ def configurable_reward(
 
     response = messages[-1].get("content", "")
     word_count = len(response.split())
-    score = min(word_count / threshold, 1.0)
+    score = min(word_count / float(threshold), 1.0)
+    success = word_count >= threshold # Example: success if count meets or exceeds threshold
 
-    return RewardOutput(
+    return EvaluateResult(
         score=score,
+        reason=f"Configurable word count. Threshold: {threshold}, Count: {word_count}.",
         metrics={
-            "configured_word_count": MetricRewardOutput(
+            "configured_word_count": MetricResult(
                 score=score,
+                success=success,
                 reason=f"Word count: {word_count}, threshold: {threshold}"
             )
         }
@@ -189,9 +200,12 @@ def configurable_reward(
 ```python
 # Define and decorate the reward function
 @reward_function
-def clarity_reward(messages, original_messages=None, **kwargs):
+def clarity_reward(messages, original_messages=None, **kwargs) -> EvaluateResult:
     # ... evaluation logic ...
-    return RewardOutput(score=0.8, metrics={...})
+    # Assume score and metric_details are calculated
+    score = 0.8 
+    metric_details = {"clarity_metric": MetricResult(score=0.8, success=True, reason="Very clear")}
+    return EvaluateResult(score=score, reason="Clarity evaluation complete.", metrics=metric_details)
 
 # Deploy the function to Fireworks
 evaluation_id = clarity_reward.deploy(

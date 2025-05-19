@@ -107,10 +107,10 @@ result = cosine_scaled_accuracy_length_reward(
 )
 
 # Print results
-print(f"Combined score: {result['score']}")
-print(f"Accuracy score: {result['metrics']['accuracy']['score']}")
-print(f"Length score: {result['metrics']['length']['score']}")
-print(f"Reason: {result['reason']}")
+print(f"Combined score: {result.score}")
+print(f"Accuracy score: {result.metrics['accuracy'].score}")
+print(f"Length score: {result.metrics['length'].score}")
+print(f"Reason: {result.reason}")
 ```
 
 #### Use Cases
@@ -136,7 +136,7 @@ You can create custom combined metrics by using the `@reward_function` decorator
 ```python
 from reward_kit.rewards.accuracy import accuracy_reward
 from reward_kit.rewards.reasoning_steps import reasoning_steps_reward
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
 
 @reward_function
 def accuracy_reasoning_reward(
@@ -161,23 +161,42 @@ def accuracy_reasoning_reward(
 
     # Calculate combined score
     combined_score = (
-        accuracy_weight * accuracy_result["score"] +
-        reasoning_weight * reasoning_result["score"]
+    accuracy_weight * accuracy_result.score + # Assuming accuracy_result is EvaluateResult
+    reasoning_weight * reasoning_result.score # Assuming reasoning_result is EvaluateResult
     )
+    # Ensure combined_score is within [0,1] if individual scores are
+    combined_score = max(0.0, min(1.0, combined_score))
+
 
     # Combine metrics
+    # Assuming accuracy_result and reasoning_result are EvaluateResult objects
+    # and their .metrics dictionaries contain MetricResult objects or compatible dicts.
+    # For simplicity, we'll construct new MetricResult objects here.
+    # A more robust way might be to merge their .metrics dictionaries if they are complex.
+    
+    acc_metric_reason = accuracy_result.reason if hasattr(accuracy_result, 'reason') else "Accuracy evaluated"
+    acc_metric_success = accuracy_result.metrics.get("accuracy", {}).get("success", accuracy_result.score > 0.5) if hasattr(accuracy_result, 'metrics') and "accuracy" in accuracy_result.metrics else accuracy_result.score > 0.5
+
+
+    rsn_metric_reason = reasoning_result.reason if hasattr(reasoning_result, 'reason') else "Reasoning evaluated"
+    rsn_metric_success = reasoning_result.metrics.get("reasoning_steps", {}).get("success", reasoning_result.score > 0.5) if hasattr(reasoning_result, 'metrics') and "reasoning_steps" in reasoning_result.metrics else reasoning_result.score > 0.5
+    
     metrics = {
-        "accuracy": MetricRewardOutput(
-            score=accuracy_result["score"],
-            reason=accuracy_result["reason"]
+        "accuracy_component": MetricResult( # Updated
+            score=accuracy_result.score,
+            success=acc_metric_success, 
+            reason=acc_metric_reason
         ),
-        "reasoning": MetricRewardOutput(
-            score=reasoning_result["score"],
-            reason=reasoning_result["reason"]
+        "reasoning_component": MetricResult( # Updated
+            score=reasoning_result.score,
+            success=rsn_metric_success,
+            reason=rsn_metric_reason
         )
     }
+    
+    overall_reason = f"Combined accuracy ({accuracy_result.score:.2f}) and reasoning ({reasoning_result.score:.2f})."
 
-    return RewardOutput(score=combined_score, metrics=metrics)
+    return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics) # Updated
 ```
 
 ### Tips for Creating Combined Metrics

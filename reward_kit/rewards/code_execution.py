@@ -27,6 +27,7 @@ import tempfile
 import traceback
 from io import StringIO
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from multiprocessing.managers import DictProxy
 
 # Try to import from e2b_code_interpreter first (preferred)
 try:
@@ -267,6 +268,24 @@ def local_code_execution_reward(
         return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
+# New top-level function to be called by multiprocessing.Process
+def _process_target_wrapper(execute_func: Callable, args: Tuple, result_container: DictProxy):
+    try:
+        # Execute the code with the provided function
+        result = execute_func(*args)
+        result_container.update(result)
+    except Exception as e:
+        # traceback is imported at the top of the file
+        error_traceback = traceback.format_exc()
+        result_container.update(
+            {
+                "success": False,
+                "output": None,
+                "error": f"Execution error: {str(e)}\n{error_traceback}",
+            }
+        )
+
+
 def _execute_code_in_process(
     execute_func: Callable, args: Tuple, timeout: int = 5
 ) -> Dict[str, Any]:
@@ -285,23 +304,8 @@ def _execute_code_in_process(
     manager = multiprocessing.Manager()
     result_dict = manager.dict()
 
-    def target_func(result_container):
-        try:
-            # Execute the code with the provided function
-            result = execute_func(*args)
-            result_container.update(result)
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            result_container.update(
-                {
-                    "success": False,
-                    "output": None,
-                    "error": f"Execution error: {str(e)}\n{error_traceback}",
-                }
-            )
-
-    # Create and start the process
-    process = multiprocessing.Process(target=target_func, args=(result_dict,))
+    # Create and start the process using the top-level wrapper
+    process = multiprocessing.Process(target=_process_target_wrapper, args=(execute_func, args, result_dict))
     process.start()
     process.join(timeout=timeout + 0.5)  # Add a small buffer to the timeout
 
@@ -524,7 +528,7 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
             raise TimeoutError(f"Execution timed out after {timeout} seconds")
 
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout)
+        signal.alarm(timeout) # Keep signal.alarm as a secondary guard
 
         try:
             # Execute in a separate process
@@ -540,7 +544,17 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 text=True,
             )
 
-            stdout, stderr = process.communicate()
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill() # Ensure the process is killed
+                stdout, stderr = process.communicate() # Drain pipes
+                signal.alarm(0) # Cancel alarm if communicate timed out
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"JavaScript execution timed out after {timeout} seconds (subprocess.TimeoutExpired). Output: {stdout.strip()}, Error: {stderr.strip()}",
+                }
 
             # Cancel the alarm
             signal.alarm(0)
@@ -555,14 +569,16 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 return {
                     "success": False,
                     "output": None,
-                    "error": stderr.strip(),
+                    "error": stderr.strip() or f"JavaScript process exited with code {process.returncode}", # Provide exit code if stderr is empty
                 }
-        except TimeoutError as e:
-            # Handle timeout
-            return {"success": False, "output": None, "error": str(e)}
+        except TimeoutError as e: # This would be from signal.alarm
+            process.kill() # Ensure the process is killed
+            _, _ = process.communicate() # Drain pipes
+            # Handle timeout from signal.alarm
+            return {"success": False, "output": None, "error": f"JavaScript execution timed out after {timeout} seconds (signal.alarm): {str(e)}"}
         finally:
             # Clean up
-            signal.alarm(0)
+            signal.alarm(0) # Ensure alarm is cancelled
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
 

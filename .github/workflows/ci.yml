@@ -53,11 +53,14 @@ jobs:
       run: |
         pip install pytest pytest-cov pytest-asyncio
 
-        # Set dummy environment variables needed for tests
-        export E2B_API_KEY="dummy_key_for_testing"
-        export FIREWORKS_API_KEY="dummy_api_key_for_testing"
-        export FIREWORKS_ACCOUNT_ID="dummy-account-id"
-        export FIREWORKS_API_BASE="https://dummy-api.fireworks.ai"
+        # Set environment variables needed for tests
+        # E2B_API_KEY and FIREWORKS_API_KEY should be set as secrets in GitHub repository settings
+        # (e.g., Settings > Secrets and variables > Actions > New repository secret)
+        # If secrets are not set, these will be empty, and tests relying on them should skip.
+        export E2B_API_KEY="${{ secrets.E2B_API_KEY }}"
+        export FIREWORKS_API_KEY="${{ secrets.FIREWORKS_API_KEY }}"
+        export FIREWORKS_ACCOUNT_ID="${{ secrets.FIREWORKS_ACCOUNT_ID }}"
+        # export FIREWORKS_API_BASE="${{ secrets.FIREWORKS_API_BASE_FOR_CI }}" # Optionally use a secret if a non-default base is needed for CI
 
         # Run tests with increased timeout and filter out deprecation warnings
         # We're only focusing on actual test failures

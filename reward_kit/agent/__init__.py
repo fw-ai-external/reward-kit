@@ -16,6 +16,7 @@ from .resources import (
     PythonStateResource,
     SQLResource,
 )
+from .tool_registry import ToolRegistry
 
 __all__ = [
     "ForkableResource",
@@ -24,4 +25,5 @@ __all__ = [
     "SQLResource",
     "FileSystemResource",
     "DockerResource",
+    "ToolRegistry",
 ]

@@ -3,30 +3,11 @@ import importlib
 import sys
 from pathlib import Path
 
-# Attempt to import BFCL File and Directory for isinstance checks
-try:
-    from verifiers.envs.bfcl_envs.gorilla_file_system import Directory as BFCLDirectory
-    from verifiers.envs.bfcl_envs.gorilla_file_system import File as BFCLFile
+# Import BFCL File and Directory for isinstance checks from local implementation
+from .bfcl_envs.gorilla_file_system import Directory as BFCLDirectory
+from .bfcl_envs.gorilla_file_system import File as BFCLFile
 
-    BFCL_TYPES_AVAILABLE = True
-except ImportError:
-    BFCL_TYPES_AVAILABLE = False
-    # Define dummy types if not available, so the rest of the code doesn't break at load time
-    # The isinstance checks will just fail gracefully if these are used.
-    BFCLDirectory = type("BFCLDirectory", (object,), {})
-    BFCLFile = type("BFCLFile", (object,), {})
-    # Add empty modules for type checkers
-    if not "verifiers" in sys.modules:
-        import types
-
-        sys.modules["verifiers"] = types.ModuleType("verifiers")
-        sys.modules["verifiers.envs"] = types.ModuleType("verifiers.envs")
-        sys.modules["verifiers.envs.bfcl_envs"] = types.ModuleType(
-            "verifiers.envs.bfcl_envs"
-        )
-        sys.modules["verifiers.envs.bfcl_envs.gorilla_file_system"] = types.ModuleType(
-            "verifiers.envs.bfcl_envs.gorilla_file_system"
-        )
+BFCL_TYPES_AVAILABLE = True
 import gc
 import inspect
 import json
@@ -37,14 +18,15 @@ from ..resource_abc import ForkableResource
 
 class BFCLSimAPIResource(ForkableResource):
     CLASS_FILE_PATH_MAPPING = {
-        "GorillaFileSystem": "verifiers.envs.bfcl_envs.gorilla_file_system",
-        "MathAPI": "verifiers.envs.bfcl_envs.math_api",
-        "MessageAPI": "verifiers.envs.bfcl_envs.message_api",
-        "TwitterAPI": "verifiers.envs.bfcl_envs.posting_api",
-        "TicketAPI": "verifiers.envs.bfcl_envs.ticket_api",
-        "TradingBot": "verifiers.envs.bfcl_envs.trading_bot",
-        "TravelAPI": "verifiers.envs.bfcl_envs.travel_booking",
-        "VehicleControlAPI": "verifiers.envs.bfcl_envs.vehicle_control",
+        "GorillaFileSystem": "reward_kit.agent.resources.bfcl_envs.gorilla_file_system",
+        "MathAPI": "reward_kit.agent.resources.bfcl_envs.math_api",
+        "TwitterAPI": "reward_kit.agent.resources.bfcl_envs.posting_api",
+        # Add these back when implemented:
+        # "MessageAPI": "reward_kit.agent.resources.bfcl_envs.message_api",
+        # "TicketAPI": "reward_kit.agent.resources.bfcl_envs.ticket_api",
+        # "TradingBot": "reward_kit.agent.resources.bfcl_envs.trading_bot",
+        # "TravelAPI": "reward_kit.agent.resources.bfcl_envs.travel_booking",
+        # "VehicleControlAPI": "reward_kit.agent.resources.bfcl_envs.vehicle_control",
     }
     STATELESS_CLASSES = ["MathAPI"]
 

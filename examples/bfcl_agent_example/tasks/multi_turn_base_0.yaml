@@ -137,4 +137,4 @@ messages:
 name: multi_turn_base_0
 poc_max_turns: 5
 resource_type: BFCLSimAPIResource
-reward_function_path: reward_kit.rewards.bfcl_reward
+reward_function_path: reward_kit.rewards.bfcl_reward_function

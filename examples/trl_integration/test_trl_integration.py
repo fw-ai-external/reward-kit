@@ -38,11 +38,11 @@ def _example_trl_reward_func(  # Renamed to avoid pytest collection
 ) -> EvaluateResult:
     """Simple test reward that returns 1.0 if text contains 'good' and 0.0 otherwise."""
     if not messages or len(messages) == 0:
-        return EvaluateResult(score=0.0, reason="No messages")
+        return EvaluateResult(score=0.0, reason="No messages", metrics={})
 
     response = messages[-1]
     if response.get("role") != "assistant" or not response.get("content"):
-        return EvaluateResult(score=0.0, reason="No assistant response")
+        return EvaluateResult(score=0.0, reason="No assistant response", metrics={})
 
     text = response.get("content", "")
 
@@ -60,34 +60,53 @@ class TestTRLIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.test_messages = [
-            [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Tell me about cats."},
-                {"role": "assistant", "content": "Cats are good pets."},
-            ],
-            [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Tell me about dogs."},
-                {"role": "assistant", "content": "Dogs are loyal companions."},
-            ],
+        # Create message sequences for test data
+        cat_messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me about cats."},
+            {"role": "assistant", "content": "Cats are good pets."},
         ]
 
-        self.grpo_messages = [
-            [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Tell me about cats."},
-                {
-                    "role": "assistant",
-                    "content": "<think>Cats are domesticated animals.</think><answer>Cats are good pets.</answer>",
-                },
-            ],
-            [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Tell me about dogs."},
-                {"role": "assistant", "content": "Dogs are loyal companions."},
-            ],
+        dog_messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me about dogs."},
+            {"role": "assistant", "content": "Dogs are loyal companions."},
         ]
+
+        # Message format for trl tests - prompt and completion separated
+        # Prompts contain system and user (but not assistant) messages
+        self.prompts = [
+            cat_messages[:-1],  # System and user message
+            dog_messages[:-1],  # System and user message
+        ]
+
+        # Completions are just the assistant responses
+        self.completions = [
+            cat_messages[-1]["content"],  # "Cats are good pets."
+            dog_messages[-1]["content"],  # "Dogs are loyal companions."
+        ]
+
+        # Test messages for the adapter tests (each has full conversation)
+        # This is for passing complete conversations to the adapter
+        self.test_messages = [cat_messages, dog_messages]
+
+        # GRPO test data with think/answer format
+        cat_grpo_messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me about cats."},
+            {
+                "role": "assistant",
+                "content": "<think>Cats are domesticated animals.</think><answer>Cats are good pets.</answer>",
+            },
+        ]
+
+        dog_no_format_messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me about dogs."},
+            {"role": "assistant", "content": "Dogs are loyal companions."},
+        ]
+
+        self.grpo_messages = [cat_grpo_messages, dog_no_format_messages]
 
         # Create reward functions
         self.test_rf = RewardFunction(
@@ -232,10 +251,12 @@ class TestTRLIntegration(unittest.TestCase):
             "Dogs are loyal companions.",
         ]
 
-        # Apply test reward
-        rewards = apply_reward_to_responses(self.test_rf, responses)
+        # Apply test reward with a specified system prompt to ensure proper context
+        rewards = apply_reward_to_responses(
+            self.test_rf, responses, system_prompt="Evaluate the response for quality."
+        )
 
-        # Check results
+        # Check results - first response contains 'good'
         self.assertEqual(len(rewards), 2)
         self.assertEqual(rewards[0], 1.0)  # Contains 'good'
         self.assertEqual(rewards[1], 0.0)  # Doesn't contain 'good'
@@ -247,6 +268,23 @@ class TestTRLIntegration(unittest.TestCase):
         self.assertEqual(len(format_rewards), 2)
         self.assertEqual(format_rewards[0], 1.0)  # Has correct format
         self.assertEqual(format_rewards[1], 0.0)  # Missing format tags
+
+
+# Simple test function to run as a standalone test
+def test_standalone_reward():
+    """Test that the test_reward function works correctly."""
+    # Create test message
+    messages = [
+        {"role": "user", "content": "Tell me about cats"},
+        {"role": "assistant", "content": "Cats are good pets."},
+    ]
+
+    # Call reward function directly
+    result = _example_trl_reward_func(messages)
+
+    # Verify result
+    assert result.score == 1.0
+    assert "good" in result.reason
 
 
 if __name__ == "__main__":

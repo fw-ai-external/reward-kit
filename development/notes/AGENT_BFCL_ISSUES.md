@@ -4,7 +4,7 @@
 
 Reproduce the Berkeley Function Call Leaderboard (BFCL) evaluation using the Reward Kit agent v2 stack to evaluate LLM agents on multi-turn tool-use tasks.
 
-## Current Framework Status (Agent v2 for BFCL)
+## Current Framework Status (Agent for BFCL)
 
 The core Agent v2 framework for BFCL evaluation is operational:
 *   **`BFCLSimAPIResource`**: Wraps BFCL environments and infers tool schemas.

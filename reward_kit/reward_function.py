@@ -306,7 +306,7 @@ class RewardFunction:
         """
 
         def adapter(
-            prompts: List[List[Dict]], completions: List[str], **kwargs
+            prompts: List[List[Dict]], completions: Optional[List[str]] = None, **kwargs
         ) -> List[float]:
             """
             Adapter function compatible with TRL's reward function signature.
@@ -315,6 +315,7 @@ class RewardFunction:
                 prompts: A batch of prompt message lists.
                          e.g., [[{'role':'system',...}, {'role':'user',...}], ...]
                 completions: A batch of generated completion strings by the model.
+                             Optional - if None, assumes prompts already contain complete conversations.
                 **kwargs: Additional keyword arguments passed by TRL, potentially including
                           ground truth data like 'solution'. TRL typically passes these
                           as lists matching the batch size.
@@ -324,8 +325,18 @@ class RewardFunction:
             """
             results = []
             batch_size = len(prompts)
+
+            # If completions is None, assume prompts already contain complete conversations
+            if completions is None:
+                completions = [""] * batch_size
+
+            # Make sure completions has the right length after the None check
             if batch_size != len(completions):
-                raise ValueError("Batch size mismatch between prompts and completions.")
+                logger.warning(
+                    f"Batch size mismatch between prompts ({batch_size}) and "
+                    f"completions ({len(completions)}). Using min length."
+                )
+                batch_size = min(batch_size, len(completions))
 
             # Extract potential ground truth solutions if available
             # TRL passes columns from the dataset that weren't removed.

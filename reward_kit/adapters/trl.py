@@ -65,14 +65,21 @@ def create_trl_adapter(
 
     def trl_reward_pipeline(
         prompts: List[Any],  # Changed from List[str] to List[Any]
-        completions: List[str],
+        completions: Optional[List[str]] = None,
         **kwargs: Any,  # Contains other dataset columns, e.g., kwargs['test_cases']
     ) -> List[float]:
         """
         This is the actual function TRL will call.
+
+        Note: completions parameter is optional to handle cases where prompts already
+        contain complete conversations.
         """
         scores: List[float] = []
         num_samples = len(prompts)
+
+        # If completions is None, assume prompts contains complete conversations
+        if completions is None:
+            completions = [""] * num_samples
 
         if not (len(completions) == num_samples):
             logger.warning(

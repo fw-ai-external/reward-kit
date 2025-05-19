@@ -129,7 +129,9 @@ def test_typed_interface_output_validation():
         return EvaluateResult(
             score=0.5,
             reason=None,
-            metrics={"test": {"score": 0.5}},  # Missing 'success' and 'reason'
+            metrics={
+                "test": {"score": 0.5},  # type: ignore[dict-item] # Missing 'success' and 'reason'
+            },
         )  # type: ignore
 
     messages = [

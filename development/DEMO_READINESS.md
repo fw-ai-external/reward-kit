@@ -9,37 +9,37 @@ This diagram illustrates the typical end-to-end developer experience when using 
 
 ```mermaid
 graph TD
-    subgraph "1. Data Phase"
-        A[Source Raw Data (e.g., Production Logs, HF Datasets)] --> B(Process/Clean/Normalize Data);
+    subgraph data_phase [Data Phase]
+        A["Source Raw Data (e.g., Production Logs, HF Datasets)"] --> B(Process/Clean/Normalize Data);
         B --> C[Create dataset.jsonl];
     end
 
-    subgraph "2. Reward Function Phase"
-        D[Develop/Select Reward Function (.py)];
-        C --> E{Local Evaluation Loop};
+    subgraph reward_function_phase [Reward Function Phase]
+        D["Develop/Select Reward Function (.py)"];
+        C --> E[Local Evaluation Loop];
         D --> E;
         E -- Iteration & Debugging --> D;
-        E -- Validated Reward Function & Dataset --> F;
+        E --> F["Validated Reward Function & Dataset"];
+        
+        subgraph llm_validation_optional ["(Optional) LLM Validation & Feedback"]
+            F --> G["LLM Regen (e.g., FW API)"];
+            G --> H["Eval Regenerated Responses"];
+            H -- Regen. Insights --> D;
+            F --> I["API Eval (e.g., FW Preview)"];
+            I -- API Eval. Insights --> D;
+        end
     end
     
-    subgraph "3. (Optional) LLM Interaction & Validation"
-        F --> G[LLM Response Regeneration (e.g., Fireworks API)];
-        G --> H[Evaluate Regenerated Responses with Reward Function];
-        H -- Insights --> D; 
-        F --> I[API-based Evaluation (e.g., Fireworks Preview)];
-        I -- Validation --> F;
-    end
-
-    subgraph "4. Model Fine-Tuning Phase (Fireworks/TRL)"
+    subgraph model_finetuning_phase ["Model Fine-Tuning (Fireworks/TRL)"]
         F --> J[Prepare Dataset for Fireworks TRL];
-        J --> K[Integrate Reward Function into Fireworks or TRL with GRPO)];
+        J --> K["Integrate RF with TRL/GRPO"];
         K --> L[Train LLM];
     end
 
-    subgraph "5. Deployment & MLOps"
+    subgraph deployment_mlops_phase [Deployment & MLOps]
         L --> M[Deploy Fine-Tuned Model];
         M --> N[Monitor & Continuously Evaluate];
-        N -- Feedback --> A; // Cycle for new data / retraining
+        N -- Feedback --> A;
     end
 
     style A fill:#f9f,stroke:#333,stroke-width:2px

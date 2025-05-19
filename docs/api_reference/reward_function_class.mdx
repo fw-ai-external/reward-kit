@@ -65,7 +65,7 @@ __call__(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> RewardOutput
+) -> EvaluateResult
 ```
 
 #### Parameters
@@ -79,7 +79,7 @@ __call__(
 
 #### Returns
 
-- **`RewardOutput`**: Object with score and metrics.
+- **`EvaluateResult`**: Object with score and metrics.
 
 #### Exceptions
 
@@ -111,15 +111,19 @@ The returned adapter function:
 ### Local Mode
 
 ```python
-from reward_kit import RewardFunction, RewardOutput, MetricRewardOutput
+from reward_kit import RewardFunction, EvaluateResult, MetricResult
 
 # Define a reward function
 def my_reward_fn(messages, **kwargs):
     response = messages[-1].get("content", "")
-    score = min(len(response) / 100, 1.0)  # Simple score based on length
-    return RewardOutput(
+    response_len = len(response)
+    score = min(response_len / 100.0, 1.0)  # Simple score based on length
+    success = response_len > 10 # Example success condition: length greater than 10
+    
+    return EvaluateResult(
         score=score,
-        metrics={"length": MetricRewardOutput(score=score, reason=f"Length: {len(response)}")}
+        reason=f"Evaluation based on response length ({response_len} characters).",
+        metrics={"length": MetricResult(score=score, success=success, reason=f"Length: {response_len}")}
     )
 
 # Create a reward function in local mode

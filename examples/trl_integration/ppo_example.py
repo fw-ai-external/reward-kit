@@ -349,11 +349,11 @@ def train_with_ppo_example():
         },
     ]
 
-    reward_result_dict = helpfulness_reward(
+    reward_result_obj = helpfulness_reward(
         sample_messages
-    )  # helpfulness_reward returns a dict
+    )  # helpfulness_reward returns an EvaluateResult object
     print(
-        f"Helpfulness reward score: {reward_result_dict['score']} - {reward_result_dict.get('reason')}"
+        f"Helpfulness reward score: {reward_result_obj.score} - {reward_result_obj.get('reason')}"
     )
 
     # Show how the adapter formats for TRL

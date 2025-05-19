@@ -136,7 +136,18 @@ def my_reward_function(
         EvaluateResult with evaluation score and metrics
     """
     # Your evaluation logic here
-    # ...
+    # score = ...
+    # reason = "..."
+    # metric_score = ...
+    # metric_success = ... (e.g., True if a condition is met)
+    # metric_reason = "..."
+    # For demonstration:
+    score = 0.75
+    reason = "The response met most criteria."
+    metric_score = 0.8
+    metric_success = True # Example: metric condition was met
+    metric_reason = "Specific aspect evaluated positively."
+
 
     return EvaluateResult(
         score=score,

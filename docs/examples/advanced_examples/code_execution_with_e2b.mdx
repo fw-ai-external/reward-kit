@@ -154,10 +154,12 @@ The `e2b_code_execution_reward` function accepts the following parameters:
 
 ## Return Value
 
-The reward function returns a `RewardOutput` object with:
+The reward function returns an `EvaluateResult` object with:
 
-- `score`: A float between 0.0 and 1.0 indicating how well the code performed
-- `metrics`: A dictionary of `MetricRewardOutput` objects with detailed information about the execution
+- `score`: A float between 0.0 and 1.0 indicating how well the code performed.
+- `reason`: An overall explanation for the evaluation.
+- `metrics`: A dictionary of `MetricResult` objects with detailed information about the execution.
+- `error` (optional): A string describing any error during evaluation.
 
 Key metrics include:
 

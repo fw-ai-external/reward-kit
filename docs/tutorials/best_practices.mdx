@@ -35,23 +35,26 @@ def comprehensive_evaluation(messages, original_messages=None, **kwargs):
     metrics = {}
 
     # Clarity component
-    clarity_score = evaluate_clarity(response)
-    metrics["clarity"] = MetricRewardOutput(
+    clarity_score = evaluate_clarity(response) # Assume this returns a float
+    metrics["clarity"] = MetricResult( # Updated
         score=clarity_score,
+        success=clarity_score > 0.7, # Example success
         reason=f"Clarity score: {clarity_score:.2f}"
     )
 
     # Accuracy component
-    accuracy_score = evaluate_accuracy(response)
-    metrics["accuracy"] = MetricRewardOutput(
+    accuracy_score = evaluate_accuracy(response) # Assume this returns a float
+    metrics["accuracy"] = MetricResult( # Updated
         score=accuracy_score,
+        success=accuracy_score > 0.8, # Example success
         reason=f"Accuracy score: {accuracy_score:.2f}"
     )
 
     # Helpfulness component
-    helpfulness_score = evaluate_helpfulness(response)
-    metrics["helpfulness"] = MetricRewardOutput(
+    helpfulness_score = evaluate_helpfulness(response) # Assume this returns a float
+    metrics["helpfulness"] = MetricResult( # Updated
         score=helpfulness_score,
+        success=helpfulness_score > 0.6, # Example success
         reason=f"Helpfulness score: {helpfulness_score:.2f}"
     )
 
@@ -61,8 +64,10 @@ def comprehensive_evaluation(messages, original_messages=None, **kwargs):
         accuracy_score * 0.4 +
         helpfulness_score * 0.3
     )
+    final_score = max(0.0, min(1.0, final_score)) # Ensure score is within [0,1]
+    overall_reason = "Comprehensive evaluation based on clarity, accuracy, and helpfulness."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics) # Updated
 ```
 
 ✅ **Good Practice**: Component metrics that can be analyzed independently
@@ -121,25 +126,31 @@ improvement_score = current_response_score / baseline_score
 Always validate input before processing:
 
 ```python
+from reward_kit import EvaluateResult, MetricResult # Added for example
+
 @reward_function
 def robust_reward(messages, original_messages=None, **kwargs):
     """Reward function with robust input validation."""
     # Check for empty or invalid input
     if not messages:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(
+            reason="Input validation failed: No messages provided.", # Added reason
+            metrics={"error": MetricResult( # Updated
                 score=0.0,
+                success=False, # Added success
                 reason="No messages provided"
             )}
         )
 
     # Check for assistant message
     if messages[-1].get("role") != "assistant":
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(
+            reason="Input validation failed: Last message is not from assistant.", # Added reason
+            metrics={"error": MetricResult( # Updated
                 score=0.0,
+                success=False, # Added success
                 reason="Last message is not from assistant"
             )}
         )
@@ -147,16 +158,19 @@ def robust_reward(messages, original_messages=None, **kwargs):
     # Check for missing content
     response = messages[-1].get("content")
     if not response:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(
+            reason="Input validation failed: Assistant message has no content.", # Added reason
+            metrics={"error": MetricResult( # Updated
                 score=0.0,
+                success=False, # Added success
                 reason="Assistant message has no content"
             )}
         )
 
     # Now process the valid input
     # ...
+    # return EvaluateResult(score=1.0, reason="Valid input processed.", metrics={}) # Example valid return
 ```
 
 ✅ **Good Practice**: Comprehensive input validation with descriptive error messages
@@ -169,10 +183,12 @@ Consider special cases explicitly:
 ```python
 # Handle very short responses
 if len(response) < 10:
-    return RewardOutput(
+    return EvaluateResult( # Updated
         score=0.1,
-        metrics={"length": MetricRewardOutput(
+        reason="Response is too short.", # Added reason
+        metrics={"length": MetricResult( # Updated
             score=0.1,
+            success=False, # Added success
             reason="Response too short to evaluate properly"
         )}
     )
@@ -197,16 +213,21 @@ def safe_evaluation(messages, original_messages=None, **kwargs):
     try:
         # Main evaluation logic
         # ...
-        return RewardOutput(score=final_score, metrics=metrics)
+        # final_score = 1.0 # Placeholder
+        # metrics = {} # Placeholder
+        # return EvaluateResult(score=final_score, reason="Successful evaluation after try.", metrics=metrics) # Updated
+        pass # Placeholder for actual logic
     except Exception as e:
         # Log the error (in a real implementation)
         print(f"Error in evaluation: {str(e)}")
 
         # Return a fallback result
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(
+            reason=f"Evaluation failed due to an exception: {str(e)}", # Added reason
+            metrics={"error": MetricResult( # Updated
                 score=0.0,
+                success=False, # Added success
                 reason=f"Evaluation error: {str(e)}"
             )}
         )
@@ -258,21 +279,24 @@ def optimized_reward(messages, original_messages=None, **kwargs):
     metrics = {}
 
     # Length metric
-    length_score = min(word_count / 100, 1.0)
-    metrics["length"] = MetricRewardOutput(
+    length_score = min(word_count / 100.0, 1.0)
+    metrics["length"] = MetricResult( # Updated
         score=length_score,
+        success=length_score > 0.5, # Example success
         reason=f"Word count: {word_count}"
     )
 
     # Vocabulary metric (reuses words and unique_words)
     vocabulary_richness = len(unique_words) / max(word_count, 1)
-    vocabulary_score = min(vocabulary_richness * 5, 1.0)
-    metrics["vocabulary"] = MetricRewardOutput(
+    vocabulary_score = min(vocabulary_richness * 5.0, 1.0)
+    metrics["vocabulary"] = MetricResult( # Updated
         score=vocabulary_score,
+        success=vocabulary_score > 0.3, # Example success
         reason=f"Vocabulary richness: {vocabulary_richness:.2f}"
     )
 
     # ...
+    # return EvaluateResult(score=(length_score+vocabulary_score)/2, reason="Optimized eval", metrics=metrics) # Example return
 ```
 
 ✅ **Good Practice**: Calculate values once and reuse
@@ -331,19 +355,21 @@ def early_return_reward(messages, original_messages=None, **kwargs):
     """Reward function with early returns for efficiency."""
     # Early return for empty input
     if not messages:
-        return RewardOutput(score=0.0, metrics={})
+        return EvaluateResult(score=0.0, reason="No messages for early return.", metrics={}) # Updated
 
     response = messages[-1].get("content", "")
 
     # Early return for very short responses
     if len(response) < 10:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.1,
-            metrics={"length": MetricRewardOutput(score=0.1, reason="Response too short")}
+            reason="Response too short for full evaluation.", # Added reason
+            metrics={"length": MetricResult(score=0.1, success=False, reason="Response too short")} # Updated
         )
 
     # Only continue with full evaluation for non-trivial responses
     # ...
+    # return EvaluateResult(score=1.0, reason="Full evaluation after early checks.", metrics={}) # Example return
 ```
 
 ✅ **Good Practice**: Return early for special cases to avoid unnecessary computation
@@ -425,11 +451,12 @@ def loggable_reward(messages, original_messages=None, **kwargs):
     logging.debug("Final score: %.2f", final_score)
 
     # Return result
-    return RewardOutput(
+    return EvaluateResult( # Updated
         score=final_score,
+        reason="Loggable reward evaluation complete.", # Added reason
         metrics={
-            "clarity": MetricRewardOutput(score=clarity_score, reason="..."),
-            "accuracy": MetricRewardOutput(score=accuracy_score, reason="...")
+            "clarity": MetricResult(score=clarity_score, success=clarity_score > 0.5, reason="..."), # Updated
+            "accuracy": MetricResult(score=accuracy_score, success=accuracy_score > 0.5, reason="...") # Updated
         }
     )
 ```
@@ -608,31 +635,35 @@ def typed_reward(
     original_messages: Optional[List[Dict[str, str]]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult: # Updated return type
     """Reward function with proper type annotations."""
     # Extract the response
     response: str = messages[-1].get("content", "")
 
     # Calculate component scores
-    clarity_score: float = calculate_clarity(response)
-    helpfulness_score: float = calculate_helpfulness(response)
+    clarity_score: float = calculate_clarity(response) # Assume returns float
+    helpfulness_score: float = calculate_helpfulness(response) # Assume returns float
 
     # Create metrics dictionary
-    metrics: Dict[str, MetricRewardOutput] = {
-        "clarity": MetricRewardOutput(
+    metrics: Dict[str, MetricResult] = { # Updated type hint
+        "clarity": MetricResult( # Updated
             score=clarity_score,
+            success=clarity_score > 0.7, # Example success
             reason=f"Clarity score: {clarity_score:.2f}"
         ),
-        "helpfulness": MetricRewardOutput(
+        "helpfulness": MetricResult( # Updated
             score=helpfulness_score,
+            success=helpfulness_score > 0.6, # Example success
             reason=f"Helpfulness score: {helpfulness_score:.2f}"
         )
     }
 
     # Calculate final score
-    final_score: float = (clarity_score + helpfulness_score) / 2
+    final_score: float = (clarity_score + helpfulness_score) / 2.0
+    final_score = max(0.0, min(1.0, final_score)) # Ensure score is within [0,1]
+    overall_reason = "Typed reward evaluation complete."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics) # Updated
 
 def calculate_clarity(text: str) -> float:
     """Calculate clarity score from text."""

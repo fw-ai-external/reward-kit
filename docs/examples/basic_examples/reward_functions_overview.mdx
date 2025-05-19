@@ -311,10 +311,10 @@ You can combine multiple reward functions to create comprehensive evaluations:
 ```python
 from reward_kit.rewards.accuracy import accuracy_reward
 from reward_kit.rewards.length import length_reward
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
 
 @reward_function
-def combined_accuracy_length(messages, ground_truth=None, **kwargs):
+def combined_accuracy_length(messages, ground_truth=None, **kwargs) -> EvaluateResult: # Added return type
     """Combine accuracy and length evaluation."""
     # Check accuracy
     accuracy_result = accuracy_reward(
@@ -330,21 +330,35 @@ def combined_accuracy_length(messages, ground_truth=None, **kwargs):
 
     # Combine scores with weighting
     # 70% accuracy, 30% length
-    combined_score = 0.7 * accuracy_result["score"] + 0.3 * length_result["score"]
+    # Assuming accuracy_result and length_result are EvaluateResult objects
+    combined_score = 0.7 * accuracy_result.score + 0.3 * length_result.score
+    combined_score = max(0.0, min(1.0, combined_score)) # Ensure score is within [0,1]
+    
+    acc_metric_reason = accuracy_result.reason if hasattr(accuracy_result, 'reason') else "Accuracy evaluated"
+    # Assuming success can be derived from the score or is available in accuracy_result.metrics
+    acc_metric_success = accuracy_result.metrics.get("accuracy", {}).get("success", accuracy_result.score > 0.5) if hasattr(accuracy_result, 'metrics') and "accuracy" in accuracy_result.metrics else accuracy_result.score > 0.5
+
+    len_metric_reason = length_result.reason if hasattr(length_result, 'reason') else "Length evaluated"
+    len_metric_success = length_result.metrics.get("length", {}).get("success", length_result.score > 0.5) if hasattr(length_result, 'metrics') and "length" in length_result.metrics else length_result.score > 0.5
+
 
     # Combine metrics
     metrics = {
-        "accuracy": MetricRewardOutput(
-            score=accuracy_result["score"],
-            reason=accuracy_result["reason"]
+        "accuracy_component": MetricResult( # Updated
+            score=accuracy_result.score,
+            success=acc_metric_success,
+            reason=acc_metric_reason
         ),
-        "length": MetricRewardOutput(
-            score=length_result["score"],
-            reason=length_result["reason"]
+        "length_component": MetricResult( # Updated
+            score=length_result.score,
+            success=len_metric_success,
+            reason=len_metric_reason
         )
     }
+    
+    overall_reason = f"Combined accuracy ({accuracy_result.score:.2f}) and length ({length_result.score:.2f})."
 
-    return RewardOutput(score=combined_score, metrics=metrics)
+    return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics) # Updated
 ```
 
 ## Pre-Built Combined Metrics

@@ -140,9 +140,9 @@ def evaluate_example(messages, ground_truth, **kwargs):
 
     # Print evaluation results
     print(f'Response ({word_count} words): "{response[:50]}..."')
-    print(f"Combined Score: {result['score']:.2f}")
-    print(f"Accuracy Score: {result['metrics']['accuracy']['score']:.2f}")
-    print(f"Length Score: {result['metrics']['length']['score']:.2f}")
+    print(f"Combined Score: {result.score:.2f}")
+    print(f"Accuracy Score: {result.metrics['accuracy'].score:.2f}")
+    print(f"Length Score: {result.metrics['length'].score:.2f}")
 
 
 if __name__ == "__main__":

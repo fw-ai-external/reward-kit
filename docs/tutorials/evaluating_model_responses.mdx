@@ -85,14 +85,17 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     metrics = {
         "word_count": MetricResult(
             score=word_count_score,
+            success=word_count_score > 0.5, # Example success
             reason=f"Word count: {word_count}"
         ),
         "keyword_usage": MetricResult(
             score=keyword_score,
+            success=keyword_score > 0.3, # Example success
             reason=f"Information keywords: {keyword_count}/3"
         ),
         "certainty": MetricResult(
             score=certainty_score,
+            success=certainty_score > 0.7, # Example success
             reason=f"Certainty score: {certainty_score:.2f} (found {uncertainty_count} uncertainty markers)"
         )
     }

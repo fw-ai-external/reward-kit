@@ -653,7 +653,7 @@ def _ioi_cpp_code_reward_impl(
         **kwargs: Additional keyword arguments
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Initialize metrics dictionary
     metrics: Dict[str, MetricResult] = {}  # Explicitly type hint
@@ -918,7 +918,7 @@ def binary_cpp_code_reward(
         **kwargs: Additional keyword arguments
 
     Returns:
-        RewardOutput with binary score (0.0 or 1.0) and metrics
+        EvaluateResult with binary score (0.0 or 1.0) and metrics
     """
     # Create a new event loop
     loop = asyncio.new_event_loop()

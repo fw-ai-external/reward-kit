@@ -42,7 +42,7 @@ def match_function_call(
             - "flexible": Allow extra arguments and type mismatches with penalty
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     metrics = {}
 
@@ -291,7 +291,7 @@ def schema_jaccard_reward(
         **kwargs: Additional keyword arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     metrics = {}
 
@@ -560,7 +560,7 @@ def llm_judge_reward(
         **kwargs: Additional keyword arguments
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Check if OpenAI is available
     if OpenAI is None:
@@ -824,7 +824,7 @@ def composite_function_call_reward(
         **kwargs: Additional keyword arguments
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Default weights
     if weights is None:

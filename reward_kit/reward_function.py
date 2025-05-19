@@ -158,7 +158,7 @@ class RewardFunction:
             **kwargs: Additional keyword arguments to pass to the function
 
         Returns:
-            RewardOutput or EvaluateResult object with score and metrics
+            EvaluateResult object with score and metrics
         """
         if original_messages is None:
             original_messages = messages[:-1] if messages else []

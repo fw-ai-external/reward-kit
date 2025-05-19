@@ -33,9 +33,9 @@ def evaluate(messages: List[Dict[str, Any]], **kwargs: Any) -> Dict[str, Any]:
     # due to its own @reward_function decorator.
     result = combined_reward(messages=messages, **kwargs)  # type: ignore
 
-    # result is an EvaluateResult, which supports dict-like access.
+    # result is an EvaluateResult. Use attribute access.
     return {
-        "score": result["score"],
-        "reason": result["reason"],  # Changed from "reasoning"
-        "metrics": result["metrics"],
+        "score": result.score,
+        "reason": result.reason,
+        "metrics": result.metrics,
     }

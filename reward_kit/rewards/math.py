@@ -572,34 +572,32 @@ def _check_unboxed_or_strictness(
     # AND it's not a single boxed expression that itself contains " or "
     # (which extract_numbers handles as a string value).
     
-    # --- DEMO READINESS MODIFICATION: Temporarily disable this strictness check ---
-    # raw_extracted_numbers = extract_numbers(
-    #     model_response_content
-    # )  # Re-extract for this check
-    # if (
-    #     " or " in model_response_content.lower()
-    #     and sum(
-    #         1
-    #         for _, val_check in raw_extracted_numbers
-    #         if isinstance(val_check, (float, int))
-    #     )
-    #     > 1
-    #     and not (
-    #         len(gen_answers_extracted)
-    #         == 1  # Check against potentially leniency-simplified list
-    #         and isinstance(gen_answers_extracted[0][1], str)
-    #         and " or " in gen_answers_extracted[0][1].lower()
-    #     )
-    # ):
-    #     specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or' in the raw response."
-    #     full_reason = (
-    #         f"Strictness fail (Issue #1 - Unboxed 'or'): {specific_reason_detail}"
-    #     )
-    #     metrics["strictness_penalty_unboxed_or"] = MetricResult(
-    #         score=0.0, success=False, reason=specific_reason_detail
-    #     )
-    #     return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
-    # --- END DEMO READINESS MODIFICATION ---
+    raw_extracted_numbers = extract_numbers(
+        model_response_content
+    )  # Re-extract for this check
+    if (
+        " or " in model_response_content.lower()
+        and sum(
+            1
+            for _, val_check in raw_extracted_numbers
+            if isinstance(val_check, (float, int))
+        )
+        > 1
+        and not (
+            len(gen_answers_extracted)
+            == 1  # Check against potentially leniency-simplified list
+            and isinstance(gen_answers_extracted[0][1], str)
+            and " or " in gen_answers_extracted[0][1].lower()
+        )
+    ):
+        specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or' in the raw response."
+        full_reason = (
+            f"Strictness fail (Issue #1 - Unboxed 'or'): {specific_reason_detail}"
+        )
+        metrics["strictness_penalty_unboxed_or"] = MetricResult(
+            score=0.0, success=False, reason=specific_reason_detail
+        )
+        return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
     return None
 
 

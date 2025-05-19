@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # Import TRL adapter utilities
-from trl_adapter import (
+from examples.trl_integration.trl_adapter import ( # Changed to absolute import from project root
     apply_reward_to_responses,
     create_combined_reward,
     create_grpo_reward,
@@ -30,9 +30,9 @@ from reward_kit.reward_function import RewardFunction, reward_function
 from reward_kit.rewards.length import length_reward
 
 
-# Define a simple test reward function
+# Define a simple example reward function (not a pytest test case)
 @reward_function
-def test_reward(
+def _example_trl_reward_func( # Renamed to avoid pytest collection
     messages: List[Dict[str, Any]],
     original_messages: Optional[List[Dict[str, Any]]] = None,
     **kwargs
@@ -50,8 +50,9 @@ def test_reward(
     score = 1.0 if "good" in text.lower() else 0.0
     reason = "Contains 'good'" if score > 0 else "Does not contain 'good'"
 
-    return EvaluateResult(score=score, reason=reason)
+    return EvaluateResult(score=score, reason=reason, metrics={}) # Added metrics={}
 
+_example_trl_reward_func.__test__ = False # Explicitly tell pytest not to collect this
 
 class TestTRLIntegration(unittest.TestCase):
     """Test cases for TRL integration."""
@@ -88,7 +89,7 @@ class TestTRLIntegration(unittest.TestCase):
         ]
 
         # Create reward functions
-        self.test_rf = RewardFunction(func=test_reward)
+        self.test_rf = RewardFunction(func=_example_trl_reward_func) # Updated to new name
         self.length_rf = RewardFunction(func=length_reward)
         self.format_rf = RewardFunction(func=grpo_format_reward)
 
@@ -96,8 +97,12 @@ class TestTRLIntegration(unittest.TestCase):
         """Test that the basic TRL adapter works correctly."""
         adapter = self.test_rf.get_trl_adapter()
 
+        # Prepare prompts and completions
+        prompts_batch = [hist[:-1] for hist in self.test_messages]
+        completions_batch = [hist[-1]['content'] for hist in self.test_messages]
+
         # Apply to test messages
-        rewards = adapter(self.test_messages)
+        rewards = adapter(prompts=prompts_batch, completions=completions_batch)
 
         # Check results
         self.assertEqual(len(rewards), 2)
@@ -110,8 +115,12 @@ class TestTRLIntegration(unittest.TestCase):
             reward_functions=[self.test_rf, self.length_rf], weights=[0.7, 0.3]
         )
 
+        # Prepare prompts and completions
+        prompts_batch_combined = [hist[:-1] for hist in self.test_messages]
+        completions_batch_combined = [hist[-1]['content'] for hist in self.test_messages]
+
         # Apply to test messages
-        rewards = combined(self.test_messages)
+        rewards = combined(prompts=prompts_batch_combined, completions=completions_batch_combined)
 
         # Check results
         self.assertEqual(len(rewards), 2)
@@ -121,7 +130,9 @@ class TestTRLIntegration(unittest.TestCase):
 
         # Get length scores (use the adapter directly)
         length_adapter = self.length_rf.get_trl_adapter()
-        length_scores = length_adapter(self.test_messages)
+        prompts_batch_len = [hist[:-1] for hist in self.test_messages]
+        completions_batch_len = [hist[-1]['content'] for hist in self.test_messages]
+        length_scores = length_adapter(prompts=prompts_batch_len, completions=completions_batch_len)
 
         # Calculate expected combined scores
         expected = [
@@ -137,8 +148,12 @@ class TestTRLIntegration(unittest.TestCase):
         """Test the GRPO format reward function."""
         format_adapter = self.format_rf.get_trl_adapter()
 
+        # Prepare prompts and completions for GRPO
+        grpo_prompts_batch = [hist[:-1] for hist in self.grpo_messages]
+        grpo_completions_batch = [hist[-1]['content'] for hist in self.grpo_messages]
+
         # Apply to GRPO messages
-        rewards = format_adapter(self.grpo_messages)
+        rewards = format_adapter(prompts=grpo_prompts_batch, completions=grpo_completions_batch)
 
         # Check results
         self.assertEqual(len(rewards), 2)
@@ -150,19 +165,29 @@ class TestTRLIntegration(unittest.TestCase):
         grpo_reward = create_grpo_reward(
             content_reward=self.test_rf, format_weight=0.4, content_weight=0.6
         )
+        
+        # Prepare prompts and completions for GRPO
+        grpo_prompts_batch_creator = [hist[:-1] for hist in self.grpo_messages]
+        grpo_completions_batch_creator = [hist[-1]['content'] for hist in self.grpo_messages]
 
         # Apply to GRPO messages
-        rewards = grpo_reward(self.grpo_messages)
+        rewards = grpo_reward(prompts=grpo_prompts_batch_creator, completions=grpo_completions_batch_creator)
 
         # Check results
         self.assertEqual(len(rewards), 2)
 
         # Calculate expected results
+        grpo_prompts_batch_fmt = [hist[:-1] for hist in self.grpo_messages]
+        grpo_completions_batch_fmt = [hist[-1]['content'] for hist in self.grpo_messages]
+
         format_adapter = self.format_rf.get_trl_adapter()
-        format_scores = format_adapter(self.grpo_messages)
+        format_scores = format_adapter(prompts=grpo_prompts_batch_fmt, completions=grpo_completions_batch_fmt)
+
+        grpo_prompts_batch_test = [hist[:-1] for hist in self.grpo_messages] # Can reuse if identical
+        grpo_completions_batch_test = [hist[-1]['content'] for hist in self.grpo_messages] # Can reuse
 
         test_adapter = self.test_rf.get_trl_adapter()
-        test_scores = test_adapter(self.grpo_messages)
+        test_scores = test_adapter(prompts=grpo_prompts_batch_test, completions=grpo_completions_batch_test)
 
         # Expected combined scores
         expected = [

@@ -233,9 +233,11 @@ def test_integration_multi_metrics(mock_env_variables, mock_requests_post):
         assert len(preview_result.results) == 2
 
         # Check that we get expected metrics in multi-metrics mode
-        assert "quality" in preview_result.results[0]["per_metric_evals"]
-        assert "relevance" in preview_result.results[0]["per_metric_evals"]
-        assert "safety" in preview_result.results[0]["per_metric_evals"]
+        # Access per_metric_evals as an attribute, then check for keys
+        assert hasattr(preview_result.results[0], "per_metric_evals")
+        assert "quality" in preview_result.results[0].per_metric_evals
+        assert "relevance" in preview_result.results[0].per_metric_evals
+        assert "safety" in preview_result.results[0].per_metric_evals
 
         # Create the evaluation
         mock_requests_post.reset_mock()

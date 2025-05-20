@@ -62,10 +62,10 @@ class TestRepetitionReward(unittest.TestCase):
         # Should be high score (low penalty) for non-repetitive text
         # Attribute access
         self.assertGreaterEqual(result.score, 0.9)
-        self.assertTrue(result.metrics["repetition"].success)
+        self.assertTrue(result.metrics["repetition"].is_score_valid)
         # Dictionary access
         self.assertGreaterEqual(result["score"], 0.9)
-        self.assertTrue(result["metrics"]["repetition"]["success"])
+        self.assertTrue(result["metrics"]["repetition"]["is_score_valid"])
 
     def test_high_repetition(self):
         """Test with highly repetitive text."""
@@ -88,10 +88,10 @@ class TestRepetitionReward(unittest.TestCase):
         # Should be lower score (higher penalty) for repetitive text
         # Attribute access
         self.assertLess(result.score, 0.8)
-        self.assertFalse(result.metrics["repetition"].success)
+        self.assertFalse(result.metrics["repetition"].is_score_valid)
         # Dictionary access
         self.assertLess(result["score"], 0.8)
-        self.assertFalse(result["metrics"]["repetition"]["success"])
+        self.assertFalse(result["metrics"]["repetition"]["is_score_valid"])
 
     def test_moderate_repetition(self):
         """Test with moderately repetitive text."""
@@ -198,10 +198,10 @@ class TestRepetitionReward(unittest.TestCase):
         # Empty response should not be penalized
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["repetition"].success)
+        self.assertTrue(result.metrics["repetition"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["repetition"]["success"])
+        self.assertTrue(result["metrics"]["repetition"]["is_score_valid"])
 
     def test_diversity_reward(self):
         """Test the diversity reward function."""
@@ -240,12 +240,12 @@ class TestRepetitionReward(unittest.TestCase):
         # Diverse content should score higher
         # Attribute access
         self.assertGreater(result_diverse.score, result_repetitive.score)
-        self.assertTrue(result_diverse.metrics["diversity"].success)
-        self.assertFalse(result_repetitive.metrics["diversity"].success)
+        self.assertTrue(result_diverse.metrics["diversity"].is_score_valid)
+        self.assertFalse(result_repetitive.metrics["diversity"].is_score_valid)
         # Dictionary access
         self.assertGreater(result_diverse["score"], result_repetitive["score"])
-        self.assertTrue(result_diverse["metrics"]["diversity"]["success"])
-        self.assertFalse(result_repetitive["metrics"]["diversity"]["success"])
+        self.assertTrue(result_diverse["metrics"]["diversity"]["is_score_valid"])
+        self.assertFalse(result_repetitive["metrics"]["diversity"]["is_score_valid"])
 
     def test_diversity_with_custom_weights(self):
         """Test diversity reward with custom n-gram weights."""

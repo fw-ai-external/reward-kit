@@ -46,11 +46,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be high score for explicit steps
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         self.assertIn("explicit_steps", result.metrics)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
         self.assertIn("explicit_steps", result["metrics"])
 
     def test_numbered_list(self):
@@ -80,11 +80,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be high score for numbered lists
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         self.assertIn("numbered_lists", result.metrics)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
         self.assertIn("numbered_lists", result["metrics"])
 
     def test_bullet_points(self):
@@ -115,11 +115,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be high score for bullet points
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         self.assertIn("bullet_points", result.metrics)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
         self.assertIn("bullet_points", result["metrics"])
 
     def test_transition_phrases(self):
@@ -146,11 +146,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be high score for transition phrases
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         self.assertIn("transition_phrases", result.metrics)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
         self.assertIn("transition_phrases", result["metrics"])
 
     def test_custom_pattern(self):
@@ -183,10 +183,10 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be high score with custom pattern
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
 
     def test_insufficient_steps(self):
         """Test with insufficient reasoning steps."""
@@ -205,10 +205,10 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be low score for insufficient steps
         # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertFalse(result.metrics["reasoning_steps"].success)
+        self.assertFalse(result.metrics["reasoning_steps"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
-        self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
+        self.assertFalse(result["metrics"]["reasoning_steps"]["is_score_valid"])
 
     def test_partial_score(self):
         """Test with partial reasoning steps."""
@@ -231,11 +231,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Attribute access
         self.assertGreater(result.score, 0.0)
         self.assertLess(result.score, 1.0)
-        self.assertFalse(result.metrics["reasoning_steps"].success)
+        self.assertFalse(result.metrics["reasoning_steps"].is_score_valid)
         # Dictionary access
         self.assertGreater(result["score"], 0.0)
         self.assertLess(result["score"], 1.0)
-        self.assertFalse(result["metrics"]["reasoning_steps"]["success"])
+        self.assertFalse(result["metrics"]["reasoning_steps"]["is_score_valid"])
 
     def test_max_steps(self):
         """Test with maximum steps parameter."""
@@ -261,10 +261,10 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should be max score even with more than max_steps
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["reasoning_steps"].success)
+        self.assertTrue(result.metrics["reasoning_steps"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["reasoning_steps"]["success"])
+        self.assertTrue(result["metrics"]["reasoning_steps"]["is_score_valid"])
 
     def test_sequence_reward_basic(self):
         """Test sequence reward with default terms."""
@@ -288,10 +288,10 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should detect sequential terms correctly
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["sequence_reasoning"].success)
+        self.assertTrue(result.metrics["sequence_reasoning"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
+        self.assertTrue(result["metrics"]["sequence_reasoning"]["is_score_valid"])
 
     def test_sequence_reward_custom(self):
         """Test sequence reward with custom terms."""
@@ -319,10 +319,10 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Should detect custom sequential terms correctly
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["sequence_reasoning"].success)
+        self.assertTrue(result.metrics["sequence_reasoning"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["sequence_reasoning"]["success"])
+        self.assertTrue(result["metrics"]["sequence_reasoning"]["is_score_valid"])
 
     def test_sequence_reward_partial(self):
         """Test sequence reward with partial matches."""
@@ -345,11 +345,11 @@ class TestReasoningStepsReward(unittest.TestCase):
         # Attribute access
         self.assertGreater(result.score, 0.0)
         self.assertLess(result.score, 1.0)
-        self.assertFalse(result.metrics["sequence_reasoning"].success)
+        self.assertFalse(result.metrics["sequence_reasoning"].is_score_valid)
         # Dictionary access
         self.assertGreater(result["score"], 0.0)
         self.assertLess(result["score"], 1.0)
-        self.assertFalse(result["metrics"]["sequence_reasoning"]["success"])
+        self.assertFalse(result["metrics"]["sequence_reasoning"]["is_score_valid"])
 
 
 if __name__ == "__main__":

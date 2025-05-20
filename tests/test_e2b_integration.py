@@ -71,7 +71,7 @@ This function takes two numbers as input and returns their sum.""",
     # Otherwise, it should be a successful result
     assert result.score == 1.0
     assert "execution_result" in result.metrics
-    assert result.metrics["execution_result"].success is True
+    assert result.metrics["execution_result"].is_score_valid is True
 
 
 if __name__ == "__main__":

@@ -46,10 +46,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["answer_accuracy"].success)
+        self.assertTrue(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
+        self.assertTrue(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_numeric_approximation(self):
         """Test approximate numeric matches."""
@@ -88,10 +88,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["answer_accuracy"].success)
+        self.assertTrue(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
+        self.assertTrue(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_from_context_ground_truth(self):
         """Test extracting ground truth from context."""
@@ -121,10 +121,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["answer_accuracy"].success)
+        self.assertTrue(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
+        self.assertTrue(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_incorrect_answer(self):
         """Test behavior with incorrect answers."""
@@ -148,10 +148,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertLess(result.score, 0.9)
-        self.assertFalse(result.metrics["answer_accuracy"].success)
+        self.assertFalse(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertLess(result["score"], 0.9)
-        self.assertFalse(result["metrics"]["answer_accuracy"]["success"])
+        self.assertFalse(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_custom_extract_function(self):
         """Test with custom extraction function."""
@@ -188,10 +188,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["answer_accuracy"].success)
+        self.assertTrue(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
+        self.assertTrue(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_non_numeric_answer(self):
         """Test non-numeric answer comparison."""
@@ -211,10 +211,10 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["answer_accuracy"].success)
+        self.assertTrue(result.metrics["answer_accuracy"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["answer_accuracy"]["success"])
+        self.assertTrue(result["metrics"]["answer_accuracy"]["is_score_valid"])
 
     def test_latex_expression(self):
         """Test extraction and comparison of LaTeX expressions."""
@@ -249,13 +249,13 @@ class TestAccuracyReward(unittest.TestCase):
         # Attribute access
         # Either 4 or -1 should be found and matched
         self.assertTrue(
-            result1.metrics["answer_accuracy"].success
-            or result2.metrics["answer_accuracy"].success
+            result1.metrics["answer_accuracy"].is_score_valid
+            or result2.metrics["answer_accuracy"].is_score_valid
         )
         # Dictionary access
         self.assertTrue(
-            result1["metrics"]["answer_accuracy"]["success"]
-            or result2["metrics"]["answer_accuracy"]["success"]
+            result1["metrics"]["answer_accuracy"]["is_score_valid"]
+            or result2["metrics"]["answer_accuracy"]["is_score_valid"]
         )
 
     def test_no_ground_truth(self):
@@ -272,14 +272,14 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result_none_gt, EvaluateResult)
         self.assertEqual(result_none_gt.score, 0.0)
         self.assertIn("Ground truth not provided", result_none_gt.reason)
-        self.assertFalse(result_none_gt.metrics["accuracy"].success)
+        self.assertFalse(result_none_gt.metrics["accuracy"].is_score_valid)
 
         # Test case 2: ground_truth is an empty list
         result_empty_list_gt = accuracy_reward(messages=messages_valid, ground_truth=[])
         self.assertIsInstance(result_empty_list_gt, EvaluateResult)
         self.assertEqual(result_empty_list_gt.score, 0.0)
         self.assertIn("Ground truth not provided", result_empty_list_gt.reason)
-        self.assertFalse(result_empty_list_gt.metrics["accuracy"].success)
+        self.assertFalse(result_empty_list_gt.metrics["accuracy"].is_score_valid)
 
         # Test case 3: ground_truth is a list with a message that has no content
         result_no_content_gt = accuracy_reward(
@@ -291,7 +291,7 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIn(
             "has no content", result_no_content_gt.reason
         )  # Or similar message from function
-        self.assertFalse(result_no_content_gt.metrics["accuracy"].success)
+        self.assertFalse(result_no_content_gt.metrics["accuracy"].is_score_valid)
 
         # Test case 4: ground_truth is a list with a message that has None content
         result_none_content_gt = accuracy_reward(
@@ -301,7 +301,7 @@ class TestAccuracyReward(unittest.TestCase):
         self.assertIsInstance(result_none_content_gt, EvaluateResult)
         self.assertEqual(result_none_content_gt.score, 0.0)
         self.assertIn("has no content", result_none_content_gt.reason)
-        self.assertFalse(result_none_content_gt.metrics["accuracy"].success)
+        self.assertFalse(result_none_content_gt.metrics["accuracy"].is_score_valid)
 
     def test_no_answer_extraction(self):
         """Test behavior when no answer can be extracted."""
@@ -322,10 +322,10 @@ class TestAccuracyReward(unittest.TestCase):
         # Answer extraction should fail
         # Attribute access
         self.assertEqual(result.metrics["answer_extraction"].score, 0.0)
-        self.assertFalse(result.metrics["answer_extraction"].success)
+        self.assertFalse(result.metrics["answer_extraction"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["metrics"]["answer_extraction"]["score"], 0.0)
-        self.assertFalse(result["metrics"]["answer_extraction"]["success"])
+        self.assertFalse(result["metrics"]["answer_extraction"]["is_score_valid"])
 
     def test_normalize_text(self):
         """Test text normalization function."""

@@ -41,7 +41,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent English
         self.assertGreaterEqual(result.score, 0.9)
-        self.assertTrue(result.metrics["language_consistency"].success)
+        self.assertTrue(result.metrics["language_consistency"].is_score_valid)
         # self.assertGreaterEqual(result['score'], 0.9) # Use attribute access
         # self.assertTrue(result['metrics']["language_consistency"]['success']) # Use attribute access
 
@@ -67,7 +67,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent Spanish
         self.assertGreaterEqual(result.score, 0.9)
-        self.assertTrue(result.metrics["language_consistency"].success)
+        self.assertTrue(result.metrics["language_consistency"].is_score_valid)
         # self.assertGreaterEqual(result['score'], 0.9) # Use attribute access
         # self.assertTrue(result['metrics']["language_consistency"]['success']) # Use attribute access
 
@@ -154,7 +154,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Should be high score for consistent Chinese
         self.assertGreaterEqual(result.score, 0.9)
-        self.assertTrue(result.metrics["language_consistency"].success)
+        self.assertTrue(result.metrics["language_consistency"].is_score_valid)
         # self.assertGreaterEqual(result['score'], 0.9) # Use attribute access
         # self.assertTrue(result['metrics']["language_consistency"]['success']) # Use attribute access
 
@@ -171,7 +171,7 @@ class TestLanguageConsistencyReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Should give zero score for no content
         self.assertEqual(result.score, 0.0)
-        self.assertFalse(result.metrics["language_consistency"].success)
+        self.assertFalse(result.metrics["language_consistency"].is_score_valid)
         # self.assertEqual(result['score'], 0.0) # Use attribute access
         # self.assertFalse(result['metrics']["language_consistency"]['success']) # Use attribute access
 

@@ -95,6 +95,7 @@ graph TD
 *   [Coding Example](./readiness/coding_example.md)
 *   [Function Calling Example](./readiness/function_calling_example.md)
 *   [Composite Example (Math + Coding)](./readiness/composite_math_coding_example.md)
+*   [Remote Evaluation with Secrets and Ngrok](./readiness/remote_evaluation_setup_plan.md)
 
 ---
 

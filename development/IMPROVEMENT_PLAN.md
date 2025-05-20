@@ -67,10 +67,7 @@ Focus: Make the README more user-centric (using the library) and streamlined.
         *   Add a prominent link to `development/CONTRIBUTING.md` for comprehensive development and contribution guidelines. Example: "For details on setting up a development environment, running tests, type checking, and contributing to Reward Kit, please see our [Contributing Guidelines](development/CONTRIBUTING.md)."
     *   **Rationale:** Keeps README focused on library usage, directing contributors to the dedicated guide.
 
-6.  **Review `RewardOutput` and `MetricRewardOutput` Usage (Covered by Approved Item 1):**
-    *   **Action:** This item is now covered by the approved "Unify Reward Result Objects" task. Once completed, this specific point can be considered resolved.
-
-7.  **CLI Examples Clarity:**
+6.  **CLI Examples Clarity:**
     *   **Issue:** The structure of `--metrics-folders "word_count=./path/to/metrics"` could be briefly explained.
     *   **Proposal:** Add a short note after the first CLI example using it: e.g., "Here, `word_count` is a name you assign to your metric(s) defined in the specified folder."
     *   **Rationale:** Reduces ambiguity for a key CLI argument.
@@ -118,15 +115,18 @@ Focus: Improve clarity, reduce redundancy, and ensure examples align with best p
             ```
     *   **Rationale:** Aligns examples with tooling and promotes better testing practices.
 
-11. **Refine "Running Tests" Comment:**
-    *   **Issue:** The comment "We only care about tests/ folder for now since there are a lot of other repos" is informal.
-    *   **Proposal:** Remove this comment or rephrase if necessary (e.g., "All unit and integration tests are located within the `tests/` directory.").
-    *   **Rationale:** Maintains a professional tone in documentation.
-
-12. **Clarify `FIREWORKS_ACCOUNT_ID`:**
-    *   **Issue:** The comment `# For specific operations` for `FIREWORKS_ACCOUNT_ID` is vague.
-    *   **Proposal:** If possible, provide a brief example or context for when this variable is needed (e.g., "Required for operations like deploying evaluators under a specific account namespace."). If it's rarely needed by typical contributors, this can be noted.
-    *   **Rationale:** Helps contributors understand the purpose of all environment variables.
+12. **Clarify `FIREWORKS_ACCOUNT_ID` & Centralize Auth:**
+    *   **Issue:** The comment `# For specific operations` for `FIREWORKS_ACCOUNT_ID` is vague, and its configuration is limited to environment variables. Authentication logic (e.g., for `FIREWORKS_API_KEY` and `FIREWORKS_ACCOUNT_ID`) is currently embedded within `reward_kit/evaluation.py`.
+    *   **Proposal:**
+        *   Centralize all Fireworks AI authentication logic into a new dedicated module (e.g., `reward_kit/auth.py`).
+        *   This new module should support reading credentials (like `FIREWORKS_API_KEY` and `FIREWORKS_ACCOUNT_ID`) with the following priority:
+            1.  Environment variables.
+            2.  An `auth.ini` configuration file (e.g., located at `~/.config/reward_kit/auth.ini` or a project-local `./.reward_kit_auth.ini`).
+        *   Thoroughly investigate and clearly document the specific operations and scenarios that require `FIREWORKS_ACCOUNT_ID`.
+        *   Refactor `reward_kit/evaluation.py` and any other relevant parts of the codebase to utilize the new centralized authentication module.
+        *   Update `README.md` and `development/CONTRIBUTING.md` with comprehensive instructions on authentication setup, detailing the purpose of each variable/setting, configuration methods (env vars, `auth.ini`), and the credential source priority.
+    *   **Rationale:** This approach will significantly improve clarity for both users and contributors regarding authentication. It offers more flexible configuration options, centralizes sensitive credential handling for better maintainability, and ensures the purpose of each configuration item is well-understood.
+    *   **Detailed Plan & Progress:** [./improvements/03_improve_authentication_configuration.md](./improvements/03_improve_authentication_configuration.md)
 
 13. **Consistency in `black` Commands:**
     *   **Issue:** "Coding Style and Standards" mentions `black reward_kit`. "Contributing Process" step 6 mentions `black reward_kit tests`.

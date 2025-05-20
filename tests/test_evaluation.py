@@ -172,8 +172,14 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     assert new_code == unchanged_code
 
 
-def test_evaluator_preview():
+def test_evaluator_preview(monkeypatch):
     """Test preview functionality"""
+    # Mock authentication and API endpoint for preview
+    monkeypatch.setenv("FIREWORKS_API_KEY", "test_preview_api_key")
+    monkeypatch.setenv("FIREWORKS_ACCOUNT_ID", "test_preview_account")
+    # Using a mock API base to prevent real calls and simulate fallback
+    monkeypatch.setenv("FIREWORKS_API_BASE", "http://localhost:12345/mock_api")
+
     tmp_dir = create_test_folder()
     sample_file = create_sample_file()
 
@@ -191,8 +197,12 @@ def test_evaluator_preview():
         # Assuming preview_result.results[0] is an object, use attribute access
         assert preview_result.results[0].index == 0
         assert preview_result.results[0].success is True
-        assert hasattr(preview_result.results[0], "score") # Check if 'score' attribute exists
-        assert hasattr(preview_result.results[0], "per_metric_evals") # Check for per_metric_evals
+        assert hasattr(
+            preview_result.results[0], "score"
+        )  # Check if 'score' attribute exists
+        assert hasattr(
+            preview_result.results[0], "per_metric_evals"
+        )  # Check for per_metric_evals
     finally:
         # Clean up
         os.unlink(os.path.join(tmp_dir, "main.py"))
@@ -200,8 +210,14 @@ def test_evaluator_preview():
         os.unlink(sample_file)
 
 
-def test_preview_evaluation_helper():
+def test_preview_evaluation_helper(monkeypatch):
     """Test the preview_evaluation helper function"""
+    # Mock authentication and API endpoint for preview
+    monkeypatch.setenv("FIREWORKS_API_KEY", "test_helper_api_key")
+    monkeypatch.setenv("FIREWORKS_ACCOUNT_ID", "test_helper_account")
+    # Using a mock API base to prevent real calls and simulate fallback
+    monkeypatch.setenv("FIREWORKS_API_BASE", "http://localhost:12345/mock_api_helper")
+
     tmp_dir = create_test_folder()
     sample_file = create_sample_file()
 

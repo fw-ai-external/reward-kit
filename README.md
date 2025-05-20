@@ -23,12 +23,43 @@ The Reward Kit simplifies the creation and deployment of reward functions for ev
 
 ### 1. Authentication Setup
 
-To use Reward Kit with the Fireworks AI platform, set up your authentication credentials:
+To interact with the Fireworks AI platform for deploying and managing evaluations, Reward Kit needs your Fireworks AI credentials. You can configure these in two ways:
+
+**A. Environment Variables (Highest Priority)**
+
+Set the following environment variables:
+
+*   `FIREWORKS_API_KEY`: Your Fireworks AI API key. This is required for all interactions with the Fireworks API.
+*   `FIREWORKS_ACCOUNT_ID`: Your Fireworks AI Account ID. This is often required for operations like creating or listing evaluators under your account.
 
 ```bash
-# Set your API key
-export FIREWORKS_API_KEY=your_api_key
+export FIREWORKS_API_KEY="your_fireworks_api_key"
+export FIREWORKS_ACCOUNT_ID="your_fireworks_account_id"
 ```
+
+**B. Configuration File (Lower Priority)**
+
+Alternatively, you can store your credentials in a configuration file located at `~/.fireworks/auth.ini`. If environment variables are not set, Reward Kit will look for this file.
+
+Create the file with the following format:
+
+```ini
+[fireworks]
+api_key = YOUR_FIREWORKS_API_KEY
+account_id = YOUR_FIREWORKS_ACCOUNT_ID
+```
+
+Replace `YOUR_FIREWORKS_API_KEY` and `YOUR_FIREWORKS_ACCOUNT_ID` with your actual credentials.
+
+**Credential Sourcing Order:**
+
+Reward Kit will prioritize credentials in the following order:
+1.  Environment Variables (`FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`)
+2.  `~/.fireworks/auth.ini` configuration file
+
+Ensure that the `auth.ini` file has appropriate permissions to protect your sensitive credentials.
+
+The `FIREWORKS_API_KEY` is essential for authenticating your requests to the Fireworks AI service. The `FIREWORKS_ACCOUNT_ID` is used to identify your specific account context for operations that are account-specific, such as managing your evaluators. While the API key authenticates *who* you are, the account ID often specifies *where* (under which account) an operation should take place. Some Fireworks API endpoints may require both.
 
 ### 2. Creating a Simple Reward Function
 

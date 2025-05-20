@@ -51,19 +51,53 @@ pip install -e .            # Basic installation
 pip install -e ".[dev]"     # With development dependencies
 ```
 
-### Required Environment Variables
+### Authentication Setup for Development
 
-For development and testing, configure these environment variables:
+For development and testing interactions with the Fireworks AI platform, you need to configure your Fireworks AI credentials. Reward Kit supports two methods:
 
+**A. Environment Variables (Highest Priority)**
+
+Set the following environment variables. For development, you might use specific development keys or a dedicated development account:
+
+*   `FIREWORKS_API_KEY`: Your Fireworks AI API key.
+    *   For development, you might use a specific dev key: `export FIREWORKS_API_KEY="your_dev_fireworks_api_key"`
+*   `FIREWORKS_ACCOUNT_ID`: Your Fireworks AI Account ID. This is used to scope operations to your account.
+    *   For development against a shared dev environment, this might be a common ID like `pyroworks-dev`: `export FIREWORKS_ACCOUNT_ID="pyroworks-dev"`
+*   `FIREWORKS_API_BASE`: (Optional) If you need to target a non-production Fireworks API endpoint.
+    *   For development: `export FIREWORKS_API_BASE="https://dev.api.fireworks.ai"`
+
+Example for a typical development setup:
 ```bash
-# Development environment
-export FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY
-export FIREWORKS_API_BASE=https://dev.api.fireworks.ai
-export FIREWORKS_ACCOUNT_ID=pyroworks-dev  # For specific operations
-
-# For E2B code execution (optional)
-export E2B_API_KEY=your_e2b_api_key
+export FIREWORKS_API_KEY="your_development_api_key"
+export FIREWORKS_ACCOUNT_ID="pyroworks-dev" # Or your specific dev account ID
+export FIREWORKS_API_BASE="https://dev.api.fireworks.ai" # If targeting dev API
 ```
+
+**B. Configuration File (Lower Priority)**
+
+If environment variables are not set, Reward Kit will attempt to read credentials from `~/.fireworks/auth.ini`.
+
+Create or ensure the file `~/.fireworks/auth.ini` exists with the following format:
+```ini
+[fireworks]
+api_key = YOUR_FIREWORKS_API_KEY
+account_id = YOUR_FIREWORKS_ACCOUNT_ID
+```
+Replace with your actual development credentials if using this method.
+
+**Credential Sourcing Order:**
+Reward Kit prioritizes credentials as follows:
+1.  Environment Variables (`FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`)
+2.  `~/.fireworks/auth.ini` configuration file
+
+**Purpose of Credentials:**
+*   `FIREWORKS_API_KEY`: Authenticates your requests to the Fireworks AI service.
+*   `FIREWORKS_ACCOUNT_ID`: Identifies your account for operations like managing evaluators. It specifies *where* (under which account) an operation should occur.
+*   `FIREWORKS_API_BASE`: Allows targeting different API environments (e.g., development, staging).
+
+**Other Environment Variables:**
+*   `E2B_API_KEY`: (Optional) If you are working on or testing features involving E2B code execution:
+    `export E2B_API_KEY="your_e2b_api_key"`
 
 ## Code Structure
 
@@ -246,7 +280,7 @@ pytest tests/test_file.py::test_function
 pytest --cov=reward_kit
 ```
 
-We only care about tests/ folder for now since there are a lot of other repos
+We can focus on tests/ and examples/ folder for now since there are a lot of other repos
 
 ### Writing Tests
 
@@ -346,17 +380,30 @@ reward-kit deploy --id my-test-evaluator \
 
 If you encounter authentication issues:
 
-1. Check environment variables are correctly set
-2. Verify API key has necessary permissions
-3. Ensure account ID matches the API environment
+1.  **Check Credential Sources**:
+    *   Verify that `FIREWORKS_API_KEY` and `FIREWORKS_ACCOUNT_ID` are correctly set as environment variables.
+    *   If not using environment variables, ensure `~/.fireworks/auth.ini` exists, is correctly formatted, and contains the right `api_key` and `account_id` under the `[fireworks]` section.
+    *   Remember the priority: environment variables override the `auth.ini` file.
+2.  **Verify API Key Permissions**: Ensure the API key has the necessary permissions for the operations you are attempting.
+3.  **Check Account ID**: Confirm that the `FIREWORKS_ACCOUNT_ID` is correct for the environment you are targeting (e.g., `pyroworks-dev` for the dev API, or your personal account ID).
+4.  **API Base URL**: If using `FIREWORKS_API_BASE`, ensure it points to the correct API endpoint (e.g., `https://dev.api.fireworks.ai` for development).
 
-Verify credentials:
-
+You can use the following snippet to check what credentials the Reward Kit is resolving:
 ```python
-from reward_kit.auth import get_authentication
-account_id, auth_token = get_authentication()
-print(f"Using account: {account_id}")
-print(f"Token (first 10 chars): {auth_token[:10]}...")
+from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+
+api_key = get_fireworks_api_key()
+account_id = get_fireworks_account_id()
+
+if api_key:
+    print(f"Retrieved API Key (first 4, last 4 chars): {api_key[:4]}...{api_key[-4:]}")
+else:
+    print("API Key not found.")
+
+if account_id:
+    print(f"Retrieved Account ID: {account_id}")
+else:
+    print("Account ID not found.")
 ```
 
 ### API Debugging

@@ -80,12 +80,7 @@ The example script is therefore broken and needs to be updated to use the V2 age
 
 # Low pri issues
 
-## ✅ Delete all legacy_reward_function
-Removed legacy_reward_function from reward_function.py and __init__.py since it's no longer needed.
 
-## Fix the E2B unittest
-```
-tests/test_deepcoder_reward.py ....s.s...                                                                  [ 55%]
-tests/test_fractional_code.py .....s..                                                                     [100%]
-```
-some of the tests are skipped due to E2B not working for me earlier
+## Comment in examples/deploy_example.py is outdated
+
+the rl command doesn't work yet.

@@ -46,12 +46,9 @@ def main():
         and not evaluation_module.used_preview_api
     ):
         print("Note: The preview used fallback mode due to server issues.")
-        proceed = input(
-            "The server might be having connectivity issues. Do you want to try creating the evaluator anyway? (y/n): "
-        )
-        if proceed.lower() != "y":
-            print("Skipping evaluator creation.")
-            sys.exit(0)
+        # Default to not creating the evaluator in non-interactive mode if fallback was used.
+        print("Skipping evaluator creation as fallback mode was used and this is a non-interactive run.")
+        sys.exit(0) # Exit gracefully
 
     print("\nCreating evaluation...")
     try:

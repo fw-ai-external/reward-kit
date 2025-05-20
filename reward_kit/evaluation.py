@@ -171,12 +171,16 @@ class EvaluatorPreviewResult:
         print("Individual Results:")
         print("------------------")
 
-        for i, result in enumerate(self.results):
-            print(f"Sample {result['index'] + 1}:")
-            print(f"  Success: {result['success']}")
-            print(f"  Score: {result['score']}")
-            for metric, value in result["per_metric_evals"].items():
-                print(f"  {metric}: {value}")
+        for i, result_obj in enumerate(self.results): # Renamed result to result_obj for clarity
+            print(f"Sample {result_obj.index + 1}:") # Use attribute access
+            print(f"  Success: {result_obj.success}") # Use attribute access
+            print(f"  Score: {result_obj.score}") # Use attribute access
+            # per_metric_evals is likely a dict stored in the SimpleNamespace
+            if hasattr(result_obj, 'per_metric_evals') and isinstance(result_obj.per_metric_evals, dict):
+                for metric, value in result_obj.per_metric_evals.items():
+                    print(f"  {metric}: {value}")
+            elif hasattr(result_obj, 'per_metric_evals'): # If it's not a dict but exists
+                print(f"  Per-Metric Evals: {result_obj.per_metric_evals}")
             if i < len(self.results) - 1:
                 print()
 

@@ -15,16 +15,17 @@ from reward_kit.rewards.lean_prover import (
     deepseek_prover_v2_reward,
     lean_prover_reward,
 )
+from reward_kit.models import Message
 
 
 def main():
     # Example statement and response
-    statement = (
+    statement_text = (
         "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
     )
 
     # Example of a partial proof with "sorry"
-    partial_response = """
+    partial_response_text = """
     theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
     begin
       induction n with d hd,
@@ -34,7 +35,7 @@ def main():
     """
 
     # Example of a more complete proof with subgoal decomposition
-    complete_response = """
+    complete_response_text = """
     theorem sum_naturals (n : ℕ) : ∑ i in range n, i = n * (n + 1) / 2 :=
     begin
       -- We'll prove this by induction on n
@@ -70,26 +71,38 @@ def main():
     end
     """
 
+    # Construct messages for evaluation
+    messages_partial = [
+        Message(role="user", content=statement_text),
+        Message(role="assistant", content=partial_response_text),
+    ]
+    messages_complete = [
+        Message(role="user", content=statement_text),
+        Message(role="assistant", content=complete_response_text),
+    ]
+
     # Basic evaluation with lean_prover_reward
     basic_partial_result = lean_prover_reward(
-        response=partial_response, statement=statement, verbose=True
+        messages=messages_partial, ground_truth=None, statement=statement_text, verbose=True
     )
 
     basic_complete_result = lean_prover_reward(
-        response=complete_response, statement=statement, verbose=True
+        messages=messages_complete, ground_truth=None, statement=statement_text, verbose=True
     )
 
     # Advanced evaluation with deepseek_prover_v2_reward
     advanced_partial_result = deepseek_prover_v2_reward(
-        response=partial_response,
-        statement=statement,
+        messages=messages_partial,
+        ground_truth=None,
+        statement=statement_text,
         check_subgoals=True,
         verbose=True,
     )
 
     advanced_complete_result = deepseek_prover_v2_reward(
-        response=complete_response,
-        statement=statement,
+        messages=messages_complete,
+        ground_truth=None,
+        statement=statement_text,
         check_subgoals=True,
         verbose=True,
     )
@@ -132,16 +145,19 @@ def main():
         from datasets import load_dataset
 
         # 1. First approach: Create a mock dataset item
-        mock_dataset_item = {
-            "id": "sum_naturals",
-            "statement": statement,
-            "expected_proof": None,  # No exact match expected
+        # For deepseek_huggingface_prover_benchmark, ground_truth is a dict
+        ground_truth_mock = {
+            "statement": statement_text,
+            "dataset_item": {
+                "id": "sum_naturals",
+                "statement": statement_text, # statement within dataset_item
+                "expected_proof": None,  # No exact match expected
+            }
         }
-
+        # The 'response' is taken from messages[-1].content
         benchmark_result = deepseek_huggingface_prover_benchmark(
-            response=complete_response,
-            statement=statement,
-            dataset_item=mock_dataset_item,
+            messages=messages_complete, # messages_complete already has complete_response_text
+            ground_truth=ground_truth_mock,
             verbose=True,
         )
 
@@ -157,18 +173,29 @@ def main():
 
                 # Get a sample statement from the dataset
                 sample_idx = 0
-                sample_statement = dataset[sample_idx].get("statement", "")
+                sample_statement_hf = dataset[sample_idx].get("statement", "")
 
-                if sample_statement:
-                    print(f"\nSample statement: {sample_statement[:100]}...")
+                if sample_statement_hf:
+                    print(f"\nSample statement: {sample_statement_hf[:100]}...")
 
                     # For demonstration, we'll use our existing proof
                     # In a real scenario, you would generate a proof for this specific statement
                     print("\nEvaluating with automatic dataset matching...")
+                    
+                    # Construct messages for the HuggingFace sample
+                    messages_hf_sample = [
+                        Message(role="user", content=sample_statement_hf), # User provides the statement
+                        Message(role="assistant", content=complete_response_text) # Assistant provides our existing proof
+                    ]
+                    # Ground truth for this specific HF sample
+                    ground_truth_hf_sample = {
+                        "statement": sample_statement_hf,
+                        # dataset_item can be omitted if dataset_name is provided for lookup
+                    }
 
                     hf_result = deepseek_huggingface_prover_benchmark(
-                        response=complete_response,  # Using our existing proof as example
-                        statement=sample_statement,  # Using statement from HF dataset
+                        messages=messages_hf_sample,
+                        ground_truth=ground_truth_hf_sample,
                         dataset_name="deepseek-ai/DeepSeek-ProverBench",  # Will search in this dataset
                         verbose=True,
                     )

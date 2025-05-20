@@ -201,5 +201,7 @@ class TestExamplesIntegration:
         deploy_module = load_module_from_path("deploy_example", deploy_path)
 
         # Verify the deploy module loaded correctly
-        assert hasattr(deploy_module, "informativeness_reward")
+        # informativeness_reward was moved and renamed.
+        # deploy_example.py now imports 'evaluate as informativeness_evaluate_function'
+        assert hasattr(deploy_module, "informativeness_evaluate_function")
         assert hasattr(deploy_module, "deploy_to_fireworks")

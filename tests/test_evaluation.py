@@ -188,10 +188,11 @@ def test_evaluator_preview():
         assert len(preview_result.results) == 2
 
         # Check first result
-        assert preview_result.results[0]["index"] == 0
-        assert preview_result.results[0]["success"] is True
-        assert "score" in preview_result.results[0]
-        assert "per_metric_evals" in preview_result.results[0]
+        # Assuming preview_result.results[0] is an object, use attribute access
+        assert preview_result.results[0].index == 0
+        assert preview_result.results[0].success is True
+        assert hasattr(preview_result.results[0], "score") # Check if 'score' attribute exists
+        assert hasattr(preview_result.results[0], "per_metric_evals") # Check for per_metric_evals
     finally:
         # Clean up
         os.unlink(os.path.join(tmp_dir, "main.py"))

@@ -245,8 +245,10 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
         # Verify results
         assert result.total_samples == 2
         assert len(result.results) == 2
-        assert result.results[0]["score"] == 0.26
-        assert "word_count" in result.results[0]["per_metric_evals"]
+        # Assuming result.results[0] is an object, use attribute access
+        assert result.results[0].score == 0.26
+        assert hasattr(result.results[0], "per_metric_evals")
+        assert "word_count" in result.results[0].per_metric_evals
 
 
 def test_create_evaluation(mock_env_variables, mock_create_api, monkeypatch):

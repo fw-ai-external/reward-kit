@@ -184,3 +184,10 @@ atropos
 gorilla
 tau-bench
 .venv-py310
+
+# Example-specific output directories
+examples/math_example/math_grpo_trainer_output*/
+examples/*/*_output/
+examples/*/*output/
+examples/math_example_openr1/math_grpo_trainer_output_openr1_qwen/checkpoint-1/
+examples/math_example/math_grpo_trainer_output_qwen

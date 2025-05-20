@@ -11,7 +11,7 @@ This API reference provides detailed documentation for the key classes, function
 
 ### Data Models
 
-- [Data Models](data_models.md): Documentation for Message, RewardOutput, MetricRewardOutput, and other data models
+- [Data Models](data_models.md): Documentation for Message, EvaluateResult, MetricResult, and other data models
 
 ## Modules
 
@@ -41,7 +41,7 @@ Key functions:
 The `models` module contains data models used throughout the Reward Kit.
 
 ```python
-from reward_kit.models import RewardOutput, MetricRewardOutput, Message
+from reward_kit.models import EvaluateResult, MetricResult, Message
 ```
 
 ### rewards Module
@@ -90,20 +90,25 @@ For detailed CLI documentation, see the [CLI Reference](../cli_reference/cli_ove
 ### Creating a Basic Reward Function
 
 ```python
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult
 
 @reward_function
 def my_reward_function(messages, original_messages=None, **kwargs):
     # Your evaluation logic here
     response = messages[-1].get("content", "")
-    score = calculate_score(response)
+    # Assume calculate_score returns a float between 0.0 and 1.0
+    # and calculate_success returns a boolean
+    score = calculate_score(response) 
+    success = calculate_success(response) # Assume calculate_success is defined
 
-    return RewardOutput(
+    return EvaluateResult(
         score=score,
+        reason="Overall evaluation reason for my_reward_function", # Added top-level reason
         metrics={
-            "my_metric": MetricRewardOutput(
-                score=score,
-                reason="Explanation for the score"
+            "my_metric": MetricResult(
+                score=score, 
+                success=success, # Added success field
+                reason="Explanation for the metric score"
             )
         }
     )

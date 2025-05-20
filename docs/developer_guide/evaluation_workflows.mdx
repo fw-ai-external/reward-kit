@@ -18,7 +18,7 @@ The typical workflow for developing and deploying reward functions involves:
 Start by creating a reward function with the `@reward_function` decorator:
 
 ```python
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated import
 from typing import List, Dict, Optional
 
 @reward_function
@@ -26,25 +26,28 @@ def helpfulness_reward(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult: # Updated return type
     """Evaluate the helpfulness of a response."""
     # Get the assistant's response
-    response = messages[-1].get("content", "").lower()
+    response_content = messages[-1].get("content", "").lower()
 
     # Define helpful keywords
     helpful_keywords = ["help", "assist", "solve", "solution", "answer", "explain"]
 
     # Count helpful keywords
-    keyword_count = sum(1 for keyword in helpful_keywords if keyword in response)
+    keyword_count = sum(1 for keyword in helpful_keywords if keyword in response_content)
 
     # Calculate score based on keyword presence (simple example)
-    score = min(keyword_count / 3, 1.0)  # Cap at 1.0
+    score = min(keyword_count / 3.0, 1.0)  # Cap at 1.0
+    success = keyword_count > 0 # Example success condition
 
-    return RewardOutput(
+    return EvaluateResult( # Updated to EvaluateResult
         score=score,
+        reason=f"Helpfulness evaluation based on {keyword_count} keywords.", # Added top-level reason
         metrics={
-            "helpfulness": MetricRewardOutput(
+            "helpfulness": MetricResult( # Updated to MetricResult
                 score=score,
+                success=success, # Added success field
                 reason=f"Found {keyword_count} helpful keywords"
             )
         }
@@ -79,8 +82,8 @@ For more comprehensive testing, create a separate test script:
 ```python
 # test_helpfulness.py
 import json
-from reward_kit import RewardOutput
-from my_rewards import helpfulness_reward
+# from reward_kit import RewardOutput # RewardOutput no longer directly used here
+from my_rewards import helpfulness_reward # Assuming helpfulness_reward is in my_rewards.py
 
 def load_test_cases(file_path):
     """Load test cases from a JSONL file."""

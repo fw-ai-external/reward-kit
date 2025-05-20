@@ -99,49 +99,11 @@ The `MetricResult` class represents a single component metric in the evaluation,
 - A reason/explanation for the score
 - An is_score_valid flag indicating if this metric evaluation is valid for RL training
 
-### Deprecated Output Types
+### Removed Output Types (Legacy)
 
-The `RewardOutput` and `MetricRewardOutput` classes are deprecated and will be removed in a future version:
+The `RewardOutput` and `MetricRewardOutput` classes were used in older versions but have now been fully removed. All reward functions should now use `EvaluateResult` and `MetricResult`.
 
-```python
-# Deprecated - use EvaluateResult instead
-from reward_kit import RewardOutput, MetricRewardOutput
-
-# This will show a deprecation warning
-result = RewardOutput(
-    score=0.75,
-    metrics={
-        "clarity": MetricRewardOutput(
-            score=0.8,
-            reason="The response is clear and concise"
-        )
-    }
-)
-
-# Convert to the preferred EvaluateResult format
-evaluate_result = result.to_evaluate_result()
-```
-
-## Type Conversion
-
-The Reward Kit provides built-in methods for converting between types:
-
-```python
-# Convert EvaluateResult to RewardOutput (for backwards compatibility)
-evaluate_result = EvaluateResult(
-    score=0.8,
-    metrics={"quality": MetricResult(score=0.8, reason="Good quality", is_score_valid=True)},
-    is_score_valid=True
-)
-reward_output = evaluate_result.to_reward_output()
-
-# Convert RewardOutput to EvaluateResult
-reward_output = RewardOutput(
-    score=0.9,
-    metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")}
-)
-evaluate_result = reward_output.to_evaluate_result()
-```
+If you are migrating from an older version that used `RewardOutput`, please refer to the "Migration from RewardOutput to EvaluateResult" section below.
 
 ## Using Types in Reward Functions
 

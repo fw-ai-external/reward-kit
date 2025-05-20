@@ -42,57 +42,6 @@ message = Message(
 
 The `Message` class is compatible with OpenAI's `ChatCompletionMessageParam` interface, allowing for easy integration with OpenAI-compatible APIs.
 
-## Reward Output Models
-
-### RewardOutput
-
-The `RewardOutput` class represents the complete result of a reward function evaluation.
-
-```python
-from reward_kit import RewardOutput, MetricRewardOutput
-
-result = RewardOutput(
-    score=0.75,
-    metrics={
-        "clarity": MetricRewardOutput(score=0.8, reason="The response clearly explains the concept"),
-        "accuracy": MetricRewardOutput(score=0.7, reason="Contains one minor factual error")
-    }
-)
-```
-
-#### Attributes
-
-- **`score`** (`float`): The overall reward score, typically between 0.0 and 1.0.
-
-- **`metrics`** (`Dict[str, MetricRewardOutput]`): Dictionary of component metrics, with metric names as keys and `MetricRewardOutput` objects as values.
-
-#### Methods
-
-- **`to_dict()`** → `Dict[str, Any]`: Converts the `RewardOutput` to a dictionary representation.
-
-- **`from_dict(data: Dict[str, Any])`** → `RewardOutput`: Class method that creates a `RewardOutput` from a dictionary representation.
-
-- **`__str__()`** → `str`: Returns a JSON string representation of the `RewardOutput`.
-
-### MetricRewardOutput
-
-The `MetricRewardOutput` class represents a single component metric in a reward evaluation.
-
-```python
-from reward_kit import MetricRewardOutput
-
-metric = MetricRewardOutput(
-    score=0.8,
-    reason="The response provides a clear explanation with appropriate examples"
-)
-```
-
-#### Attributes
-
-- **`score`** (`float`): The score for this specific metric, typically between 0.0 and 1.0.
-
-- **`reason`** (`Optional[str]`): Optional explanation for why this score was assigned.
-
 ## Evaluation Models
 
 ### EvaluateResult
@@ -186,34 +135,6 @@ tool_call_message = Message(
 )
 ```
 
-### Working with RewardOutput
-
-```python
-from reward_kit import RewardOutput, MetricRewardOutput
-
-# Create a RewardOutput with multiple metrics
-result = RewardOutput(
-    score=0.75,
-    metrics={
-        "clarity": MetricRewardOutput(score=0.8, reason="Response is clear and well-structured"),
-        "accuracy": MetricRewardOutput(score=0.7, reason="Contains minor factual errors"),
-        "completeness": MetricRewardOutput(score=0.75, reason="Covers most aspects of the topic")
-    }
-)
-
-# Convert to dictionary
-result_dict = result.to_dict()
-print(result_dict)
-
-# Create from dictionary
-new_result = RewardOutput.from_dict(result_dict)
-print(new_result.score)  # 0.75
-
-# String representation
-result_str = str(result)
-print(result_str)  # JSON string
-```
-
 ### Working with EvaluateResult
 
 ```python
@@ -241,24 +162,6 @@ if eval_result.error:
 else:
     print(f"Evaluation successful with score: {eval_result.score}")
 ```
-
-## Conversion Between Types
-
-Reward Kit provides functions for converting between `RewardOutput` and `EvaluateResult` formats:
-
-```python
-from reward_kit.utils import convert_to_reward_output, convert_to_evaluate_result
-
-# Convert EvaluateResult to RewardOutput
-evaluate_result = EvaluateResult(score=0.8, is_score_valid=True, metrics={"quality": MetricResult(score=0.8, is_score_valid=True, reason="Good quality")})
-reward_output = convert_to_reward_output(evaluate_result)
-
-# Convert RewardOutput to EvaluateResult
-reward_output = RewardOutput(score=0.9, metrics={"clarity": MetricRewardOutput(score=0.9, reason="Very clear")})
-evaluate_result = convert_to_evaluate_result(reward_output)
-```
-
-This conversion functionality is useful when interacting with different parts of the API that might expect different formats.
 
 ## Type Compatibility
 

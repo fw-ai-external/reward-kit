@@ -31,6 +31,10 @@ setup(
             "types-requests",  # For Mypy
             "types-PyYAML",  # For Mypy
             "types-docker",  # For Mypy
+            "torch>=1.9",  # Added torch for transformers and trl
+            "trl>=0.7.0",  # Added trl for GRPOTrainer
+            "peft>=0.7.0",  # Added peft for LoRA
+            "datasets",  # trl examples often use datasets
         ],
         "deepseek": [
             "datasets>=2.12.0",

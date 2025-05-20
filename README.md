@@ -35,24 +35,33 @@ export FIREWORKS_API_KEY=your_api_key
 Create a reward function to evaluate the quality of AI responses:
 
 ```python
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function
+from reward_kit.models import EvaluateResult, MetricResult, Message # Assuming models are here
+from typing import List, Dict, Any, Optional
 
 @reward_function
-def informativeness(messages, original_messages=None, **kwargs):
+def informativeness(
+    messages: List[Dict[str, Any]], # Or List[Message] if using Message type directly
+    original_messages: Optional[List[Dict[str, Any]]] = None, # Or List[Message]
+    **kwargs: Any
+) -> EvaluateResult:
     """Evaluate the informativeness of a response."""
     # Get the assistant's response
     response = messages[-1].get("content", "")
 
     # Simple evaluation: word count
     word_count = len(response.split())
-    score = min(word_count / 100, 1.0)  # Cap at 1.0
+    # Score normalized to 0-1, assuming 100 words is a good target for this example
+    score = min(word_count / 100.0, 1.0)
+    is_informative_enough = word_count > 10 # Example success condition
 
-    return RewardOutput(
+    return EvaluateResult(
         score=score,
         reason=f"Word count: {word_count}",
         metrics={
-            "word_count": MetricRewardOutput(
+            "word_count": MetricResult(
                 score=score,
+                success=is_informative_enough,
                 reason=f"Word count: {word_count}"
             )
         }
@@ -120,28 +129,47 @@ evaluator = create_evaluation(
 Combine multiple metrics in a single reward function:
 
 ```python
+from reward_kit import reward_function
+from reward_kit.models import EvaluateResult, MetricResult, Message # Assuming models are here
+from typing import List, Dict, Any, Optional
+
 @reward_function
-def combined_reward(messages, original_messages=None, **kwargs):
+def combined_reward(
+    messages: List[Dict[str, Any]], # Or List[Message]
+    original_messages: Optional[List[Dict[str, Any]]] = None, # Or List[Message]
+    **kwargs: Any
+) -> EvaluateResult:
     """Evaluate with multiple metrics."""
     response = messages[-1].get("content", "")
 
     # Word count metric
     word_count = len(response.split())
-    word_score = min(word_count / 100, 1.0)
+    word_score = min(word_count / 100.0, 1.0)
+    word_metric_success = word_count > 10
 
     # Specificity metric
     specificity_markers = ["specifically", "for example", "such as"]
     marker_count = sum(1 for marker in specificity_markers if marker.lower() in response.lower())
     specificity_score = min(marker_count / 2.0, 1.0)
+    specificity_metric_success = marker_count > 0
 
     # Combined score with weighted components
     final_score = word_score * 0.3 + specificity_score * 0.7
 
-    return RewardOutput(
+    return EvaluateResult(
         score=final_score,
+        reason=f"Combined score based on word count ({word_count}) and specificity markers ({marker_count})",
         metrics={
-            "word_count": MetricRewardOutput(score=word_score, reason=f"Word count: {word_count}"),
-            "specificity": MetricRewardOutput(score=specificity_score, reason=f"Found {marker_count} specificity markers")
+            "word_count": MetricResult(
+                score=word_score,
+                success=word_metric_success,
+                reason=f"Word count: {word_count}"
+            ),
+            "specificity": MetricResult(
+                score=specificity_score,
+                success=specificity_metric_success,
+                reason=f"Found {marker_count} specificity markers"
+            )
         }
     )
 ```

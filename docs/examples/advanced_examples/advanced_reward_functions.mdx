@@ -12,7 +12,7 @@ Example of an advanced multi-component reward function.
 """
 
 from typing import List, Dict, Optional, Any
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
 import re
 
 @reward_function
@@ -21,7 +21,7 @@ def comprehensive_evaluator(
     original_messages: Optional[List[Dict[str, str]]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult: # Updated return type
     """
     Comprehensive reward function that evaluates multiple aspects
     of a response: helpfulness, accuracy, safety, and conciseness.
@@ -33,7 +33,7 @@ def comprehensive_evaluator(
         **kwargs: Additional parameters
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Default settings
     metadata = metadata or {}
@@ -46,9 +46,10 @@ def comprehensive_evaluator(
 
     # Get user query and assistant response
     if not messages or len(messages) < 2:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="Insufficient messages")}
+            reason="Evaluation failed due to insufficient messages.", # Added reason
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Insufficient messages")} # Updated, added success
         )
 
     user_query = ""
@@ -59,9 +60,10 @@ def comprehensive_evaluator(
 
     assistant_response = messages[-1].get("content", "")
     if not assistant_response or messages[-1].get("role") != "assistant":
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="No assistant response found")}
+            reason="No assistant response found for evaluation.", # Added reason
+            metrics={"error": MetricResult(score=0.0, success=False, reason="No assistant response found")} # Updated, added success
         )
 
     # Initialize metrics dictionary
@@ -69,29 +71,33 @@ def comprehensive_evaluator(
 
     # 1. Helpfulness evaluation
     helpfulness_score, helpfulness_reason = evaluate_helpfulness(user_query, assistant_response)
-    metrics["helpfulness"] = MetricRewardOutput(
+    metrics["helpfulness"] = MetricResult( # Updated
         score=helpfulness_score,
+        success=helpfulness_score > 0.5, # Example success
         reason=helpfulness_reason
     )
 
     # 2. Accuracy evaluation (simplified example)
     accuracy_score, accuracy_reason = evaluate_accuracy(assistant_response)
-    metrics["accuracy"] = MetricRewardOutput(
+    metrics["accuracy"] = MetricResult( # Updated
         score=accuracy_score,
+        success=accuracy_score > 0.7, # Example success
         reason=accuracy_reason
     )
 
     # 3. Safety evaluation
     safety_score, safety_reason = evaluate_safety(assistant_response)
-    metrics["safety"] = MetricRewardOutput(
+    metrics["safety"] = MetricResult( # Updated
         score=safety_score,
+        success=safety_score == 1.0, # Example success (perfect safety)
         reason=safety_reason
     )
 
     # 4. Conciseness evaluation
     conciseness_score, conciseness_reason = evaluate_conciseness(assistant_response)
-    metrics["conciseness"] = MetricRewardOutput(
+    metrics["conciseness"] = MetricResult( # Updated
         score=conciseness_score,
+        success=conciseness_score > 0.6, # Example success
         reason=conciseness_reason
     )
 
@@ -106,12 +112,17 @@ def comprehensive_evaluator(
     if "boost_factor" in metadata:
         boost = float(metadata["boost_factor"])
         final_score = min(final_score * boost, 1.0)
-        metrics["boost_applied"] = MetricRewardOutput(
+        metrics["boost_applied"] = MetricResult( # Updated
             score=0.0,  # Doesn't affect score calculation
+            success=True, # Informational metric
             reason=f"Applied boost factor of {boost}"
         )
+    
+    overall_reason = f"Comprehensive evaluation. Helpfulness: {helpfulness_score:.2f}, Accuracy: {accuracy_score:.2f}, Safety: {safety_score:.2f}, Conciseness: {conciseness_score:.2f}."
+    if "boost_factor" in metadata:
+        overall_reason += f" Boost factor {metadata['boost_factor']} applied."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics) # Updated
 
 
 # Helper evaluation functions
@@ -308,9 +319,10 @@ Example of a composite reward function that calls multiple specialized functions
 """
 
 from typing import List, Dict, Optional, Any
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
 
 # Import specialized reward functions (assuming they're defined elsewhere)
+# These would need to return EvaluateResult or a compatible dict
 from reward_components.helpfulness import helpfulness_reward
 from reward_components.factuality import factuality_reward
 from reward_components.safety import safety_reward
@@ -321,7 +333,7 @@ def combined_reward(
     original_messages: Optional[List[Dict[str, str]]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult: # Updated return type
     """
     Combines multiple specialized reward functions into a single evaluator.
 
@@ -375,19 +387,23 @@ def combined_reward(
         all_metrics[f"safety_{name}"] = metric
 
     # Also add the main component scores
-    all_metrics["helpfulness"] = MetricRewardOutput(
+    # Assuming helpfulness_output, factuality_output, safety_output are EvaluateResult objects
+    all_metrics["helpfulness_main"] = MetricResult( # Updated, renamed for clarity
         score=helpfulness_output.score,
-        reason="Overall helpfulness score"
+        success=helpfulness_output.score > 0.5, # Example success
+        reason=helpfulness_output.reason if hasattr(helpfulness_output, 'reason') else "Overall helpfulness score"
     )
 
-    all_metrics["factuality"] = MetricRewardOutput(
+    all_metrics["factuality_main"] = MetricResult( # Updated, renamed for clarity
         score=factuality_output.score,
-        reason="Overall factuality score"
+        success=factuality_output.score > 0.7, # Example success
+        reason=factuality_output.reason if hasattr(factuality_output, 'reason') else "Overall factuality score"
     )
 
-    all_metrics["safety"] = MetricRewardOutput(
+    all_metrics["safety_main"] = MetricResult( # Updated, renamed for clarity
         score=safety_output.score,
-        reason="Overall safety score"
+        success=safety_output.score == 1.0, # Example success
+        reason=safety_output.reason if hasattr(safety_output, 'reason') else "Overall safety score"
     )
 
     # Calculate weighted final score
@@ -396,8 +412,11 @@ def combined_reward(
         factuality_output.score * weights.get("factuality", 0.0) +
         safety_output.score * weights.get("safety", 0.0)
     )
+    final_score = max(0.0, min(1.0, final_score)) # Ensure score is within [0,1]
+    
+    overall_reason = f"Combined score from helpfulness ({helpfulness_output.score:.2f}), factuality ({factuality_output.score:.2f}), and safety ({safety_output.score:.2f})."
 
-    return RewardOutput(score=final_score, metrics=all_metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=all_metrics) # Updated
 ```
 
 ## Contextual Reward Function
@@ -410,7 +429,7 @@ Example of a contextual reward function that evaluates responses based on conver
 """
 
 from typing import List, Dict, Optional, Any
-from reward_kit import reward_function, RewardOutput, MetricRewardOutput
+from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
 import re
 
 @reward_function
@@ -418,7 +437,7 @@ def contextual_reward(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> RewardOutput:
+) -> EvaluateResult: # Updated return type
     """
     Evaluates responses based on conversation context and history.
 
@@ -428,13 +447,14 @@ def contextual_reward(
         **kwargs: Additional parameters
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Ensure we have enough messages
     if len(messages) < 2:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="Insufficient conversation history")}
+            reason="Insufficient conversation history for contextual evaluation.", # Added reason
+            metrics={"error": MetricResult(score=0.0, success=False, reason="Insufficient conversation history")} # Updated
         )
 
     # Get the current user query and assistant response
@@ -445,16 +465,18 @@ def contextual_reward(
             break
 
     if not user_query:
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="No user query found")}
+            reason="No user query found in conversation history.", # Added reason
+            metrics={"error": MetricResult(score=0.0, success=False, reason="No user query found")} # Updated
         )
 
     assistant_response = messages[-1].get("content", "")
     if not assistant_response or messages[-1].get("role") != "assistant":
-        return RewardOutput(
+        return EvaluateResult( # Updated
             score=0.0,
-            metrics={"error": MetricRewardOutput(score=0.0, reason="No assistant response found")}
+            reason="No assistant response found for evaluation.", # Added reason
+            metrics={"error": MetricResult(score=0.0, success=False, reason="No assistant response found")} # Updated
         )
 
     # Analyze conversation history
@@ -467,29 +489,33 @@ def contextual_reward(
 
     # 1. Continuity: Evaluate if the response maintains conversation flow
     continuity_score = evaluate_continuity(previous_topics, current_topics, assistant_response)
-    metrics["continuity"] = MetricRewardOutput(
+    metrics["continuity"] = MetricResult( # Updated
         score=continuity_score,
+        success=continuity_score > 0.5, # Example success
         reason=f"Conversation flow continuity: {continuity_score:.2f}"
     )
 
     # 2. Query addressing: Check if the response directly addresses the query
     addressing_score = evaluate_addressing(user_query, assistant_response)
-    metrics["query_addressing"] = MetricRewardOutput(
+    metrics["query_addressing"] = MetricResult( # Updated
         score=addressing_score,
+        success=addressing_score > 0.6, # Example success
         reason=f"Query addressing: {addressing_score:.2f}"
     )
 
     # 3. Context utilization: Check if the response uses previous context
     context_score = evaluate_context_utilization(conversation_history, assistant_response)
-    metrics["context_utilization"] = MetricRewardOutput(
+    metrics["context_utilization"] = MetricResult( # Updated
         score=context_score,
+        success=context_score > 0.4, # Example success
         reason=f"Context utilization: {context_score:.2f}"
     )
 
     # Calculate final score (equal weighting for simplicity)
     final_score = (continuity_score + addressing_score + context_score) / 3.0
+    overall_reason = f"Contextual evaluation. Continuity: {continuity_score:.2f}, Addressing: {addressing_score:.2f}, Context Use: {context_score:.2f}."
 
-    return RewardOutput(score=final_score, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics) # Updated
 
 
 # Helper functions

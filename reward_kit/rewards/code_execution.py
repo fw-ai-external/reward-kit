@@ -27,6 +27,7 @@ import tempfile
 import traceback
 from io import StringIO
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from multiprocessing.managers import DictProxy
 
 # Try to import from e2b_code_interpreter first (preferred)
 try:
@@ -282,6 +283,26 @@ def local_code_execution_reward(
         return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
+# New top-level function to be called by multiprocessing.Process
+def _process_target_wrapper(
+    execute_func: Callable, args: Tuple, result_container: DictProxy
+):
+    try:
+        # Execute the code with the provided function
+        result = execute_func(*args)
+        result_container.update(result)
+    except Exception as e:
+        # traceback is imported at the top of the file
+        error_traceback = traceback.format_exc()
+        result_container.update(
+            {
+                "success": False,
+                "output": None,
+                "error": f"Execution error: {str(e)}\n{error_traceback}",
+            }
+        )
+
+
 def _execute_code_in_process(
     execute_func: Callable, args: Tuple, timeout: int = 5
 ) -> Dict[str, Any]:
@@ -300,9 +321,9 @@ def _execute_code_in_process(
     manager = multiprocessing.Manager()
     result_dict = manager.dict()
 
-    # 这里用全局的 target_func
+    # Create and start the process using the top-level wrapper
     process = multiprocessing.Process(
-        target=_target_func_for_execution, args=(result_dict, execute_func, args)
+        target=_process_target_wrapper, args=(execute_func, args, result_dict)
     )
     process.start()
     process.join(timeout=timeout + 0.5)
@@ -524,7 +545,7 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
             raise TimeoutError(f"Execution timed out after {timeout} seconds")
 
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout)
+        signal.alarm(timeout)  # Keep signal.alarm as a secondary guard
 
         try:
             # Execute in a separate process
@@ -540,7 +561,17 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 text=True,
             )
 
-            stdout, stderr = process.communicate()
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()  # Ensure the process is killed
+                stdout, stderr = process.communicate()  # Drain pipes
+                signal.alarm(0)  # Cancel alarm if communicate timed out
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"JavaScript execution timed out after {timeout} seconds (subprocess.TimeoutExpired). Output: {stdout.strip()}, Error: {stderr.strip()}",
+                }
 
             # Cancel the alarm
             signal.alarm(0)
@@ -555,14 +586,21 @@ def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]
                 return {
                     "success": False,
                     "output": None,
-                    "error": stderr.strip(),
+                    "error": stderr.strip()
+                    or f"JavaScript process exited with code {process.returncode}",  # Provide exit code if stderr is empty
                 }
-        except TimeoutError as e:
-            # Handle timeout
-            return {"success": False, "output": None, "error": str(e)}
+        except TimeoutError as e:  # This would be from signal.alarm
+            process.kill()  # Ensure the process is killed
+            _, _ = process.communicate()  # Drain pipes
+            # Handle timeout from signal.alarm
+            return {
+                "success": False,
+                "output": None,
+                "error": f"JavaScript execution timed out after {timeout} seconds (signal.alarm): {str(e)}",
+            }
         finally:
             # Clean up
-            signal.alarm(0)
+            signal.alarm(0)  # Ensure alarm is cancelled
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
 
@@ -840,102 +878,106 @@ def execute_code_with_e2b(
         with Sandbox(api_key=api_key) as sandbox:
             # Capture stdout and stderr
             stdout = []
-        stderr = []
+            stderr = []
 
-        def capture_stdout(output):
-            if hasattr(output, "line"):
-                stdout.append(output.line)
+            def capture_stdout(output):
+                if hasattr(output, "line"):
+                    stdout.append(output.line)
+                else:
+                    stdout.append(str(output))
+
+            def capture_stderr(output):
+                if hasattr(output, "line"):
+                    stderr.append(output.line)
+                else:
+                    stderr.append(str(output))
+
+            # Create file based on language
+            if language.lower() in ["python", "py"]:
+                file_path = "/code/script.py"
+                cmd = "python3 /code/script.py"
+            elif language.lower() in ["javascript", "js"]:
+                file_path = "/code/script.js"
+                cmd = "node /code/script.js"
             else:
-                stdout.append(str(output))
-
-        def capture_stderr(output):
-            if hasattr(output, "line"):
-                stderr.append(output.line)
-            else:
-                stderr.append(str(output))
-
-        # Create file based on language
-        if language.lower() in ["python", "py"]:
-            file_path = "/code/script.py"
-            cmd = "python3 /code/script.py"
-        elif language.lower() in ["javascript", "js"]:
-            file_path = "/code/script.js"
-            cmd = "node /code/script.js"
-        else:
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Unsupported language for E2B: {language}",
-            }
-
-        # Write code to file in sandbox
-        try:
-            fs_handler = None
-            if _E2B_SOURCE == "e2b_code_interpreter":
-                if hasattr(sandbox, "filesystem"):
-                    fs_handler = sandbox.filesystem
-            elif _E2B_SOURCE == "e2b":  # Fallback for 'e2b'
-                if hasattr(sandbox, "_filesystem"):  # Older 'e2b' might use _filesystem
-                    fs_handler = sandbox._filesystem
-                elif hasattr(sandbox, "filesystem"):  # Or it might have been updated
-                    fs_handler = sandbox.filesystem
-
-            if not fs_handler:
                 return {
                     "success": False,
                     "output": None,
-                    "error": "Could not access E2B sandbox filesystem handler.",
+                    "error": f"Unsupported language for E2B: {language}",
                 }
 
-            # Create directory if it doesn't exist
+            # Write code to file in sandbox
             try:
-                fs_handler.make_dir("/code")
-            except Exception:
-                # Directory might already exist, or other error
-                pass  # Continue to attempt writing the file
+                fs_handler = None
+                if _E2B_SOURCE == "e2b_code_interpreter":
+                    if hasattr(sandbox, "filesystem"):
+                        fs_handler = sandbox.filesystem
+                elif _E2B_SOURCE == "e2b":  # Fallback for 'e2b'
+                    if hasattr(
+                        sandbox, "_filesystem"
+                    ):  # Older 'e2b' might use _filesystem
+                        fs_handler = sandbox._filesystem
+                    elif hasattr(
+                        sandbox, "filesystem"
+                    ):  # Or it might have been updated
+                        fs_handler = sandbox.filesystem
 
-            # Write code to file
-            fs_handler.write(file_path, code)
-        except Exception as e:
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Failed to write code to sandbox: {str(e)}",
-            }
+                if not fs_handler:
+                    return {
+                        "success": False,
+                        "output": None,
+                        "error": "Could not access E2B sandbox filesystem handler.",
+                    }
 
-        # Execute code
-        try:
-            # Use the commands interface to run the code
-            result = sandbox.commands.run(
-                cmd,
-                on_stdout=capture_stdout,
-                on_stderr=capture_stderr,
-                timeout=timeout,
-            )
+                # Create directory if it doesn't exist
+                try:
+                    fs_handler.make_dir("/code")
+                except Exception:
+                    # Directory might already exist, or other error
+                    pass  # Continue to attempt writing the file
 
-            # Combine captured output
-            output = "\n".join(stdout)
-            error_output = "\n".join(stderr)
-
-            # Sandbox is automatically closed by the 'with' statement
-
-            if result.exit_code == 0:
-                return {"success": True, "output": output, "error": None}
-            else:
+                # Write code to file
+                fs_handler.write(file_path, code)
+            except Exception as e:
                 return {
                     "success": False,
                     "output": None,
-                    "error": f"Process exited with code {result.exit_code}: {error_output}",
+                    "error": f"Failed to write code to sandbox: {str(e)}",
                 }
 
-        except Exception as e:
-            # Sandbox is automatically closed by the 'with' statement even on exception
+            # Execute code
+            try:
+                # Use the commands interface to run the code
+                result = sandbox.commands.run(
+                    cmd,
+                    on_stdout=capture_stdout,
+                    on_stderr=capture_stderr,
+                    timeout=timeout,
+                )
 
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Execution error: {str(e)}",
-            }
+                # Combine captured output
+                output = "\n".join(stdout)
+                error_output = "\n".join(stderr)
+
+                # Sandbox is automatically closed by the 'with' statement
+
+                if result.exit_code == 0:
+                    return {"success": True, "output": output, "error": None}
+                else:
+                    return {
+                        "success": False,
+                        "output": None,
+                        "error": f"Process exited with code {result.exit_code}: {error_output}",
+                    }
+
+            except Exception as e:
+                # Sandbox is automatically closed by the 'with' statement even on exception
+
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Execution error: {str(e)}",
+                }
 
     except Exception as e:
         error_traceback = traceback.format_exc()

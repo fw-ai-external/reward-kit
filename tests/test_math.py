@@ -440,11 +440,11 @@ class TestMathReward:
         assert result.score == 0.0
         # assert result.score == 0.0 # Duplicate line removed
         assert (
-            result.reason is not None and "Strictness fail (Issue #1)" in result.reason
+            result.reason is not None and result.reason.startswith("Strictness fail (Issue #1")
         )
         assert (
             result.metrics["strictness_penalty_unboxed_or"].reason
-            == "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
+            == "Generated answer offers multiple numeric alternatives with an unboxed 'or' in the raw response."
         )
 
     def test_no_penalty_if_gen_is_single_boxed_or_expr(self):
@@ -473,11 +473,11 @@ class TestMathReward:
         assert result.score == 0.0
         # assert result.score == 0.0 # Duplicate line removed
         assert (
-            result.reason is not None and "Strictness fail (Issue #2)" in result.reason
+            result.reason is not None and result.reason.startswith("Strictness fail (Issue #2")
         )
         assert (
             result.metrics["strictness_penalty_ambiguity"].reason
-            == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
+            == "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted, even after potential leniency)."
         )
 
     def test_issue_false_mcq_match_on_v_B(self):
@@ -525,7 +525,7 @@ class TestMathReward:
         )
         assert (
             result.reason is not None
-            and "includes other distinct numerical values: [3.0]" in result.reason
+            and "includes other distinct numerical values not matching any original answer: [3.0]" in result.reason
         )
 
     def test_issue3_scenario_correct_handling(self):

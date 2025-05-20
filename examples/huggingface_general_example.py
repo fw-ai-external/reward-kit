@@ -32,37 +32,70 @@ def main():
     with open("./temp_metrics/length_metric/main.py", "w") as f:
         f.write(
             """
+# It's assumed that reward_kit.models.EvaluateResult and MetricResult are not directly
+# available for import in this dynamically executed script by preview_evaluation.
+# Instead, we will return a dictionary matching their structure.
+
 def evaluate(messages, original_messages=None, tools=None, **kwargs):
     # Extract assistant response
     assistant_messages = [m for m in messages if m.get("role") == "assistant"]
     if not assistant_messages:
-        return {"score": 0.0, "reasoning": "No assistant messages found"}
+        return {
+            "score": 0.0,
+            "reason": "No assistant messages found",
+            "metrics": {
+                "length_eval": {
+                    "score": 0.0,
+                    "success": False,
+                    "reason": "No assistant messages found"
+                }
+            }
+        }
 
     # Get the length of the assistant's response
     response_text = assistant_messages[0].get("content", "")
     response_length = len(response_text.split())
+    metric_score = 0.0
+    metric_success = False
+    overall_reason = ""
 
     # Calculate score based on length (normalize between 0-1)
     # Prefer responses between 50-200 words
     if response_length < 10:
-        score = 0.1  # Too short
-        reason = f"Response too short ({response_length} words)"
+        metric_score = 0.1  # Too short
+        overall_reason = f"Response too short ({response_length} words)"
+        metric_success = False
     elif response_length < 50:
-        score = 0.1 + (response_length - 10) * 0.02  # Linear increase from 0.1 to 0.9
-        reason = f"Response somewhat short ({response_length} words)"
+        metric_score = 0.1 + (response_length - 10) * 0.02  # Linear increase from 0.1 to 0.9
+        overall_reason = f"Response somewhat short ({response_length} words)"
+        metric_success = False # Or True, depending on definition of success
     elif response_length <= 200:
-        score = 1.0  # Ideal length
-        reason = f"Response ideal length ({response_length} words)"
+        metric_score = 1.0  # Ideal length
+        overall_reason = f"Response ideal length ({response_length} words)"
+        metric_success = True
     elif response_length <= 500:
-        score = 1.0 - (response_length - 200) * 0.001  # Gradually decrease
-        reason = f"Response somewhat verbose ({response_length} words)"
+        metric_score = 1.0 - (response_length - 200) * 0.001  # Gradually decrease
+        overall_reason = f"Response somewhat verbose ({response_length} words)"
+        metric_success = True # Or False, depending on definition
     else:
-        score = 0.7  # Too verbose
-        reason = f"Response too verbose ({response_length} words)"
+        metric_score = 0.7  # Too verbose, but still some score
+        overall_reason = f"Response too verbose ({response_length} words)"
+        metric_success = False
+
+    # The main score for EvaluateResult is often the primary metric's score or a combined one.
+    # For this simple example, let's use the metric_score as the main score.
+    final_score = metric_score
 
     return {
-        "score": score,
-        "reasoning": reason
+        "score": final_score,
+        "reason": overall_reason,
+        "metrics": {
+            "length_evaluation": {
+                "score": metric_score,
+                "success": metric_success,
+                "reason": overall_reason # Metric reason can be the same as overall for simple cases
+            }
+        }
     }
 """
         )

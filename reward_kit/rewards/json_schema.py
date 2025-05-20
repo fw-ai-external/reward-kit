@@ -39,7 +39,7 @@ def json_schema_reward(
         **kwargs: Additional keyword arguments.
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     metrics = {}
 
@@ -290,7 +290,7 @@ def json_schema_reward_with_llm_judge(
         **kwargs: Additional keyword arguments
 
     Returns:
-        RewardOutput with score and metrics
+        EvaluateResult with score and metrics
     """
     # Import OpenAI at call time to make this optional
     try:

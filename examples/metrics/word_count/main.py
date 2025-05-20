@@ -36,6 +36,10 @@ def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
         reason=f"Word count: {word_count}",
         is_score_valid=True,
         metrics={
-            "word_count": MetricResult(score=score, reason=f"Word count: {word_count}", is_score_valid=True)
+            "word_count": MetricResult(
+                score=score,
+                is_score_valid=word_count > 0,  # Basic is_score_valid if there are any words
+                reason=f"Word count: {word_count}",
+            )
         },
     )

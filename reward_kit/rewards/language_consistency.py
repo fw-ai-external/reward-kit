@@ -590,7 +590,7 @@ def language_consistency_reward(
             metrics={
                 "language_consistency": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -691,7 +691,7 @@ def language_consistency_reward(
             metrics={
                 "language_consistency": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="No language markers detected in model response.",
                 )
             },
@@ -723,7 +723,7 @@ def language_consistency_reward(
             percentage = count / total_counted * 100
             language_metrics[f"{lang}_percentage"] = MetricResult(
                 score=percentage / 100,  # Scale to 0-1
-                success=True,
+                is_score_valid=True,
                 reason=f"{percentage:.1f}% {lang} content",
             )
 
@@ -731,12 +731,12 @@ def language_consistency_reward(
     metrics = {
         "language_consistency": MetricResult(
             score=score,
-            success=success,
+            is_score_valid=success,
             reason=f"Target language '{target_language}' consistency: {consistency_ratio:.2f}",
         ),
         "target_language": MetricResult(
             score=1.0 if target_language else 0.0,
-            success=bool(target_language),
+            is_score_valid=bool(target_language),
             reason=f"Target language identified as '{target_language}'",
         ),
         **language_metrics,

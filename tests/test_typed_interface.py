@@ -40,7 +40,7 @@ def test_typed_interface_basic():
     assert "test" in result.metrics
     metric_test = result.metrics["test"]
     assert isinstance(metric_test, MetricResult)
-    assert metric_test.success is True
+    assert metric_test.is_score_valid is True
     assert metric_test.score == 0.8
     assert metric_test.reason == "Test reason"
 
@@ -52,7 +52,7 @@ def test_typed_interface_basic():
     metric_test_dict_access = result["metrics"]["test"]  # This is a MetricResult object
     assert isinstance(metric_test_dict_access, MetricResult)
     assert (
-        metric_test_dict_access["success"] is True
+        metric_test_dict_access["is_score_valid"] is True
     )  # MetricResult also has __getitem__
     assert metric_test_dict_access["score"] == 0.8
     assert metric_test_dict_access["reason"] == "Test reason"
@@ -214,7 +214,7 @@ def test_typed_interface_model_dump():
     assert "test" in result.metrics
     metric_test = result.metrics["test"]
     assert isinstance(metric_test, MetricResult)
-    assert metric_test.success is True
+    assert metric_test.is_score_valid is True
     assert metric_test.score == 0.8
     assert metric_test.reason == "Test reason"
 
@@ -226,6 +226,6 @@ def test_typed_interface_model_dump():
     assert "test" in result["metrics"]
     metric_test_dict_access = result["metrics"]["test"]
     assert isinstance(metric_test_dict_access, MetricResult)
-    assert metric_test_dict_access["success"] is True
+    assert metric_test_dict_access["is_score_valid"] is True
     assert metric_test_dict_access["score"] == 0.8
     assert metric_test_dict_access["reason"] == "Test reason"

@@ -54,9 +54,10 @@ from reward_kit import EvaluateResult, MetricResult
 result = EvaluateResult(
     score=0.75,
     reason="Overall good response with minor issues",
+    is_score_valid=True,
     metrics={
-        "clarity": MetricResult(score=0.8, reason="Clear and concise"),
-        "accuracy": MetricResult(score=0.7, reason="Contains a minor factual error")
+        "clarity": MetricResult(score=0.8, reason="Clear and concise", is_score_valid=True),
+        "accuracy": MetricResult(score=0.7, reason="Contains a minor factual error", is_score_valid=True)
     },
     error=None  # Optional error message
 )
@@ -81,8 +82,8 @@ from reward_kit import MetricResult
 
 metric = MetricResult(
     score=0.8,
-    reason="The response is clear and well-structured",
-    success=True  # Optional success indicator
+    reason="The response provides a clear explanation with appropriate examples",
+    is_score_valid=True
 )
 ```
 
@@ -92,7 +93,7 @@ metric = MetricResult(
 
 - **`reason`** (`str`): Explanation for why this score was assigned.
 
-- **`success`** (`Optional[bool]`): Optional flag indicating whether this metric evaluation was successful.
+- **`is_score_valid`** (`bool`): Indicates whether the score is valid.
 
 ## Example Usages
 
@@ -143,10 +144,11 @@ from reward_kit import EvaluateResult, MetricResult
 eval_result = EvaluateResult(
     score=0.75,
     reason="Overall good response with some minor issues",
+    is_score_valid=True,
     metrics={
-        "clarity": MetricResult(score=0.8, reason="Clear and concise explanation"),
-        "accuracy": MetricResult(score=0.7, reason="Contains one minor factual error"),
-        "relevance": MetricResult(score=0.75, reason="Mostly relevant to the query")
+        "clarity": MetricResult(score=0.8, reason="Clear and concise explanation", is_score_valid=True),
+        "accuracy": MetricResult(score=0.7, reason="Contains one minor factual error", is_score_valid=True),
+        "relevance": MetricResult(score=0.75, reason="Mostly relevant to the query", is_score_valid=True)
     }
 )
 

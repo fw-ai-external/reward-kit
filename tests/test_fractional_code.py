@@ -232,7 +232,7 @@ print(add(2, 3))
                 # Check if we got a connection error
                 if (
                     "execution_result" in result.metrics
-                    and not result.metrics["execution_result"].success
+                    and not result.metrics["execution_result"].is_score_valid
                 ):
                     reason = result.metrics["execution_result"].reason
                     if "502 Bad Gateway" in reason or "sandbox timeout" in reason:

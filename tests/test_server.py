@@ -58,7 +58,7 @@ class TestServer:
         assert "test" in data["metrics"]
         assert data["metrics"]["test"]["score"] == 0.5
         assert data["metrics"]["test"]["reason"] == "Test reason"
-        assert data["metrics"]["test"]["success"] is True
+        assert data["metrics"]["test"]["is_score_valid"] is True
 
     def test_reward_endpoint_with_metadata(self, client):
         """Test the reward endpoint with metadata."""

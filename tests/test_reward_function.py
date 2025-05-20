@@ -89,7 +89,8 @@ class TestRewardFunction:
             mock_response.status_code = 200
             mock_response.json.return_value = {
                 "score": 0.8,
-                "metrics": {"remote": {"score": 0.8, "reason": "Remote score"}},
+                "is_score_valid": True,
+                "metrics": {"remote": {"score": 0.8, "reason": "Remote score", "is_score_valid": True}},
             }
             mock_requests_module.post.return_value = mock_response
 
@@ -184,7 +185,7 @@ class TestRewardFunctionDecorator:
         assert isinstance(metric_test, MetricResult)
         assert metric_test.score == 0.7
         assert metric_test.reason == "Test score"
-        assert metric_test.success is True
+        assert metric_test.is_score_valid is True
 
         # Dictionary-style access (since EvaluateResult is now hybrid)
         assert result["score"] == 0.7
@@ -197,7 +198,7 @@ class TestRewardFunctionDecorator:
         assert isinstance(metric_test_dict_access, MetricResult)
         assert metric_test_dict_access["score"] == 0.7
         assert metric_test_dict_access["reason"] == "Test score"
-        assert metric_test_dict_access["success"] is True
+        assert metric_test_dict_access["is_score_valid"] is True
 
     def test_decorator_deploy_method(self):
         """Test that the new decorator does NOT add a deploy method directly."""

@@ -41,7 +41,7 @@ def lean_prover_reward(
             reason="Statement not provided in kwargs.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Statement not provided."
+                    score=0.0, is_score_valid=False, reason="Statement not provided."
                 )
             },
         )
@@ -58,7 +58,7 @@ def lean_prover_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -71,7 +71,7 @@ def lean_prover_reward(
             reason="Assistant response content is empty.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Empty assistant response content."
+                    score=0.0, is_score_valid=False, reason="Empty assistant response content."
                 )
             },
         )
@@ -167,7 +167,7 @@ def lean_prover_reward(
         metrics = {
             "syntax": MetricResult(
                 score=float(has_theorem_def),
-                success=has_theorem_def,
+                is_score_valid=has_theorem_def,
                 reason=(
                     "Has valid theorem definition"
                     if has_theorem_def
@@ -176,7 +176,7 @@ def lean_prover_reward(
             ),
             "completeness": MetricResult(
                 score=0.0 if has_sorry or has_admitted else 1.0,
-                success=not (has_sorry or has_admitted),
+                is_score_valid=not (has_sorry or has_admitted),
                 reason=(
                     "Incomplete proof (has sorry/admitted)"
                     if has_sorry or has_admitted
@@ -185,7 +185,7 @@ def lean_prover_reward(
             ),
             "tactics": MetricResult(
                 score=min(1.0, tactics_count / 10),
-                success=tactics_count > 0,  # Basic success if any tactics used
+                is_score_valid=tactics_count > 0,  # Basic success if any tactics used
                 reason=f"Used {tactics_count} tactics",
             ),
         }
@@ -194,7 +194,7 @@ def lean_prover_reward(
             expected_match_bool = expected_answer.lower() in response.lower()
             metrics["expected_match"] = MetricResult(
                 score=1.0 if expected_match_bool else 0.0,
-                success=expected_match_bool,
+                is_score_valid=expected_match_bool,
                 reason=(
                     "Matches expected proof"
                     if expected_match_bool
@@ -241,7 +241,7 @@ def deepseek_prover_v2_reward(
             reason="Statement not provided in kwargs for deepseek_prover_v2_reward.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Statement not provided."
+                    score=0.0, is_score_valid=False, reason="Statement not provided."
                 )
             },
         )
@@ -342,13 +342,13 @@ def deepseek_prover_v2_reward(
             score=min(
                 1.0, subgoal_decomposition_score_normalized
             ),  # Ensure score is <= 1.0
-            success=subgoal_decomposition_score_normalized > 0.5,
+            is_score_valid=subgoal_decomposition_score_normalized > 0.5,
             reason=f"Found {subgoal_count} subgoal patterns",
         )
 
         metrics["hierarchical_structure"] = MetricResult(
             score=hierarchy_depth,
-            success=hierarchy_depth
+            is_score_valid=hierarchy_depth
             > 0.5,  # Mark success if structure is reasonably deep
             reason=f"Hierarchical depth: {hierarchy_depth:.2f}",
         )
@@ -405,7 +405,7 @@ def deepseek_huggingface_prover_benchmark(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Statement not provided in ground_truth.",
                 )
             },
@@ -423,7 +423,7 @@ def deepseek_huggingface_prover_benchmark(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -436,7 +436,7 @@ def deepseek_huggingface_prover_benchmark(
             reason="Assistant response content is empty for HuggingFace benchmark.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Empty assistant response content."
+                    score=0.0, is_score_valid=False, reason="Empty assistant response content."
                 )
             },
         )
@@ -491,7 +491,7 @@ def deepseek_huggingface_prover_benchmark(
                     metrics={
                         "dataset_match": MetricResult(
                             score=0.0,
-                            success=False,
+                            is_score_valid=False,
                             reason="No matching problem found in the dataset",
                         )
                     },
@@ -500,13 +500,13 @@ def deepseek_huggingface_prover_benchmark(
             # Add fuzzy match info to metrics
             metrics["dataset_match"] = MetricResult(
                 score=matched_ratio,
-                success=matched_ratio > 0.7,  # Success if similarity is above threshold
+                is_score_valid=matched_ratio > 0.7,  # Success if similarity is above threshold
                 reason=f"Found similar problem with {matched_ratio:.2f} similarity",
             )
         else:
             # Add exact match info to metrics
             metrics["dataset_match"] = MetricResult(
-                score=1.0, success=True, reason="Found exact match in dataset"
+                score=1.0, is_score_valid=True, reason="Found exact match in dataset"
             )
 
         dataset_item = matched_item
@@ -536,7 +536,7 @@ def deepseek_huggingface_prover_benchmark(
         if not answer_found:
             metrics["answer_match"] = MetricResult(
                 score=0.0,
-                success=False,
+                is_score_valid=False,
                 reason=f"Expected answer '{expected_answer_str}' not found in response",
             )
             return EvaluateResult(
@@ -546,7 +546,7 @@ def deepseek_huggingface_prover_benchmark(
             )
         else:
             metrics["answer_match"] = MetricResult(
-                score=1.0, success=True, reason="Expected answer found in response"
+                score=1.0, is_score_valid=True, reason="Expected answer found in response"
             )
             current_top_level_reason += " Expected answer found."
 
@@ -578,7 +578,7 @@ def deepseek_huggingface_prover_benchmark(
     if verbose:
         combined_metrics["dataset_info"] = MetricResult(
             score=1.0,  # Not an evaluative score
-            success=True,  # Informational metric
+            is_score_valid=True,  # Informational metric
             reason=json.dumps(
                 {
                     "id": dataset_item.get("id", ""),

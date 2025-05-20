@@ -44,7 +44,7 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     """
     # Validate input
     if not messages or len(messages) < 2:
-        return EvaluateResult(score=0.0, reason="Insufficient messages", metrics={})
+        return EvaluateResult(score=0.0, reason="Insufficient messages", metrics={}, is_score_valid=False)
 
     # Get the query and response
     user_query = None
@@ -58,7 +58,8 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
         return EvaluateResult(
             score=0.0,
             reason="Last message is not from assistant",
-            metrics={}
+            metrics={},
+            is_score_valid=False
         )
 
     # Simple word count metric
@@ -85,25 +86,26 @@ def evaluate(messages: List[Message], original_messages: List[Message] = list(),
     metrics = {
         "word_count": MetricResult(
             score=word_count_score,
-            success=word_count_score > 0.5, # Example success
+            is_score_valid=word_count_score > 0.5, # Example is_score_valid
             reason=f"Word count: {word_count}"
         ),
         "keyword_usage": MetricResult(
             score=keyword_score,
-            success=keyword_score > 0.3, # Example success
+            is_score_valid=keyword_score > 0.3, # Example is_score_valid
             reason=f"Information keywords: {keyword_count}/3"
         ),
         "certainty": MetricResult(
             score=certainty_score,
-            success=certainty_score > 0.7, # Example success
+            is_score_valid=certainty_score > 0.7, # Example is_score_valid
             reason=f"Certainty score: {certainty_score:.2f} (found {uncertainty_count} uncertainty markers)"
         )
     }
 
     return EvaluateResult(
         score=informativeness_score,
-        reason=f"Informativeness score: {informativeness_score:.2f}",
-        metrics=metrics
+        reason="Informativeness score",
+        metrics=metrics,
+        is_score_valid=True
     )
 ```
 

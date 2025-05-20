@@ -68,14 +68,14 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertTrue(result.metrics["mcq_comparison"].success)
+        self.assertTrue(result.metrics["mcq_comparison"].is_score_valid)
         self.assertTrue(
             result.reason is not None
             and "Gen: '(B)' (B) vs Orig: '(B)' (B)" in result.reason
         )
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["mcq_comparison"]["success"])
+        self.assertTrue(result["metrics"]["mcq_comparison"]["is_score_valid"])
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(B)' (B) vs Orig: '(B)' (B)" in result["reason"]
@@ -96,14 +96,14 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertFalse(result.metrics["mcq_comparison"].success)
+        self.assertFalse(result.metrics["mcq_comparison"].is_score_valid)
         self.assertTrue(
             result.reason is not None
             and "Gen: '(A)' (A) vs Orig: '(D)' (D)" in result.reason
         )
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
-        self.assertFalse(result["metrics"]["mcq_comparison"]["success"])
+        self.assertFalse(result["metrics"]["mcq_comparison"]["is_score_valid"])
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(A)' (A) vs Orig: '(D)' (D)" in result["reason"]
@@ -138,16 +138,16 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
             result.reason is not None
             and "Could not extract MCQ option from original message" in result.reason
         )
-        self.assertTrue(result.metrics["extracted_generated_mcq"].success)
-        self.assertFalse(result.metrics["extracted_original_mcq"].success)
+        self.assertTrue(result.metrics["extracted_generated_mcq"].is_score_valid)
+        self.assertFalse(result.metrics["extracted_original_mcq"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
         self.assertTrue(
             result["reason"] is not None
             and "Could not extract MCQ option from original message" in result["reason"]
         )
-        self.assertTrue(result["metrics"]["extracted_generated_mcq"]["success"])
-        self.assertFalse(result["metrics"]["extracted_original_mcq"]["success"])
+        self.assertTrue(result["metrics"]["extracted_generated_mcq"]["is_score_valid"])
+        self.assertFalse(result["metrics"]["extracted_original_mcq"]["is_score_valid"])
 
     def test_ambiguous_generated_answer(self):
         gen_msgs = self._create_messages("It could be (A) or maybe (B).")
@@ -161,7 +161,7 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
             and "Generated answer is ambiguous" in result.reason
         )
         self.assertTrue(
-            result.metrics["ambiguous_generated_mcq"].success == False
+            result.metrics["ambiguous_generated_mcq"].is_score_valid == False
         )  # success is False for this metric
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
@@ -170,7 +170,7 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
             and "Generated answer is ambiguous" in result["reason"]
         )
         self.assertTrue(
-            result["metrics"]["ambiguous_generated_mcq"]["success"] == False
+            result["metrics"]["ambiguous_generated_mcq"]["is_score_valid"] == False
         )
 
     def test_ambiguous_original_answer_still_compares_first(self):
@@ -181,14 +181,14 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)  # Matches first extracted from original
-        self.assertTrue(result.metrics["ambiguous_original_mcq"].success == False)
+        self.assertTrue(result.metrics["ambiguous_original_mcq"].is_score_valid == False)
         self.assertTrue(
             result.reason is not None
             and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result.reason
         )
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["success"] == False)
+        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False)
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result["reason"]
@@ -201,8 +201,8 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)  # D vs D
-        self.assertTrue(result.metrics["ambiguous_generated_mcq"].success == False)
-        self.assertTrue(result.metrics["ambiguous_original_mcq"].success == False)
+        self.assertTrue(result.metrics["ambiguous_generated_mcq"].is_score_valid == False)
+        self.assertTrue(result.metrics["ambiguous_original_mcq"].is_score_valid == False)
         self.assertTrue(
             result.reason is not None
             and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result.reason
@@ -210,9 +210,9 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(
-            result["metrics"]["ambiguous_generated_mcq"]["success"] == False
+            result["metrics"]["ambiguous_generated_mcq"]["is_score_valid"] == False
         )
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["success"] == False)
+        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False)
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result["reason"]

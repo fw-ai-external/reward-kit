@@ -401,7 +401,7 @@ async def main(args):
                         metric_detail,
                     ) in result.metrics.items():
                         print(
-                            f"  {metric_name_key}: Score={metric_detail.score}, Success={metric_detail.success}, Reason='{metric_detail.reason}'"
+                            f"  {metric_name_key}: Score={metric_detail.score}, Success={metric_detail.is_score_valid}, Reason='{metric_detail.reason}'"
                         )
 
                 if result.score == 1.0:

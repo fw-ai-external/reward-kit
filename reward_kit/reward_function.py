@@ -192,7 +192,7 @@ class RewardFunction:
                     score, components = result
                     # Convert to EvaluateResult
                     metrics = {
-                        k: MetricResult(score=v, reason=f"{k} score", success=None)
+                        k: MetricResult(score=v, reason=f"{k} score", is_score_valid=True)
                         for k, v in components.items()
                     }
                     return EvaluateResult(score=score, metrics=metrics)
@@ -211,13 +211,13 @@ class RewardFunction:
                                 metrics[k] = MetricResult(
                                     score=v.get("score", 0.0),
                                     reason=v.get("reason", f"{k} score"),
-                                    success=v.get("success", None),
+                                    is_score_valid=v.get("is_score_valid", True),
                                 )
                             else:
                                 metrics[k] = MetricResult(
                                     score=float(v),
                                     reason=f"{k} score",
-                                    success=None,
+                                    is_score_valid=True,
                                 )
                     return EvaluateResult(
                         score=result["score"],
@@ -267,13 +267,13 @@ class RewardFunction:
                                 metrics[k] = MetricResult(
                                     score=v.get("score", 0.0),
                                     reason=v.get("reason", f"{k} score"),
-                                    success=v.get("success", None),
+                                    is_score_valid=v.get("success", True),
                                 )
                             else:
                                 metrics[k] = MetricResult(
                                     score=float(v),
                                     reason=f"{k} score",
-                                    success=None,
+                                    is_score_valid=True,
                                 )
 
                     return EvaluateResult(
@@ -284,7 +284,7 @@ class RewardFunction:
                 else:
                     raise ValueError(f"Invalid response from remote endpoint: {result}")
 
-            except requests.exceptions.RequestException as e:
+            except Exception as e:
                 logger.error(f"Error calling remote endpoint: {str(e)}")
                 raise
 

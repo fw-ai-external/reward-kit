@@ -131,7 +131,7 @@ def list_comparison_math_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -148,7 +148,7 @@ def list_comparison_math_reward(
             reason="Assistant response content is empty.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Empty generated message content."
+                    score=0.0, is_score_valid=False, reason="Empty generated message content."
                 )
             },
         )
@@ -158,7 +158,7 @@ def list_comparison_math_reward(
             reason="Ground truth string (expected list) is empty.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Empty ground truth string."
+                    score=0.0, is_score_valid=False, reason="Empty ground truth string."
                 )
             },
         )
@@ -168,12 +168,12 @@ def list_comparison_math_reward(
 
     metrics["extracted_original_lists"] = MetricResult(
         score=1.0 if orig_lists else 0.0,
-        success=bool(orig_lists),
+        is_score_valid=bool(orig_lists),
         reason=f"Original lists: {orig_lists}",
     )
     metrics["extracted_generated_lists"] = MetricResult(
         score=1.0 if gen_lists else 0.0,
-        success=bool(gen_lists),
+        is_score_valid=bool(gen_lists),
         reason=f"Generated lists: {gen_lists}",
     )
 
@@ -240,6 +240,6 @@ def list_comparison_math_reward(
             match_reason = " ".join(match_reason_parts)
 
     metrics["list_comparison"] = MetricResult(
-        score=score, success=(score == 1.0), reason=match_reason
+        score=score, is_score_valid=(score == 1.0), reason=match_reason
     )
     return EvaluateResult(score=score, reason=match_reason, metrics=metrics)

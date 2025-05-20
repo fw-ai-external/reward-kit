@@ -595,7 +595,7 @@ def _check_unboxed_or_strictness(
             f"Strictness fail (Issue #1 - Unboxed 'or'): {specific_reason_detail}"
         )
         metrics["strictness_penalty_unboxed_or"] = MetricResult(
-            score=0.0, success=False, reason=specific_reason_detail
+            score=0.0, is_score_valid=False, reason=specific_reason_detail
         )
         return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
     return None
@@ -615,7 +615,7 @@ def _check_ambiguity_strictness(
             f"Strictness fail (Issue #2 - Ambiguity): {specific_reason_detail}"
         )
         metrics["strictness_penalty_ambiguity"] = MetricResult(
-            score=0.0, success=False, reason=specific_reason_detail
+            score=0.0, is_score_valid=False, reason=specific_reason_detail
         )
         return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
     return None
@@ -670,7 +670,7 @@ def _check_conflicting_answers_strictness(
                 f"also includes other distinct numerical values not matching any original answer: [{formatted_conflicting}]"
             )
             metrics["strictness_penalty_conflicting_answers"] = MetricResult(
-                score=0.0, success=False, reason=specific_reason_detail
+                score=0.0, is_score_valid=False, reason=specific_reason_detail
             )
             return (
                 0.0,
@@ -702,7 +702,7 @@ def math_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -714,7 +714,7 @@ def math_reward(
             reason="Missing or empty ground_truth (expected math answer string).",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Invalid ground_truth string."
+                    score=0.0, is_score_valid=False, reason="Invalid ground_truth string."
                 )
             },
         )
@@ -734,12 +734,12 @@ def math_reward(
 
     metrics["extracted_original_answers"] = MetricResult(
         score=0.0,
-        success=bool(orig_answers_extracted),
+        is_score_valid=bool(orig_answers_extracted),
         reason=f"Extracted from original: {format_extracted(orig_answers_extracted)}",
     )
     metrics["extracted_generated_answers"] = MetricResult(
         score=0.0,
-        success=bool(
+        is_score_valid=bool(
             gen_answers_extracted_initial
         ),  # Report based on initial extraction
         reason=f"Extracted from generated (initial): {format_extracted(gen_answers_extracted_initial)}",
@@ -786,7 +786,7 @@ def math_reward(
                     gen_answers_extracted = [(gen_text, gen_val)]
                     metrics["demo_leniency_info"] = MetricResult(
                         score=1.0,
-                        success=True,
+                        is_score_valid=True,
                         reason=f"Demo Leniency: Matching boxed answer '{gen_text}' found. Simplified gen_answers to this match.",
                     )
                     break
@@ -901,8 +901,8 @@ def math_reward(
 
     metrics["answer_comparison"] = MetricResult(
         score=best_match_score,
-        success=match_found_flag
-        and best_match_score > 0,  # Success if a match was found and score > 0
+        is_score_valid=match_found_flag
+        and best_match_score > 0,  # is_score_valid if a match was found and score > 0
         reason=best_match_reason,
     )
     return EvaluateResult(

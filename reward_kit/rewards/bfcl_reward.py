@@ -337,19 +337,19 @@ def bfcl_reward(
     metrics = {}  # Initialize metrics dictionary
     metrics["state_match"] = MetricResult(
         score=state_match_score,
-        success=state_match_score == 0.5,
+        is_score_valid=state_match_score == 0.5,
         reason=f"State match: {state_match}"
         + (f", Differences: {json.dumps(state_diffs)}" if state_diffs else ""),
     )
     metrics["function_call_match"] = MetricResult(
         score=func_match_score,
-        success=func_match_score
+        is_score_valid=func_match_score
         == 0.5,  # Success if it gets the full 0.5 for this part
         reason=f"{num_func_matches_for_score}/{reason_num_total_gt_turns_with_calls} GT turns with calls matched by model. Model made calls in {num_model_turns_with_actual_calls} turn(s).",
     )
     metrics["format_check"] = MetricResult(
         score=format_score,
-        success=format_score == 0.2,  # Success if it gets the full 0.2 for format
+        is_score_valid=format_score == 0.2,  # Success if it gets the full 0.2 for format
         reason=f"{valid_assistant_messages}/{total_assistant_messages} assistant messages had correct format.",
     )
 

@@ -66,10 +66,11 @@ def deepcoder_code_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
+            is_score_valid=False
         )
 
     assistant_content = messages[-1].content
@@ -82,14 +83,15 @@ def deepcoder_code_reward(
             reason=f"No {language} code block found.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason=f"No {language} code block found."
+                    score=0.0, is_score_valid=False, reason=f"No {language} code block found."
                 )
             },
+            is_score_valid=False
         )
 
     code_to_execute = code_blocks[0]["code"]
     metrics_dict["extracted_code"] = MetricResult(
-        score=0.0, success=True, reason=f"Extracted code:\n```\n{code_to_execute}\n```"
+        score=0.0, is_score_valid=True, reason=f"Extracted code:\n```\n{code_to_execute}\n```"
     )
 
     if not test_cases:
@@ -100,10 +102,11 @@ def deepcoder_code_reward(
             reason="No test cases provided.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="No test cases provided."
+                    score=0.0, is_score_valid=False, reason="No test cases provided."
                 ),
                 **metrics_dict,  # Include already gathered metrics like extracted_code
             },
+            is_score_valid=False
         )
 
     # Use the explicitly passed target_function if available
@@ -111,13 +114,13 @@ def deepcoder_code_reward(
     if function_to_call:
         metrics_dict["target_function_provided"] = MetricResult(
             score=0.0,
-            success=True,
+            is_score_valid=True,
             reason=f"Using provided target function: {function_to_call}",
         )
     else:
         metrics_dict["target_function_missing"] = MetricResult(
             score=0.0,
-            success=False,
+            is_score_valid=False,
             reason="Target function name not provided in input data. Will attempt stdin/stdout.",
         )
         # Fallback to stdin/stdout mode will happen in _run_test_cases
@@ -163,7 +166,7 @@ def deepcoder_code_reward(
         # overall_reason is already set based on final_score
         pass
     metrics_dict["overall_status"] = MetricResult(
-        score=final_score, success=(final_score == 1.0), reason=overall_reason
+        score=final_score, is_score_valid=(final_score == 1.0), reason=overall_reason
     )
 
     # The main reason for EvaluateResult should reflect the overall outcome.
@@ -175,4 +178,4 @@ def deepcoder_code_reward(
             eval_result_from_tests.reason
         )  # Use reason from test runner if it failed and provided one.
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics_dict)
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics_dict, is_score_valid=final_score == 1.0)

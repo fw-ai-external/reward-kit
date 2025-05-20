@@ -41,10 +41,11 @@ def informativeness_reward(
         return EvaluateResult(
             score=0.0,
             reason="No assistant response found",  # Added reason for EvaluateResult
+            is_score_valid=False,
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="No assistant response found",  # success added
                 )
             },
@@ -60,7 +61,7 @@ def informativeness_reward(
     length_score = min(length / 1000.0, 1.0)  # Cap at 1000 chars
     metrics["length"] = MetricResult(
         score=length_score * 0.2,  # 20% weight
-        success=length_score > 0,  # Basic success if length > 0
+        is_score_valid=length_score > 0,  # Basic success if length > 0
         reason=f"Response length: {length} chars",
     )
 
@@ -80,7 +81,7 @@ def informativeness_reward(
     marker_score = min(marker_count / 2.0, 1.0)  # Cap at 2 markers
     metrics["specificity"] = MetricResult(
         score=marker_score * 0.3,  # 30% weight
-        success=marker_count > 0,  # Basic success if markers found
+        is_score_valid=marker_count > 0,  # Basic success if markers found
         reason=f"Found {marker_count} specificity markers",
     )
 
@@ -109,7 +110,7 @@ def informativeness_reward(
 
     metrics["content_density"] = MetricResult(
         score=density_score * 0.5,  # 50% weight
-        success=density_score > 0.1,  # Basic success if density is somewhat reasonable
+        is_score_valid=density_score > 0.1,  # Basic success if density is somewhat reasonable
         reason=f"Content density: {content_word_count} content words in {word_count} total words",
     )
 
@@ -122,7 +123,7 @@ def informativeness_reward(
     elif final_score < 0.3:
         overall_reason = "Response lacks informativeness."
 
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics, is_score_valid=final_score > 0.0)
 
 
 # Test the reward function with example messages

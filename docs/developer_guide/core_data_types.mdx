@@ -60,14 +60,17 @@ from reward_kit import EvaluateResult, MetricResult
 result = EvaluateResult(
     score=0.75,  # Overall score between 0.0 and 1.0
     reason="The response meets quality requirements",  # Optional explanation
+    is_score_valid=True,
     metrics={    # Component metrics dictionary
         "clarity": MetricResult(
+            is_score_valid=True,
             score=0.8,
             reason="The response is clear and concise"
         ),
         "accuracy": MetricResult(
             score=0.7,
-            reason="Contains one minor factual error"
+            reason="Contains one minor factual error",
+            is_score_valid=True
         )
     }
 )
@@ -87,14 +90,14 @@ from reward_kit import MetricResult
 metric = MetricResult(
     score=0.8,  # Score for this specific metric
     reason="Explanation for why this score was assigned",  # Description
-    success=True  # Optional success indicator
+    is_score_valid=True  # Success indicator, if you want to use this score for rl training
 )
 ```
 
 The `MetricResult` class represents a single component metric in the evaluation, containing:
 - A score value (typically 0.0 to 1.0)
 - A reason/explanation for the score
-- An optional success flag indicating if this metric evaluation was successful
+- An is_score_valid flag indicating if this metric evaluation is valid for RL training
 
 ### Removed Output Types (Legacy)
 
@@ -134,12 +137,13 @@ def my_reward_function(
         "clarity": MetricResult(
             score=clarity_score,
             reason=f"Clarity score: {clarity_score:.2f}",
-            success=clarity_score >= 0.7  # Optional success indicator
+            is_score_valid=clarity_score >= 0.7
         )
     }
 
     return EvaluateResult(
         score=clarity_score,
+        is_score_valid=True,
         reason=f"Overall quality assessment: {clarity_score:.2f}",
         metrics=metrics
     )
@@ -150,7 +154,7 @@ def my_reward_function(
 1. **Use EvaluateResult**: Always return EvaluateResult from your reward functions
 2. **Use Type Hints**: Include proper type annotations in your functions
 3. **Provide Reasons**: Include clear reason strings for both overall score and individual metrics
-4. **Use Success Flags**: Set the success flag in MetricResult to indicate pass/fail conditions
+4. **Use is_score_valid**: Set the is_score_valid flag in MetricResult to indicate pass/fail or validity conditions
 5. **Default Values**: Provide defaults for optional parameters
 6. **Validation**: Validate input data before processing
 7. **Error Handling**: Handle missing or malformed data gracefully
@@ -179,11 +183,12 @@ def my_reward(messages, **kwargs):
     return EvaluateResult(
         score=0.75,
         reason="Overall assessment",  # Add an overall reason
+        is_score_valid=True,
         metrics={
             "clarity": MetricResult(
                 score=0.8,
                 reason="Clear explanation",
-                success=True  # Add success flag if applicable
+                is_score_valid=True  # Add is_score_valid flag if applicable
             )
         }
     )

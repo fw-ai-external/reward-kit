@@ -48,12 +48,12 @@ class TestTagCountReward(unittest.TestCase):
         # Check the overall score (0.5 * 2 = 1.0)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertEqual(result.metrics["overall"].success, True)
+        self.assertEqual(result.metrics["overall"].is_score_valid, True)
         self.assertEqual(result.metrics["tag_think"].score, 1.0)
         self.assertEqual(result.metrics["tag_answer"].score, 1.0)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertEqual(result["metrics"]["overall"]["success"], True)
+        self.assertEqual(result["metrics"]["overall"]["is_score_valid"], True)
         self.assertEqual(result["metrics"]["tag_think"]["score"], 1.0)
         self.assertEqual(result["metrics"]["tag_answer"]["score"], 1.0)
 
@@ -80,12 +80,12 @@ class TestTagCountReward(unittest.TestCase):
         # Check the overall score (0.5 * 1 = 0.5)
         # Attribute access
         self.assertEqual(result.score, 0.5)
-        self.assertEqual(result.metrics["overall"].success, False)
+        self.assertEqual(result.metrics["overall"].is_score_valid, False)
         self.assertEqual(result.metrics["tag_think"].score, 0.0)
         self.assertEqual(result.metrics["tag_answer"].score, 1.0)
         # Dictionary access
         self.assertEqual(result["score"], 0.5)
-        self.assertEqual(result["metrics"]["overall"]["success"], False)
+        self.assertEqual(result["metrics"]["overall"]["is_score_valid"], False)
         self.assertEqual(result["metrics"]["tag_think"]["score"], 0.0)
         self.assertEqual(result["metrics"]["tag_answer"]["score"], 1.0)
 
@@ -117,11 +117,11 @@ class TestTagCountReward(unittest.TestCase):
         # Only the balanced "answer" tag should count, "think" should be penalized
         # Attribute access
         self.assertEqual(result_balanced.score, 0.0)  # 0.5 - 0.5 = 0
-        self.assertEqual(result_balanced.metrics["overall"].success, False)
+        self.assertEqual(result_balanced.metrics["overall"].is_score_valid, False)
         self.assertEqual(result_balanced.metrics["tag_think"].score, 0.0)
         # Dictionary access
         self.assertEqual(result_balanced["score"], 0.0)
-        self.assertEqual(result_balanced["metrics"]["overall"]["success"], False)
+        self.assertEqual(result_balanced["metrics"]["overall"]["is_score_valid"], False)
         self.assertEqual(result_balanced["metrics"]["tag_think"]["score"], 0.0)
 
         # With require_balanced=False
@@ -168,12 +168,12 @@ class TestTagCountReward(unittest.TestCase):
         # Check the overall score (0.25 * 2 = 0.5)
         # Attribute access
         self.assertEqual(result.score, 0.5)
-        self.assertEqual(result.metrics["overall"].success, True)
+        self.assertEqual(result.metrics["overall"].is_score_valid, True)
         self.assertEqual(result.metrics["tag_reasoning"].score, 1.0)
         self.assertEqual(result.metrics["tag_conclusion"].score, 1.0)
         # Dictionary access
         self.assertEqual(result["score"], 0.5)
-        self.assertEqual(result["metrics"]["overall"]["success"], True)
+        self.assertEqual(result["metrics"]["overall"]["is_score_valid"], True)
         self.assertEqual(result["metrics"]["tag_reasoning"]["score"], 1.0)
         self.assertEqual(result["metrics"]["tag_conclusion"]["score"], 1.0)
 
@@ -202,11 +202,11 @@ class TestTagCountReward(unittest.TestCase):
         # Check the overall score (0.5 * 2 = 1.0)
         # Attribute access
         self.assertEqual(result.score, 1.0)
-        self.assertEqual(result.metrics["overall"].success, True)
+        self.assertEqual(result.metrics["overall"].is_score_valid, True)
         self.assertIn("3 balanced 'step' tag(s)", result.metrics["tag_step"].reason)
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertEqual(result["metrics"]["overall"]["success"], True)
+        self.assertEqual(result["metrics"]["overall"]["is_score_valid"], True)
         self.assertIn(
             "3 balanced 'step' tag(s)", result["metrics"]["tag_step"]["reason"]
         )
@@ -218,11 +218,11 @@ class TestTagCountReward(unittest.TestCase):
         # Attribute access
         self.assertEqual(result.score, 0.0)
         self.assertEqual(result.metrics["tag_count"].score, 0.0)
-        self.assertEqual(result.metrics["tag_count"].success, False)
+        self.assertEqual(result.metrics["tag_count"].is_score_valid, False)
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
         self.assertEqual(result["metrics"]["tag_count"]["score"], 0.0)
-        self.assertEqual(result["metrics"]["tag_count"]["success"], False)
+        self.assertEqual(result["metrics"]["tag_count"]["is_score_valid"], False)
 
     def test_non_assistant_message(self):
         """Test behavior when the last message is not from the assistant."""
@@ -232,10 +232,10 @@ class TestTagCountReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
-        self.assertEqual(result.metrics["tag_count"].success, False)
+        self.assertEqual(result.metrics["tag_count"].is_score_valid, False)
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
-        self.assertEqual(result["metrics"]["tag_count"]["success"], False)
+        self.assertEqual(result["metrics"]["tag_count"]["is_score_valid"], False)
 
     def test_attributes_in_tags(self):
         """Test tags with HTML-like attributes."""

@@ -52,6 +52,21 @@ from ..models import EvaluateResult, Message, MetricResult
 from ..reward_function import reward_function
 
 
+def _target_func_for_execution(result_container, execute_func, args):
+    try:
+        result = execute_func(*args)
+        result_container.update(result)
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        result_container.update(
+            {
+                "success": False,
+                "output": None,
+                "error": f"Execution error: {str(e)}\n{error_traceback}",
+            }
+        )
+
+
 def extract_code_blocks(
     text: str, language: Optional[str] = None
 ) -> List[Dict[str, str]]:
@@ -170,7 +185,7 @@ def local_code_execution_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -192,7 +207,7 @@ def local_code_execution_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason=f"No {language} code blocks found in model's response.",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -203,7 +218,7 @@ def local_code_execution_reward(
     metrics["extracted_code"] = MetricResult(
         score=0.0,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
-        success=True,
+        is_score_valid=True,
     )
 
     # Add expected output to metrics if available
@@ -211,7 +226,7 @@ def local_code_execution_reward(
         metrics["expected_output"] = MetricResult(
             score=0.0,
             reason=f"Expected output:\n{expected_output_str}",
-            success=True,
+            is_score_valid=True,
         )
 
     # Execute the code based on language
@@ -223,7 +238,7 @@ def local_code_execution_reward(
         execution_result = execute_javascript_code(code, timeout)
     else:
         metrics["error"] = MetricResult(
-            score=0.0, reason=f"Unsupported language: {language}", success=False
+            score=0.0, reason=f"Unsupported language: {language}", is_score_valid=False
         )
         return EvaluateResult(
             score=0.0, reason=f"Unsupported language: {language}", metrics=metrics
@@ -236,7 +251,7 @@ def local_code_execution_reward(
         metrics["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully with output:\n{output}",
-            success=True,
+            is_score_valid=True,
         )
 
         # Compare with expected output if provided
@@ -245,7 +260,7 @@ def local_code_execution_reward(
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str}\n\nActual:\n{output}"
 
             metrics["output_match"] = MetricResult(
-                score=similarity, reason=match_reason, success=similarity == 1.0
+                score=similarity, reason=match_reason, is_score_valid=similarity == 1.0
             )
             final_reason = f"Execution successful. Output similarity: {similarity:.2f}."
             return EvaluateResult(
@@ -262,7 +277,7 @@ def local_code_execution_reward(
         metrics["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed with error:\n{error}",
-            success=False,
+            is_score_valid=False,
         )
         final_reason = f"Code execution failed: {error}"
         return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
@@ -302,7 +317,7 @@ def _execute_code_in_process(
     Returns:
         Dictionary with execution results
     """
-    # Use multiprocessing to isolate the execution
+    import multiprocessing
     manager = multiprocessing.Manager()
     result_dict = manager.dict()
 
@@ -311,21 +326,19 @@ def _execute_code_in_process(
         target=_process_target_wrapper, args=(execute_func, args, result_dict)
     )
     process.start()
-    process.join(timeout=timeout + 0.5)  # Add a small buffer to the timeout
+    process.join(timeout=timeout + 0.5)
 
-    # If the process is still running, terminate it
     if process.is_alive():
         process.terminate()
-        process.join(0.5)  # Give it a chance to terminate gracefully
+        process.join(0.5)
         if process.is_alive():
-            process.kill()  # Force kill if still running
+            process.kill()
         return {
             "success": False,
             "output": None,
             "error": f"Timeout: execution timed out after {timeout} seconds",
         }
 
-    # If process died without updating result_dict
     if not result_dict:
         return {
             "success": False,
@@ -1010,7 +1023,7 @@ def e2b_code_execution_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason="E2B package not installed. Install with: pip install e2b",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -1024,7 +1037,7 @@ def e2b_code_execution_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason="E2B API key is required. Set the E2B_API_KEY environment variable or provide api_key parameter.",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -1044,7 +1057,7 @@ def e2b_code_execution_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -1066,7 +1079,7 @@ def e2b_code_execution_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason=f"No {language} code blocks found in model's response.",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -1077,7 +1090,7 @@ def e2b_code_execution_reward(
     metrics["extracted_code"] = MetricResult(
         score=0.0,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
-        success=True,
+        is_score_valid=True,
     )
 
     # Add expected output to metrics if available
@@ -1085,7 +1098,7 @@ def e2b_code_execution_reward(
         metrics["expected_output"] = MetricResult(
             score=0.0,
             reason=f"Expected output:\n{expected_output_str}",
-            success=True,
+            is_score_valid=True,
         )
 
     # Execute the code in E2B sandbox
@@ -1100,7 +1113,7 @@ def e2b_code_execution_reward(
         metrics["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully in E2B sandbox with output:\n{output}",
-            success=True,
+            is_score_valid=True,
         )
 
         # Compare with expected output if provided
@@ -1109,7 +1122,7 @@ def e2b_code_execution_reward(
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str}\n\nActual:\n{output}"
 
             metrics["output_match"] = MetricResult(
-                score=similarity, reason=match_reason, success=similarity == 1.0
+                score=similarity, reason=match_reason, is_score_valid=similarity == 1.0
             )
             final_reason = (
                 f"E2B execution successful. Output similarity: {similarity:.2f}."
@@ -1128,7 +1141,7 @@ def e2b_code_execution_reward(
         metrics["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed in E2B sandbox with error:\n{error}",
-            success=False,
+            is_score_valid=False,
         )
         final_reason = f"E2B code execution failed: {error}"
         return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
@@ -1183,7 +1196,7 @@ def fractional_code_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -1208,7 +1221,7 @@ def fractional_code_reward(
                 reason="Invalid ground_truth format: expected string or list of test case dicts.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, success=False, reason="Invalid ground_truth format."
+                        score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
                     )
                 },
             )
@@ -1218,7 +1231,7 @@ def fractional_code_reward(
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Invalid ground_truth format."
+                    score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
                 )
             },
         )
@@ -1235,7 +1248,7 @@ def fractional_code_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason=f"No {language} code blocks found in model's response.",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -1276,7 +1289,7 @@ def fractional_code_reward(
                     "error": MetricResult(
                         score=0.0,
                         reason="E2B package not installed. Install with: pip install e2b",
-                        success=False,
+                        is_score_valid=False,
                     )
                 },
             )
@@ -1291,13 +1304,13 @@ def fractional_code_reward(
         else:
             # Convert string metrics to MetricResult objects before returning
             final_metrics_on_error: Dict[str, MetricResult] = {
-                k: MetricResult(score=0.0, reason=v, success=(k == "extracted_code"))
+                k: MetricResult(score=0.0, reason=v, is_score_valid=(k == "extracted_code"))
                 for k, v in metrics_strings.items()
             }
             final_metrics_on_error["error"] = MetricResult(
                 score=0.0,
                 reason=f"Unsupported language: {language}",
-                success=False,
+                is_score_valid=False,
             )
             return EvaluateResult(
                 score=0.0,
@@ -1310,7 +1323,7 @@ def fractional_code_reward(
         k: MetricResult(
             score=0.0,
             reason=v,
-            success=(
+            is_score_valid=(
                 k == "extracted_code"
                 or (k == "expected_output" and expected_output_str_from_gt is not None)
             ),
@@ -1323,7 +1336,7 @@ def fractional_code_reward(
         metric_results["execution_result"] = MetricResult(
             score=1.0,
             reason=f"Code executed successfully with output:\n{output}",
-            success=True,
+            is_score_valid=True,
         )
 
         if (
@@ -1332,7 +1345,7 @@ def fractional_code_reward(
             similarity = compare_outputs(output, expected_output_str_from_gt)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str_from_gt}\n\nActual:\n{output}"
             metric_results["output_match"] = MetricResult(
-                score=similarity, reason=match_reason, success=similarity == 1.0
+                score=similarity, reason=match_reason, is_score_valid=similarity == 1.0
             )
             final_reason = f"Fractional code execution successful. Output similarity: {similarity:.2f}."
             return EvaluateResult(
@@ -1349,7 +1362,7 @@ def fractional_code_reward(
         metric_results["execution_result"] = MetricResult(
             score=0.0,
             reason=f"Code execution failed with error:\n{error}",
-            success=False,
+            is_score_valid=False,
         )
         final_reason = f"Fractional code execution failed: {error}"
         return EvaluateResult(score=0.0, reason=final_reason, metrics=metric_results)
@@ -1395,7 +1408,7 @@ def _run_test_cases(
             reason="No test cases provided",
             metrics={
                 "error": MetricResult(  # Changed
-                    score=0.0, reason="No test cases provided", success=False
+                    score=0.0, reason="No test cases provided", is_score_valid=False
                 )
             },
         )
@@ -1627,7 +1640,7 @@ process.stdout.write(output); // Write directly to avoid extra newline
                 "error": MetricResult(
                     score=0.0,
                     reason=f"Unsupported language for test cases: {language}",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -1650,7 +1663,7 @@ process.stdout.write(output); // Write directly to avoid extra newline
                         "error": MetricResult(  # Changed
                             score=0.0,
                             reason="E2B package not installed. Install with: pip install e2b",
-                            success=False,
+                            is_score_valid=False,
                         )
                     },
                 )
@@ -1676,7 +1689,7 @@ process.stdout.write(output); // Write directly to avoid extra newline
                         "error": MetricResult(
                             score=0.0,
                             reason=f"Unsupported language for local execution: {language}",
-                            success=False,
+                            is_score_valid=False,
                         )
                     },
                 )  # Changed
@@ -1745,20 +1758,20 @@ process.stdout.write(output); // Write directly to avoid extra newline
             final_metrics[key] = MetricResult(
                 score=score,  # Use overall score for this summary metric
                 reason=json.dumps(value, indent=2),  # Serialize list of dicts
-                success=score == 1.0,
+                is_score_valid=score == 1.0,
             )
         elif key == "pass_rate":
             final_metrics[key] = MetricResult(
                 score=score,  # Use overall score
                 reason=str(value),
-                success=score == 1.0,
+                is_score_valid=score == 1.0,
             )
         elif isinstance(
             value, MetricResult
         ):  # Should not happen here as metrics are strings or lists
             final_metrics[key] = value
         elif isinstance(value, str):  # Should not happen here anymore
-            final_metrics[key] = MetricResult(score=0.0, reason=value, success=False)
+            final_metrics[key] = MetricResult(score=0.0, reason=value, is_score_valid=False)
 
     return EvaluateResult(
         score=score, reason=f"{passed}/{total} tests passed.", metrics=final_metrics

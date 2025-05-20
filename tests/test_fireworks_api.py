@@ -1,41 +1,30 @@
 import json
 import os
-
 import requests
 
-# Print API key info (masked)
-api_key = os.environ.get("FIREWORKS_API_KEY", "")
+from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+
+# Get API key using the new auth module
+api_key = get_fireworks_api_key()
 if api_key:
-    print(f"API key found: {api_key[:4]}...{api_key[-4:]}")
+    print(f"API key retrieved via auth module: {api_key[:4]}...{api_key[-4:]}")
 else:
-    print("No API key found in environment")
+    print("No API key retrieved via auth module.")
 
-# Read account ID from settings
-account_id = os.environ.get("FIREWORKS_ACCOUNT_ID", "")
-if not account_id:
-    print("No account ID found in environment, trying to read from settings file")
-    import pathlib
-
-    settings_path = pathlib.Path.home() / ".fireworks" / "settings.ini"
-    if settings_path.exists():
-        try:
-            with open(settings_path, "r") as f:
-                for line in f:
-                    if "account_id" in line and "=" in line:
-                        account_id = line.split("=", 1)[1].strip()
-                        break
-        except Exception as e:
-            print(f"Error reading settings file: {str(e)}")
-
+# Get account ID using the new auth module
+account_id = get_fireworks_account_id()
 if account_id:
-    print(f"Using account ID: {account_id}")
+    print(f"Account ID retrieved via auth module: {account_id}")
 else:
-    print("No account ID found")
+    print("No account ID retrieved via auth module.")
+
+# Ensure api_key is not None for header construction, default to empty string if None
+effective_api_key = api_key if api_key is not None else ""
 
 # Test API connection
 try:
     # Try listing models to verify API connectivity
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = {"Authorization": f"Bearer {effective_api_key}"}
     base_url = "https://api.fireworks.ai/v1"
 
     # Check if models endpoint works (to verify API connection)

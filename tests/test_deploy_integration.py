@@ -87,47 +87,67 @@ def test_informativeness_reward(deploy_example):
 def test_deploy_to_fireworks(
     deploy_example, mock_env_variables, mock_requests_post, mock_requests_get
 ):
-    """Test the deployment function"""
-    with patch("reward_kit.auth.get_authentication") as mock_get_auth, patch.object(
-        deploy_example, "deploy_to_fireworks"
-    ) as mock_deploy:
+    """Test the deployment function using the refactored deploy_example"""
+    # mock_env_variables fixture sets FIREWORKS_API_KEY and FIREWORKS_ACCOUNT_ID
+    # mock_requests_post fixture mocks requests.post to simulate successful API call
+    # mock_requests_get fixture is also available if needed (e.g. for checking existence before PUT/POST)
 
-        # Mock the authentication function
-        mock_get_auth.return_value = ("test_account", "test_api_key")
+    # Call the actual deploy_to_fireworks function from the loaded example module
+    # This will use create_evaluation, which internally uses the new auth and requests.post
+    evaluation_id = deploy_example.deploy_to_fireworks()
 
-        # Mock the deploy function to return a fixed evaluation ID
-        mock_deploy.return_value = "informativeness-v1"
+    # Assert based on the mocked response in mock_requests_post and deploy_example logic
+    # The mock_requests_post returns:
+    # {
+    #     "name": "accounts/test_account/evaluators/informativeness-v1",
+    #     "displayName": "informativeness-v1", ...
+    # }
+    # The refactored deploy_example.py extracts "informativeness-v1" from this name.
+    assert evaluation_id == "informativeness-v1"
 
-        # Run the deploy function
-        evaluation_id = mock_deploy()
-
-        # Verify the result
-        assert evaluation_id == "informativeness-v1"
-        assert mock_deploy.call_count == 1
+    # Verify that requests.post was called (by create_evaluation)
+    mock_requests_post.assert_called()
 
 
-def test_deploy_failure_handling(deploy_example, mock_env_variables):
-    """Test error handling in the deploy_to_fireworks function"""
-    # Create a mock ValueError with the expected error message
-    error_message = """
-    Permission Error: Your API key doesn't have deployment permissions.
-    Possible solutions:
-    1. Use a production API key: export FIREWORKS_API_KEY=your_production_key
-    2. Request deployment permissions for your API key
-    3. Check if your account has evaluator deployment enabled
-    Error details: {"error":"unauthorized"}
-    """
+def test_deploy_failure_handling(deploy_example, mock_env_variables, monkeypatch):
+    """Test error handling in the deploy_to_fireworks function when API call fails"""
 
-    with patch.object(deploy_example, "deploy_to_fireworks") as mock_deploy:
-        # Mock the deploy function to raise a ValueError
-        mock_deploy.side_effect = ValueError(error_message)
+    # Configure mock_requests_post to simulate an API error
+    mock_response_one = MagicMock()  # Renamed to avoid conflict
+    mock_response_one.status_code = 401  # Unauthorized
+    mock_response_one.text = '{"error": "unauthorized"}'
+    mock_response_one.json.return_value = {"error": "unauthorized"}
+    # Import requests for requests.exceptions.HTTPError
+    import requests
 
-        # Since we're expecting an error, we need to handle it
-        try:
-            mock_deploy()
-            assert False, "Expected ValueError to be raised"
-        except ValueError as e:
-            # Verify the error was raised
-            assert isinstance(e, ValueError)
-            assert "Permission Error" in str(e)
-            assert mock_deploy.call_count == 1
+    mock_response_one.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        "API Error", response=mock_response_one
+    )
+
+    with patch("requests.post", return_value=mock_response_one) as mock_post_failure:
+        # Call the actual deploy_to_fireworks function
+        result = deploy_example.deploy_to_fireworks()
+
+        # The example's deploy_to_fireworks catches exceptions and prints, then returns None
+        assert result is None
+        mock_post_failure.assert_called()  # Ensure the API call was attempted
+
+    # Test another failure case, e.g. non-JSON response or other requests exception
+    with patch(
+        "requests.post",
+        side_effect=requests.exceptions.ConnectionError("Connection failed"),
+    ) as mock_post_conn_error:
+        result = deploy_example.deploy_to_fireworks()
+        assert result is None
+        mock_post_conn_error.assert_called()
+
+    # Create a mock ValueError with the expected error message (this part of original test seems less relevant now)
+    # error_message = """
+    # Permission Error: Your API key doesn't have deployment permissions.
+    # ...
+    # """
+    # The refactored deploy_example.py's error handling is more generic now,
+    # catching Exception and printing str(e).
+
+    # If we want to test specific error messages printed to console, we'd need to mock 'print'
+    # For now, verifying it returns None on error is sufficient for this test's scope.

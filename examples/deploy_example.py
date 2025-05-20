@@ -21,7 +21,100 @@ if not os.environ.get("FIREWORKS_API_KEY"):
     )
 
 from reward_kit import EvaluateResult, Message, MetricResult, reward_function
-from reward_kit.auth import get_authentication
+
+# get_authentication is removed, new auth functions are used by create_evaluation internally.
+# from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+from reward_kit.evaluation import create_evaluation
+import tempfile
+import shutil
+
+# The reward function code as a string to write to a temporary file
+INFORMATIVENESS_REWARD_CODE = """
+from reward_kit import EvaluateResult, Message, MetricResult, reward_function
+from typing import List # Ensure List is imported for the type hint
+
+@reward_function
+def evaluate( # Renamed from informativeness_reward to evaluate
+    messages: List[Message],
+    **kwargs,
+) -> EvaluateResult:
+    # This function is now named 'evaluate' as expected by the Evaluator class
+    if not messages or messages[-1].role != "assistant":
+        return EvaluateResult(
+            score=0.0,
+            reason="No assistant response found",
+            metrics={
+                "error": MetricResult(
+                    score=0.0,
+                    success=False,
+                    reason="No assistant response found",
+                )
+            },
+        )
+
+    response = (
+        messages[-1].content if messages[-1].content is not None else ""
+    )
+    metrics = {}
+
+    length = len(response)
+    length_score = min(length / 1000.0, 1.0)
+    metrics["length"] = MetricResult(
+        score=length_score * 0.2,
+        success=length_score > 0,
+        reason=f"Response length: {length} chars",
+    )
+
+    specificity_markers = [
+        "specifically", "in particular", "for example", "such as",
+        "notably", "precisely", "exactly",
+    ]
+    marker_count = sum(
+        1 for marker in specificity_markers if marker.lower() in response.lower()
+    )
+    marker_score = min(marker_count / 2.0, 1.0)
+    metrics["specificity"] = MetricResult(
+        score=marker_score * 0.3,
+        success=marker_count > 0,
+        reason=f"Found {marker_count} specificity markers",
+    )
+
+    content_words = [
+        "information", "data", "analysis", "recommend", "solution",
+        "approach", "technique", "method",
+    ]
+    word_count = len(response.split())
+    content_word_count = sum(
+        1 for word in content_words if word.lower() in response.lower()
+    )
+
+    if word_count > 0:
+        density_score = min(
+            content_word_count / (word_count / 20), 1.0
+        )
+    else:
+        density_score = 0.0
+
+    metrics["content_density"] = MetricResult(
+        score=density_score * 0.5,
+        success=density_score > 0.1,
+        reason=f"Content density: {content_word_count} content words in {word_count} total words",
+    )
+
+    final_score = sum(metric.score for metric in metrics.values())
+    overall_reason = "Evaluation based on length, specificity, and content density."
+    if final_score > 0.7:
+        overall_reason = "Response is informative."
+    elif final_score < 0.3:
+        overall_reason = "Response lacks informativeness."
+
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
+"""
+
+# Define the reward function here so it can be tested locally if needed,
+# but for deployment, we'll use its code string.
+# This requires importing List from typing for the annotation.
+from typing import List
 
 
 @reward_function
@@ -151,57 +244,75 @@ def test_reward_function():
 
 # Deploy the reward function to Fireworks
 def deploy_to_fireworks():
+    temp_metric_dir = None
     try:
-        # Get authentication from the auth module
-        account_id, auth_token = get_authentication()
+        # Create a temporary directory for the metric
+        temp_metric_dir = tempfile.mkdtemp(prefix="reward_kit_deploy_example_")
+        metric_main_py = os.path.join(temp_metric_dir, "main.py")
 
-        # Display info about what we're using
-        print(f"Using account ID: {account_id}")
-        print(f"Using auth token (first 10 chars): {auth_token[:10]}...")
+        with open(metric_main_py, "w") as f:
+            # Write the reward function code (defined above as a string) to main.py
+            # Need to adjust imports within the string if they rely on relative paths
+            # For this example, assume INFORMATIVENESS_REWARD_CODE is self-contained or uses absolute imports
+            f.write(INFORMATIVENESS_REWARD_CODE)
 
-        # Deploy the reward function with force=True to overwrite if it exists
-        evaluation_id = informativeness_reward.deploy(
-            name="informativeness-v1",
+        print(f"Created temporary metric file at {metric_main_py}")
+
+        # Deploy using create_evaluation
+        # Authentication is handled internally by create_evaluation
+        print("Deploying 'informativeness-v1'...")
+        evaluator_details = create_evaluation(
+            evaluator_id="informativeness-v1",
+            metric_folders=[f"informativeness={temp_metric_dir}"],
+            display_name="Informativeness Reward (v1)",
             description="Evaluates response informativeness based on specificity and content density",
-            account_id=account_id,
-            auth_token=auth_token,
             force=True,  # Overwrite if already exists
         )
-        print(f"Deployed evaluation with ID: {evaluation_id}")
 
-        # Example of deploying with a custom provider
-        custom_evaluation_id = informativeness_reward.deploy(
-            name="informativeness-v1-anthropic",
-            description="Informativeness evaluation using Claude model",
-            account_id=account_id,
-            auth_token=auth_token,
-            force=True,  # Overwrite if already exists
-            providers=[
-                {
-                    "providerType": "anthropic",
-                    "modelId": "claude-3-sonnet-20240229",
-                }
-            ],
-        )
-        print(f"Deployed evaluation with custom provider: {custom_evaluation_id}")
+        if evaluator_details and "name" in evaluator_details:
+            evaluation_id = evaluator_details[
+                "name"
+            ]  # The 'name' field usually contains the full path
+            # Extract the simple ID if it's part of a path like 'accounts/.../evaluators/ID'
+            if "/evaluators/" in evaluation_id:
+                evaluation_id = evaluation_id.split("/evaluators/")[-1]
 
-        # Show how to use the evaluation ID in a training job
-        print("Use this in your RL training job:")
-        print(
-            f'firectl create rl-job --reward-endpoint "https://api.fireworks.ai/v1/evaluations/{evaluation_id}"'
-        )
+            print(f"Successfully deployed evaluator. Full details: {evaluator_details}")
+            print(f"Evaluator ID: {evaluation_id}")
 
-        return evaluation_id
+            # Show how to use the evaluation ID in a training job
+            # Note: The endpoint structure might differ slightly based on API version.
+            # This is a generic example.
+            print("\nUse this in your RL training job (example endpoint):")
+            print(
+                f'firectl create rl-job --reward-endpoint "https://api.fireworks.ai/v1/accounts/YOUR_ACCOUNT_ID/evaluators/{evaluation_id}"'
+            )
+            return evaluation_id
+        else:
+            print(
+                f"Failed to deploy evaluator or extract ID. Response: {evaluator_details}"
+            )
+            return None
 
-    except ValueError as e:
-        print(f"Authentication error: {str(e)}")
-        print("Make sure you have proper Fireworks API credentials set up.")
+    except Exception as e:
+        print(f"Deployment error: {str(e)}")
+        # Consider re-raising or logging more details if needed
         return None
+    finally:
+        if temp_metric_dir and os.path.exists(temp_metric_dir):
+            print(f"Cleaning up temporary metric directory: {temp_metric_dir}")
+            shutil.rmtree(temp_metric_dir)
 
 
 if __name__ == "__main__":
     # First test the reward function locally
     print("Testing reward function locally...")
+    # To test locally, the informativeness_reward function needs to be defined in this scope
+    # The string version is for deployment. We'll use the directly defined one for local test.
+
+    # Re-define or ensure informativeness_reward is available for local test
+    # For simplicity, we assume the @reward_function decorated one above is used.
+    # If INFORMATIVENESS_REWARD_CODE was the sole source, we'd need to exec it or similar.
     test_reward_function()
 
     # Deploy to Fireworks

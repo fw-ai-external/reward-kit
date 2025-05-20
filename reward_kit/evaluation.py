@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 import requests
 
+from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+
 logger = logging.getLogger(__name__)
 
 # Flag to track if the preview API was successfully used
@@ -332,9 +334,27 @@ class Evaluator:
             raise ValueError(f"No valid samples found in {sample_file}")
 
         # Get authentication information
+        # Get authentication information
+        account_id = get_fireworks_account_id()
+        auth_token = get_fireworks_api_key()
+
+        if not account_id or not auth_token:
+            logger.error(
+                "Authentication error: Missing Fireworks Account ID or API Key. "
+                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY environment variables, "
+                "or configure them in ~/.fireworks/auth.ini."
+            )
+            raise ValueError(
+                "Missing Fireworks Account ID or API Key. "
+                "Ensure FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY are set "
+                "or configured in ~/.fireworks/auth.ini."
+            )
         try:
-            account_id, auth_token = self._get_authentication()
-        except ValueError as e:
+            # account_id, auth_token = self._get_authentication() # Original call
+            pass  # Now handled above
+        except (
+            ValueError
+        ) as e:  # This specific except block might be less relevant if direct checks are made
             logger.error(f"Authentication error: {str(e)}")
             raise
 
@@ -502,19 +522,34 @@ class Evaluator:
             raise ValueError("No code files loaded. Load metric folder(s) first.")
 
         # Authentication
-        try:
-            account_id, auth_token = self._get_authentication()
+        account_id = get_fireworks_account_id()
+        auth_token = get_fireworks_api_key()
 
-            # Verify API key format is valid
-            if not auth_token or len(auth_token) < 10 or not account_id:
-                logger.error("API credentials appear to be invalid or incomplete")
-                raise ValueError(
-                    "Invalid or missing API credentials. Please set valid FIREWORKS_API_KEY and "
-                    "FIREWORKS_ACCOUNT_ID environment variables or configure ~/.fireworks/auth.ini"
-                )
-        except ValueError as e:
-            logger.error(f"Authentication error: {str(e)}")
-            raise
+        if (
+            not auth_token or not account_id
+        ):  # Simplified check, length check can be added if necessary
+            logger.error(
+                "Authentication error: API credentials appear to be invalid or incomplete. "
+                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY environment variables, "
+                "or configure them in ~/.fireworks/auth.ini."
+            )
+            raise ValueError(
+                "Invalid or missing API credentials. Please set valid FIREWORKS_API_KEY and "
+                "FIREWORKS_ACCOUNT_ID environment variables or configure ~/.fireworks/auth.ini"
+            )
+        # try: # Original try-except might not be needed if checks are direct
+        # account_id, auth_token = self._get_authentication() # Original call
+
+        # Verify API key format is valid
+        # if not auth_token or len(auth_token) < 10 or not account_id: # Length check removed for brevity, can be re-added
+        # logger.error("API credentials appear to be invalid or incomplete")
+        # raise ValueError(
+        # "Invalid or missing API credentials. Please set valid FIREWORKS_API_KEY and "
+        # "FIREWORKS_ACCOUNT_ID environment variables or configure ~/.fireworks/auth.ini"
+        # )
+        # except ValueError as e:
+        # logger.error(f"Authentication error: {str(e)}")
+        # raise
 
         # Set display name and description
         self.display_name = display_name or evaluator_id
@@ -868,88 +903,38 @@ if __name__ == '__main__':
 
     def _get_authentication(self):
         """
-        Get authentication information for the Fireworks API
+        Get authentication information for the Fireworks API.
+        This method now uses the centralized functions from reward_kit.auth.
 
         Returns:
             Tuple of (account_id, auth_token)
+
+        Raises:
+            ValueError: If either account_id or auth_token couldn't be found.
         """
-        import configparser
-        from pathlib import Path
-
-        # Try to get API key from environment
-        auth_token = os.environ.get("FIREWORKS_API_KEY")
-        account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
-
-        # If not found, try config files
-        if not auth_token or not account_id:
-            auth_path = Path.home() / ".fireworks" / "auth.ini"
-            settings_path = Path.home() / ".fireworks" / "settings.ini"
-
-            # Try to read auth.ini first with standard configparser
-            if auth_path.exists():
-                try:
-                    auth_config = configparser.ConfigParser()
-                    auth_config.read(auth_path)
-                    if "default" in auth_config:
-                        if not auth_token and "id_token" in auth_config["default"]:
-                            auth_token = auth_config["default"]["id_token"]
-                except Exception:
-                    # If standard parsing fails, try to read as key-value pairs
-                    try:
-                        with open(auth_path, "r") as f:
-                            for line in f:
-                                if "=" in line:
-                                    key, value = line.split("=", 1)
-                                    key = key.strip()
-                                    value = value.strip()
-                                    if key == "id_token" and not auth_token:
-                                        auth_token = value
-                                    elif key == "account_id" and not account_id:
-                                        account_id = value
-                    except Exception as e:
-                        logger.warning(
-                            f"Error reading auth.ini as key-value pairs: {str(e)}"
-                        )
-
-            # Try to read settings.ini with standard configparser
-            if settings_path.exists():
-                try:
-                    settings_config = configparser.ConfigParser()
-                    settings_config.read(settings_path)
-                    if "default" in settings_config:
-                        if (
-                            not account_id
-                            and "account_id" in settings_config["default"]
-                        ):
-                            account_id = settings_config["default"]["account_id"]
-                except Exception:
-                    # If standard parsing fails, try to read as key-value pairs
-                    try:
-                        with open(settings_path, "r") as f:
-                            for line in f:
-                                if "=" in line:
-                                    key, value = line.split("=", 1)
-                                    key = key.strip()
-                                    value = value.strip()
-                                    if key == "account_id" and not account_id:
-                                        account_id = value
-                    except Exception as e:
-                        logger.warning(
-                            f"Error reading settings.ini as key-value pairs: {str(e)}"
-                        )
-
-        # We need real authentication credentials
+        account_id = get_fireworks_account_id()
+        auth_token = get_fireworks_api_key()
 
         if not account_id:
+            logger.error(
+                "Authentication error: Fireworks Account ID not found. "
+                "Please set the FIREWORKS_ACCOUNT_ID environment variable "
+                "or configure it in ~/.fireworks/auth.ini."
+            )
             raise ValueError(
-                "Account ID not found. Set FIREWORKS_ACCOUNT_ID environment variable "
-                "or configure ~/.fireworks/settings.ini"
+                "Fireworks Account ID not found. Set FIREWORKS_ACCOUNT_ID environment variable "
+                "or configure it in ~/.fireworks/auth.ini."
             )
 
         if not auth_token:
+            logger.error(
+                "Authentication error: Fireworks API Key not found. "
+                "Please set the FIREWORKS_API_KEY environment variable "
+                "or configure it in ~/.fireworks/auth.ini."
+            )
             raise ValueError(
-                "Auth token not found. Set FIREWORKS_API_KEY environment variable "
-                "or configure ~/.fireworks/auth.ini"
+                "Fireworks API Key not found. Set FIREWORKS_API_KEY environment variable "
+                "or configure it in ~/.fireworks/auth.ini."
             )
 
         return account_id, auth_token

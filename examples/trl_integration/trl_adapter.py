@@ -265,6 +265,9 @@ def prepare_grpo_message_format(
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
 
+    # Add a default user prompt if there isn't one
+    messages.append({"role": "user", "content": "Respond to this prompt."})
+
     # Add the response as assistant message
     messages.append({"role": "assistant", "content": text})
 
@@ -288,9 +291,19 @@ def apply_reward_to_responses(
         List of reward scores
     """
     # Convert responses to message format
-    message_batches = [
-        prepare_grpo_message_format(response, system_prompt) for response in responses
-    ]
+    message_batches = []
+    for response in responses:
+        user_message = {"role": "user", "content": "Evaluate this response."}
+        assistant_message = {"role": "assistant", "content": response}
+
+        # Create a conversation with system, user, and assistant messages
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append(user_message)
+        messages.append(assistant_message)
+
+        message_batches.append(messages)
 
     # Check if we need to get the adapter
     if isinstance(reward_function, RewardFunction):

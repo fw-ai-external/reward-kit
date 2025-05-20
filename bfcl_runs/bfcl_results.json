@@ -1,0 +1,24 @@
+{
+  "multi_turn_base_0": {
+    "error": null,
+    "score": 0.0,
+    "reason": "State or function calls did not perfectly match ground truth. State match failed. Differences: {\"TwitterAPI\": {\"tweets\": [{\"0\": {\"content\": \"Just finished analyzing the reports!\", \"id\": 0, \"mentions\": [], \"tags\": [\"#analysis\", \"#reports\"], \"username\": \"analyst_pro\"}, \"1\": {\"content\": \"Budget analysis insights coming soon!\", \"id\": 1, \"mentions\": [], \"tags\": [\"#budget\", \"#analysis\", \"#insights\"], \"username\": \"analyst_pro\"}, \"2\": {\"content\": \"Stay tuned for more updates!\", \"id\": 2, \"mentions\": [], \"tags\": [\"#updates\", \"#staytuned\"], \"username\": \"analyst_pro\"}}, {\"0\": {\"content\": \"Just finished analyzing the reports!\", \"id\": 0, \"mentions\": [], \"tags\": [\"#analysis\", \"#reports\"], \"username\": \"analyst_pro\"}, \"1\": {\"content\": \"Budget analysis insights coming soon!\", \"id\": 1, \"mentions\": [], \"tags\": [\"#budget\", \"#analysis\", \"#insights\"], \"username\": \"analyst_pro\"}, \"2\": {\"content\": \"Stay tuned for more updates!\", \"id\": 2, \"mentions\": [], \"tags\": [\"#updates\", \"#staytuned\"], \"username\": \"analyst_pro\"}}], \"following_list\": [[], [\"alice\", \"bob\"]]}, \"GorillaFileSystem\": {\"current_dir\": [{\"type\": \"directory\", \"name\": \"workspace\", \"contents\": {\"temp\": {\"type\": \"directory\", \"name\": \"temp\", \"contents\": {}}}}, null], \"root\": [{\"type\": \"directory\", \"name\": \"workspace\", \"contents\": {\"temp\": {\"type\": \"directory\", \"name\": \"temp\", \"contents\": {}}}}, \"<Directory: workspace, Parent: None, Contents: {'document': <Directory: document, Parent: workspace, Contents: {'temp': <Directory: temp, Parent: document, Contents: {'final_report.pdf': <<File: final_report.pdf, Content: Year2024 This is the final report content including budget analysis and other sections.>>, 'previous_report.pdf': <<File: previous_report.pdf, Content: Year203 This is the previous report content with different budget analysis.>>}>}>, 'archive': <Directory: archive, Parent: workspace, Contents: {}>}>\"]}} Function call match failed (1/4 GT turns with calls matched).",
+    "metrics": {
+      "state_match": {
+        "success": false,
+        "score": 0.0,
+        "reason": "State match: False, Differences: {\"TwitterAPI\": {\"tweets\": [{\"0\": {\"content\": \"Just finished analyzing the reports!\", \"id\": 0, \"mentions\": [], \"tags\": [\"#analysis\", \"#reports\"], \"username\": \"analyst_pro\"}, \"1\": {\"content\": \"Budget analysis insights coming soon!\", \"id\": 1, \"mentions\": [], \"tags\": [\"#budget\", \"#analysis\", \"#insights\"], \"username\": \"analyst_pro\"}, \"2\": {\"content\": \"Stay tuned for more updates!\", \"id\": 2, \"mentions\": [], \"tags\": [\"#updates\", \"#staytuned\"], \"username\": \"analyst_pro\"}}, {\"0\": {\"content\": \"Just finished analyzing the reports!\", \"id\": 0, \"mentions\": [], \"tags\": [\"#analysis\", \"#reports\"], \"username\": \"analyst_pro\"}, \"1\": {\"content\": \"Budget analysis insights coming soon!\", \"id\": 1, \"mentions\": [], \"tags\": [\"#budget\", \"#analysis\", \"#insights\"], \"username\": \"analyst_pro\"}, \"2\": {\"content\": \"Stay tuned for more updates!\", \"id\": 2, \"mentions\": [], \"tags\": [\"#updates\", \"#staytuned\"], \"username\": \"analyst_pro\"}}], \"following_list\": [[], [\"alice\", \"bob\"]]}, \"GorillaFileSystem\": {\"current_dir\": [{\"type\": \"directory\", \"name\": \"workspace\", \"contents\": {\"temp\": {\"type\": \"directory\", \"name\": \"temp\", \"contents\": {}}}}, null], \"root\": [{\"type\": \"directory\", \"name\": \"workspace\", \"contents\": {\"temp\": {\"type\": \"directory\", \"name\": \"temp\", \"contents\": {}}}}, \"<Directory: workspace, Parent: None, Contents: {'document': <Directory: document, Parent: workspace, Contents: {'temp': <Directory: temp, Parent: document, Contents: {'final_report.pdf': <<File: final_report.pdf, Content: Year2024 This is the final report content including budget analysis and other sections.>>, 'previous_report.pdf': <<File: previous_report.pdf, Content: Year203 This is the previous report content with different budget analysis.>>}>}>, 'archive': <Directory: archive, Parent: workspace, Contents: {}>}>\"]}}"
+      },
+      "function_call_match": {
+        "success": false,
+        "score": 0.0,
+        "reason": "1/4 GT turns with calls matched by model. Model made calls in 4 turn(s)."
+      },
+      "format_check": {
+        "success": true,
+        "score": 0.2,
+        "reason": "9/9 assistant messages had correct format."
+      }
+    }
+  }
+}

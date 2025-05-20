@@ -104,6 +104,22 @@ class PythonStateResource(ForkableResource):
         """
         return copy.deepcopy(self._state)
 
+    def get_state(self) -> Dict[str, Any]:
+        """
+        Returns a deep copy of the current state dictionary.
+        This is a synchronous version of get_observation for compatibility with test tasks.
+        """
+        return copy.deepcopy(self._state)
+
+    def set_state(self, state: Dict[str, Any]) -> None:
+        """
+        Sets the resource's state to the provided dictionary.
+
+        Args:
+            state: A dictionary containing the new state.
+        """
+        self._state = copy.deepcopy(state)
+
     async def get_tools_spec(self) -> List[Dict[str, Any]]:
         """
         Returns a list of tool specifications available for this resource.

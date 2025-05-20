@@ -24,11 +24,13 @@ except ImportError:
 
 import json  # Fallback or for explicit JSON files
 import logging  # For logger instance
+import os  # For environment variables
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from reward_kit.agent import Orchestrator
+from reward_kit.agent.task_manager import TaskManager
 from reward_kit.models import TaskDefinitionModel  # Import the new Pydantic model
 
 # setup_logging is already called in cli.py's main, but good for standalone use if any
@@ -42,115 +44,234 @@ def agent_eval_command(args):
     logger = logging.getLogger("agent_eval")  # Use a specific logger
     logger.info("Starting agent-eval command.")
 
+    # Create a new TaskManager instance
+    task_manager = TaskManager()
+
+    # Handle task definition file or directory
     if not args.task_def:
         logger.error(
-            "Error: --task-def (path to task definition YAML file) is required."
+            "Error: --task-def (path to task definition YAML file or directory) is required."
         )
         return 1
 
     task_def_path = Path(args.task_def)
-    if not task_def_path.exists() or not task_def_path.is_file():
-        logger.error(
-            f"Error: Task definition file not found or is not a file: {task_def_path}"
+
+    # Register tasks based on whether it's a file or directory
+    registered_task_ids = []
+    if task_def_path.is_file():
+        # Single task definition file
+        task_def = task_manager._load_task_from_file(str(task_def_path))
+        if task_def:
+            task_id = task_manager.register_task(task_def)
+            registered_task_ids.append(task_id)
+        else:
+            logger.error(f"Failed to load task definition from {task_def_path}")
+            return 1
+    elif task_def_path.is_dir():
+        # Directory of task definitions
+        registered_task_ids = task_manager.register_tasks_from_directory(
+            str(task_def_path)
         )
-        return 1
-
-    task_definition = None
-    try:
-        with open(task_def_path, "r") as f:
-            if yaml:
-                try:
-                    task_definition = yaml.safe_load(f)
-                    logger.info(
-                        f"Successfully loaded task definition from YAML: {task_def_path}"
-                    )
-                except yaml.YAMLError as e_yaml:
-                    logger.error(f"Error parsing YAML file {task_def_path}: {e_yaml}")
-                    logger.info("Attempting to parse as JSON as a fallback...")
-                    f.seek(0)  # Reset file pointer
-                    try:
-                        task_definition = json.load(f)
-                        logger.info(
-                            f"Successfully loaded task definition as JSON (fallback): {task_def_path}"
-                        )
-                    except json.JSONDecodeError as e_json:
-                        logger.error(
-                            f"Error parsing file as JSON (fallback attempt for {task_def_path}): {e_json}"
-                        )
-                        return 1
-            else:  # PyYAML not available, try to parse as JSON directly
-                logger.warning(
-                    "PyYAML not installed. Attempting to parse task definition as JSON."
-                )
-                try:
-                    task_definition = json.load(f)
-                    logger.info(
-                        f"Successfully loaded task definition from JSON (PyYAML not found): {task_def_path}"
-                    )
-                except json.JSONDecodeError as e_json:
-                    logger.error(
-                        f"Error: Could not parse task definition file {task_def_path} as JSON. PyYAML is recommended for YAML files."
-                    )
-                    return 1
-
-    except Exception as e:
-        logger.error(f"Error reading task definition file {task_def_path}: {e}")
-        return 1
-
-    if (
-        task_definition is None
-    ):  # Should have been caught by earlier returns, but defensive
-        logger.error("Task definition could not be loaded.")
-        return 1
-
-    # Validate the loaded dictionary against the Pydantic model
-    try:
-        validated_task_def = TaskDefinitionModel.model_validate(task_definition)
-        logger.info(
-            f"Task definition validated successfully: {validated_task_def.name}"
-        )
-    except ValidationError as e_val:
-        logger.error(f"Invalid task definition file structure in {task_def_path}:")
-        for error in e_val.errors():
+        if not registered_task_ids:
             logger.error(
-                f"  - {'.'.join(map(str,error['loc'])) if error['loc'] else 'root'}: {error['msg']}"
+                f"No valid task definitions found in directory: {task_def_path}"
             )
-        return 1
-    except Exception as e_other_val:  # Catch any other validation related errors
-        logger.error(
-            f"Unexpected error during task definition validation: {e_other_val}"
-        )
+            return 1
+    else:
+        logger.error(f"Task definition path not found or invalid: {task_def_path}")
         return 1
 
-    # Instantiate Orchestrator with the validated Pydantic model instance
-    try:
-        orchestrator = Orchestrator(task_definition=validated_task_def)
-    except Exception as e:
-        logger.error(f"Error instantiating Orchestrator: {e}")
-        return 1
+    logger.info(f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}")
 
-    # Run the Orchestrator's PoC lifecycle
+    # Run tasks with asyncio
     try:
-        # asyncio.run() is the entry point for async code from sync CLI
+
         async def main_flow():
-            # setup_base_resource is called within execute_task_poc if needed,
-            # or can be called separately if explicit setup control is desired before poc.
-            # For simplicity here, let execute_task_poc handle its own setup.
-            # await orchestrator.setup_base_resource() # This is optional if execute_task_poc handles it
-            result = await orchestrator.execute_task_poc()
-            # Handle or log the result if necessary
-            if result is None:
-                logger.warning(
-                    "Orchestrator's execute_task_poc returned None, indicating a possible issue during execution."
+            # Handle model override
+            if getattr(args, "model", None):
+                original_model = os.environ.get("MODEL_AGENT")
+                os.environ["MODEL_AGENT"] = args.model
+                logger.info(f"Model overridden to: {args.model}")
+
+            # Execute tasks based on CLI options
+            parallel = getattr(args, "parallel", False)
+            max_concurrency = getattr(args, "max_concurrency", 3)
+            filter_tasks = getattr(args, "filter", None)
+
+            # Filter tasks if specified
+            tasks_to_run = registered_task_ids
+            if filter_tasks:
+                tasks_to_run = [
+                    tid for tid in registered_task_ids if tid in filter_tasks
+                ]
+                if not tasks_to_run:
+                    logger.warning(
+                        f"No tasks match the specified filter: {filter_tasks}"
+                    )
+                    return
+
+            # Execute tasks (parallel or sequential)
+            try:
+                results = await task_manager.execute_tasks(
+                    task_ids=tasks_to_run,
+                    parallel=parallel,
+                    max_concurrency=max_concurrency,
                 )
-            else:
-                logger.info(f"Orchestrator PoC execution result: {result}")
+
+                # Log results summary
+                logger.info(f"Execution completed for {len(results)} tasks")
+                for task_id, result in results.items():
+                    if isinstance(result, dict) and "error" in result:
+                        logger.error(f"Task '{task_id}' failed: {result['error']}")
+                    elif isinstance(result, dict) and "score" in result:
+                        logger.info(f"Task '{task_id}' score: {result['score']}")
+                    else:
+                        logger.info(f"Task '{task_id}' completed")
+            finally:
+                # Clean up resources regardless of execution outcome
+                await task_manager.cleanup()
 
         asyncio.run(main_flow())
         logger.info("agent-eval command finished successfully.")
         return 0
     except Exception as e:
         logger.error(f"Error during agent-eval execution: {e}")
+        import traceback
+
+        logger.debug(traceback.format_exc())
+        return 1
+
+
+def bfcl_eval_command(args):
+    """
+    Run BFCL agent evaluations using the refactored framework.
+    This command specifically manages BFCL task evaluation.
+    """
+    logger = logging.getLogger("bfcl_eval")
+    logger.info("Starting BFCL evaluation command.")
+
+    # Create a TaskManager instance
+    task_manager = TaskManager()
+
+    # Get task directory
+    task_dir = Path(args.task_dir)
+    if not task_dir.is_dir():
+        logger.error(f"Task directory not found: {task_dir}")
+        return 1
+
+    # Load all tasks from the directory
+    logger.info(f"Registering BFCL tasks from {task_dir}")
+
+    try:
+        registered_task_ids = []
+
+        # Handle specific task_id vs. all tasks
+        if args.task_id:
+            # Look for a specific task
+            task_path = task_dir / f"{args.task_id}.yaml"
+            if not task_path.exists():
+                logger.error(f"Task file not found: {task_path}")
+                return 1
+
+            task_def = task_manager._load_task_from_file(str(task_path))
+            if task_def:
+                task_id = task_manager.register_task(task_def)
+                registered_task_ids.append(task_id)
+                logger.info(f"Registered task: {task_id}")
+            else:
+                logger.error(f"Failed to load task from {task_path}")
+                return 1
+        else:
+            # Register all tasks in the directory
+            registered_task_ids = task_manager.register_tasks_from_directory(
+                str(task_dir)
+            )
+            if not registered_task_ids:
+                logger.error(f"No valid BFCL tasks found in directory: {task_dir}")
+                return 1
+            logger.info(f"Registered {len(registered_task_ids)} BFCL tasks")
+
+        # Run tasks with asyncio
+        async def main_flow():
+            # Handle model override
+            if args.model:
+                original_model = os.environ.get("MODEL_AGENT")
+                os.environ["MODEL_AGENT"] = args.model
+                logger.info(f"Model overridden to: {args.model}")
+
+            # Create output directory if needed
+            if args.output_dir:
+                output_path = Path(args.output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Results will be saved to {output_path}")
+
+            # Execute tasks based on CLI options
+            try:
+                results = await task_manager.execute_tasks(
+                    task_ids=registered_task_ids,
+                    parallel=args.parallel,
+                    max_concurrency=args.max_concurrency,
+                )
+
+                # Log results summary
+                logger.info(f"BFCL evaluation completed for {len(results)} tasks")
+                for task_id, result in results.items():
+                    if isinstance(result, dict) and "error" in result:
+                        logger.error(f"Task '{task_id}' failed: {result['error']}")
+                    elif isinstance(result, dict) and "score" in result:
+                        logger.info(f"Task '{task_id}' score: {result['score']}")
+
+                        # More detailed results for BFCL
+                        if "format_score" in result:
+                            logger.info(
+                                f"Task '{task_id}' format score: {result['format_score']}"
+                            )
+                        if "state_match" in result:
+                            logger.info(
+                                f"Task '{task_id}' state match: {result['state_match']}"
+                            )
+                    else:
+                        logger.info(f"Task '{task_id}' completed with result: {result}")
+
+                # Save results to output directory if specified
+                if args.output_dir:
+                    results_file = Path(args.output_dir) / "bfcl_results.json"
+
+                    # Convert results to JSON-serializable format
+                    serializable_results = {}
+                    for task_id, result in results.items():
+                        if hasattr(result, "dict"):
+                            # Handle Pydantic models
+                            serializable_results[task_id] = result.dict()
+                        elif isinstance(result, dict):
+                            # Handle dictionaries with potentially non-serializable values
+                            serializable_dict = {}
+                            for k, v in result.items():
+                                if hasattr(v, "dict"):
+                                    serializable_dict[k] = v.dict()
+                                elif hasattr(v, "__dict__"):
+                                    serializable_dict[k] = str(v)
+                                else:
+                                    serializable_dict[k] = v
+                            serializable_results[task_id] = serializable_dict
+                        else:
+                            # Handle other objects by converting to string
+                            serializable_results[task_id] = str(result)
+
+                    with open(results_file, "w") as f:
+                        json.dump(serializable_results, f, indent=2)
+                    logger.info(f"Results saved to {results_file}")
+
+            finally:
+                # Clean up resources
+                await task_manager.cleanup()
+
+        asyncio.run(main_flow())
+        logger.info("BFCL evaluation completed successfully.")
+        return 0
+
+    except Exception as e:
+        logger.error(f"Error during BFCL evaluation: {e}")
         import traceback
 
         logger.debug(traceback.format_exc())

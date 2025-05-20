@@ -98,15 +98,32 @@ class Orchestrator:
             module_path, function_name = full_path.rsplit(".", 1)
             module = importlib.import_module(module_path)
             func = getattr(module, function_name)
-            if not callable(func):
+
+            # Check if the attribute exists but might not be directly callable due to decoration
+            # For example, bfcl_reward is defined in the module but wrapped with @reward_function
+            if hasattr(module, function_name):
+                # For attributes that are or contain callable objects
+                attr = getattr(module, function_name)
+                if callable(attr):
+                    self.logger.info(
+                        f"Successfully loaded function '{function_name}' from module '{module_path}'."
+                    )
+                    return attr
+                # For module-level objects that might wrap callable functions
+                elif hasattr(attr, "__call__"):
+                    self.logger.info(
+                        f"Successfully loaded callable object '{function_name}' from module '{module_path}'."
+                    )
+                    return attr.__call__
+                else:
+                    self.logger.error(
+                        f"Loaded attribute '{function_name}' from '{module_path}' is not callable."
+                    )
+            else:
                 self.logger.error(
-                    f"Loaded attribute '{function_name}' from '{module_path}' is not callable."
+                    f"Attribute '{function_name}' not found in module '{module_path}'."
                 )
-                return None
-            self.logger.info(
-                f"Successfully loaded function '{function_name}' from module '{module_path}'."
-            )
-            return func
+            return None
         except (ImportError, AttributeError, ValueError) as e:
             self.logger.error(f"Failed to load function from '{full_path}': {e}")
             return None
@@ -130,11 +147,79 @@ class Orchestrator:
                 "No 'tools_module_path' specified. Tools may only come from resource.get_tools_spec()."
             )
 
+        # Load reward function
         if self.task_definition.reward_function_path:
-            self.reward_function = self._load_module_and_function(
-                self.task_definition.reward_function_path
-            )
-            if not self.reward_function:
+            try:
+                # First try direct import
+                self.reward_function = self._load_module_and_function(
+                    self.task_definition.reward_function_path
+                )
+
+                if not self.reward_function:
+                    # If that failed, check if we need to import from reward_kit.rewards
+                    if "." not in self.task_definition.reward_function_path:
+                        # Try importing from rewards directly as a fallback
+                        fallback_path = f"reward_kit.rewards.{self.task_definition.reward_function_path}"
+                        self.logger.info(
+                            f"Attempting fallback import from: {fallback_path}"
+                        )
+                        self.reward_function = self._load_module_and_function(
+                            fallback_path
+                        )
+
+                    # If still no function, try importing from __init__ exports
+                    if (
+                        not self.reward_function
+                        and "reward_kit.rewards"
+                        in self.task_definition.reward_function_path
+                    ):
+                        # Extract the function name from the path
+                        func_name = self.task_definition.reward_function_path.split(
+                            "."
+                        )[-1]
+                        self.logger.debug(
+                            f"Attempting to get function by name: {func_name}"
+                        )
+                        try:
+                            import reward_kit.rewards
+
+                            self.logger.debug(
+                                f"Available in rewards module: {dir(reward_kit.rewards)}"
+                            )
+                            if hasattr(reward_kit.rewards, func_name):
+                                self.reward_function = getattr(
+                                    reward_kit.rewards, func_name
+                                )
+                                self.logger.info(
+                                    f"Found reward function {func_name} in reward_kit.rewards"
+                                )
+                                self.logger.debug(
+                                    f"Loaded function type: {type(self.reward_function)}"
+                                )
+                                self.logger.debug(
+                                    f"Is callable: {callable(self.reward_function)}"
+                                )
+                            else:
+                                self.logger.error(
+                                    f"Function {func_name} not found in reward_kit.rewards"
+                                )
+                        except (ImportError, AttributeError) as e:
+                            self.logger.error(
+                                f"Error importing from rewards module: {e}"
+                            )
+
+                if self.reward_function:
+                    self.logger.info(
+                        f"Successfully loaded reward function: {self.task_definition.reward_function_path}"
+                    )
+                    return True
+                else:
+                    self.logger.error(
+                        f"Failed to load reward function from '{self.task_definition.reward_function_path}'"
+                    )
+                    return False
+            except Exception as e:
+                self.logger.error(f"Error loading reward function: {e}", exc_info=True)
                 return False
         else:
             self.logger.error("Reward function path is mandatory but missing.")
@@ -221,88 +306,98 @@ class Orchestrator:
                         f"Skipping resource tool spec due to missing 'name': {tool_spec}"
                     )
 
-        # Keep the rest of the function for module tools
+        # Check for tools defined using ToolRegistry (more common pattern)
         if self.tools_module:
             self.logger.debug(
                 f"Inspecting tools_module: {self.tools_module} (type: {type(self.tools_module)})"
             )
 
-            members_to_inspect = []
-            if inspect.ismodule(self.tools_module):
-                self.logger.debug(
-                    f"tools_module is a module. Using inspect.getmembers."
-                )
-                members_to_inspect = inspect.getmembers(self.tools_module)
-            elif hasattr(
-                self.tools_module, "__dict__"
-            ):  # For class instances like DummyToolsModule
-                self.logger.debug(
-                    f"tools_module is an object with __dict__. Iterating __dict__.items()."
-                )
-                members_to_inspect = self.tools_module.__dict__.items()
-            else:  # Fallback to getmembers if no __dict__ or not a module
-                self.logger.debug(
-                    f"tools_module is not a module and has no __dict__. Falling back to inspect.getmembers."
-                )
-                members_to_inspect = inspect.getmembers(self.tools_module)
-
-            for name, member in members_to_inspect:
-                self.logger.debug(
-                    f"Found member in tools_module: '{name}', type: {type(member)}, callable: {callable(member)}"
-                )
-                if name.startswith("_") or not callable(member):
-                    self.logger.debug(
-                        f"Skipping member '{name}' (startswith_ or not callable)."
-                    )
+            # First, try to find a ToolRegistry instance
+            registry_instances = []
+            for name, member in inspect.getmembers(self.tools_module):
+                # Skip if it starts with underscore or is not a ToolRegistry
+                if name.startswith("_"):
                     continue
 
-                is_tool_async_nature = False
-                signature_target = member  # Default to member itself for signature
+                if hasattr(member, "get_tools") and callable(member.get_tools):
+                    registry_instances.append((name, member))
+                    self.logger.debug(f"Found ToolRegistry instance: {name}")
 
-                # Log type and isinstance check
-                # Try isinstance first, then by name as a fallback for potential mock type identity issues
-                is_async_mock_instance = isinstance(member, AsyncMock)
-                if not is_async_mock_instance and type(member).__name__ == "AsyncMock":
-                    self.logger.warning(
-                        f"Member '{name}' identified as AsyncMock by name, not isinstance. Type: {type(member)}, Expected AsyncMock type: {type(AsyncMock)}"
+            if registry_instances:
+                # Use the first registry instance found
+                registry_name, registry = registry_instances[0]
+                self.logger.info(f"Using ToolRegistry '{registry_name}' from module")
+
+                # Get all tools from the registry
+                registry_tools = registry.get_tools()
+                for tool_name, tool_func in registry_tools.items():
+                    # Create an adapter that will pass the resource to the tool
+                    def create_tool_adapter(tool_func):
+                        async def adapter(
+                            params: Dict[str, Any], bound_resource=episode_resource
+                        ):
+                            # Handle both sync and async functions
+                            if asyncio.iscoroutinefunction(tool_func):
+                                result = await tool_func(
+                                    resource=bound_resource, **params
+                                )
+                            else:
+                                result = tool_func(resource=bound_resource, **params)
+                            return result
+
+                        return adapter
+
+                    available_tools[tool_name] = create_tool_adapter(tool_func)
+                    self.logger.debug(
+                        f"Added tool '{tool_name}' from registry {registry_name}"
                     )
-                    is_async_mock_instance = True  # Treat it as an AsyncMock
 
+                # If we found and used a registry, we're done
+                if available_tools:
+                    self.logger.info(
+                        f"Found {len(available_tools)} tools from ToolRegistry"
+                    )
+                    self.logger.debug(f"Tool names: {list(available_tools.keys())}")
+
+            # If no registry tools were found, fall back to module inspection
+            if not available_tools:
                 self.logger.debug(
-                    f"Member '{name}': is_async_mock_instance = {is_async_mock_instance} (after name check), type is {type(member)}"
+                    "No ToolRegistry found or no tools in registry. Falling back to module inspection."
                 )
 
-                if is_async_mock_instance:
-                    is_tool_async_nature = True
-                    # Try to get the wrapped function for accurate signature inspection
-                    if hasattr(member, "func") and member.func is not None:
-                        self.logger.debug(
-                            f"Member '{name}' is AsyncMock, using wrapped func (from .func) for signature: {member.func}"
-                        )
-                        signature_target = member.func
-                    elif (
-                        hasattr(member, "_mock_wraps")
-                        and member._mock_wraps is not None
-                    ):  # Check _mock_wraps (internal)
-                        self.logger.debug(
-                            f"Member '{name}' is AsyncMock, using wrapped func (from ._mock_wraps) for signature: {member._mock_wraps}"
-                        )
-                        signature_target = member._mock_wraps
-                    else:
-                        self.logger.debug(
-                            f"Member '{name}' is AsyncMock, but no 'func' or '_mock_wraps' attribute found. Signature target will be the AsyncMock itself."
-                        )
-                elif asyncio.iscoroutinefunction(member):
-                    self.logger.debug(f"Member '{name}' is coroutine function.")
-                    is_tool_async_nature = True
-                else:
+                members_to_inspect = []
+                if inspect.ismodule(self.tools_module):
                     self.logger.debug(
-                        f"Member '{name}' is not identified as async tool (not AsyncMock by isinstance/name, not coroutine function)."
+                        "tools_module is a module. Using inspect.getmembers."
+                    )
+                    members_to_inspect = inspect.getmembers(self.tools_module)
+                elif hasattr(self.tools_module, "__dict__"):
+                    self.logger.debug(
+                        "tools_module is an object with __dict__. Iterating __dict__.items()."
+                    )
+                    members_to_inspect = self.tools_module.__dict__.items()
+                else:
+                    self.logger.debug("Falling back to inspect.getmembers.")
+                    members_to_inspect = inspect.getmembers(self.tools_module)
+
+                for name, member in members_to_inspect:
+                    self.logger.debug(
+                        f"Found member in tools_module: '{name}', type: {type(member)}, callable: {callable(member)}"
+                    )
+                    if name.startswith("_") or not callable(member):
+                        self.logger.debug(
+                            f"Skipping member '{name}' (startswith_ or not callable)."
+                        )
+                        continue
+
+                    # Check if it's a sync or async function
+                    is_async = asyncio.iscoroutinefunction(member)
+                    self.logger.debug(
+                        f"Member '{name}' is {'async' if is_async else 'sync'} function."
                     )
 
-                if is_tool_async_nature:
                     try:
-                        sig = inspect.signature(signature_target)
+                        sig = inspect.signature(member)
                         resource_param_name = next(
                             (
                                 pname
@@ -319,21 +414,25 @@ class Orchestrator:
                                 bound_tool_func=member,
                                 bound_resource=episode_resource,
                                 res_param_name=resource_param_name,
+                                is_async=is_async,
                             ):
                                 tool_kwargs = {res_param_name: bound_resource, **params}
-                                return await bound_tool_func(**tool_kwargs)
+                                if is_async:
+                                    return await bound_tool_func(**tool_kwargs)
+                                else:
+                                    return bound_tool_func(**tool_kwargs)
 
                             available_tools[name] = module_tool_adapter
                             self.logger.debug(
-                                f"Added tool '{name}' from tools_module (type: {type(member)}, signature target: {type(signature_target)})."
+                                f"Added tool '{name}' from tools_module directly."
                             )
                         else:
                             self.logger.debug(
-                                f"Skipping module tool '{name}' (type: {type(member)}): no 'resource' or 'db_resource' parameter in signature '{sig}'."
+                                f"Skipping module tool '{name}': no 'resource' or 'db_resource' parameter in signature '{sig}'."
                             )
                     except ValueError as e_sig:
                         self.logger.debug(
-                            f"Skipping module tool '{name}' (type: {type(member)}): could not get signature from {type(signature_target)}. Error: {e_sig}"
+                            f"Skipping module tool '{name}': could not get signature. Error: {e_sig}"
                         )
         self.logger.info(f"Combined available tools: {list(available_tools.keys())}")
         return available_tools
@@ -507,8 +606,9 @@ class Orchestrator:
                 # Format tools for OpenAI API (should be done once per user turn, or if tools change)
                 openai_tools: List[ChatCompletionToolParam] = []
                 if OPENAI_AVAILABLE:
+                    # First add tools from the resource
                     for spec in resource_tool_specs:
-                        # Ensure spec has the structure {"type": "function", "function": {...}}
+                        # Ensure spec has the structure with name and parameters
                         if "name" in spec and "parameters" in spec:
                             openai_tools.append(
                                 ChatCompletionToolParam(
@@ -525,6 +625,25 @@ class Orchestrator:
                         else:
                             self.logger.warning(
                                 f"Skipping tool spec due to missing name/parameters: {spec}"
+                            )
+
+                    # Now add tools from the registry
+                    if (
+                        self.tools_module
+                        and hasattr(self.tools_module, "R")
+                        and hasattr(self.tools_module.R, "get_openai_tools")
+                    ):
+                        registry_tools = self.tools_module.R.get_openai_tools()
+                        for tool_spec in registry_tools:
+                            openai_tools.append(
+                                ChatCompletionToolParam(
+                                    type="function",
+                                    function={
+                                        "name": tool_spec["name"],
+                                        "description": tool_spec.get("description", ""),
+                                        "parameters": tool_spec["parameters"],
+                                    },
+                                )
                             )
                 else:
                     self.logger.warning(
@@ -763,10 +882,10 @@ class Orchestrator:
             ground_truth_for_reward = None
             if eval_criteria:
                 ground_truth_for_reward = {
-                    "ground_truth_function_calls": getattr(
+                    "function_calls": getattr(
                         eval_criteria, "ground_truth_function_calls", None
                     ),
-                    "ground_truth_comparable_state": getattr(
+                    "comparable_state": getattr(
                         eval_criteria, "ground_truth_comparable_state", None
                     ),
                 }
@@ -783,12 +902,12 @@ class Orchestrator:
                 "messages": conversation_messages,  # Pass final conversation history (as dicts)
                 "state": state_for_reward,
                 "task_achieved": task_achieved,  # Still needs proper determination
-                # "tool_usage_counts": tool_usage_counts, # Replaced by successful_func_calls in state
                 "task_definition_name": self.task_definition.name,
             }
-            # Unpack the ground truth dictionary into eval_args if it exists
+
+            # Add ground_truth as a single parameter (not unpacked)
             if ground_truth_for_reward:
-                eval_args.update(ground_truth_for_reward)
+                eval_args["ground_truth"] = ground_truth_for_reward
 
             # Call the reward function
             evaluation_result = self.reward_function(**eval_args)

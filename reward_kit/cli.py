@@ -155,18 +155,67 @@ def parse_args(args=None):
     agent_eval_parser.add_argument(
         "--task-def",
         required=True,
-        help="Path to the task definition YAML/JSON file for the agent evaluation.",
+        help="Path to task definition file or directory containing task definitions.",
     )
-    # Add other relevant arguments for agent-eval (formerly v2) if needed,
-    # e.g., output_dir, model overrides, etc.
-    # For PoC, --task-def is the main one.
-    # Re-use verbose and debug from the main parser if they are global.
-    # agent_eval_parser.add_argument(
-    #     "--output-dir", # Example, if Orchestrator needs it and it's not in task_def
-    #     default="./agent_runs", # Updated default dir name
-    #     help="Directory to store agent evaluation runs (default: ./agent_runs)",
-    # )
-    # Arguments like --debug are handled by the main parser.
+    agent_eval_parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Execute tasks in parallel when multiple tasks are specified.",
+    )
+    agent_eval_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=3,
+        help="Maximum number of tasks to execute in parallel (default: 3).",
+    )
+    agent_eval_parser.add_argument(
+        "--filter",
+        nargs="+",
+        help="Run only tasks matching the specified task IDs.",
+    )
+    agent_eval_parser.add_argument(
+        "--output-dir",
+        default="./agent_runs",
+        help="Directory to store agent evaluation run results (default: ./agent_runs).",
+    )
+    agent_eval_parser.add_argument(
+        "--model",
+        help="Override MODEL_AGENT environment variable (format: provider/model_name).",
+    )
+
+    # BFCL-specific evaluation command
+    bfcl_eval_parser = subparsers.add_parser(
+        "bfcl-eval", help="Run BFCL agent evaluations"
+    )
+    bfcl_eval_parser.add_argument(
+        "--task-id",
+        help="Specific BFCL task ID to run (e.g., multi_turn_base_0)",
+    )
+    bfcl_eval_parser.add_argument(
+        "--task-dir",
+        default="evaluations/bfcl/tasks",
+        help="Directory containing BFCL task definitions (default: evaluations/bfcl/tasks)",
+    )
+    bfcl_eval_parser.add_argument(
+        "--model",
+        help="Override the model to use (instead of using MODEL_AGENT env var)",
+    )
+    bfcl_eval_parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run multiple tasks in parallel",
+    )
+    bfcl_eval_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=3,
+        help="Maximum number of tasks to run in parallel",
+    )
+    bfcl_eval_parser.add_argument(
+        "--output-dir",
+        default="./bfcl_runs",
+        help="Directory to store BFCL evaluation run results (default: ./bfcl_runs).",
+    )
 
     return parser.parse_args(args)
 
@@ -184,6 +233,10 @@ def main():
         return deploy_command(args)
     elif args.command == "agent-eval":
         return agent_eval_command(args)
+    elif args.command == "bfcl-eval":
+        from .cli_commands.agent_eval_cmd import bfcl_eval_command
+
+        return bfcl_eval_command(args)
     else:
         # No command provided, show help
         # This case should ideally not be reached if subparsers are required.

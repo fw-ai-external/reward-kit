@@ -37,7 +37,7 @@ class MetricResult(BaseModel):
         score (float): The score for this metric.
         reason (str): Explanation for the score.
     """
-    is_score_valid: bool
+    is_score_valid: bool = True
     score: float = Field(..., ge=0.0, le=1.0)
     reason: str
 
@@ -86,7 +86,7 @@ class EvaluateResult(BaseModel):
     error: Optional[str] = None
     score: float = Field(..., ge=0.0, le=1.0)
     reason: Optional[str] = None
-    is_score_valid: bool
+    is_score_valid: bool = True
     metrics: Dict[str, MetricResult]
 
     def __getitem__(self, key: str) -> Any:

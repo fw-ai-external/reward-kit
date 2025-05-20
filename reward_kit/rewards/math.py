@@ -564,7 +564,7 @@ def math_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -582,7 +582,7 @@ def math_reward(
             reason="Missing or empty ground_truth (expected math answer string).",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Invalid ground_truth string."
+                    score=0.0, is_score_valid=False, reason="Invalid ground_truth string."
                 )
             },
         )
@@ -602,12 +602,12 @@ def math_reward(
 
     metrics["extracted_original_answers"] = MetricResult(
         score=0.0,
-        success=bool(orig_answers_extracted),
+        is_score_valid=bool(orig_answers_extracted),
         reason=f"Extracted from original: {format_extracted(orig_answers_extracted)}",
     )
     metrics["extracted_generated_answers"] = MetricResult(
         score=0.0,
-        success=bool(gen_answers_extracted),
+        is_score_valid=bool(gen_answers_extracted),
         reason=f"Extracted from generated: {format_extracted(gen_answers_extracted)}",
     )
 
@@ -652,7 +652,7 @@ def math_reward(
         specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or'."
         full_reason = f"Strictness fail (Issue #1): {specific_reason_detail}"
         metrics["strictness_penalty_unboxed_or"] = MetricResult(
-            score=0.0, success=False, reason=specific_reason_detail
+            score=0.0, is_score_valid=False, reason=specific_reason_detail
         )
         return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
 
@@ -660,7 +660,7 @@ def math_reward(
         specific_reason_detail = "Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted)."
         full_reason = f"Strictness fail (Issue #2): {specific_reason_detail}"
         metrics["strictness_penalty_ambiguity"] = MetricResult(
-            score=0.0, success=False, reason=specific_reason_detail
+            score=0.0, is_score_valid=False, reason=specific_reason_detail
         )
         return EvaluateResult(score=0.0, reason=full_reason, metrics=metrics)
 
@@ -858,12 +858,12 @@ def math_reward(
                 match_found_flag = False  # No longer a success
                 best_match_reason = f"Strictness fail (Conflicting Answers): {specific_reason_detail}. Initial match was: {current_best_reason}"
                 metrics["strictness_penalty_conflicting_answers"] = MetricResult(
-                    score=0.0, success=False, reason=specific_reason_detail
+                    score=0.0, is_score_valid=False, reason=specific_reason_detail
                 )
 
     metrics["answer_comparison"] = MetricResult(
         score=best_match_score,
-        success=match_found_flag
+        is_score_valid=match_found_flag
         and best_match_score > 0,  # match_found_flag might be False now
         reason=best_match_reason,
     )

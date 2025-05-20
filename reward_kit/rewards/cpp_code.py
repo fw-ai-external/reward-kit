@@ -670,7 +670,7 @@ def _ioi_cpp_code_reward_impl(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Last message not a valid assistant response.",
                 )
             },
@@ -694,7 +694,7 @@ def _ioi_cpp_code_reward_impl(
                 metrics={
                     "error": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Invalid ground_truth list format.",
                     )
                 },
@@ -705,7 +705,7 @@ def _ioi_cpp_code_reward_impl(
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, success=False, reason="Invalid ground_truth format."
+                    score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
                 )
             },
         )
@@ -721,7 +721,7 @@ def _ioi_cpp_code_reward_impl(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason=f"No {language} code blocks found in model's response.",
                 )
             },
@@ -732,7 +732,7 @@ def _ioi_cpp_code_reward_impl(
 
     metrics["extracted_code"] = MetricResult(
         score=0.0,
-        success=True,
+        is_score_valid=True,
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
 
@@ -740,7 +740,7 @@ def _ioi_cpp_code_reward_impl(
     if expected_output_str_from_gt and not test_cases_from_gt:
         metrics["expected_output"] = MetricResult(
             score=0.0,
-            success=True,
+            is_score_valid=True,
             reason=f"Expected output:\n{expected_output_str_from_gt}",
         )
 
@@ -770,7 +770,7 @@ def _ioi_cpp_code_reward_impl(
         # Add test results to metrics
         metrics["test_results"] = MetricResult(
             score=overall_score,
-            success=overall_score >= pass_threshold,  # Success if pass_threshold is met
+            is_score_valid=overall_score >= pass_threshold,  # Success if pass_threshold is met
             reason=json.dumps(
                 [
                     {
@@ -787,7 +787,7 @@ def _ioi_cpp_code_reward_impl(
 
         metrics["pass_rate"] = MetricResult(
             score=overall_score,
-            success=overall_score == 1.0,  # Full success if all pass
+            is_score_valid=overall_score == 1.0,  # Full success if all pass
             reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
 
@@ -813,7 +813,7 @@ def _ioi_cpp_code_reward_impl(
 
             metrics["execution_result"] = MetricResult(
                 score=1.0,
-                success=True,
+                is_score_valid=True,
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
@@ -824,7 +824,7 @@ def _ioi_cpp_code_reward_impl(
 
             metrics["output_match"] = MetricResult(
                 score=similarity,
-                success=similarity >= pass_threshold,
+                is_score_valid=similarity >= pass_threshold,
                 reason=match_reason,
             )
 
@@ -838,7 +838,7 @@ def _ioi_cpp_code_reward_impl(
 
             metrics["execution_result"] = MetricResult(
                 score=0.0,
-                success=False,
+                is_score_valid=False,
                 reason=f"Code execution failed with error:\n{error}",
             )
 
@@ -866,7 +866,7 @@ def _ioi_cpp_code_reward_impl(
 
             metrics["execution_result"] = MetricResult(
                 score=1.0,
-                success=True,
+                is_score_valid=True,
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
@@ -877,7 +877,7 @@ def _ioi_cpp_code_reward_impl(
             final_reason = f"Code execution failed: {error}"
             metrics["execution_result"] = MetricResult(
                 score=0.0,
-                success=False,
+                is_score_valid=False,
                 reason=f"Code execution failed with error:\n{error}",
             )
 
@@ -951,7 +951,7 @@ def binary_cpp_code_reward(
         final_reason = f"Binary score based on threshold {pass_threshold:.2f}. Original score: {score:.2f}."
         metrics["binary_result"] = MetricResult(
             score=binary_score,
-            success=binary_score == 1.0,
+            is_score_valid=binary_score == 1.0,
             reason=f"{'Passed' if binary_score > 0 else 'Failed'} (threshold: {pass_threshold:.2f}, actual: {score:.2f})",
         )
 

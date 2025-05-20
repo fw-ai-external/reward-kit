@@ -46,7 +46,7 @@ def reasoning_steps_reward(
             reason="No messages provided",
             metrics={
                 "reasoning_steps": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -63,7 +63,7 @@ def reasoning_steps_reward(
             metrics={
                 "reasoning_steps": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Message not from assistant or has no content",
                 )
             },
@@ -124,7 +124,7 @@ def reasoning_steps_reward(
     if explicit_steps > 0:
         step_metrics["explicit_steps"] = MetricResult(
             score=min(1.0, explicit_steps / min_steps),
-            success=explicit_steps >= min_steps,
+            is_score_valid=explicit_steps >= min_steps,
             reason=f"Found {explicit_steps} explicit steps",
         )
 
@@ -133,7 +133,7 @@ def reasoning_steps_reward(
     if numbered_lists > 0:
         step_metrics["numbered_lists"] = MetricResult(
             score=min(1.0, numbered_lists / min_steps),
-            success=numbered_lists >= min_steps,
+            is_score_valid=numbered_lists >= min_steps,
             reason=f"Found {numbered_lists} numbered list items",
         )
 
@@ -142,7 +142,7 @@ def reasoning_steps_reward(
     if bullets > 0:
         step_metrics["bullet_points"] = MetricResult(
             score=min(1.0, bullets / min_steps),
-            success=bullets >= min_steps,
+            is_score_valid=bullets >= min_steps,
             reason=f"Found {bullets} bullet points",
         )
 
@@ -157,7 +157,7 @@ def reasoning_steps_reward(
     if transitions > 0:
         step_metrics["transition_phrases"] = MetricResult(
             score=min(1.0, transitions / min_steps),
-            success=transitions >= min_steps,
+            is_score_valid=transitions >= min_steps,
             reason=f"Found {transitions} transition phrases",
         )
 
@@ -165,7 +165,7 @@ def reasoning_steps_reward(
     metrics = {
         "reasoning_steps": MetricResult(
             score=score,
-            success=success,
+            is_score_valid=success,
             reason=f"Found {num_steps} reasoning steps (minimum required: {min_steps})",
         ),
         **step_metrics,
@@ -210,7 +210,7 @@ def sequence_reward(
             reason="No messages provided",
             metrics={
                 "sequence_reasoning": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -225,7 +225,7 @@ def sequence_reward(
             metrics={
                 "sequence_reasoning": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Message not from assistant or has no content",
                 )
             },
@@ -271,12 +271,12 @@ def sequence_reward(
     metrics = {
         "sequence_reasoning": MetricResult(
             score=score,
-            success=success,
+            is_score_valid=success,
             reason=f"Found {num_matches} sequential terms (minimum required: {min_matches})",
         ),
         "sequential_terms_found": MetricResult(
             score=score,
-            success=success,
+            is_score_valid=success,
             reason=f"Sequential terms found: {', '.join(found_terms)}",
         ),
     }

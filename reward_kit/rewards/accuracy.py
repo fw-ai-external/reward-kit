@@ -410,7 +410,7 @@ def accuracy_reward(
             reason="No messages provided (cannot extract model response).",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, success=False, reason="No messages provided."
+                    score=0.0, is_score_valid=False, reason="No messages provided."
                 )
             },
         )
@@ -428,7 +428,7 @@ def accuracy_reward(
                 reason="Last message is not a valid assistant response.",
                 metrics={
                     "accuracy": MetricResult(
-                        score=0.0, success=False, reason="Invalid assistant response."
+                        score=0.0, is_score_valid=False, reason="Invalid assistant response."
                     )
                 },
             )
@@ -445,7 +445,7 @@ def accuracy_reward(
                 metrics={
                     "accuracy": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Invalid assistant response (dict).",
                     )
                 },
@@ -456,7 +456,7 @@ def accuracy_reward(
             reason=f"Unexpected type for last message: {type(model_last_message)}.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type."
+                    score=0.0, is_score_valid=False, reason="Invalid message type."
                 )
             },
         )
@@ -468,7 +468,7 @@ def accuracy_reward(
             reason="Ground truth not provided or not in expected list format.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, success=False, reason="Invalid ground truth format."
+                    score=0.0, is_score_valid=False, reason="Invalid ground truth format."
                 )
             },
         )
@@ -485,7 +485,7 @@ def accuracy_reward(
                 reason="First ground truth message has no content.",
                 metrics={
                     "accuracy": MetricResult(
-                        score=0.0, success=False, reason="Ground truth content missing."
+                        score=0.0, is_score_valid=False, reason="Ground truth content missing."
                     )
                 },
             )
@@ -500,7 +500,7 @@ def accuracy_reward(
                 metrics={
                     "accuracy": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Ground truth content missing (dict).",
                     )
                 },
@@ -512,7 +512,7 @@ def accuracy_reward(
             metrics={
                 "accuracy": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Invalid ground truth message type.",
                 )
             },
@@ -567,7 +567,7 @@ def accuracy_reward(
     metrics = {
         "answer_extraction": MetricResult(
             score=1.0 if has_extracted else 0.0,
-            success=has_extracted,
+            is_score_valid=has_extracted,
             reason=(
                 f"Extracted answer: '{extracted_answer}'"
                 if has_extracted
@@ -576,7 +576,7 @@ def accuracy_reward(
         ),
         "answer_accuracy": MetricResult(
             score=similarity_score,
-            success=success,
+            is_score_valid=success,
             reason=f"Answer similarity: {similarity_score:.2f}",
         ),
     }

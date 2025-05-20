@@ -126,7 +126,7 @@ def multiple_choice_math_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Missing generated messages",
                 )
             },
@@ -139,7 +139,7 @@ def multiple_choice_math_reward(
             metrics={
                 "error": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Missing ground truth message",
                 )
             },
@@ -154,7 +154,7 @@ def multiple_choice_math_reward(
     if not gen_content:
         metrics["error_generated_message"] = MetricResult(
             score=0.0,
-            success=False,
+            is_score_valid=False,
             reason="Invalid generated message: Last message not from assistant or has no content.",
         )
         return EvaluateResult(
@@ -173,7 +173,7 @@ def multiple_choice_math_reward(
     if not orig_content:
         metrics["error_original_message"] = MetricResult(
             score=0.0,
-            success=False,
+            is_score_valid=False,
             reason="Invalid ground truth message: Not an assistant message or has no content.",
         )
         return EvaluateResult(
@@ -192,12 +192,12 @@ def multiple_choice_math_reward(
 
     metrics["extracted_original_mcq"] = MetricResult(
         score=1.0 if orig_mcq_options else 0.0,
-        success=bool(orig_mcq_options),
+        is_score_valid=bool(orig_mcq_options),
         reason=f"Extracted from original: {format_extracted_mcq(orig_mcq_options)}",
     )
     metrics["extracted_generated_mcq"] = MetricResult(
         score=1.0 if gen_mcq_options else 0.0,
-        success=bool(gen_mcq_options),
+        is_score_valid=bool(gen_mcq_options),
         reason=f"Extracted from generated: {format_extracted_mcq(gen_mcq_options)}",
     )
 
@@ -221,7 +221,7 @@ def multiple_choice_math_reward(
     if len(orig_mcq_options) > 1:
         metrics["ambiguous_original_mcq"] = MetricResult(
             score=0.0,
-            success=False,
+            is_score_valid=False,
             reason=f"Original message has multiple MCQ options extracted: {format_extracted_mcq(orig_mcq_options)}",
         )
         # We could penalize here, or pick the first one. For now, let's pick the first.
@@ -231,7 +231,7 @@ def multiple_choice_math_reward(
     if len(gen_mcq_options) > 1:
         metrics["ambiguous_generated_mcq"] = MetricResult(
             score=0.0,
-            success=False,
+            is_score_valid=False,
             reason=f"Generated message has multiple MCQ options extracted: {format_extracted_mcq(gen_mcq_options)}",
         )
         # Penalize for ambiguity if GT is specific
@@ -251,7 +251,7 @@ def multiple_choice_math_reward(
     reason = f"Match: {is_match}. Gen: '{gen_mcq_options[0][0]}' ({gen_answer_letter}) vs Orig: '{orig_mcq_options[0][0]}' ({orig_answer_letter})"
 
     metrics["mcq_comparison"] = MetricResult(
-        score=score, success=is_match, reason=reason
+        score=score, is_score_valid=is_match, reason=reason
     )
 
     return EvaluateResult(score=score, reason=reason, metrics=metrics)

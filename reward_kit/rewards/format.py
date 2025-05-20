@@ -49,9 +49,10 @@ def format_reward(
             reason="No messages provided",
             metrics={
                 "format_check": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
+            is_score_valid=False
         )
 
     response = messages[-1]
@@ -65,10 +66,11 @@ def format_reward(
                 metrics={
                     "format_check": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
+                is_score_valid=False
             )
         text = response.content
     elif isinstance(response, dict):
@@ -79,10 +81,11 @@ def format_reward(
                 metrics={
                     "format_check": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
+                is_score_valid=False
             )
         text = response.get("content", "")
     else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
@@ -91,9 +94,10 @@ def format_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "format_check": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type in messages."
+                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
                 )
             },
+            is_score_valid=False
         )
 
     # Compile the regex with DOTALL flag to match across newlines
@@ -112,10 +116,11 @@ def format_reward(
             metrics={
                 "format_check": MetricResult(
                     score=1.0,
-                    success=True,
+                    is_score_valid=True,
                     reason="Text follows the required format pattern",
                 )
             },
+            is_score_valid=True
         )
     else:
         return EvaluateResult(
@@ -124,8 +129,9 @@ def format_reward(
             metrics={
                 "format_check": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Text does not follow the required format pattern",
                 )
             },
+            is_score_valid=False
         )

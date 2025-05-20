@@ -51,7 +51,7 @@ def json_schema_reward(
                 reason="No messages provided to extract JSON content.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, reason="No messages provided", success=False
+                        score=0.0, reason="No messages provided", is_score_valid=False
                     )
                 },
             )
@@ -70,7 +70,7 @@ def json_schema_reward(
                         "error": MetricResult(
                             score=0.0,
                             reason="Invalid assistant message for JSON extraction.",
-                            success=False,
+                            is_score_valid=False,
                         )
                     },
                 )
@@ -88,7 +88,7 @@ def json_schema_reward(
                         "error": MetricResult(
                             score=0.0,
                             reason="Invalid assistant message (dict) for JSON extraction.",
-                            success=False,
+                            is_score_valid=False,
                         )
                     },
                 )
@@ -100,7 +100,7 @@ def json_schema_reward(
                     "error": MetricResult(
                         score=0.0,
                         reason="Invalid message type for JSON extraction.",
-                        success=False,
+                        is_score_valid=False,
                     )
                 },
             )
@@ -145,7 +145,7 @@ def json_schema_reward(
                     "error": MetricResult(
                         score=0.0,
                         reason="No JSON content found in messages",
-                        success=False,
+                        is_score_valid=False,
                     )
                 },
             )
@@ -157,7 +157,7 @@ def json_schema_reward(
             reason="No expected schema provided for comparison.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, reason="No expected schema provided", success=False
+                    score=0.0, reason="No expected schema provided", is_score_valid=False
                 )
             },
         )
@@ -178,7 +178,7 @@ def json_schema_reward(
                 "error": MetricResult(
                     score=0.0,
                     reason=f"Invalid JSON content: {json_content}",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -249,7 +249,7 @@ def json_schema_reward(
     metrics["schema_similarity"] = MetricResult(
         score=schema_similarity,
         reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
-        success=schema_similarity == 1.0,
+        is_score_valid=schema_similarity == 1.0,
     )
 
     # Calculate final score based on schema similarity
@@ -303,7 +303,7 @@ def json_schema_reward_with_llm_judge(
                 "error": MetricResult(
                     score=0.0,
                     reason="OpenAI package not installed. Install it with: pip install openai",
-                    success=False,
+                    is_score_valid=False,
                 )
             },
         )
@@ -477,20 +477,20 @@ EXPLANATION: [your detailed explanation]
     combined_metrics["llm_judge"] = MetricResult(
         score=llm_score,
         reason=llm_reason,
-        success=llm_score >= 0.8,  # Assuming high score means success
+        is_score_valid=llm_score >= 0.8,  # Assuming high score means success
     )
 
     # Add summary metrics
     combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
-        success=schema_result.score == 1.0,
+        is_score_valid=schema_result.score == 1.0,
     )
 
     combined_metrics["llm_score"] = MetricResult(
         score=llm_score,
         reason=f"LLM judge score: {llm_score:.2f}",
-        success=llm_score >= 0.8,
+        is_score_valid=llm_score >= 0.8,
     )
 
     # Calculate weighted final score
@@ -504,7 +504,7 @@ EXPLANATION: [your detailed explanation]
     combined_metrics["weights"] = MetricResult(
         score=0.0,  # Not a real score
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
-        success=True,  # Informational metric
+        is_score_valid=True,  # Informational metric
     )
 
     return EvaluateResult(

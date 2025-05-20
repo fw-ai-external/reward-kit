@@ -79,7 +79,7 @@ def length_reward(
             reason="No messages provided",
             metrics={
                 "length": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -95,7 +95,7 @@ def length_reward(
                 metrics={
                     "length": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
@@ -109,7 +109,7 @@ def length_reward(
                 metrics={
                     "length": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
@@ -121,7 +121,7 @@ def length_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "length": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type in messages."
+                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
                 )
             },
         )
@@ -282,13 +282,13 @@ def length_reward(
 
     # Prepare metrics
     metrics = {
-        "length": MetricResult(score=score, success=success, reason=reason),
+        "length": MetricResult(score=score, is_score_valid=success, reason=reason),
         "token_count": MetricResult(
             score=min(
                 1.0,
                 float(token_count) / (target_length or max_length or min_length or 100),
             ),
-            success=success,
+            is_score_valid=success,
             reason=f"Token count: {token_count}",
         ),
     }
@@ -345,7 +345,7 @@ def cosine_length_reward(
             reason="No messages provided",
             metrics={
                 "cosine_length": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -361,7 +361,7 @@ def cosine_length_reward(
                 metrics={
                     "cosine_length": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
@@ -375,7 +375,7 @@ def cosine_length_reward(
                 metrics={
                     "cosine_length": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant or has no content",
                     )
                 },
@@ -387,7 +387,7 @@ def cosine_length_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "cosine_length": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type in messages."
+                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
                 )
             },
         )
@@ -433,15 +433,15 @@ def cosine_length_reward(
 
     # Prepare metrics
     metrics = {
-        "cosine_length": MetricResult(score=score, success=success, reason=reason),
+        "cosine_length": MetricResult(score=score, is_score_valid=success, reason=reason),
         "token_count": MetricResult(
             score=min(1.0, float(token_count) / max_length),
-            success=success,
+            is_score_valid=success,
             reason=f"Token count: {token_count}/{max_length}",
         ),
         "correctness": MetricResult(
             score=1.0 if solution_is_correct else 0.0,
-            success=solution_is_correct,
+            is_score_valid=solution_is_correct,
             reason=f"Solution is {'correct' if solution_is_correct else 'incorrect'}",
         ),
     }

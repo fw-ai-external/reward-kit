@@ -43,7 +43,7 @@ def tag_count_reward(
             reason="No messages provided",
             metrics={
                 "tag_count": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -58,7 +58,7 @@ def tag_count_reward(
             metrics={
                 "tag_count": MetricResult(
                     score=0.0,
-                    success=False,
+                    is_score_valid=False,
                     reason="Message not from assistant or has no content",
                 )
             },
@@ -118,7 +118,7 @@ def tag_count_reward(
 
         tag_metrics[f"tag_{tag}"] = MetricResult(
             score=tag_score,
-            success=tag_success,
+            is_score_valid=tag_success,
             reason=_get_tag_reason(tag, opening_count, closing_count, require_balanced),
         )
 
@@ -140,10 +140,10 @@ def tag_count_reward(
         required_tags, found_tags, mismatched_tags, require_balanced
     )
     tag_metrics["overall"] = MetricResult(
-        score=total_score, success=success, reason=reason
+        score=total_score, is_score_valid=success, reason=reason
     )
 
-    return EvaluateResult(score=total_score, reason=reason, metrics=tag_metrics)
+    return EvaluateResult(score=total_score, reason=reason, metrics=tag_metrics, is_score_valid=success)
 
 
 def _get_tag_reason(

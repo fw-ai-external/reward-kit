@@ -86,7 +86,7 @@ def repetition_penalty_reward(
             reason="No messages provided",
             metrics={
                 "repetition": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -102,7 +102,7 @@ def repetition_penalty_reward(
                 metrics={
                     "repetition": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant",
                     )
                 },
@@ -116,7 +116,7 @@ def repetition_penalty_reward(
                 metrics={
                     "repetition": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant",
                     )
                 },
@@ -128,7 +128,7 @@ def repetition_penalty_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "repetition": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type in messages."
+                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
                 )
             },
         )
@@ -142,17 +142,17 @@ def repetition_penalty_reward(
             metrics={
                 "repetition": MetricResult(
                     score=1.0,
-                    success=True,
+                    is_score_valid=True,
                     reason="Empty response",
                 ),
                 "unique_ngram_ratio": MetricResult(
                     score=1.0,
-                    success=True,
+                    is_score_valid=True,
                     reason="Empty response",
                 ),
                 "repetition_penalty": MetricResult(
                     score=1.0,  # No penalty means score is 1.0 for this metric
-                    success=True,
+                    is_score_valid=True,
                     reason="No penalty applied to empty response",
                 ),
             },
@@ -169,7 +169,7 @@ def repetition_penalty_reward(
             metrics={
                 "repetition": MetricResult(
                     score=1.0,
-                    success=True,
+                    is_score_valid=True,
                     reason=f"Text too short for {ngram_size}-gram analysis",
                 )
             },
@@ -194,20 +194,20 @@ def repetition_penalty_reward(
     reason = f"Repetition ratio: {repetition_ratio:.2f}, Unique {ngram_size}-grams: {unique_ngrams}/{total}"
 
     metrics = {
-        "repetition": MetricResult(score=score, success=success, reason=reason),
+        "repetition": MetricResult(score=score, is_score_valid=success, reason=reason),
         "unique_ngram_ratio": MetricResult(
             score=1.0 - repetition_ratio,  # Higher is better
-            success=success,
+            is_score_valid=success,
             reason=f"Unique {ngram_size}-gram ratio: {1.0 - repetition_ratio:.2f}",
         ),
         "repetition_penalty": MetricResult(
             score=1.0 - penalty,  # Inverse of penalty for consistency
-            success=success,
+            is_score_valid=success,
             reason=f"Applied repetition penalty: {penalty:.2f}",
         ),
     }
 
-    return EvaluateResult(score=score, reason=reason, metrics=metrics)
+    return EvaluateResult(score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0)
 
 
 @reward_function
@@ -246,7 +246,7 @@ def diversity_reward(
             reason="No messages provided",
             metrics={
                 "diversity": MetricResult(
-                    score=0.0, success=False, reason="No messages provided"
+                    score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
         )
@@ -262,7 +262,7 @@ def diversity_reward(
                 metrics={
                     "diversity": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant",
                     )
                 },
@@ -276,7 +276,7 @@ def diversity_reward(
                 metrics={
                     "diversity": MetricResult(
                         score=0.0,
-                        success=False,
+                        is_score_valid=False,
                         reason="Message not from assistant",
                     )
                 },
@@ -288,7 +288,7 @@ def diversity_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "diversity": MetricResult(
-                    score=0.0, success=False, reason="Invalid message type in messages."
+                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
                 )
             },
         )
@@ -301,7 +301,7 @@ def diversity_reward(
             metrics={
                 "diversity": MetricResult(
                     score=0.0,  # Or 1.0
-                    success=False,  # Or True
+                    is_score_valid=False,  # Or True
                     reason="Empty response",
                 )
             },
@@ -357,7 +357,7 @@ def diversity_reward(
     for size, ratio in ratios.items():
         size_metrics[size] = MetricResult(
             score=ratio,
-            success=ratio > 0.7,  # Higher threshold for individual n-gram sizes
+            is_score_valid=ratio > 0.7,  # Higher threshold for individual n-gram sizes
             reason=f"Diversity ratio for {size}: {ratio:.2f}",
         )
 
@@ -365,7 +365,7 @@ def diversity_reward(
     metrics = {
         "diversity": MetricResult(
             score=final_score,
-            success=success,
+            is_score_valid=success,
             reason=f"Overall weighted diversity score: {final_score:.2f}",
         ),
         **size_metrics,

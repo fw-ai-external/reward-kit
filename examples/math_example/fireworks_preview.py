@@ -65,7 +65,7 @@ def main():
                 # The key is that sample_result items should allow attribute access
                 # for .success, .score, .reason, .per_metric_evals
                 mock_metric_detail = types.SimpleNamespace(
-                    score=1.0, reason="Mocked metric success", success=True
+                    score=1.0, reason="Mocked metric success", is_score_valid=True
                 )
                 mock_per_metric_evals = {
                     "math_example_metric": mock_metric_detail
@@ -73,7 +73,7 @@ def main():
                 # or "math_reward" if that's the key
 
                 sample_result_obj = types.SimpleNamespace(
-                    success=True,
+                    is_score_valid=True,
                     score=1.0,
                     reason="Mocked sample success via env var",
                     per_metric_evals=mock_per_metric_evals,
@@ -162,7 +162,7 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
             for i, sample_result in enumerate(results.results):
                 print(f"\n--- Sample {i+1} (from API) ---")
                 # We don't have original messages here directly, but can show API result
-                print(f"Success: {sample_result.success}")
+                print(f"Success: {sample_result.is_score_valid}")
                 print(f"Score: {sample_result.score}")
                 print(f"Reason: {sample_result.reason}")  # Top-level reason from API
                 if sample_result.per_metric_evals:
@@ -175,7 +175,7 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
                         print(f"    Score: {eval_detail.score}")
                         print(f"    Reason: {eval_detail.reason}")
 
-                if sample_result.score == 1.0 and sample_result.success:
+                if sample_result.score == 1.0 and sample_result.is_score_valid:
                     print("Status: PASSED (according to API)")
                     passed_api_samples += 1
                 else:

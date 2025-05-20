@@ -164,7 +164,7 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in base_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.success})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
         )
     print()
 
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in safety_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.success})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
         )
     print()
 
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in combined_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.success})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
         )
     print()
 

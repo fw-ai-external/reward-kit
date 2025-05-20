@@ -187,7 +187,20 @@ tau-bench
 
 # Example-specific output directories
 examples/math_example/math_grpo_trainer_output*/
-examples/*/*_output/
+examples/math_example/math_grpo_trainer_output_qwen/checkpoint-1/*
+examples/*/*_output_qwen/
 examples/*/*output/
 examples/math_example_openr1/math_grpo_trainer_output_openr1_qwen/checkpoint-1/
 examples/math_example/math_grpo_trainer_output_qwen
+
+# Ignore build artifacts and large data directories
+examples/math_example/math_grpo_trainer_output_qwen/
+
+# You can add other patterns here as needed, for example:
+# __pycache__/
+# *.pyc
+# .env
+# /venv/
+# /build/
+# /dist/
+# *.egg-info/

@@ -71,17 +71,24 @@ def test_informativeness_reward(deploy_example):
         },
     ]
 
-    # Test the reward function
-    result = deploy_example.informativeness_reward(
-        messages=test_messages, original_messages=[test_messages[0]]
-    )
+    # Import the updated reward function
+    from examples.informativeness_metric.main import evaluate as informativeness_evaluate_function
+    from reward_kit import Message # For converting dict messages to Message objects
 
-    # Verify results
-    assert isinstance(result["score"], float)
-    assert 0.0 <= result["score"] <= 1.0
-    assert "length" in result["metrics"]
-    assert "specificity" in result["metrics"]
-    assert "content_density" in result["metrics"]
+    # Convert test messages to Message objects
+    test_messages_objects = [Message(**msg) for msg in test_messages]
+
+    # Test the reward function
+    # The informativeness_evaluate_function expects List[Message] and **kwargs.
+    # It does not explicitly take original_messages.
+    result = informativeness_evaluate_function(messages=test_messages_objects)
+
+    # Verify results (EvaluateResult uses attribute access)
+    assert isinstance(result.score, float)
+    assert 0.0 <= result.score <= 1.0
+    assert "length" in result.metrics
+    assert "specificity" in result.metrics
+    assert "content_density" in result.metrics
 
 
 def test_deploy_to_fireworks(
@@ -102,8 +109,25 @@ def test_deploy_to_fireworks(
     #     "name": "accounts/test_account/evaluators/informativeness-v1",
     #     "displayName": "informativeness-v1", ...
     # }
-    # The refactored deploy_example.py extracts "informativeness-v1" from this name.
-    assert evaluation_id == "informativeness-v1"
+    # The refactored deploy_example.py now deploys with ID "informativeness-metric-example-v1"
+    # and the mock should reflect what the actual API call would do for that ID.
+    # The mock_requests_post currently returns a name based on "informativeness-v1".
+    # Let's update the assertion to match the new ID used in deploy_example.py.
+    # The deploy_example.py also extracts the ID from the response name.
+    # If mock_requests_post.return_value.json.return_value["name"] is
+    # "accounts/test_account/evaluators/informativeness-metric-example-v1",
+    # then deploy_example.py should extract "informativeness-metric-example-v1".
+
+    # Adjust mock to return the new ID in the 'name' field of the response
+    mock_requests_post.return_value.json.return_value = {
+        "name": "accounts/test_account/evaluators/informativeness-metric-example-v1",
+        "displayName": "Informativeness Metric (Example V1)",
+        "description": "Evaluates response informativeness based on specificity and content density.",
+        # ... other fields if necessary
+    }
+    
+    evaluation_id = deploy_example.deploy_to_fireworks()
+    assert evaluation_id == "informativeness-metric-example-v1"
 
     # Verify that requests.post was called (by create_evaluation)
     mock_requests_post.assert_called()

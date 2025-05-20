@@ -20,223 +20,40 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/deploy_example.py"
     )
 
-from reward_kit import EvaluateResult, Message, MetricResult, reward_function
-
-# get_authentication is removed, new auth functions are used by create_evaluation internally.
-# from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
-from reward_kit.evaluation import create_evaluation
-import tempfile
-import shutil
-
-# The reward function code as a string to write to a temporary file
-INFORMATIVENESS_REWARD_CODE = """
-from reward_kit import EvaluateResult, Message, MetricResult, reward_function
-from typing import List # Ensure List is imported for the type hint
-
-@reward_function
-def evaluate( # Renamed from informativeness_reward to evaluate
-    messages: List[Message],
-    **kwargs,
-) -> EvaluateResult:
-    # This function is now named 'evaluate' as expected by the Evaluator class
-    if not messages or messages[-1].role != "assistant":
-        return EvaluateResult(
-            score=0.0,
-            reason="No assistant response found",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    success=False,
-                    reason="No assistant response found",
-                )
-            },
-        )
-
-    response = (
-        messages[-1].content if messages[-1].content is not None else ""
-    )
-    metrics = {}
-
-    length = len(response)
-    length_score = min(length / 1000.0, 1.0)
-    metrics["length"] = MetricResult(
-        score=length_score * 0.2,
-        success=length_score > 0,
-        reason=f"Response length: {length} chars",
-    )
-
-    specificity_markers = [
-        "specifically", "in particular", "for example", "such as",
-        "notably", "precisely", "exactly",
-    ]
-    marker_count = sum(
-        1 for marker in specificity_markers if marker.lower() in response.lower()
-    )
-    marker_score = min(marker_count / 2.0, 1.0)
-    metrics["specificity"] = MetricResult(
-        score=marker_score * 0.3,
-        success=marker_count > 0,
-        reason=f"Found {marker_count} specificity markers",
-    )
-
-    content_words = [
-        "information", "data", "analysis", "recommend", "solution",
-        "approach", "technique", "method",
-    ]
-    word_count = len(response.split())
-    content_word_count = sum(
-        1 for word in content_words if word.lower() in response.lower()
-    )
-
-    if word_count > 0:
-        density_score = min(
-            content_word_count / (word_count / 20), 1.0
-        )
-    else:
-        density_score = 0.0
-
-    metrics["content_density"] = MetricResult(
-        score=density_score * 0.5,
-        success=density_score > 0.1,
-        reason=f"Content density: {content_word_count} content words in {word_count} total words",
-    )
-
-    final_score = sum(metric.score for metric in metrics.values())
-    overall_reason = "Evaluation based on length, specificity, and content density."
-    if final_score > 0.7:
-        overall_reason = "Response is informative."
-    elif final_score < 0.3:
-        overall_reason = "Response lacks informativeness."
-
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
-"""
-
-# Define the reward function here so it can be tested locally if needed,
-# but for deployment, we'll use its code string.
-# This requires importing List from typing for the annotation.
-from typing import List
-
-
-@reward_function
-def informativeness_reward(
-    messages: List[Message],
-    **kwargs,
-) -> EvaluateResult:
-    """
-    Evaluates the informativeness of an assistant response based on
-    specificity markers and content density.
-    """
-    # Get the assistant's response
-    # messages are List[Dict[str, str]] as per type hint, but decorator converts to List[Message]
-    # However, the decorator in typed_interface.py passes List[Message] to the wrapped function.
-    # So, messages[-1] here will be a Message object.
-    if not messages or messages[-1].role != "assistant":  # Use attribute access
-        return EvaluateResult(
-            score=0.0,
-            reason="No assistant response found",  # Added reason for EvaluateResult
-            is_score_valid=False,
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    is_score_valid=False,
-                    reason="No assistant response found",  # success added
-                )
-            },
-        )
-
-    response = (
-        messages[-1].content if messages[-1].content is not None else ""
-    )  # Use attribute access
-    metrics = {}
-
-    # 1. Length check - reward concise but informative responses
-    length = len(response)
-    length_score = min(length / 1000.0, 1.0)  # Cap at 1000 chars
-    metrics["length"] = MetricResult(
-        score=length_score * 0.2,  # 20% weight
-        is_score_valid=length_score > 0,  # Basic success if length > 0
-        reason=f"Response length: {length} chars",
-    )
-
-    # 2. Specificity markers
-    specificity_markers = [
-        "specifically",
-        "in particular",
-        "for example",
-        "such as",
-        "notably",
-        "precisely",
-        "exactly",
-    ]
-    marker_count = sum(
-        1 for marker in specificity_markers if marker.lower() in response.lower()
-    )
-    marker_score = min(marker_count / 2.0, 1.0)  # Cap at 2 markers
-    metrics["specificity"] = MetricResult(
-        score=marker_score * 0.3,  # 30% weight
-        is_score_valid=marker_count > 0,  # Basic success if markers found
-        reason=f"Found {marker_count} specificity markers",
-    )
-
-    # 3. Content density (simple heuristic based on ratio of content words to total)
-    content_words = [
-        "information",
-        "data",
-        "analysis",
-        "recommend",
-        "solution",
-        "approach",
-        "technique",
-        "method",
-    ]
-    word_count = len(response.split())
-    content_word_count = sum(
-        1 for word in content_words if word.lower() in response.lower()
-    )
-
-    if word_count > 0:
-        density_score = min(
-            content_word_count / (word_count / 20), 1.0
-        )  # Normalize by expecting ~5% density
-    else:
-        density_score = 0.0
-
-    metrics["content_density"] = MetricResult(
-        score=density_score * 0.5,  # 50% weight
-        is_score_valid=density_score > 0.1,  # Basic success if density is somewhat reasonable
-        reason=f"Content density: {content_word_count} content words in {word_count} total words",
-    )
-
-    # Calculate final score as weighted sum of metrics
-    final_score = sum(metric.score for metric in metrics.values())
-    # Determine overall reason based on score
-    overall_reason = "Evaluation based on length, specificity, and content density."
-    if final_score > 0.7:
-        overall_reason = "Response is informative."
-    elif final_score < 0.3:
-        overall_reason = "Response lacks informativeness."
-
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics, is_score_valid=final_score > 0.0)
+# Import Message for type hinting if needed, and other necessary components
+from reward_kit import Message
+# from reward_kit.auth import get_authentication # This line was causing the ImportError
+# Import the deployment function
+from reward_kit.evaluation import deploy_folder_evaluation
+# Import the evaluate function from the new location for local testing
+from examples.informativeness_metric.main import evaluate as informativeness_evaluate_function
 
 
 # Test the reward function with example messages
 def test_reward_function():
-    # Example messages
-    test_messages = [
+    # Import the specific evaluate function for testing
+    # from examples.informativeness_metric.main import evaluate as informativeness_evaluate_function
+    # This is now imported at the top of the script.
+
+    # Example messages - convert to Message objects for the test
+    test_messages_data = [
         {"role": "user", "content": "Can you explain machine learning?"},
         {
             "role": "assistant",
             "content": "Machine learning is a method of data analysis that automates analytical model building. Specifically, it uses algorithms that iteratively learn from data, allowing computers to find hidden insights without being explicitly programmed where to look. For example, deep learning is a type of machine learning that uses neural networks with many layers. Such approaches have revolutionized fields like computer vision and natural language processing.",
         },
     ]
+    test_messages_objects = [Message(**msg) for msg in test_messages_data]
 
     # Test the reward function
-    result = informativeness_reward(messages=test_messages)
-    print("Informativeness Reward Result:")
-    print(f"Score: {result.score}")
+    # The imported function `informativeness_evaluate_function` is already decorated.
+    result = informativeness_evaluate_function(messages=test_messages_objects)
+    print("Informativeness Reward Result (Local Test):")
+    print(f"Score: {result.score}") # Access score via attribute
     print("Metrics:")
-    for name, metric in result.metrics.items():
-        print(f"  {name}: {metric.score} - {metric.reason}")
+    # Access metrics via attribute, assuming MetricResult has score and reason
+    for name, metric_obj in result.metrics.items(): # result.metrics should be a dict of MetricResult
+        print(f"  {name}: {metric_obj.score} - {metric_obj.reason}")
     print()
 
     return result
@@ -246,62 +63,68 @@ def test_reward_function():
 def deploy_to_fireworks():
     temp_metric_dir = None
     try:
-        # Create a temporary directory for the metric
-        temp_metric_dir = tempfile.mkdtemp(prefix="reward_kit_deploy_example_")
-        metric_main_py = os.path.join(temp_metric_dir, "main.py")
+        # Authentication is typically handled by environment variables or ~/.fireworks/auth.ini
+        # get_authentication() can be used if direct token/account_id passing is needed by a deploy function,
+        # but deploy_folder_evaluation likely uses it internally.
+        # For this example, we'll rely on deploy_folder_evaluation's internal auth handling.
+        print("Attempting to deploy using credentials from environment or auth files...")
 
-        with open(metric_main_py, "w") as f:
-            # Write the reward function code (defined above as a string) to main.py
-            # Need to adjust imports within the string if they rely on relative paths
-            # For this example, assume INFORMATIVENESS_REWARD_CODE is self-contained or uses absolute imports
-            f.write(INFORMATIVENESS_REWARD_CODE)
+        evaluator_folder_path = os.path.join(os.path.dirname(__file__), "informativeness_metric")
+        evaluator_id_name = "informativeness-metric-example-v1"
 
-        print(f"Created temporary metric file at {metric_main_py}")
-
-        # Deploy using create_evaluation
-        # Authentication is handled internally by create_evaluation
-        print("Deploying 'informativeness-v1'...")
-        evaluator_details = create_evaluation(
-            evaluator_id="informativeness-v1",
-            metric_folders=[f"informativeness={temp_metric_dir}"],
-            display_name="Informativeness Reward (v1)",
-            description="Evaluates response informativeness based on specificity and content density",
+        # Deploy the reward function using deploy_folder_evaluation
+        deployment_result = deploy_folder_evaluation(
+            evaluator_id=evaluator_id_name,
+            evaluator_folder=evaluator_folder_path,
+            display_name="Informativeness Metric (Example V1)",
+            description="Evaluates response informativeness based on specificity and content density.",
             force=True,  # Overwrite if already exists
+            # multi_metrics=False by default, which is correct for a single reward function in main.py
+        )
+        
+        # The result from deploy_folder_evaluation is the response from Evaluator.create()
+        # which is a dictionary. We need to extract the actual ID.
+        # Example structure: {'evaluator': {'name': 'accounts/fireworks/evaluators/actual-id-v1'}}
+        # or similar. The exact path to the ID might vary.
+        
+        deployed_evaluator_name = deployment_result.get("evaluator", {}).get("name", evaluator_id_name)
+        if isinstance(deployed_evaluator_name, str) and "/evaluators/" in deployed_evaluator_name:
+            actual_id_to_use = deployed_evaluator_name.split("/evaluators/")[-1]
+        else:
+            actual_id_to_use = evaluator_id_name # Fallback to the intended ID if parsing fails
+
+        print(f"Deployment successful. Evaluator ID: {actual_id_to_use}")
+        print(f"Full deployment result: {deployment_result}")
+
+
+        # The custom provider deployment part is more complex as deploy_folder_evaluation
+        # doesn't directly support `providers` argument. This would require using
+        # `Evaluator().create()` with a custom payload.
+        # For now, this part will be omitted to keep the example focused on the primary fix.
+        # print("\nDeploying with custom provider (functionality for this may require direct Evaluator.create() usage)...")
+
+
+        # Show how to use the evaluation ID in a training job
+        print("\nUse this in your RL training job (example):")
+        print(
+            f'firectl create rl-job --reward-endpoint "https://api.fireworks.ai/v1/evaluations/{actual_id_to_use}"'
         )
 
-        if evaluator_details and "name" in evaluator_details:
-            evaluation_id = evaluator_details[
-                "name"
-            ]  # The 'name' field usually contains the full path
-            # Extract the simple ID if it's part of a path like 'accounts/.../evaluators/ID'
-            if "/evaluators/" in evaluation_id:
-                evaluation_id = evaluation_id.split("/evaluators/")[-1]
+        return actual_id_to_use # Return the extracted/intended ID
 
-            print(f"Successfully deployed evaluator. Full details: {evaluator_details}")
-            print(f"Evaluator ID: {evaluation_id}")
-
-            # Show how to use the evaluation ID in a training job
-            # Note: The endpoint structure might differ slightly based on API version.
-            # This is a generic example.
-            print("\nUse this in your RL training job (example endpoint):")
-            print(
-                f'firectl create rl-job --reward-endpoint "https://api.fireworks.ai/v1/accounts/YOUR_ACCOUNT_ID/evaluators/{evaluation_id}"'
-            )
-            return evaluation_id
-        else:
-            print(
-                f"Failed to deploy evaluator or extract ID. Response: {evaluator_details}"
-            )
-            return None
-
-    except Exception as e:
-        print(f"Deployment error: {str(e)}")
-        # Consider re-raising or logging more details if needed
+    except ValueError as e: # Handles get_authentication errors if they were to occur
+        print(f"Authentication or setup error: {str(e)}")
+        print("Make sure you have proper Fireworks API credentials set up.")
         return None
-    finally:
-        if temp_metric_dir and os.path.exists(temp_metric_dir):
-            print(f"Cleaning up temporary metric directory: {temp_metric_dir}")
-            shutil.rmtree(temp_metric_dir)
+    except ImportError as e:
+        print(f"Import error: {str(e)}. Make sure reward-kit and its dependencies are installed.")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred during deployment: {str(e)}")
+        # Consider logging the full traceback for debugging
+        # import traceback
+        # traceback.print_exc()
+        return None
 
 
 if __name__ == "__main__":

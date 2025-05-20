@@ -121,7 +121,9 @@ def length_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "length": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type in messages.",
                 )
             },
         )
@@ -387,7 +389,9 @@ def cosine_length_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "cosine_length": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type in messages.",
                 )
             },
         )
@@ -433,7 +437,9 @@ def cosine_length_reward(
 
     # Prepare metrics
     metrics = {
-        "cosine_length": MetricResult(score=score, is_score_valid=success, reason=reason),
+        "cosine_length": MetricResult(
+            score=score, is_score_valid=success, reason=reason
+        ),
         "token_count": MetricResult(
             score=min(1.0, float(token_count) / max_length),
             is_score_valid=success,

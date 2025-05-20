@@ -148,7 +148,9 @@ def list_comparison_math_reward(
             reason="Assistant response content is empty.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Empty generated message content."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Empty generated message content.",
                 )
             },
         )

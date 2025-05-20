@@ -98,7 +98,7 @@ def my_reward_function(messages, original_messages=None, **kwargs):
     response = messages[-1].get("content", "")
     # Assume calculate_score returns a float between 0.0 and 1.0
     # and calculate_success returns a boolean
-    score = calculate_score(response) 
+    score = calculate_score(response)
     success = calculate_success(response) # Assume calculate_success is defined
 
     return EvaluateResult(
@@ -106,7 +106,7 @@ def my_reward_function(messages, original_messages=None, **kwargs):
         reason="Overall evaluation reason for my_reward_function", # Added top-level reason
         metrics={
             "my_metric": MetricResult(
-                score=score, 
+                score=score,
                 success=success, # Added success field
                 reason="Explanation for the metric score"
             )

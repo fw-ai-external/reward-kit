@@ -349,7 +349,8 @@ def bfcl_reward(
     )
     metrics["format_check"] = MetricResult(
         score=format_score,
-        is_score_valid=format_score == 0.2,  # Success if it gets the full 0.2 for format
+        is_score_valid=format_score
+        == 0.2,  # Success if it gets the full 0.2 for format
         reason=f"{valid_assistant_messages}/{total_assistant_messages} assistant messages had correct format.",
     )
 

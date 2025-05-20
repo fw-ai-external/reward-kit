@@ -70,7 +70,7 @@ def deepcoder_code_reward(
                     reason="Last message not a valid assistant response.",
                 )
             },
-            is_score_valid=False
+            is_score_valid=False,
         )
 
     assistant_content = messages[-1].content
@@ -83,15 +83,19 @@ def deepcoder_code_reward(
             reason=f"No {language} code block found.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason=f"No {language} code block found."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason=f"No {language} code block found.",
                 )
             },
-            is_score_valid=False
+            is_score_valid=False,
         )
 
     code_to_execute = code_blocks[0]["code"]
     metrics_dict["extracted_code"] = MetricResult(
-        score=0.0, is_score_valid=True, reason=f"Extracted code:\n```\n{code_to_execute}\n```"
+        score=0.0,
+        is_score_valid=True,
+        reason=f"Extracted code:\n```\n{code_to_execute}\n```",
     )
 
     if not test_cases:
@@ -106,7 +110,7 @@ def deepcoder_code_reward(
                 ),
                 **metrics_dict,  # Include already gathered metrics like extracted_code
             },
-            is_score_valid=False
+            is_score_valid=False,
         )
 
     # Use the explicitly passed target_function if available
@@ -178,4 +182,9 @@ def deepcoder_code_reward(
             eval_result_from_tests.reason
         )  # Use reason from test runner if it failed and provided one.
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics_dict, is_score_valid=final_score == 1.0)
+    return EvaluateResult(
+        score=final_score,
+        reason=final_reason,
+        metrics=metrics_dict,
+        is_score_valid=final_score == 1.0,
+    )

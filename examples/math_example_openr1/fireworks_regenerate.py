@@ -1,21 +1,18 @@
 import argparse
+import asyncio
 import json
 import os
 import sys
-import asyncio
+
 import aiohttp
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from typing import (
-    Optional,
-    List,
-    Dict,
-    Any,
-)
-from reward_kit.rewards.math import math_reward
+from typing import Any, Dict, List, Optional
+
 from reward_kit.models import Message
+from reward_kit.rewards.math import math_reward
 
 # Configuration for Fireworks API
 FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
@@ -58,7 +55,6 @@ async def generate_with_fireworks_inner(
             return "A generic mocked math solution for OpenR1 that will likely result in a score of 0."
 
     # there are some examples with multiple choice and model just answers with multiple choice instead.
-    # {"user_prompt": "Two is $10 \\%$ of $x$ and $20 \\%$ of $y$. What is $x - y$?\n$(\\mathrm {A}) \\ 1 \\qquad (\\mathrm {B}) \\ 2 \\qquad (\\mathrm {C})\\ 5 \\qquad (\\mathrm {D}) \\ 10 \\qquad (\\mathrm {E})\\ 20$", "original_assistant_content": "$2 = \\frac {1}{10}x \\Longrightarrow x = 20,\\quad 2 = \\frac{1}{5}y \\Longrightarrow y = 10,\\quad x-y = 20 - 10=10  \\mathrm{(D)}$.\n\nThe final answer is \\boxed{10}.", "regenerated_content": "<think>\nOkay, let's see. The problem says that two is 10% of x and 20% of y. I need to find x minus y. Hmm. Let me break this down step by step.\n\nFirst, let me translate the words into equations. If two is 10% of x, that means 2 equals 10% times x. Similarly, 2 is 20% of y, so 2 equals 20% times y. Let me write that out:\n\n2 = 10% * x  \n2 = 20% * y\n\nBut percentages can be converted to decimals. So 10% is 0.10 and 20% is 0.20. So substituting those in:\n\n2 = 0.10 * x  \n2 = 0.20 * y\n\nNow, I need to solve for x and y. Let me start with the first equation. If 2 equals 0.10 times x, then to find x, I can divide both sides by 0.10. Let me do that:\n\nx = 2 / 0.10\n\nDividing by 0.10 is the same as multiplying by 10, right? Because 0.10 is 1/10. So 2 divided by 1/10 is 2 * 10 = 20. So x is 20. Let me check that. 10% of 20 is 2, which matches the given information. Good.\n\nNow for the second equation: 2 = 0.20 * y. Similarly, to solve for y, I divide both sides by 0.20:\n\ny = 2 / 0.20\n\nHmm, 0.20 is 1/5, so dividing by 1/5 is the same as multiplying by 5. So 2 divided by 0.20 is 2 * 5 = 10. Therefore, y is 10. Let me check that. 20% of 10 is 2, which is correct. Perfect.\n\nNow the question asks for x minus y. So that's 20 minus 10. Which is 10. So x - y equals 10. Let me check the answer choices. Option D is 10. So the answer should be D.\n\nWait, but let me make sure I didn't mix up anything. The problem says two is 10% of x and 20% of y. So 2 = 0.1x and 2 = 0.2y. Solving for x gives 20, solving for y gives 10. Subtracting them gives 10. Yeah, that seems right. I don't think I made any mistakes here. The answer is D, 10.\n\n**Final Answer**\n\\boxed{D}\n</think>\n\nTo solve the problem, we start by translating the given information into mathematical equations.\n\nWe are told:\n\n- Two is 10% of $ x $, which translates to:\n  $$\n  2 = 0.10x\n  $$\n\n- Two is 20% of $ y $, which translates to:\n  $$\n  2 = 0.20y\n  $$\n\n---\n\n### Step 1: Solve for $ x $\n\nFrom the first equation:\n$$\n2 = 0.10x\n$$\nDivide both sides by 0.10:\n$$\nx = \\frac{2}{0.10} = 20\n$$\n\n---\n\n### Step 2: Solve for $ y $\n\nFrom the second equation:\n$$\n2 = 0.20y\n$$\nDivide both sides by 0.20:\n$$\ny = \\frac{2}{0.20} = 10\n$$\n\n---\n\n### Step 3: Compute $ x - y $\n\nNow that we have $ x = 20 $ and $ y = 10 $, we compute:\n$$\nx - y = 20 - 10 = 10\n$$\n\n---\n\n### Final Answer\n\n$$\n\\boxed{D}\n$$", "evaluation_score": 0.0, "evaluation_reason": "Strictness fail (Issue #2 - Ambiguity): Ground truth is specific (one answer), but generated answer is ambiguous (multiple answers extracted, even after potential leniency).", "error_category": "C"}
     system_prompt = "IMPORTANT: You MUST provide your final numerical answer enclosed *only* in `\\boxed{answer}`. Do not include any other numbers or text within the box. Your entire response should be your reasoning, followed by the single, final boxed answer. Example: `\\boxed{123.45}`. If the question is a multiple choice question, please still provide the numerical answer."
     payload: Dict[str, Any] = {
         "model": FIREWORKS_MODEL_NAME,
@@ -520,7 +516,9 @@ async def main(args):
             print(f"  Category {category}: {count}")
 
     if category_c_indices:
-        print(f"\nIndices of samples with Category C errors: {sorted(list(set(category_c_indices)))}")
+        print(
+            f"\nIndices of samples with Category C errors: {sorted(list(set(category_c_indices)))}"
+        )
     else:
         print("\nNo samples found with Category C errors in this run.")
 

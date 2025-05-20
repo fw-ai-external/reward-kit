@@ -263,21 +263,57 @@ def test_create_evaluation_helper(monkeypatch):
                 raise Exception("API Error")
 
     def mock_post(*args, **kwargs):
-        # Check payload format
+        # Check payload format for the new structure
         payload = kwargs.get("json", {})
-        assertions = payload.get("evaluation", {}).get("assertions", [])
+        assert "evaluator" in payload
+        assert "evaluatorId" in payload
 
-        assert len(assertions) > 0
-        assert "assertionType" in assertions[0]
-        assert assertions[0]["assertionType"] == "CODE"
-        assert "codeAssertion" in assertions[0]
+        evaluator_data = payload["evaluator"]
+        assert "criteria" in evaluator_data
+        criteria = evaluator_data["criteria"]
 
+        assert len(criteria) > 0, "Criteria list should not be empty"
+        criterion = criteria[0]
+        assert "type" in criterion
+        assert criterion["type"] == "CODE_SNIPPETS"
+        assert "codeSnippets" in criterion
+        assert "fileContents" in criterion["codeSnippets"]
+        assert (
+            "main.py" in criterion["codeSnippets"]["fileContents"]
+        )  # Assuming test_metric/main.py
+
+        # Return a mock response consistent with the new structure if needed,
+        # or a generic success response. The test asserts on the returned evaluator object.
+        # The create_evaluation function returns the result of response.json().
+        # The actual API returns a structure like:
+        # { "evaluator": { "name": "...", "displayName": "...", ... } }
+        # However, the old test was asserting on top-level keys from a flatter structure.
+        # Let's make the mock response match what the SUT now expects from the API.
+        # The SUT's create() method returns response.json() directly.
+        # The test asserts evaluator["name"], evaluator["displayName"] etc.
+        # This implies the mock response should be the content of the "evaluator" object itself,
+        # or the test assertions need to change.
+        # Given the SUT returns response.json(), the mock should return the full API response.
+
+        # The `create_evaluation` helper calls `evaluator.create`, which returns `result = response.json()`.
+        # The test then asserts `evaluator["name"]`. This means `result` should have a "name" key.
+        # The actual API response for a successful creation is typically the full evaluator resource.
+        # e.g. { "name": "accounts/...", "displayName": "...", ... }
+        # Or if it's the new structure: { "evaluator": { "name": "...", ... } }
+        # The `deploy_example.py` expects `deployment_result.get("evaluator", {}).get("name", ...)`
+        # This suggests the API returns the nested structure.
+
+        # Let's assume the mock should return the nested structure.
         return MockResponse(
-            {
-                "name": "accounts/test_account/evaluators/test-eval",
-                "displayName": "Test Evaluator",
-                "description": "Test description",
-                "multiMetrics": False,
+            {  # This is the full response.json()
+                "evaluator": {
+                    "name": "accounts/test_account/evaluators/test-eval",
+                    "displayName": "Test Evaluator",
+                    "description": "Test description",
+                    "multiMetrics": False,
+                    # other fields like criteria, etc.
+                },
+                "evaluatorId": "test-eval",  # if this is part of the response
             }
         )
 
@@ -285,16 +321,25 @@ def test_create_evaluation_helper(monkeypatch):
     monkeypatch.setattr("requests.post", mock_post)
 
     try:
-        evaluator = create_evaluation(
+        # create_evaluation returns the result of response.json()
+        api_response = create_evaluation(
             evaluator_id="test-eval",
             metric_folders=[f"test_metric={tmp_dir}"],
             display_name="Test Evaluator",
             description="Test description",
         )
 
-        assert evaluator["name"] == "accounts/test_account/evaluators/test-eval"
-        assert evaluator["displayName"] == "Test Evaluator"
-        assert evaluator["description"] == "Test description"
+        # Assertions should now reflect the (potentially nested) structure of api_response
+        # Based on deploy_example.py, it seems the actual evaluator data is under an "evaluator" key.
+        assert "evaluator" in api_response
+        created_evaluator_data = api_response["evaluator"]
+
+        assert (
+            created_evaluator_data["name"]
+            == "accounts/test_account/evaluators/test-eval"
+        )
+        assert created_evaluator_data["displayName"] == "Test Evaluator"
+        assert created_evaluator_data["description"] == "Test description"
     finally:
         # Clean up
         os.unlink(os.path.join(tmp_dir, "main.py"))

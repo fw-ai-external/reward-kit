@@ -90,7 +90,13 @@ class TestRewardFunction:
             mock_response.json.return_value = {
                 "score": 0.8,
                 "is_score_valid": True,
-                "metrics": {"remote": {"score": 0.8, "reason": "Remote score", "is_score_valid": True}},
+                "metrics": {
+                    "remote": {
+                        "score": 0.8,
+                        "reason": "Remote score",
+                        "is_score_valid": True,
+                    }
+                },
             }
             mock_requests_module.post.return_value = mock_response
 

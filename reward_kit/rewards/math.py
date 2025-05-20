@@ -6,11 +6,9 @@ answers by extracting numerical values from text using regex patterns and
 comparing them with expected answers.
 """
 
-from typing import Dict, List, Tuple, Any, Union, Optional, Set
-import re
 import math
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Removed outdated comment
 from ..models import EvaluateResult, Message, MetricResult
@@ -571,7 +569,7 @@ def _check_unboxed_or_strictness(
     # AND multiple numbers were extracted from the raw response
     # AND it's not a single boxed expression that itself contains " or "
     # (which extract_numbers handles as a string value).
-    
+
     raw_extracted_numbers = extract_numbers(
         model_response_content
     )  # Re-extract for this check
@@ -714,7 +712,9 @@ def math_reward(
             reason="Missing or empty ground_truth (expected math answer string).",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid ground_truth string."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid ground_truth string.",
                 )
             },
         )

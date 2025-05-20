@@ -5,7 +5,7 @@ Example of a basic reward function using the Reward Kit.
 from typing import Any, Dict, List, Optional
 
 from reward_kit import reward_function
-from reward_kit.models import EvaluateResult, MetricResult, Message
+from reward_kit.models import EvaluateResult, Message, MetricResult
 
 
 @reward_function

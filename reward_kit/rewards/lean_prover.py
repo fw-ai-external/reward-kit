@@ -71,7 +71,9 @@ def lean_prover_reward(
             reason="Assistant response content is empty.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Empty assistant response content."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Empty assistant response content.",
                 )
             },
         )
@@ -436,7 +438,9 @@ def deepseek_huggingface_prover_benchmark(
             reason="Assistant response content is empty for HuggingFace benchmark.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Empty assistant response content."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Empty assistant response content.",
                 )
             },
         )
@@ -500,7 +504,8 @@ def deepseek_huggingface_prover_benchmark(
             # Add fuzzy match info to metrics
             metrics["dataset_match"] = MetricResult(
                 score=matched_ratio,
-                is_score_valid=matched_ratio > 0.7,  # Success if similarity is above threshold
+                is_score_valid=matched_ratio
+                > 0.7,  # Success if similarity is above threshold
                 reason=f"Found similar problem with {matched_ratio:.2f} similarity",
             )
         else:
@@ -546,7 +551,9 @@ def deepseek_huggingface_prover_benchmark(
             )
         else:
             metrics["answer_match"] = MetricResult(
-                score=1.0, is_score_valid=True, reason="Expected answer found in response"
+                score=1.0,
+                is_score_valid=True,
+                reason="Expected answer found in response",
             )
             current_top_level_reason += " Expected answer found."
 

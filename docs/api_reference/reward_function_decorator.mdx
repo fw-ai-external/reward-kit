@@ -203,7 +203,7 @@ def configurable_reward(
 def clarity_reward(messages, original_messages=None, **kwargs) -> EvaluateResult:
     # ... evaluation logic ...
     # Assume score and metric_details are calculated
-    score = 0.8 
+    score = 0.8
     metric_details = {"clarity_metric": MetricResult(score=0.8, success=True, reason="Very clear")}
     return EvaluateResult(score=score, reason="Clarity evaluation complete.", metrics=metric_details)
 

@@ -333,7 +333,7 @@ def combined_accuracy_length(messages, ground_truth=None, **kwargs) -> EvaluateR
     # Assuming accuracy_result and length_result are EvaluateResult objects
     combined_score = 0.7 * accuracy_result.score + 0.3 * length_result.score
     combined_score = max(0.0, min(1.0, combined_score)) # Ensure score is within [0,1]
-    
+
     acc_metric_reason = accuracy_result.reason if hasattr(accuracy_result, 'reason') else "Accuracy evaluated"
     # Assuming success can be derived from the score or is available in accuracy_result.metrics
     acc_metric_success = accuracy_result.metrics.get("accuracy", {}).get("success", accuracy_result.score > 0.5) if hasattr(accuracy_result, 'metrics') and "accuracy" in accuracy_result.metrics else accuracy_result.score > 0.5
@@ -355,7 +355,7 @@ def combined_accuracy_length(messages, ground_truth=None, **kwargs) -> EvaluateR
             reason=len_metric_reason
         )
     }
-    
+
     overall_reason = f"Combined accuracy ({accuracy_result.score:.2f}) and length ({length_result.score:.2f})."
 
     return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics) # Updated

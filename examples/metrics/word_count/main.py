@@ -18,7 +18,9 @@ def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
     """
     # If this is the first message, there's nothing to evaluate
     if not messages:
-        return EvaluateResult(score=0.0, reason="No messages found", is_score_valid=False)
+        return EvaluateResult(
+            score=0.0, reason="No messages found", is_score_valid=False
+        )
 
     # Get the last message (assistant's response)
     last_message = messages[-1]
@@ -38,7 +40,8 @@ def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
         metrics={
             "word_count": MetricResult(
                 score=score,
-                is_score_valid=word_count > 0,  # Basic is_score_valid if there are any words
+                is_score_valid=word_count
+                > 0,  # Basic is_score_valid if there are any words
                 reason=f"Word count: {word_count}",
             )
         },

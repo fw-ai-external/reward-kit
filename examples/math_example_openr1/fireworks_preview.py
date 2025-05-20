@@ -1,9 +1,8 @@
 import json
 import os
-import sys
-
-import tempfile
 import shutil
+import sys
+import tempfile
 import types  # Import the types module
 
 # Ensure reward-kit is in the path
@@ -89,7 +88,7 @@ from typing import List, Dict, Any
 def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, Any]] = None, tools: List[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
     typed_messages = [Message(**msg) for msg in messages]
     typed_original_messages = [Message(**msg) for msg in original_messages] if original_messages else typed_messages
-    
+
     assistant_content = next((m['content'] for m in typed_messages if m.role == 'assistant'), None)
     if assistant_content is None:
         # Return as dict matching EvaluateResult structure
@@ -100,7 +99,7 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
         messages=typed_messages,
         original_messages=typed_original_messages,
         ground_truth=assistant_content, # Use assistant's response as GT for this example
-        **kwargs 
+        **kwargs
     )
     return result_obj.model_dump() # Return as dict
 """

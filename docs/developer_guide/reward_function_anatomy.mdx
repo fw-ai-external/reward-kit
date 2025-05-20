@@ -233,7 +233,7 @@ def calculate_base_score_and_metrics(response_content: str, min_length: int) -> 
 def configurable_evaluation(
     messages: List[Dict[str, str]], # Added type hints
     original_messages: Optional[List[Dict[str, str]]] = None, # Added type hints
-    metadata: Optional[Dict[str, Any]] = None, 
+    metadata: Optional[Dict[str, Any]] = None,
     **kwargs
 ) -> EvaluateResult: # Changed RewardOutput to EvaluateResult
     """Reward function that supports configuration via metadata."""

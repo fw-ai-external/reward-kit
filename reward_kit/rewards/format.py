@@ -52,7 +52,7 @@ def format_reward(
                     score=0.0, is_score_valid=False, reason="No messages provided"
                 )
             },
-            is_score_valid=False
+            is_score_valid=False,
         )
 
     response = messages[-1]
@@ -70,7 +70,7 @@ def format_reward(
                         reason="Message not from assistant or has no content",
                     )
                 },
-                is_score_valid=False
+                is_score_valid=False,
             )
         text = response.content
     elif isinstance(response, dict):
@@ -85,7 +85,7 @@ def format_reward(
                         reason="Message not from assistant or has no content",
                     )
                 },
-                is_score_valid=False
+                is_score_valid=False,
             )
         text = response.get("content", "")
     else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
@@ -94,10 +94,12 @@ def format_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "format_check": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type in messages.",
                 )
             },
-            is_score_valid=False
+            is_score_valid=False,
         )
 
     # Compile the regex with DOTALL flag to match across newlines
@@ -120,7 +122,7 @@ def format_reward(
                     reason="Text follows the required format pattern",
                 )
             },
-            is_score_valid=True
+            is_score_valid=True,
         )
     else:
         return EvaluateResult(
@@ -133,5 +135,5 @@ def format_reward(
                     reason="Text does not follow the required format pattern",
                 )
             },
-            is_score_valid=False
+            is_score_valid=False,
         )

@@ -117,7 +117,7 @@ def comprehensive_evaluator(
             success=True, # Informational metric
             reason=f"Applied boost factor of {boost}"
         )
-    
+
     overall_reason = f"Comprehensive evaluation. Helpfulness: {helpfulness_score:.2f}, Accuracy: {accuracy_score:.2f}, Safety: {safety_score:.2f}, Conciseness: {conciseness_score:.2f}."
     if "boost_factor" in metadata:
         overall_reason += f" Boost factor {metadata['boost_factor']} applied."
@@ -413,7 +413,7 @@ def combined_reward(
         safety_output.score * weights.get("safety", 0.0)
     )
     final_score = max(0.0, min(1.0, final_score)) # Ensure score is within [0,1]
-    
+
     overall_reason = f"Combined score from helpfulness ({helpfulness_output.score:.2f}), factuality ({factuality_output.score:.2f}), and safety ({safety_output.score:.2f})."
 
     return EvaluateResult(score=final_score, reason=overall_reason, metrics=all_metrics) # Updated

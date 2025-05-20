@@ -1,20 +1,20 @@
-import os
 import configparser  # Import the original for type hinting if needed, but not for spec.
+import os
+
+# Import the original ConfigParser for use in spec if absolutely necessary,
+# though direct configuration of the mock instance is preferred.
+from configparser import ConfigParser as OriginalConfigParser
 from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
 # Import the SUT
 from reward_kit.auth import (
-    get_fireworks_api_key,
-    get_fireworks_account_id,
     AUTH_INI_FILE,
+    get_fireworks_account_id,
+    get_fireworks_api_key,
 )
-
-# Import the original ConfigParser for use in spec if absolutely necessary,
-# though direct configuration of the mock instance is preferred.
-from configparser import ConfigParser as OriginalConfigParser
 
 # Test data
 TEST_ENV_API_KEY = "test_env_api_key_123"
@@ -53,20 +53,26 @@ def test_get_api_key_from_ini(mock_ConfigParser_class, mock_path_exists):
     mock_parser_instance = mock_ConfigParser_class.return_value
     mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
 
-    # Simulate config["fireworks"]["api_key"]
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        True  # "api_key" in config["fireworks"]
-    )
-    fireworks_section_mock.__getitem__.return_value = (
-        INI_API_KEY  # config["fireworks"]["api_key"]
-    )
+    # Simulate key found in [fireworks] section
+    def has_option_fireworks_true(section, option):
+        if section == "fireworks":
+            return option == "api_key"
+        return False  # Not in default or other sections for this test
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
+    def get_fireworks_value(section, option):
+        if section == "fireworks" and option == "api_key":
+            return INI_API_KEY
+        raise configparser.NoOptionError(option, section)
+
+    mock_parser_instance.has_option.side_effect = has_option_fireworks_true
+    mock_parser_instance.get.side_effect = get_fireworks_value
+    # Ensure 'fireworks' section itself exists
+    mock_parser_instance.__contains__.side_effect = (
+        lambda item: item == "fireworks"
+    )  # For "fireworks" in config check
 
     with patch(
-        "builtins.open", mock_open(read_data="")
+        "builtins.open", mock_open(read_data="[fireworks]\napi_key = foo")
     ):  # Actual read_data not used by mock parser
         assert get_fireworks_api_key() == INI_API_KEY
 
@@ -96,51 +102,114 @@ def test_get_api_key_not_found(mock_path_exists):
 def test_get_api_key_ini_exists_no_section(mock_ConfigParser_class, mock_path_exists):
     mock_parser_instance = mock_ConfigParser_class.return_value
     mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
-    mock_parser_instance.__contains__.return_value = False  # "fireworks" not in config
-
-    with patch("builtins.open", mock_open(read_data="")):
+    # "fireworks" section does not exist
+    mock_parser_instance.__contains__.side_effect = (
+        lambda item: item != "fireworks"
+    )  # For "fireworks" in config check
+    # Simulate default section also not having the key
+    mock_parser_instance = mock_ConfigParser_class.return_value
+    # Simulate MissingSectionHeaderError to trigger fallback
+    mock_parser_instance.read.side_effect = configparser.MissingSectionHeaderError(
+        "file", 1, "line"
+    )
+    # Fallback parsing will not find 'api_key' in this data
+    with patch(
+        "builtins.open",
+        mock_open(read_data="other_key = some_val_but_no_section_header\nanother=val"),
+    ):
         assert get_fireworks_api_key() is None
 
 
 @patch("pathlib.Path.exists", return_value=True)
 @patch("configparser.ConfigParser")
-def test_get_api_key_ini_exists_no_key_option(
+def test_get_api_key_ini_exists_no_key_option(  # Tests [fireworks] exists, but no api_key in it, and not in default, configparser parses OK (no fallback)
     mock_ConfigParser_class, mock_path_exists
 ):
     mock_parser_instance = mock_ConfigParser_class.return_value
-    mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
+    mock_parser_instance.read.return_value = [
+        str(AUTH_INI_FILE)
+    ]  # Simulate successful read
 
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        False  # "api_key" not in config["fireworks"]
-    )
+    # "fireworks" section exists
+    mock_parser_instance.__contains__.side_effect = lambda item: item == "fireworks"
+    # but no "api_key" option in it, and not in default section
+    mock_parser_instance.has_option.side_effect = lambda section, option: False
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
-
-    with patch("builtins.open", mock_open(read_data="")):
+    with patch("builtins.open", mock_open(read_data="[fireworks]\nsome_other_key=foo")):
         assert get_fireworks_api_key() is None
 
 
 @patch("pathlib.Path.exists", return_value=True)
 @patch("configparser.ConfigParser")
-def test_get_api_key_ini_empty_value(mock_ConfigParser_class, mock_path_exists):
+def test_get_api_key_ini_empty_value(
+    mock_ConfigParser_class, mock_path_exists
+):  # Key exists in [fireworks] but value is empty
     mock_parser_instance = mock_ConfigParser_class.return_value
     mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
 
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        True  # "api_key" in config["fireworks"]
+    # "fireworks" section exists and has "api_key"
+    mock_parser_instance.__contains__.side_effect = lambda item: item == "fireworks"
+    mock_parser_instance.has_option.side_effect = (
+        lambda section, option: section == "fireworks" and option == "api_key"
     )
-    fireworks_section_mock.__getitem__.return_value = (
-        ""  # config["fireworks"]["api_key"] is empty
+    # but its value is empty
+    mock_parser_instance.get.side_effect = lambda section, option: (
+        ""
+        if section == "fireworks" and option == "api_key"
+        else configparser.NoOptionError(option, section)
     )
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
+    with patch("builtins.open", mock_open(read_data="[fireworks]\napi_key=")):
+        assert (
+            get_fireworks_api_key() is None
+        )  # Empty string treated as not found by SUT
 
-    with patch("builtins.open", mock_open(read_data="")):
-        assert get_fireworks_api_key() is None
+
+@patch("pathlib.Path.exists", return_value=True)
+@patch("configparser.ConfigParser")
+def test_get_api_key_from_ini_default_section_success(
+    mock_ConfigParser_class, mock_path_exists
+):
+    mock_parser_instance = mock_ConfigParser_class.return_value
+    mock_parser_instance.read.return_value = [
+        str(AUTH_INI_FILE)
+    ]  # Simulate successful read
+
+    def has_option_logic(section, option):
+        if section == "fireworks":  # Not in [fireworks]
+            return False
+        # Is in default section
+        return section == mock_parser_instance.default_section and option == "api_key"
+
+    def get_logic(section, option):
+        if section == mock_parser_instance.default_section and option == "api_key":
+            return INI_API_KEY
+        raise configparser.NoOptionError(option, section)
+
+    mock_parser_instance.has_option.side_effect = has_option_logic
+    mock_parser_instance.get.side_effect = get_logic
+    mock_parser_instance.__contains__.side_effect = (
+        lambda item: item != "fireworks"
+    )  # No 'fireworks' section
+
+    with patch("builtins.open", mock_open(read_data="api_key = ini_api_key_abc")):
+        assert get_fireworks_api_key() == INI_API_KEY
+
+
+@patch("pathlib.Path.exists", return_value=True)
+@patch("configparser.ConfigParser")
+def test_get_api_key_from_ini_fallback_parsing_success(
+    mock_ConfigParser_class, mock_path_exists
+):
+    mock_parser_instance = mock_ConfigParser_class.return_value
+    # Simulate MissingSectionHeaderError to trigger fallback
+    mock_parser_instance.read.side_effect = configparser.MissingSectionHeaderError(
+        "mocked file", 1, "mocked line content"
+    )
+
+    file_content = f"api_key = {INI_API_KEY}\nother_key = value"
+    with patch("builtins.open", mock_open(read_data=file_content)):
+        assert get_fireworks_api_key() == INI_API_KEY
 
 
 # --- Tests for get_fireworks_account_id ---
@@ -157,18 +226,22 @@ def test_get_account_id_from_ini(mock_ConfigParser_class, mock_path_exists):
     mock_parser_instance = mock_ConfigParser_class.return_value
     mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
 
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        True  # "account_id" in config["fireworks"]
-    )
-    fireworks_section_mock.__getitem__.return_value = (
-        INI_ACCOUNT_ID  # config["fireworks"]["account_id"]
-    )
+    # Simulate key found in [fireworks] section
+    def has_option_fireworks_true(section, option):
+        if section == "fireworks":
+            return option == "account_id"
+        return False  # Not in default or other sections for this test
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
+    def get_fireworks_value(section, option):
+        if section == "fireworks" and option == "account_id":
+            return INI_ACCOUNT_ID
+        raise configparser.NoOptionError(option, section)
 
-    with patch("builtins.open", mock_open(read_data="")):
+    mock_parser_instance.has_option.side_effect = has_option_fireworks_true
+    mock_parser_instance.get.side_effect = get_fireworks_value
+    mock_parser_instance.__contains__.side_effect = lambda item: item == "fireworks"
+
+    with patch("builtins.open", mock_open(read_data="[fireworks]\naccount_id = foo")):
         assert get_fireworks_account_id() == INI_ACCOUNT_ID
 
     mock_path_exists.assert_called_once_with()
@@ -198,52 +271,106 @@ def test_get_account_id_ini_exists_no_section(
     mock_ConfigParser_class, mock_path_exists
 ):
     mock_parser_instance = mock_ConfigParser_class.return_value
-    mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
-    mock_parser_instance.__contains__.return_value = False  # "fireworks" not in config
-
-    with patch("builtins.open", mock_open(read_data="")):
+    # Simulate MissingSectionHeaderError to trigger fallback
+    mock_parser_instance.read.side_effect = configparser.MissingSectionHeaderError(
+        "file", 1, "line"
+    )
+    # Fallback parsing will not find 'account_id' in this data
+    with patch(
+        "builtins.open",
+        mock_open(read_data="other_key = some_val_but_no_section_header\nanother=val"),
+    ):
         assert get_fireworks_account_id() is None
 
 
 @patch("pathlib.Path.exists", return_value=True)
 @patch("configparser.ConfigParser")
-def test_get_account_id_ini_exists_no_id_option(
+def test_get_account_id_ini_exists_no_id_option(  # Tests [fireworks] exists, but no account_id in it, and not in default, configparser parses OK
+    mock_ConfigParser_class, mock_path_exists
+):
+    mock_parser_instance = mock_ConfigParser_class.return_value
+    mock_parser_instance.read.return_value = [
+        str(AUTH_INI_FILE)
+    ]  # Simulate successful read
+
+    mock_parser_instance.__contains__.side_effect = (
+        lambda item: item == "fireworks"
+    )  # Has [fireworks] section
+    # No "account_id" option in [fireworks] or default section
+    mock_parser_instance.has_option.side_effect = lambda section, option: False
+
+    with patch("builtins.open", mock_open(read_data="[fireworks]\nsome_other_key=foo")):
+        assert get_fireworks_account_id() is None
+
+
+@patch("pathlib.Path.exists", return_value=True)
+@patch("configparser.ConfigParser")
+def test_get_account_id_ini_empty_value(
+    mock_ConfigParser_class, mock_path_exists
+):  # Key exists in [fireworks] but value is empty
+    mock_parser_instance = mock_ConfigParser_class.return_value
+    mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
+
+    mock_parser_instance.__contains__.side_effect = lambda item: item == "fireworks"
+    mock_parser_instance.has_option.side_effect = (
+        lambda section, option: section == "fireworks" and option == "account_id"
+    )
+    mock_parser_instance.get.side_effect = lambda section, option: (
+        ""
+        if section == "fireworks" and option == "account_id"
+        else configparser.NoOptionError(option, section)
+    )
+
+    with patch("builtins.open", mock_open(read_data="[fireworks]\naccount_id=")):
+        assert (
+            get_fireworks_account_id() is None
+        )  # Empty string treated as not found by SUT
+
+
+@patch("pathlib.Path.exists", return_value=True)
+@patch("configparser.ConfigParser")
+def test_get_account_id_from_ini_default_section_success(
     mock_ConfigParser_class, mock_path_exists
 ):
     mock_parser_instance = mock_ConfigParser_class.return_value
     mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
 
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        False  # "account_id" not in config["fireworks"]
-    )
+    def has_option_logic(section, option):
+        if section == "fireworks":  # Not in [fireworks]
+            return False
+        # Is in default section
+        return (
+            section == mock_parser_instance.default_section and option == "account_id"
+        )
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
+    def get_logic(section, option):
+        if section == mock_parser_instance.default_section and option == "account_id":
+            return INI_ACCOUNT_ID
+        raise configparser.NoOptionError(option, section)
 
-    with patch("builtins.open", mock_open(read_data="")):
-        assert get_fireworks_account_id() is None
+    mock_parser_instance.has_option.side_effect = has_option_logic
+    mock_parser_instance.get.side_effect = get_logic
+    mock_parser_instance.__contains__.side_effect = (
+        lambda item: item != "fireworks"
+    )  # No 'fireworks' section
+
+    with patch("builtins.open", mock_open(read_data="account_id = ini_account_id_def")):
+        assert get_fireworks_account_id() == INI_ACCOUNT_ID
 
 
 @patch("pathlib.Path.exists", return_value=True)
 @patch("configparser.ConfigParser")
-def test_get_account_id_ini_empty_value(mock_ConfigParser_class, mock_path_exists):
+def test_get_account_id_from_ini_fallback_parsing_success(
+    mock_ConfigParser_class, mock_path_exists
+):
     mock_parser_instance = mock_ConfigParser_class.return_value
-    mock_parser_instance.read.return_value = [str(AUTH_INI_FILE)]
-
-    fireworks_section_mock = MagicMock()
-    fireworks_section_mock.__contains__.return_value = (
-        True  # "account_id" in config["fireworks"]
-    )
-    fireworks_section_mock.__getitem__.return_value = (
-        ""  # config["fireworks"]["account_id"] is empty
+    mock_parser_instance.read.side_effect = configparser.MissingSectionHeaderError(
+        "mocked file", 1, "mocked line content"
     )
 
-    mock_parser_instance.__contains__.return_value = True  # "fireworks" in config
-    mock_parser_instance.__getitem__.return_value = fireworks_section_mock
-
-    with patch("builtins.open", mock_open(read_data="")):
-        assert get_fireworks_account_id() is None
+    file_content = f"account_id = {INI_ACCOUNT_ID}\nother_key = value"
+    with patch("builtins.open", mock_open(read_data=file_content)):
+        assert get_fireworks_account_id() == INI_ACCOUNT_ID
 
 
 # --- Tests for error handling ---
@@ -258,7 +385,8 @@ def test_get_api_key_ini_parse_error(mock_ConfigParser_class, mock_path_exists, 
 
     with patch("builtins.open", mock_open(read_data="malformed ini content")):
         assert get_fireworks_api_key() is None
-    assert "Error parsing" in caplog.text
+    # Adjusted to match the new log message format
+    assert "Configparser error reading" in caplog.text
     assert "Mocked Parsing Error" in caplog.text
 
 
@@ -272,7 +400,8 @@ def test_get_account_id_ini_parse_error(
 
     with patch("builtins.open", mock_open(read_data="malformed ini content")):
         assert get_fireworks_account_id() is None
-    assert "Error parsing" in caplog.text
+    # Adjusted to match the new log message format
+    assert "Configparser error reading" in caplog.text
     assert "Mocked Parsing Error" in caplog.text
 
 

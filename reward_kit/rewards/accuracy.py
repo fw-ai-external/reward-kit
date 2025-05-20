@@ -428,7 +428,9 @@ def accuracy_reward(
                 reason="Last message is not a valid assistant response.",
                 metrics={
                     "accuracy": MetricResult(
-                        score=0.0, is_score_valid=False, reason="Invalid assistant response."
+                        score=0.0,
+                        is_score_valid=False,
+                        reason="Invalid assistant response.",
                     )
                 },
             )
@@ -468,7 +470,9 @@ def accuracy_reward(
             reason="Ground truth not provided or not in expected list format.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid ground truth format."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid ground truth format.",
                 )
             },
         )
@@ -485,7 +489,9 @@ def accuracy_reward(
                 reason="First ground truth message has no content.",
                 metrics={
                     "accuracy": MetricResult(
-                        score=0.0, is_score_valid=False, reason="Ground truth content missing."
+                        score=0.0,
+                        is_score_valid=False,
+                        reason="Ground truth content missing.",
                     )
                 },
             )

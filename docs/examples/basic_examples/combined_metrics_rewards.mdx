@@ -174,18 +174,18 @@ def accuracy_reasoning_reward(
     # and their .metrics dictionaries contain MetricResult objects or compatible dicts.
     # For simplicity, we'll construct new MetricResult objects here.
     # A more robust way might be to merge their .metrics dictionaries if they are complex.
-    
+
     acc_metric_reason = accuracy_result.reason if hasattr(accuracy_result, 'reason') else "Accuracy evaluated"
     acc_metric_success = accuracy_result.metrics.get("accuracy", {}).get("success", accuracy_result.score > 0.5) if hasattr(accuracy_result, 'metrics') and "accuracy" in accuracy_result.metrics else accuracy_result.score > 0.5
 
 
     rsn_metric_reason = reasoning_result.reason if hasattr(reasoning_result, 'reason') else "Reasoning evaluated"
     rsn_metric_success = reasoning_result.metrics.get("reasoning_steps", {}).get("success", reasoning_result.score > 0.5) if hasattr(reasoning_result, 'metrics') and "reasoning_steps" in reasoning_result.metrics else reasoning_result.score > 0.5
-    
+
     metrics = {
         "accuracy_component": MetricResult( # Updated
             score=accuracy_result.score,
-            success=acc_metric_success, 
+            success=acc_metric_success,
             reason=acc_metric_reason
         ),
         "reasoning_component": MetricResult( # Updated
@@ -194,7 +194,7 @@ def accuracy_reasoning_reward(
             reason=rsn_metric_reason
         )
     }
-    
+
     overall_reason = f"Combined accuracy ({accuracy_result.score:.2f}) and reasoning ({reasoning_result.score:.2f})."
 
     return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics) # Updated

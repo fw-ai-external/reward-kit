@@ -72,8 +72,10 @@ def test_informativeness_reward(deploy_example):
     ]
 
     # Import the updated reward function
-    from examples.informativeness_metric.main import evaluate as informativeness_evaluate_function
-    from reward_kit import Message # For converting dict messages to Message objects
+    from examples.informativeness_metric.main import (
+        evaluate as informativeness_evaluate_function,
+    )
+    from reward_kit import Message  # For converting dict messages to Message objects
 
     # Convert test messages to Message objects
     test_messages_objects = [Message(**msg) for msg in test_messages]
@@ -125,7 +127,7 @@ def test_deploy_to_fireworks(
         "description": "Evaluates response informativeness based on specificity and content density.",
         # ... other fields if necessary
     }
-    
+
     evaluation_id = deploy_example.deploy_to_fireworks()
     assert evaluation_id == "informativeness-metric-example-v1"
 

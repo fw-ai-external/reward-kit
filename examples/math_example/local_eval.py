@@ -6,8 +6,8 @@ import sys
 # This assumes the script is run from the 'examples/math_example/' directory or reward-kit is installed
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from reward_kit.rewards.math import math_reward
 from reward_kit.models import Message
+from reward_kit.rewards.math import math_reward
 
 
 def load_dataset(file_path: str):

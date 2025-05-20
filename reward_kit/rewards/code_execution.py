@@ -26,8 +26,8 @@ import sys
 import tempfile
 import traceback
 from io import StringIO
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from multiprocessing.managers import DictProxy
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # Try to import from e2b_code_interpreter first (preferred)
 try:
@@ -318,6 +318,7 @@ def _execute_code_in_process(
         Dictionary with execution results
     """
     import multiprocessing
+
     manager = multiprocessing.Manager()
     result_dict = manager.dict()
 
@@ -1221,7 +1222,9 @@ def fractional_code_reward(
                 reason="Invalid ground_truth format: expected string or list of test case dicts.",
                 metrics={
                     "error": MetricResult(
-                        score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
+                        score=0.0,
+                        is_score_valid=False,
+                        reason="Invalid ground_truth format.",
                     )
                 },
             )
@@ -1231,7 +1234,9 @@ def fractional_code_reward(
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid ground_truth format.",
                 )
             },
         )
@@ -1304,7 +1309,9 @@ def fractional_code_reward(
         else:
             # Convert string metrics to MetricResult objects before returning
             final_metrics_on_error: Dict[str, MetricResult] = {
-                k: MetricResult(score=0.0, reason=v, is_score_valid=(k == "extracted_code"))
+                k: MetricResult(
+                    score=0.0, reason=v, is_score_valid=(k == "extracted_code")
+                )
                 for k, v in metrics_strings.items()
             }
             final_metrics_on_error["error"] = MetricResult(
@@ -1771,7 +1778,9 @@ process.stdout.write(output); // Write directly to avoid extra newline
         ):  # Should not happen here as metrics are strings or lists
             final_metrics[key] = value
         elif isinstance(value, str):  # Should not happen here anymore
-            final_metrics[key] = MetricResult(score=0.0, reason=value, is_score_valid=False)
+            final_metrics[key] = MetricResult(
+                score=0.0, reason=value, is_score_valid=False
+            )
 
     return EvaluateResult(
         score=score, reason=f"{passed}/{total} tests passed.", metrics=final_metrics

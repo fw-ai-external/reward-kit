@@ -1,16 +1,17 @@
+import json
 import os
 import sys
-import json
+from unittest.mock import MagicMock, patch
+
+import aiohttp
 import pytest
 import torch
-import aiohttp
-from unittest.mock import patch, MagicMock
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from reward_kit.models import EvaluateResult, Message  # Removed PreviewBulk* models
 from reward_kit.rewards.math import math_reward
-from reward_kit.models import Message, EvaluateResult  # Removed PreviewBulk* models
 
 # Import functions from the example scripts if they are structured for import
 # For simplicity here, we might re-implement small parts or directly call reward functions
@@ -127,18 +128,15 @@ class TestMathExampleReadiness:
         # examples/math_example/fireworks_preview.py calls it (with reward_functions, dataset).
         # This suggests that examples/math_example/fireworks_preview.py might be using
         # a different preview_evaluation or there's an adapter.
-
         # Given the Pylint error "Unexpected keyword argument 'reward_functions'",
         # the call below is incorrect for the reward_kit.evaluation.preview_evaluation.
         # I will comment this part out as the E2E script test is more appropriate.
-
         # api_results = reward_kit_preview_evaluation(
         #     reward_functions=[math_reward], # This is the problematic part
         #     dataset=math_example_dataset
         # )
         # assert api_results.total_samples == len(math_example_dataset)
         # assert all(res.score == 1.0 for res in api_results.results)
-
         # For this unit test to pass without calling the script, we'd need to know
         # exactly what `preview_evaluation` is being called by the script.
         # Assuming the E2E test below will cover the script's execution.
@@ -301,11 +299,11 @@ class TestMathExampleEndToEndScripts:
             "E2E Test: Math Example - fireworks_preview.py (Mocked API via Env Var): PASSED"
         )
 
-    @patch(
-        "examples.math_example.fireworks_regenerate.aiohttp.ClientSession.post"
-    )
+    @patch("examples.math_example.fireworks_regenerate.aiohttp.ClientSession.post")
     def test_e2e_fireworks_regenerate_script(
-        self, mock_aiohttp_session_post, mock_fireworks_api_key # Renamed mock for clarity
+        self,
+        mock_aiohttp_session_post,
+        mock_fireworks_api_key,  # Renamed mock for clarity
     ):
         """End-to-end test for examples/math_example/fireworks_regenerate.py with mocked API."""
         print("\nRunning E2E Test: Math Example - fireworks_regenerate.py (Mocked API)")
@@ -323,9 +321,7 @@ class TestMathExampleEndToEndScripts:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = mock_api_response_data
-        mock_aiohttp_session_post.return_value = ( # Use the new mock name
-            mock_response
-        )
+        mock_aiohttp_session_post.return_value = mock_response  # Use the new mock name
 
         env_vars = {
             "FIREWORKS_API_KEY": "mocked_key_for_e2e_test",
@@ -346,8 +342,13 @@ class TestMathExampleEndToEndScripts:
             "E2E Test: Math Example - fireworks_regenerate.py (Mocked API via Env Var): PASSED"
         )
 
-    @pytest.mark.skipif(os.environ.get("CI") == "true", reason="Skipping resource-intensive TRL integration test in CI")
-    @pytest.mark.timeout(630)  # Timeout for test function (slightly > subprocess timeout)
+    @pytest.mark.skipif(
+        os.environ.get("CI") == "true",
+        reason="Skipping resource-intensive TRL integration test in CI",
+    )
+    @pytest.mark.timeout(
+        630
+    )  # Timeout for test function (slightly > subprocess timeout)
     @patch("examples.math_example.trl_grpo_integration.GRPOTrainer")
     @patch("peft.get_peft_model")
     @patch("transformers.AutoModelForCausalLM.from_pretrained")
@@ -429,7 +430,9 @@ class TestMathExampleEndToEndScripts:
 
         env_vars = {"TEST_MODE_TRL": "true"}
         # Run the script with a 10-minute (600 seconds) timeout
-        result = self.run_script("trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600)
+        result = self.run_script(
+            "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
+        )
 
         assert (
             result.returncode == 0
@@ -447,12 +450,10 @@ class TestMathExampleEndToEndScripts:
         # where the @patch decorator does not apply.
         # The assertions on result.returncode and stdout content are the primary checks for this E2E script test.
         # mock_grpo_trainer_instance.train.assert_called_once() # This line is removed.
-
         # The number of steps taken internally by train() will be 1 due to TEST_MODE_TRL=true in the script's env.
         # We can't easily check internal step calls on the mock of GRPOTrainer itself when train() is called.
         # The script's output "GRPO training loop completed for Math Example." and return code 0 are primary indicators.
         # The assertion on result.returncode == 0 and the completion message in stdout already cover this.
-
         # If we wanted to check logs for number of steps, that would be parsing stdout.
         # For now, asserting train() was called is the most direct check on the mock.
 
@@ -484,11 +485,13 @@ class TestMathExampleOpenR1EndToEndScripts:
             command,
             capture_output=True,
             text=True,
-            cwd=self.BASE_MATH_EXAMPLE_OPENR1_PATH, # Run script from its directory
+            cwd=self.BASE_MATH_EXAMPLE_OPENR1_PATH,  # Run script from its directory
             env=current_env,
             timeout=timeout_seconds,
         )
-        print(f"\n--- Output for {script_name} (OpenR1, timeout: {timeout_seconds}s) ---")
+        print(
+            f"\n--- Output for {script_name} (OpenR1, timeout: {timeout_seconds}s) ---"
+        )
         print(f"STDOUT:\n{process.stdout}")
         if process.stderr:
             print(f"STDERR:\n{process.stderr}")
@@ -509,10 +512,12 @@ class TestMathExampleOpenR1EndToEndScripts:
 
     def test_e2e_fireworks_preview_script_openr1(self, mock_fireworks_api_key):
         """End-to-end test for examples/math_example_openr1/fireworks_preview.py with mocked API via Env Var."""
-        print("\nRunning E2E Test: Math Example OpenR1 - fireworks_preview.py (Mocked API via Env Var)")
+        print(
+            "\nRunning E2E Test: Math Example OpenR1 - fireworks_preview.py (Mocked API via Env Var)"
+        )
 
         env_vars = {
-            "FIREWORKS_API_KEY": "mocked_key_for_e2e_test_openr1_preview", # Ensure this is distinct if needed
+            "FIREWORKS_API_KEY": "mocked_key_for_e2e_test_openr1_preview",  # Ensure this is distinct if needed
             "TEST_MOCK_FIREWORKS_PREVIEW": "true",
         }
         result = self.run_script("fireworks_preview.py", env_vars=env_vars)
@@ -520,19 +525,32 @@ class TestMathExampleOpenR1EndToEndScripts:
         assert (
             result.returncode == 0
         ), f"OpenR1 fireworks_preview.py script failed with exit code {result.returncode}. Stderr: {result.stderr}"
-        assert "Mocking Fireworks Preview API call in test mode." in result.stdout # Assuming script logs this
         assert (
-            "All samples passed successfully via Fireworks Preview API!" in result.stdout
+            "Mocking Fireworks Preview API call in test mode." in result.stdout
+        )  # Assuming script logs this
+        assert (
+            "All samples passed successfully via Fireworks Preview API!"
+            in result.stdout
         ), "Expected success message not found in OpenR1 fireworks_preview.py output."
-        print("E2E Test: Math Example OpenR1 - fireworks_preview.py (Mocked API via Env Var): PASSED")
+        print(
+            "E2E Test: Math Example OpenR1 - fireworks_preview.py (Mocked API via Env Var): PASSED"
+        )
 
-    @patch("examples.math_example_openr1.fireworks_regenerate.aiohttp.ClientSession.post") # Corrected patch target
-    def test_e2e_fireworks_regenerate_script_openr1(self, mock_aiohttp_post_openr1, mock_fireworks_api_key):
+    @patch(
+        "examples.math_example_openr1.fireworks_regenerate.aiohttp.ClientSession.post"
+    )  # Corrected patch target
+    def test_e2e_fireworks_regenerate_script_openr1(
+        self, mock_aiohttp_post_openr1, mock_fireworks_api_key
+    ):
         """End-to-end test for examples/math_example_openr1/fireworks_regenerate.py with mocked API."""
-        print("\nRunning E2E Test: Math Example OpenR1 - fireworks_regenerate.py (Mocked API)")
+        print(
+            "\nRunning E2E Test: Math Example OpenR1 - fireworks_regenerate.py (Mocked API)"
+        )
 
         # Configure the mock for the generation API call
-        mock_regenerated_solution = "This is a mocked correct OpenR1 math solution." # Example
+        mock_regenerated_solution = (
+            "This is a mocked correct OpenR1 math solution."  # Example
+        )
         mock_api_response_data = {
             "choices": [
                 {"message": {"role": "assistant", "content": mock_regenerated_solution}}
@@ -543,31 +561,34 @@ class TestMathExampleOpenR1EndToEndScripts:
         # which needs to be awaited for .json()
         mock_aiohttp_client_response = MagicMock(spec=aiohttp.ClientResponse)
         mock_aiohttp_client_response.status = 200
-        
-        async def mock_json(): # The .json() method is async
+
+        async def mock_json():  # The .json() method is async
             return mock_api_response_data
-            
+
         mock_aiohttp_client_response.json = mock_json
-        mock_aiohttp_client_response.raise_for_status = MagicMock() # Mock raise_for_status
+        mock_aiohttp_client_response.raise_for_status = (
+            MagicMock()
+        )  # Mock raise_for_status
 
         # The session.post() itself is an async context manager in the script
         # So, the mock_aiohttp_post_openr1 should return an object that can be used in `async with`
         # and that object's __aenter__ should return the mock_aiohttp_client_response.
-        
+
         mock_async_context_manager = MagicMock()
+
         async def __aenter__():
             return mock_aiohttp_client_response
+
         async def __aexit__(*args):
             pass
-        
+
         mock_async_context_manager.__aenter__ = __aenter__
         mock_async_context_manager.__aexit__ = __aexit__
         mock_aiohttp_post_openr1.return_value = mock_async_context_manager
 
-
         env_vars = {
             "FIREWORKS_API_KEY": "mocked_key_for_e2e_test_openr1_regenerate",
-            "TEST_MOCK_FIREWORKS_REGEN": "true", # Activate script's internal mocking
+            "TEST_MOCK_FIREWORKS_REGEN": "true",  # Activate script's internal mocking
         }
         # Ensure the recorded data file exists for the script's internal mocking to work as expected
         # For this test, we rely on the script's internal mock logic using TEST_MOCK_FIREWORKS_REGEN.
@@ -575,9 +596,14 @@ class TestMathExampleOpenR1EndToEndScripts:
         # or if the script's internal mocking still made a requests.post call (which it shouldn't if fully mocked).
 
         # Create a dummy recorded data file if the script expects one for TEST_MOCK_FIREWORKS_REGEN=true
-        recorded_data_path = os.path.join(self.BASE_MATH_EXAMPLE_OPENR1_PATH, "fireworks_regenerate_recorded_data_openr1.jsonl")
+        recorded_data_path = os.path.join(
+            self.BASE_MATH_EXAMPLE_OPENR1_PATH,
+            "fireworks_regenerate_recorded_data_openr1.jsonl",
+        )
         if not os.path.exists(recorded_data_path):
-            print(f"Warning: Mock recorded data file not found at {recorded_data_path}, creating dummy for test.")
+            print(
+                f"Warning: Mock recorded data file not found at {recorded_data_path}, creating dummy for test."
+            )
             # Create a minimal dummy file so the script doesn't fail on file open
             # The script should ideally handle this gracefully or the test setup should ensure it exists.
             # For a robust test, this file should contain data that makes the script pass.
@@ -586,11 +612,16 @@ class TestMathExampleOpenR1EndToEndScripts:
                 dummy_sample = {
                     "index": 0,
                     "messages": [{"role": "user", "content": "What is 1+1?"}],
-                    "regenerated_messages": [{"role": "assistant", "content": "\\boxed{2}"}],
-                    "evaluation_result": {"score": 1.0, "reason": "Mock pass", "success": True}
+                    "regenerated_messages": [
+                        {"role": "assistant", "content": "\\boxed{2}"}
+                    ],
+                    "evaluation_result": {
+                        "score": 1.0,
+                        "reason": "Mock pass",
+                        "success": True,
+                    },
                 }
                 f.write(json.dumps(dummy_sample) + "\n")
-
 
         result = self.run_script("fireworks_regenerate.py", env_vars=env_vars)
 
@@ -601,17 +632,23 @@ class TestMathExampleOpenR1EndToEndScripts:
         # If the dummy file above is used, and the script processes it, it should pass for that one sample.
         # The script's logic for "All samples processed..." needs to be robust to the number of samples in the mock file.
         assert (
-            "All samples processed in this run passed successfully with regenerated responses!" in result.stdout
-            or "Mocking Fireworks API call for regeneration using recorded data for prompt:" in result.stdout # More specific check for mock mode
+            "All samples processed in this run passed successfully with regenerated responses!"
+            in result.stdout
+            or "Mocking Fireworks API call for regeneration using recorded data for prompt:"
+            in result.stdout  # More specific check for mock mode
         ), "Expected success or mock mode activation message not found in OpenR1 fireworks_regenerate.py output."
 
         # If TEST_MOCK_FIREWORKS_REGEN="true" and the script uses its internal mock data,
         # then aiohttp.ClientSession.post (mock_aiohttp_post_openr1) should not be called.
         mock_aiohttp_post_openr1.assert_not_called()
-        print("E2E Test: Math Example OpenR1 - fireworks_regenerate.py (Mocked API via Env Var): PASSED")
+        print(
+            "E2E Test: Math Example OpenR1 - fireworks_regenerate.py (Mocked API via Env Var): PASSED"
+        )
 
-
-    @pytest.mark.skipif(os.environ.get("CI") == "true", reason="Skipping resource-intensive TRL integration test in CI")
+    @pytest.mark.skipif(
+        os.environ.get("CI") == "true",
+        reason="Skipping resource-intensive TRL integration test in CI",
+    )
     @patch("examples.math_example_openr1.trl_grpo_integration.GRPOTrainer")
     @patch("peft.get_peft_model")
     @patch("transformers.AutoModelForCausalLM.from_pretrained")
@@ -628,12 +665,16 @@ class TestMathExampleOpenR1EndToEndScripts:
         mock_grpo_trainer_class_openr1,
     ):
         """End-to-end test for examples/math_example_openr1/trl_grpo_integration.py with mocked TRL steps."""
-        print("\nRunning E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL)")
+        print(
+            "\nRunning E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL)"
+        )
 
         # Configure mocks
         mock_tokenizer = MagicMock()
         mock_tokenizer.pad_token = "<|endoftext|>"
-        mock_tokenizer.eos_token_id = 50256 # Example, ensure it matches model if relevant
+        mock_tokenizer.eos_token_id = (
+            50256  # Example, ensure it matches model if relevant
+        )
         mock_tokenizer_load_openr1.return_value = mock_tokenizer
 
         mock_base_model = MagicMock()
@@ -653,7 +694,7 @@ class TestMathExampleOpenR1EndToEndScripts:
         mock_dataset_from_list_openr1.return_value = mock_dataset_instance
 
         mock_grpo_trainer_instance = MagicMock()
-        mock_grpo_trainer_instance.train = MagicMock() # Mock the train method directly
+        mock_grpo_trainer_instance.train = MagicMock()  # Mock the train method directly
 
         # Mock dataloader and accelerator parts if GRPOTrainer's train() needs them internally from the instance
         mock_dataloader = MagicMock()
@@ -664,12 +705,14 @@ class TestMathExampleOpenR1EndToEndScripts:
             "response": ["mock response openr1"],
         }
         mock_dataloader.__iter__.return_value = iter([mock_batch])
-        mock_grpo_trainer_instance.get_train_dataloader = MagicMock(return_value=mock_dataloader)
+        mock_grpo_trainer_instance.get_train_dataloader = MagicMock(
+            return_value=mock_dataloader
+        )
 
         mock_accelerator = MagicMock()
         mock_accelerator.device = torch.device("cpu")
         mock_grpo_trainer_instance.accelerator = mock_accelerator
-        
+
         mock_grpo_trainer_class_openr1.return_value = mock_grpo_trainer_instance
 
         env_vars = {"TEST_MODE_TRL": "true"}
@@ -681,11 +724,13 @@ class TestMathExampleOpenR1EndToEndScripts:
         assert (
             "GRPO training loop completed for OpenR1 Math Example." in result.stdout
         ), "Expected completion message not found in OpenR1 trl_grpo_integration.py output."
-        
+
         # Since the script runs in a subprocess, the mocks apply to the script's execution context if it imports them.
         # The primary check is the script's output and return code.
         # We can't directly assert mock_grpo_trainer_instance.train.assert_called_once() here
         # because the mock object `mock_grpo_trainer_instance` is in the test process,
         # not the subprocess where the script ran.
 
-        print("E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL): PASSED")
+        print(
+            "E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL): PASSED"
+        )

@@ -128,7 +128,9 @@ def repetition_penalty_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "repetition": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type in messages.",
                 )
             },
         )
@@ -207,7 +209,9 @@ def repetition_penalty_reward(
         ),
     }
 
-    return EvaluateResult(score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0)
+    return EvaluateResult(
+        score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0
+    )
 
 
 @reward_function
@@ -288,7 +292,9 @@ def diversity_reward(
             reason="Last message is of unexpected type.",
             metrics={
                 "diversity": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type in messages."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type in messages.",
                 )
             },
         )

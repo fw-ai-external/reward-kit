@@ -1,10 +1,12 @@
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 from reward_kit import EvaluateResult, Message, MetricResult, reward_function
 
+
 @reward_function
-def evaluate( # Renamed from informativeness_reward
+def evaluate(  # Renamed from informativeness_reward
     messages: List[Message],
-    **kwargs: Any, # Added **kwargs to match typical signature for deployed functions
+    **kwargs: Any,  # Added **kwargs to match typical signature for deployed functions
 ) -> EvaluateResult:
     """
     Evaluates the informativeness of an assistant response based on
@@ -23,9 +25,7 @@ def evaluate( # Renamed from informativeness_reward
             },
         )
 
-    response = (
-        messages[-1].content if messages[-1].content is not None else ""
-    )
+    response = messages[-1].content if messages[-1].content is not None else ""
     metrics = {}
 
     # 1. Length check - reward concise but informative responses

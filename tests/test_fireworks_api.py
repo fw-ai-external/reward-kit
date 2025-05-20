@@ -1,8 +1,9 @@
 import json
 import os
+
 import requests
 
-from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+from reward_kit.auth import get_fireworks_account_id, get_fireworks_api_key
 
 # Get API key using the new auth module
 api_key = get_fireworks_api_key()

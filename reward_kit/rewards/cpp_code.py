@@ -705,7 +705,9 @@ def _ioi_cpp_code_reward_impl(
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid ground_truth format."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid ground_truth format.",
                 )
             },
         )
@@ -770,7 +772,8 @@ def _ioi_cpp_code_reward_impl(
         # Add test results to metrics
         metrics["test_results"] = MetricResult(
             score=overall_score,
-            is_score_valid=overall_score >= pass_threshold,  # Success if pass_threshold is met
+            is_score_valid=overall_score
+            >= pass_threshold,  # Success if pass_threshold is met
             reason=json.dumps(
                 [
                     {

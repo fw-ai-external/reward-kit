@@ -20,7 +20,7 @@ graph TD
         D --> E;
         E -- Iteration & Debugging --> D;
         E --> F["Validated Reward Function & Dataset"];
-        
+
         subgraph llm_validation_optional ["(Optional) LLM Validation & Feedback"]
             F --> G["LLM Regen (e.g., FW API)"];
             G --> H["Eval Regenerated Responses"];
@@ -29,7 +29,7 @@ graph TD
             I -- API Eval. Insights --> D;
         end
     end
-    
+
     subgraph model_finetuning_phase ["Model Fine-Tuning (Fireworks/TRL)"]
         F --> J[Prepare Dataset for Fireworks TRL];
         J --> K["Integrate RF with TRL/GRPO"];

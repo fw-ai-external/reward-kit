@@ -181,14 +181,18 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)  # Matches first extracted from original
-        self.assertTrue(result.metrics["ambiguous_original_mcq"].is_score_valid == False)
+        self.assertTrue(
+            result.metrics["ambiguous_original_mcq"].is_score_valid == False
+        )
         self.assertTrue(
             result.reason is not None
             and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result.reason
         )
         # Dictionary access
         self.assertEqual(result["score"], 1.0)
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False)
+        self.assertTrue(
+            result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False
+        )
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(A)' (A) vs Orig: '(A)' (A)" in result["reason"]
@@ -201,8 +205,12 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 1.0)  # D vs D
-        self.assertTrue(result.metrics["ambiguous_generated_mcq"].is_score_valid == False)
-        self.assertTrue(result.metrics["ambiguous_original_mcq"].is_score_valid == False)
+        self.assertTrue(
+            result.metrics["ambiguous_generated_mcq"].is_score_valid == False
+        )
+        self.assertTrue(
+            result.metrics["ambiguous_original_mcq"].is_score_valid == False
+        )
         self.assertTrue(
             result.reason is not None
             and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result.reason
@@ -212,7 +220,9 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertTrue(
             result["metrics"]["ambiguous_generated_mcq"]["is_score_valid"] == False
         )
-        self.assertTrue(result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False)
+        self.assertTrue(
+            result["metrics"]["ambiguous_original_mcq"]["is_score_valid"] == False
+        )
         self.assertTrue(
             result["reason"] is not None
             and "Gen: '(D)' (D) vs Orig: '(D)' (D)" in result["reason"]

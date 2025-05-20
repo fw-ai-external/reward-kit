@@ -10,12 +10,12 @@ Requirements:
 - For the deepseek_huggingface_prover_benchmark, install with: pip install "reward-kit[deepseek]"
 """
 
+from reward_kit.models import Message
 from reward_kit.rewards.lean_prover import (
     deepseek_huggingface_prover_benchmark,
     deepseek_prover_v2_reward,
     lean_prover_reward,
 )
-from reward_kit.models import Message
 
 
 def main():
@@ -83,11 +83,17 @@ def main():
 
     # Basic evaluation with lean_prover_reward
     basic_partial_result = lean_prover_reward(
-        messages=messages_partial, ground_truth=None, statement=statement_text, verbose=True
+        messages=messages_partial,
+        ground_truth=None,
+        statement=statement_text,
+        verbose=True,
     )
 
     basic_complete_result = lean_prover_reward(
-        messages=messages_complete, ground_truth=None, statement=statement_text, verbose=True
+        messages=messages_complete,
+        ground_truth=None,
+        statement=statement_text,
+        verbose=True,
     )
 
     # Advanced evaluation with deepseek_prover_v2_reward
@@ -150,13 +156,13 @@ def main():
             "statement": statement_text,
             "dataset_item": {
                 "id": "sum_naturals",
-                "statement": statement_text, # statement within dataset_item
+                "statement": statement_text,  # statement within dataset_item
                 "expected_proof": None,  # No exact match expected
-            }
+            },
         }
         # The 'response' is taken from messages[-1].content
         benchmark_result = deepseek_huggingface_prover_benchmark(
-            messages=messages_complete, # messages_complete already has complete_response_text
+            messages=messages_complete,  # messages_complete already has complete_response_text
             ground_truth=ground_truth_mock,
             verbose=True,
         )
@@ -181,11 +187,15 @@ def main():
                     # For demonstration, we'll use our existing proof
                     # In a real scenario, you would generate a proof for this specific statement
                     print("\nEvaluating with automatic dataset matching...")
-                    
+
                     # Construct messages for the HuggingFace sample
                     messages_hf_sample = [
-                        Message(role="user", content=sample_statement_hf), # User provides the statement
-                        Message(role="assistant", content=complete_response_text) # Assistant provides our existing proof
+                        Message(
+                            role="user", content=sample_statement_hf
+                        ),  # User provides the statement
+                        Message(
+                            role="assistant", content=complete_response_text
+                        ),  # Assistant provides our existing proof
                     ]
                     # Ground truth for this specific HF sample
                     ground_truth_hf_sample = {

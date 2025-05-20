@@ -32,15 +32,50 @@ def get_fireworks_api_key() -> Optional[str]:
         try:
             config = configparser.ConfigParser()
             config.read(AUTH_INI_FILE)
-            if "fireworks" in config and "api_key" in config["fireworks"]:
-                api_key_from_file = config["fireworks"]["api_key"]
+            # Try [fireworks] section first
+            if "fireworks" in config and config.has_option("fireworks", "api_key"):
+                api_key_from_file = config.get("fireworks", "api_key")
                 if api_key_from_file:
-                    logger.debug(f"Using api_key from {AUTH_INI_FILE}.")
+                    logger.debug(
+                        f"Using api_key from [fireworks] section in {AUTH_INI_FILE}."
+                    )
                     return api_key_from_file
-        except configparser.Error as e:
-            logger.warning(f"Error parsing {AUTH_INI_FILE}: {e}")
-        except Exception as e:
-            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e}")
+            # If not found in [fireworks] section, try the default section
+            # config.defaults() returns a dictionary of default values.
+            # config[config.default_section] is another way to access them.
+            if config.has_option(config.default_section, "api_key"):
+                api_key_from_default = config.get(config.default_section, "api_key")
+                if api_key_from_default:
+                    logger.debug(
+                        f"Using api_key from default section [{config.default_section}] in {AUTH_INI_FILE}."
+                    )
+                    return api_key_from_default
+        except configparser.MissingSectionHeaderError:
+            # If MissingSectionHeaderError occurs, try parsing as simple key-value pairs
+            logger.warning(
+                f"{AUTH_INI_FILE} has no section headers. Attempting simple key-value parsing for 'api_key'."
+            )
+            try:
+                with open(AUTH_INI_FILE, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip()
+                            if key == "api_key" and value:
+                                logger.debug(
+                                    f"Using api_key from simple key-value parsing of {AUTH_INI_FILE}."
+                                )
+                                return value
+            except Exception as e_simple:
+                logger.warning(
+                    f"Error during simple key-value parsing of {AUTH_INI_FILE}: {e_simple}"
+                )
+        except configparser.Error as e_config:
+            logger.warning(f"Configparser error reading {AUTH_INI_FILE}: {e_config}")
+        except Exception as e_general:
+            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e_general}")
 
     logger.debug("Fireworks API key not found in environment variables or auth.ini.")
     return None
@@ -68,15 +103,49 @@ def get_fireworks_account_id() -> Optional[str]:
         try:
             config = configparser.ConfigParser()
             config.read(AUTH_INI_FILE)
-            if "fireworks" in config and "account_id" in config["fireworks"]:
-                account_id_from_file = config["fireworks"]["account_id"]
+            # Try [fireworks] section first
+            if "fireworks" in config and config.has_option("fireworks", "account_id"):
+                account_id_from_file = config.get("fireworks", "account_id")
                 if account_id_from_file:
-                    logger.debug(f"Using account_id from {AUTH_INI_FILE}.")
+                    logger.debug(
+                        f"Using account_id from [fireworks] section in {AUTH_INI_FILE}."
+                    )
                     return account_id_from_file
-        except configparser.Error as e:
-            logger.warning(f"Error parsing {AUTH_INI_FILE}: {e}")
-        except Exception as e:
-            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e}")
+            # If not found in [fireworks] section, try the default section
+            if config.has_option(config.default_section, "account_id"):
+                account_id_from_default = config.get(
+                    config.default_section, "account_id"
+                )
+                if account_id_from_default:
+                    logger.debug(
+                        f"Using account_id from default section [{config.default_section}] in {AUTH_INI_FILE}."
+                    )
+                    return account_id_from_default
+        except configparser.MissingSectionHeaderError:
+            logger.warning(
+                f"{AUTH_INI_FILE} has no section headers. Attempting simple key-value parsing for 'account_id'."
+            )
+            try:
+                with open(AUTH_INI_FILE, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip()
+                            if key == "account_id" and value:
+                                logger.debug(
+                                    f"Using account_id from simple key-value parsing of {AUTH_INI_FILE}."
+                                )
+                                return value
+            except Exception as e_simple:
+                logger.warning(
+                    f"Error during simple key-value parsing of {AUTH_INI_FILE}: {e_simple}"
+                )
+        except configparser.Error as e_config:
+            logger.warning(f"Configparser error reading {AUTH_INI_FILE}: {e_config}")
+        except Exception as e_general:
+            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e_general}")
 
     # Handle Dev API special case for account ID if FIREWORKS_API_BASE is set
     # This logic was present in the original file and might be relevant

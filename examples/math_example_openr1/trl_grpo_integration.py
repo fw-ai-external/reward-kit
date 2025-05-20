@@ -1,25 +1,19 @@
+import json
 import os
 import sys
-import json
+from typing import Any, Dict, List
+
 import torch
-from typing import List, Dict, Any
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    DataCollatorWithPadding,
-)
-from trl import (
-    GRPOConfig,
-    GRPOTrainer,
-)
-from peft import LoraConfig, get_peft_model
 from datasets import Dataset
+from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorWithPadding
+from trl import GRPOConfig, GRPOTrainer
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from reward_kit.rewards.math import math_reward
 from reward_kit.models import Message
+from reward_kit.rewards.math import math_reward
 
 # --- Configuration ---
 MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"  # Using the same model
@@ -216,11 +210,11 @@ def main():
 
 if __name__ == "__main__":
     try:
+        import datasets
+        import peft
         import torch
         import transformers
         import trl
-        import datasets
-        import peft
     except ImportError:
         print("Error: PyTorch, Transformers, TRL, Datasets, or PEFT library not found.")
         print("Please install them: pip install torch transformers trl datasets peft")

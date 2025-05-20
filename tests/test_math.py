@@ -439,8 +439,8 @@ class TestMathReward:
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
         # assert result.score == 0.0 # Duplicate line removed
-        assert (
-            result.reason is not None and result.reason.startswith("Strictness fail (Issue #1")
+        assert result.reason is not None and result.reason.startswith(
+            "Strictness fail (Issue #1"
         )
         assert (
             result.metrics["strictness_penalty_unboxed_or"].reason
@@ -472,8 +472,8 @@ class TestMathReward:
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
         # assert result.score == 0.0 # Duplicate line removed
-        assert (
-            result.reason is not None and result.reason.startswith("Strictness fail (Issue #2")
+        assert result.reason is not None and result.reason.startswith(
+            "Strictness fail (Issue #2"
         )
         assert (
             result.metrics["strictness_penalty_ambiguity"].reason
@@ -525,7 +525,8 @@ class TestMathReward:
         )
         assert (
             result.reason is not None
-            and "includes other distinct numerical values not matching any original answer: [3.0]" in result.reason
+            and "includes other distinct numerical values not matching any original answer: [3.0]"
+            in result.reason
         )
 
     def test_issue3_scenario_correct_handling(self):

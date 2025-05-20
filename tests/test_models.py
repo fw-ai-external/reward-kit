@@ -26,7 +26,9 @@ def test_metric_result_serialization():
 
 def test_metric_result_deserialization():
     """Test deserializing MetricResult from JSON."""
-    json_str = '{"score": 0.9, "reason": "Test deserialization", "is_score_valid": true}'
+    json_str = (
+        '{"score": 0.9, "reason": "Test deserialization", "is_score_valid": true}'
+    )
     metric = MetricResult.model_validate_json(json_str)
     assert metric.score == 0.9
     assert metric.reason == "Test deserialization"
@@ -39,7 +41,9 @@ def test_evaluate_result_creation():
         "metric1": MetricResult(score=0.5, reason="Reason 1", is_score_valid=True),
         "metric2": MetricResult(score=0.7, reason="Reason 2", is_score_valid=True),
     }
-    result = EvaluateResult(score=0.6, reason="Overall assessment", metrics=metrics, is_score_valid=True)
+    result = EvaluateResult(
+        score=0.6, reason="Overall assessment", metrics=metrics, is_score_valid=True
+    )
     assert result.score == 0.6
     assert result.reason == "Overall assessment"
     assert len(result.metrics) == 2
@@ -55,7 +59,9 @@ def test_evaluate_result_serialization():
         "metric1": MetricResult(score=0.5, reason="Reason 1", is_score_valid=True),
         "metric2": MetricResult(score=0.7, reason="Reason 2", is_score_valid=True),
     }
-    result = EvaluateResult(score=0.6, reason="Overall assessment", metrics=metrics, is_score_valid=True)
+    result = EvaluateResult(
+        score=0.6, reason="Overall assessment", metrics=metrics, is_score_valid=True
+    )
     json_str = result.model_dump_json()
     data = json.loads(json_str)
     assert data["score"] == 0.6
@@ -88,7 +94,9 @@ def test_evaluate_result_deserialization():
 
 def test_empty_metrics_evaluate_result():
     """Test EvaluateResult with empty metrics dictionary."""
-    result = EvaluateResult(score=1.0, reason="Perfect score", metrics={}, is_score_valid=True)
+    result = EvaluateResult(
+        score=1.0, reason="Perfect score", metrics={}, is_score_valid=True
+    )
     assert result.score == 1.0
     assert result.reason == "Perfect score"
     assert result.metrics == {}
@@ -107,27 +115,27 @@ def test_metric_result_dict_access():
     metric = MetricResult(score=0.7, reason="Dict access test", is_score_valid=True)
 
     # __getitem__
-    assert metric['score'] == 0.7
-    assert metric['reason'] == "Dict access test"
-    assert metric['is_score_valid'] is True
+    assert metric["score"] == 0.7
+    assert metric["reason"] == "Dict access test"
+    assert metric["is_score_valid"] is True
     with pytest.raises(KeyError):
         _ = metric["invalid_key"]
 
     # __contains__
-    assert 'score' in metric
-    assert 'reason' in metric
-    assert 'is_score_valid' in metric
-    assert 'invalid_key' not in metric
+    assert "score" in metric
+    assert "reason" in metric
+    assert "is_score_valid" in metric
+    assert "invalid_key" not in metric
 
     # get()
-    assert metric.get('score') == 0.7
-    assert metric.get('reason') == "Dict access test"
-    assert metric.get('is_score_valid') is True
-    assert metric.get('invalid_key') is None
-    assert metric.get('invalid_key', 'default_val') == 'default_val'
+    assert metric.get("score") == 0.7
+    assert metric.get("reason") == "Dict access test"
+    assert metric.get("is_score_valid") is True
+    assert metric.get("invalid_key") is None
+    assert metric.get("invalid_key", "default_val") == "default_val"
 
     # keys()
-    assert set(metric.keys()) == {'score', 'reason', 'is_score_valid'}
+    assert set(metric.keys()) == {"score", "reason", "is_score_valid"}
 
     # values() - order might not be guaranteed by model_fields, so check content
     # Pydantic model_fields preserves declaration order.
@@ -142,13 +150,16 @@ def test_metric_result_dict_access():
     assert metric.reason in actual_values
     assert metric.is_score_valid in actual_values
 
-
     # items()
-    expected_items = {('score', 0.7), ('reason', "Dict access test"), ('is_score_valid', True)}
+    expected_items = {
+        ("score", 0.7),
+        ("reason", "Dict access test"),
+        ("is_score_valid", True),
+    }
     assert set(metric.items()) == expected_items
 
     # __iter__
-    assert set(list(metric)) == {'score', 'reason', 'is_score_valid'}
+    assert set(list(metric)) == {"score", "reason", "is_score_valid"}
 
 
 def test_evaluate_result_dict_access():
@@ -157,7 +168,13 @@ def test_evaluate_result_dict_access():
     metrics_dict: Dict[str, MetricResult] = {
         "metric1": metric1_obj,
     }
-    result = EvaluateResult(score=0.6, reason="Overall assessment", metrics=metrics_dict, error="Test Error", is_score_valid=False)
+    result = EvaluateResult(
+        score=0.6,
+        reason="Overall assessment",
+        metrics=metrics_dict,
+        error="Test Error",
+        is_score_valid=False,
+    )
 
     # __getitem__
     assert result["score"] == 0.6
@@ -187,7 +204,13 @@ def test_evaluate_result_dict_access():
     assert result.get("invalid_key", "default_val") == "default_val"
 
     # keys()
-    assert set(result.keys()) == {"score", "reason", "metrics", "error", "is_score_valid"}
+    assert set(result.keys()) == {
+        "score",
+        "reason",
+        "metrics",
+        "error",
+        "is_score_valid",
+    }
 
     # values() - check presence due to potential order variation of model_fields
     actual_values = list(result.values())
@@ -215,4 +238,10 @@ def test_evaluate_result_dict_access():
     assert actual_items_list == expected_items_list
 
     # __iter__
-    assert set(list(result)) == {"score", "reason", "metrics", "error", "is_score_valid"}
+    assert set(list(result)) == {
+        "score",
+        "reason",
+        "metrics",
+        "error",
+        "is_score_valid",
+    }

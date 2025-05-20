@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 import requests
 
-from reward_kit.auth import get_fireworks_api_key, get_fireworks_account_id
+from reward_kit.auth import get_fireworks_account_id, get_fireworks_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -171,15 +171,21 @@ class EvaluatorPreviewResult:
         print("Individual Results:")
         print("------------------")
 
-        for i, result_obj in enumerate(self.results): # Renamed result to result_obj for clarity
-            print(f"Sample {result_obj.index + 1}:") # Use attribute access
-            print(f"  Success: {result_obj.success}") # Use attribute access
-            print(f"  Score: {result_obj.score}") # Use attribute access
+        for i, result_obj in enumerate(
+            self.results
+        ):  # Renamed result to result_obj for clarity
+            print(f"Sample {result_obj.index + 1}:")  # Use attribute access
+            print(f"  Success: {result_obj.success}")  # Use attribute access
+            print(f"  Score: {result_obj.score}")  # Use attribute access
             # per_metric_evals is likely a dict stored in the SimpleNamespace
-            if hasattr(result_obj, 'per_metric_evals') and isinstance(result_obj.per_metric_evals, dict):
+            if hasattr(result_obj, "per_metric_evals") and isinstance(
+                result_obj.per_metric_evals, dict
+            ):
                 for metric, value in result_obj.per_metric_evals.items():
                     print(f"  {metric}: {value}")
-            elif hasattr(result_obj, 'per_metric_evals'): # If it's not a dict but exists
+            elif hasattr(
+                result_obj, "per_metric_evals"
+            ):  # If it's not a dict but exists
                 print(f"  Per-Metric Evals: {result_obj.per_metric_evals}")
             if i < len(self.results) - 1:
                 print()
@@ -559,38 +565,18 @@ class Evaluator:
         self.display_name = display_name or evaluator_id
         self.description = description or f"Evaluator created from {evaluator_id}"
 
-        # Construct the evaluation payload
-        # Check if we're using the new API format
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
-        using_new_api = "dev.api.fireworks.ai" in api_base
-
-        if using_new_api:
-            # New API format (similar to deploy_example.py)
-            payload = {
-                "evaluator": {
-                    "displayName": self.display_name,
-                    "description": self.description,
-                    "multiMetrics": self.multi_metrics,
-                    "criteria": self._construct_criteria(),
-                    "requirements": "",
-                    "rollupSettings": None,
-                },
-                "evaluatorId": evaluator_id,
-            }
-        else:
-            # Legacy API format
-            payload = {
-                "evaluationId": evaluator_id,
-                "evaluation": {
-                    "evaluationType": "code_assertion",
-                    "description": self.description,
-                    "assertions": self._construct_criteria(),
-                },
-            }
-
-            # Add multiMetrics if using API that supports it
-            if api_base.startswith("https://dev.api.fireworks.ai"):
-                payload["evaluation"]["multiMetrics"] = self.multi_metrics
+        # Always use the new API payload format
+        payload = {
+            "evaluator": {
+                "displayName": self.display_name,
+                "description": self.description,
+                "multiMetrics": self.multi_metrics,
+                "criteria": self._construct_criteria(),  # This will now always return the new format
+                "requirements": "",  # Ensure this is an empty string if not used, or appropriate value
+                "rollupSettings": None,  # Ensure this is null if not used, or appropriate value
+            },
+            "evaluatorId": evaluator_id,
+        }
 
         # Make API request to create evaluator
         # For dev environment, special handling for account_id
@@ -676,19 +662,45 @@ class Evaluator:
             List of assertion objects
         """
         assertions = []
-        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        # Always use the new API format for criteria (codeSnippets)
+        if self.multi_metrics:
+            # Construct a single criterion with all files for multi-metrics
+            file_contents = {}
+            for filename, content in self.code_files.items():
+                # Skip files that aren't Python
+                if not filename.endswith(".py"):
+                    continue
+                file_contents[filename] = self._update_evaluate_signature(content)
 
-        if api_base.startswith("https://dev.api.fireworks.ai"):
-            # New API format for dev
-            if self.multi_metrics:
-                # Construct a single assertion with all files
+            assertions.append(
+                {
+                    "codeSnippets": {
+                        "language": "python",
+                        "fileContents": file_contents,
+                    },
+                    "name": "eval",  # Default name for multi-metric criterion
+                    "type": "CODE_SNIPPETS",
+                    "description": self.description or "Multi-metric evaluation",
+                }
+            )
+        else:
+            # Construct individual criteria for each metric folder
+            for metric_name in self.metric_folders:
                 file_contents = {}
-                for filename, content in self.code_files.items():
-                    # Skip files that aren't Python
-                    if not filename.endswith(".py"):
-                        continue
+                for k, v in self.code_files.items():
+                    if k.startswith(f"{metric_name}/"):
+                        # Ensure k is a path-like string before splitting
+                        if isinstance(k, str) and "/" in k:
+                            simple_name = k.split("/", 1)[1]
+                        else:
+                            simple_name = k  # Fallback if no slash
+                        file_contents[simple_name] = self._update_evaluate_signature(v)
 
-                    file_contents[filename] = self._update_evaluate_signature(content)
+                if not file_contents:  # Skip if no files found for this metric
+                    logger.warning(
+                        f"No Python files found for metric '{metric_name}', skipping its criterion."
+                    )
+                    continue
 
                 assertions.append(
                     {
@@ -696,67 +708,18 @@ class Evaluator:
                             "language": "python",
                             "fileContents": file_contents,
                         },
-                        "name": "eval",
+                        "name": metric_name,
                         "type": "CODE_SNIPPETS",
-                        "description": self.description,
+                        "description": f"Metric: {metric_name}",
                     }
                 )
-            else:
-                # Construct individual assertions for each metric
-                for metric_name in self.metric_folders:
-                    file_contents = {}
-                    for k, v in self.code_files.items():
-                        if k.startswith(f"{metric_name}/"):
-                            simple_name = k.split("/", 1)[1]
-                            file_contents[simple_name] = (
-                                self._update_evaluate_signature(v)
-                            )
 
-                    assertions.append(
-                        {
-                            "codeSnippets": {
-                                "language": "python",
-                                "fileContents": file_contents,
-                            },
-                            "name": metric_name,
-                            "type": "CODE_SNIPPETS",
-                            "description": f"Metric: {metric_name}",
-                        }
-                    )
-        else:
-            # Original API format
-            if self.multi_metrics:
-                # Construct a single assertion with all files
-                code = self._get_combined_code()
-                assertions.append(
-                    {
-                        "assertionType": "CODE",
-                        "codeAssertion": {"language": "python", "code": code},
-                        "metricName": "combined_metrics",
-                    }
-                )
-            else:
-                # Construct individual assertions for each metric
-                for metric_name in self.metric_folders:
-                    files = {
-                        k.split("/", 1)[1]: v
-                        for k, v in self.code_files.items()
-                        if k.startswith(f"{metric_name}/")
-                    }
-
-                    # Convert files to a single code block
-                    code = self._get_code_from_files(files)
-
-                    assertions.append(
-                        {
-                            "assertionType": "CODE",
-                            "codeAssertion": {
-                                "language": "python",
-                                "code": code,
-                            },
-                            "metricName": metric_name,
-                        }
-                    )
+        if not assertions:
+            # This case should ideally be prevented by checks in load_metric_folder etc.
+            # but as a safeguard:
+            raise ValueError(
+                "No valid criteria could be constructed. Ensure metric folders contain Python files."
+            )
 
         return assertions
 

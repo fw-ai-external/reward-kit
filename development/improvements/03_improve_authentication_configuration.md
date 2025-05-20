@@ -110,4 +110,4 @@ The existing module, `reward_kit/auth.py`, will be enhanced to serve as the cent
 
 *   **Error Handling for Missing Credentials:** Confirm whether the getter functions in `auth.py` should solely return `None` (leaving error handling to the caller) or if they should have an option to raise an error if a credential is not found but deemed essential by the caller. (Current proposal: return `None` for flexibility).
 *   **Other Credentials:** Are there any other authentication-related parameters for Fireworks AI or other services that should be incorporated into this new auth module now or in the near future?
-*   **Security of `auth.ini`:** While `auth.ini` offers convenience, remind users in documentation about file permissions if storing sensitive keys, especially for the user-level config file. The project-level file being in `.gitignore` is a key part of this. 
+*   **Security of `auth.ini`:** While `auth.ini` offers convenience, remind users in documentation about file permissions if storing sensitive keys, especially for the user-level config file. The project-level file being in `.gitignore` is a key part of this.

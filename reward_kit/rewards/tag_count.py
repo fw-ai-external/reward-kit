@@ -143,7 +143,9 @@ def tag_count_reward(
         score=total_score, is_score_valid=success, reason=reason
     )
 
-    return EvaluateResult(score=total_score, reason=reason, metrics=tag_metrics, is_score_valid=success)
+    return EvaluateResult(
+        score=total_score, reason=reason, metrics=tag_metrics, is_score_valid=success
+    )
 
 
 def _get_tag_reason(

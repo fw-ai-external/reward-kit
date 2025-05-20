@@ -1,11 +1,11 @@
 import argparse
 import json
 import logging
-import re  # Added import
 import math  # Added import
+import re  # Added import
 
 try:
-    from datasets import load_dataset, Dataset
+    from datasets import Dataset, load_dataset
 
     HAS_DATASETS_LIB = True
 except ImportError:
@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 
 # Attempt to import math_reward functions from reward_kit
 try:
-    from reward_kit.rewards.math import math_reward as numeric_math_reward
-    from reward_kit.rewards.math import extract_numbers  # Added direct import
-    from reward_kit.rewards.multiple_choice_math_reward import (
-        multiple_choice_math_reward,
-    )
+    from reward_kit.models import MetricResult  # Import MetricResult for type checking
     from reward_kit.rewards.list_comparison_math_reward import (
         list_comparison_math_reward,
     )
-    from reward_kit.models import MetricResult  # Import MetricResult for type checking
+    from reward_kit.rewards.math import extract_numbers  # Added direct import
+    from reward_kit.rewards.math import math_reward as numeric_math_reward
+    from reward_kit.rewards.multiple_choice_math_reward import (
+        multiple_choice_math_reward,
+    )
 
     HAS_REWARD_KIT_MATH_FUNCTIONS = True
 except ImportError as e:
@@ -209,7 +209,7 @@ def convert_math_dataset_to_openai_jsonl(
                             f"Skipping example {example.get('uuid', 'N/A')} for 'numeric' math_type as ground_truth_answer_column ('{gt_answer_content}') suggests a lettered choice."
                         )
                         continue
-                
+
                 messages = [
                     {"role": "user", "content": query_content},
                     {

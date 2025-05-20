@@ -102,4 +102,6 @@ def evaluate(
         reason = f"Task incomplete: {progress_score:.2f} progress score"
 
     # Return as an EvaluateResult object
-    return EvaluateResult(score=score, reason=reason, metrics=metrics_dict, is_score_valid=success)
+    return EvaluateResult(
+        score=score, reason=reason, metrics=metrics_dict, is_score_valid=success
+    )

@@ -1,9 +1,8 @@
 import json
 import os
-import sys
-
-import tempfile
 import shutil
+import sys
+import tempfile
 import types  # Import the types module
 
 # Ensure reward-kit is in the path
@@ -95,7 +94,7 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
     # Convert dict messages to Message objects for math_reward
     typed_messages = [Message(**msg) for msg in messages]
     typed_original_messages = [Message(**msg) for msg in original_messages] if original_messages else typed_messages
-    
+
     # math_reward expects ground_truth. For this setup, we assume ground_truth is passed in kwargs
     # or derived if not. For the example dataset, assistant's response is the ground_truth.
     # The preview_evaluation sends each sample's **kwargs.
@@ -120,7 +119,7 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
     # The `dataset.jsonl` has `{"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}`.
     # The `preview_evaluation` sends the whole sample dict as kwargs to `evaluate`.
     # So, `kwargs` will contain `messages`.
-    
+
     assistant_content = next((m['content'] for m in typed_messages if m.role == 'assistant'), None)
     if assistant_content is None:
         return EvaluateResult(score=0.0, reason="No assistant message for ground truth").model_dump()

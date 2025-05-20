@@ -141,7 +141,9 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
     )
     overall_reason = f"Final score based on weighted average of length ({metrics['length'].score:.2f}), informativeness ({metrics['informativeness'].score:.2f}), and clarity ({metrics['clarity'].score:.2f})."
 
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics, is_score_valid=True)
+    return EvaluateResult(
+        score=final_score, reason=overall_reason, metrics=metrics, is_score_valid=True
+    )
 
 
 def run_test_request():

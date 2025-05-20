@@ -157,7 +157,9 @@ def json_schema_reward(
             reason="No expected schema provided for comparison.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, reason="No expected schema provided", is_score_valid=False
+                    score=0.0,
+                    reason="No expected schema provided",
+                    is_score_valid=False,
                 )
             },
         )

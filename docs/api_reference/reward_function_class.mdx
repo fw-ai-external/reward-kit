@@ -119,7 +119,7 @@ def my_reward_fn(messages, **kwargs):
     response_len = len(response)
     score = min(response_len / 100.0, 1.0)  # Simple score based on length
     success = response_len > 10 # Example success condition: length greater than 10
-    
+
     return EvaluateResult(
         score=score,
         reason=f"Evaluation based on response length ({response_len} characters).",

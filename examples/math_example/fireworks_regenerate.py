@@ -1,21 +1,23 @@
 import argparse
+import asyncio  # Added asyncio
 import json
 import os
 import sys
-import asyncio  # Added asyncio
+
 import aiohttp  # Added aiohttp
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from typing import (
-    Optional,
-    List,
-    Dict,
+from typing import (  # Add Optional, List, Dict, Any for type hints
     Any,
-)  # Add Optional, List, Dict, Any for type hints
-from reward_kit.rewards.math import math_reward
+    Dict,
+    List,
+    Optional,
+)
+
 from reward_kit.models import Message
+from reward_kit.rewards.math import math_reward
 
 # Configuration for Fireworks API
 FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions"

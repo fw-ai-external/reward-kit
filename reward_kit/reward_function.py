@@ -192,7 +192,9 @@ class RewardFunction:
                     score, components = result
                     # Convert to EvaluateResult
                     metrics = {
-                        k: MetricResult(score=v, reason=f"{k} score", is_score_valid=True)
+                        k: MetricResult(
+                            score=v, reason=f"{k} score", is_score_valid=True
+                        )
                         for k, v in components.items()
                     }
                     return EvaluateResult(score=score, metrics=metrics)

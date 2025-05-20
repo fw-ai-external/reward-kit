@@ -56,23 +56,27 @@ def create_combined_reward(
     # Create adapters for each reward function
     trl_adapters = [rf.get_trl_adapter() for rf in reward_functions]
 
-    def combined_adapter_for_trl(prompts: List[List[Dict]], completions: List[str], **kwargs) -> List[float]:
+    def combined_adapter_for_trl(
+        prompts: List[List[Dict]], completions: List[str], **kwargs
+    ) -> List[float]:
         """
         Combined adapter function that works with TRL.
         It now accepts prompts and completions separately.
         """
         all_individual_scores: List[List[float]] = []
-        
+
         # Each adapter in trl_adapters expects (prompts, completions, **kwargs)
         for adapter_func in trl_adapters:
             # Pass the full batch of prompts and completions to each underlying adapter
-            individual_reward_scores = adapter_func(prompts=prompts, completions=completions, **kwargs)
+            individual_reward_scores = adapter_func(
+                prompts=prompts, completions=completions, **kwargs
+            )
             all_individual_scores.append(individual_reward_scores)
 
         if not all_individual_scores or not all_individual_scores[0]:
             # This case should ideally not happen if prompts/completions are non-empty
             # and adapters return valid score lists.
-            return [0.0] * len(prompts) # Return a list of zeros of appropriate length
+            return [0.0] * len(prompts)  # Return a list of zeros of appropriate length
 
         # Combine weighted scores for each sample in the batch
         num_samples = len(all_individual_scores[0])
@@ -81,14 +85,18 @@ def create_combined_reward(
         for i in range(num_samples):
             weighted_sum_for_sample = 0.0
             for adapter_idx, individual_scores_list in enumerate(all_individual_scores):
-                if i < len(individual_scores_list): # Check bounds
-                    weighted_sum_for_sample += individual_scores_list[i] * weights[adapter_idx]
+                if i < len(individual_scores_list):  # Check bounds
+                    weighted_sum_for_sample += (
+                        individual_scores_list[i] * weights[adapter_idx]
+                    )
                 else:
                     # Handle potential mismatch in lengths of score lists from different adapters, though unlikely
                     # For robustness, could add a default score or raise an error
-                    weighted_sum_for_sample += 0.0 # Or some other default/error handling
+                    weighted_sum_for_sample += (
+                        0.0  # Or some other default/error handling
+                    )
             final_combined_scores.append(weighted_sum_for_sample)
-            
+
         return final_combined_scores
 
     return combined_adapter_for_trl
@@ -200,7 +208,9 @@ def grpo_format_reward(
         ),
     }
 
-    return EvaluateResult(score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0)
+    return EvaluateResult(
+        score=score, reason=reason, metrics=metrics, is_score_valid=score > 0.0
+    )
 
 
 def create_grpo_reward(
@@ -293,7 +303,7 @@ def apply_reward_to_responses(
     # We need to separate prompts and completions from message_batches
     # For apply_reward_to_responses, the 'prompt' is effectively just the system_prompt (if any)
     # and the 'completion' is the response string.
-    
+
     prompts_batch: List[List[Dict[str, str]]] = []
     completions_batch: List[str] = []
 
@@ -305,7 +315,7 @@ def apply_reward_to_responses(
             current_prompt_messages.append({"role": "system", "content": system_prompt})
         # If there were other "user" turns before the response, they would go here.
         # But apply_reward_to_responses is simpler and assumes response is standalone or with system prompt.
-        
+
         prompts_batch.append(current_prompt_messages)
         completions_batch.append(response_str)
 

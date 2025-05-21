@@ -64,3 +64,22 @@ help:
 
 release: lint typecheck test build upload
 	@echo "Published to PyPI"
+
+# Demo for Remote Evaluation using Serveo.net
+demo-remote-eval:
+	@echo "---------------------------------------------------------------------"
+	@echo "Running Remote Evaluation Demo with Serveo.net..."
+	@echo "This demo will:"
+	@echo "1. Generate a temporary API key."
+	@echo "2. Start a local mock API service."
+	@echo "3. Expose the mock API service to the internet using Serveo.net via SSH."
+	@echo "   (Requires a working SSH client in your PATH)"
+	@echo "4. Run evaluation functions that call the tunneled mock API service."
+	@echo "5. Clean up all started processes on completion or interruption."
+	@echo "---------------------------------------------------------------------"
+	@echo "Log files for the demo will be created in ./logs/remote_eval_demo/"
+	@echo "Starting demo script..."
+	python examples/remote_eval_demo/run_demo.py
+	@echo "---------------------------------------------------------------------"
+	@echo "Remote Evaluation Demo finished."
+	@echo "---------------------------------------------------------------------"

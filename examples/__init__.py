@@ -1,3 +1,1 @@
-"""
-Examples package for Reward Kit.
-"""
+"""Examples package for Reward Kit."""

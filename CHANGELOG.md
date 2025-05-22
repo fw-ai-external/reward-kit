@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - (Your vulnerabilities patched here)
 
+## [Internal Note - Action Required]
+- Versions `0.2.5` through `0.2.11` have been released but are not yet documented in this changelog.
+- These entries need to be backfilled by reviewing the git commit history for notable changes in each respective version.
+- Please update release dates for all versions, including for `0.2.4` below.
+
 ## [0.2.4] - YYYY-MM-DD
 ### Added
 - Initial setup of project structure and core functionalities.

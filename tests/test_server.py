@@ -41,7 +41,7 @@ class TestServer:
 
     def test_reward_endpoint(self, client):
         """Test the reward endpoint."""
-        payload = {
+        payload: Dict[str, Any] = {
             "messages": [
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
@@ -62,7 +62,7 @@ class TestServer:
 
     def test_reward_endpoint_with_metadata(self, client):
         """Test the reward endpoint with metadata."""
-        payload = {
+        payload: Dict[str, Any] = {
             "messages": [
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
@@ -79,7 +79,7 @@ class TestServer:
     def test_reward_endpoint_missing_required_fields(self, client):
         """Test the reward endpoint with missing required fields."""
         # Empty payload without messages field
-        payload = {}
+        payload: Dict[str, Any] = {}
 
         response = client.post("/reward", json=payload)
         assert response.status_code == 422  # Validation error
@@ -87,7 +87,7 @@ class TestServer:
     def test_reward_endpoint_malformed_messages(self, client):
         """Test the reward endpoint with malformed messages."""
         # Malformed messages - missing role
-        payload = {
+        payload: Dict[str, Any] = {
             "messages": [
                 {"content": "Hello"},  # Missing role
                 {"role": "assistant", "content": "Hi there"},

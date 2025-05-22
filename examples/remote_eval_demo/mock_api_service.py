@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Header, HTTPException, Depends
-from pydantic import BaseModel
 import os
+
 import uvicorn
+from fastapi import Depends, FastAPI, Header, HTTPException
+from pydantic import BaseModel
 
 # --- Configuration ---
 # The expected API key is set via the "EXPECTED_API_KEY" environment variable by the calling script (run_demo.py)

@@ -272,7 +272,7 @@ class VehicleControlAPI:
         unit: str = "celsius",
         fanSpeed: int = 50,
         mode: str = "auto",
-    ) -> Dict[str, Union[str, float]]:
+    ) -> Dict[str, Union[str, float, int]]:  # Added int for fanSpeed
         """
         Adjusts the climate control of the vehicle.
         Args:
@@ -293,31 +293,39 @@ class VehicleControlAPI:
         self.fanSpeed = fanSpeed
         self.acMode = mode
         return {
-            "currentACTemperature": temperature,
-            "climateMode": mode,
+            "currentACTemperature": self.acTemperature,  # Return the potentially converted Celsius temp
+            "fanSpeed": self.fanSpeed,  # Added fanSpeed to return
+            "climateMode": self.acMode,  # Use self.acMode
             "humidityLevel": self.humidityLevel,
         }
 
-    def get_outside_temperature_from_google(self) -> Dict[str, float]:
+    def get_outside_temperature_from_google(
+        self,
+    ) -> Dict[str, Any]:  # More general for flexibility
         """
         Gets the outside temperature.
         Returns:
             outsideTemperature (float): The outside temperature in degree Celsius.
         """
         if self.long_context:
-            LONG_WEATHER_EXTENSION["outsideTemperature"] = self._random.uniform(
+            # Ensure all keys in LONG_WEATHER_EXTENSION are compatible with Dict[str, Union[str, float]]
+            # Assuming LONG_WEATHER_EXTENSION might contain other string keys.
+            current_weather_data: Dict[str, Any] = deepcopy(LONG_WEATHER_EXTENSION)
+            current_weather_data["outsideTemperature"] = self._random.uniform(
                 -10.0, 40.0
             )
-            return LONG_WEATHER_EXTENSION
+            return current_weather_data
         return {"outsideTemperature": self._random.uniform(-10.0, 40.0)}
 
-    def get_outside_temperature_from_weather_com(self) -> Dict[str, float]:
+    def get_outside_temperature_from_weather_com(
+        self,
+    ) -> Dict[str, Union[str, int]]:
         """
         Gets the outside temperature.
         Returns:
             outsideTemperature (float): The outside temperature in degree Celsius.
         """
-        return {"error": 404}
+        return {"error": 404}  # 404 is an int, so Union[str, int]
 
     def setHeadlights(self, mode: str) -> Dict[str, str]:
         """
@@ -338,7 +346,7 @@ class VehicleControlAPI:
 
     def displayCarStatus(
         self, option: str
-    ) -> Dict[str, Union[str, float, Dict[str, str]]]:
+    ) -> Dict[str, Any]:  # Generalizing return type due to mixed value types
         """
         Displays the status of the vehicle based on the provided display option.
         Args:
@@ -365,33 +373,33 @@ class VehicleControlAPI:
                 - engineState (str): [Optional] The state of the engine. [Enum]: ["running", "stopped"]
                 - metadata (str): [Optional] The metadata of the car.
         """
-        status = {}
+        status: Dict[str, Any] = {}  # Initialize with general type
         if self.long_context:
-            status["metadata"] = CAR_STATUS_METADATA_EXTENSION
+            status["metadata"] = CAR_STATUS_METADATA_EXTENSION  # str
         if option == "fuel":
-            status["fuelLevel"] = self.fuelLevel
+            status["fuelLevel"] = self.fuelLevel  # float
         elif option == "battery":
-            status["batteryVoltage"] = self.batteryVoltage
+            status["batteryVoltage"] = self.batteryVoltage  # float
         elif option == "doors":
-            status["doorStatus"] = self.doorStatus
+            status["doorStatus"] = self.doorStatus  # Dict[str, str]
         elif option == "climate":
-            status["currentACTemperature"] = self.acTemperature
-            status["fanSpeed"] = self.fanSpeed
-            status["climateMode"] = self.acMode
-            status["humidityLevel"] = self.humidityLevel
+            status["currentACTemperature"] = self.acTemperature  # float
+            status["fanSpeed"] = self.fanSpeed  # int
+            status["climateMode"] = self.acMode  # str
+            status["humidityLevel"] = self.humidityLevel  # float
         elif option == "headlights":
-            status["headlightStatus"] = self.headLightStatus
+            status["headlightStatus"] = self.headLightStatus  # str
         elif option == "parkingBrake":
-            status["parkingBrakeStatus"] = self.parkingBrakeStatus
-            status["parkingBrakeForce"] = self._parkingBrakeForce
-            status["slopeAngle"] = self._slopeAngle
+            status["parkingBrakeStatus"] = self.parkingBrakeStatus  # str
+            status["parkingBrakeForce"] = self._parkingBrakeForce  # float
+            status["slopeAngle"] = self._slopeAngle  # float
         elif option == "brakePedal":
-            status["brakePedalStatus"] = self.brakePedalStatus
-            status["brakePedalForce"] = self._brakePedalForce
+            status["brakePedalStatus"] = self.brakePedalStatus  # str
+            status["brakePedalForce"] = self._brakePedalForce  # float
         elif option == "engine":
-            status["engineState"] = self.engine_state
+            status["engineState"] = self.engine_state  # str
         else:
-            status["error"] = "Invalid option"
+            status["error"] = "Invalid option"  # str
         return status
 
     def activateParkingBrake(self, mode: str) -> Dict[str, Union[str, float]]:
@@ -411,32 +419,36 @@ class VehicleControlAPI:
             self._parkingBrakeForce = 500.0
             self._slopeAngle = 10.0
             if self.long_context:
-                return {
+                # PARKING_BRAKE_INSTRUCTION is str, others are str/float
+                response_data: Dict[str, Union[str, float]] = {
                     "parkingBrakeInstruction": PARKING_BRAKE_INSTRUCTION,
                     "parkingBrakeStatus": "engaged",
                     "_parkingBrakeForce": 500.0,
                     "_slopeAngle": 10.0,
                 }
+                return response_data
             return {
                 "parkingBrakeStatus": "engaged",
                 "_parkingBrakeForce": 500.0,
                 "_slopeAngle": 10.0,
             }
-        else:
+        else:  # mode == "release"
             self.parkingBrakeStatus = "released"
             self._parkingBrakeForce = 0.0
-            self._slopeAngle = 10.0
+            # _slopeAngle might not change on release, or might reset. Assuming it stays for now.
+            # self._slopeAngle = 0.0 # Or keep as is, depending on spec. Let's keep it.
             if self.long_context:
-                return {
-                    "parkingBrakeInstruction": PARKING_BRAKE_INSTRUCTION,
+                response_data_release: Dict[str, Union[str, float]] = {
+                    "parkingBrakeInstruction": PARKING_BRAKE_INSTRUCTION,  # Assuming instruction is always relevant
                     "parkingBrakeStatus": "released",
                     "_parkingBrakeForce": 0.0,
-                    "_slopeAngle": 10.0,
+                    "_slopeAngle": self._slopeAngle,  # Use current slope angle
                 }
+                return response_data_release
             return {
                 "parkingBrakeStatus": "released",
                 "_parkingBrakeForce": 0.0,
-                "_slopeAngle": 10.0,
+                "_slopeAngle": self._slopeAngle,  # Use current slope angle
             }
 
     def pressBrakePedal(self, pedalPosition: float) -> Dict[str, Union[str, float]]:
@@ -465,8 +477,8 @@ class VehicleControlAPI:
 
         # Update the brake pedal status and force
         self.brakePedalStatus = "pressed"
-        self._brakePedalForce = force
-        return {"brakePedalStatus": "pressed", "brakePedalForce": float(force)}
+        self._brakePedalForce = float(force)  # Ensure force is float
+        return {"brakePedalStatus": "pressed", "brakePedalForce": self._brakePedalForce}
 
     def releaseBrakePedal(self) -> Dict[str, Union[str, float]]:
         """
@@ -575,61 +587,62 @@ class VehicleControlAPI:
             distance (float): The distance between the two cities in km.
             intermediaryCities (List[str]): [Optional] The list of intermediary cities between the two cities.
         """
-        distance: Dict[str, Union[str, float]] = {}
+        result: Dict[str, Any] = {}  # Use Dict[str, Any] for flexibility
+        # ... (rest of the distance logic)
         if (cityA == "83214" and cityB == "74532") or (
             cityA == "74532" and cityB == "83214"
         ):
-            distance = {"distance": 750.0}
+            result = {"distance": 750.0}
         elif (cityA == "56108" and cityB == "62947") or (
             cityA == "62947" and cityB == "56108"
         ):
-            distance = {"distance": 320.0}
+            result = {"distance": 320.0}
         elif (cityA == "71354" and cityB == "83462") or (
             cityA == "83462" and cityB == "71354"
         ):
-            distance = {"distance": 450.0}
+            result = {"distance": 450.0}
         elif (cityA == "47329" and cityB == "52013") or (
             cityA == "52013" and cityB == "47329"
         ):
-            distance = {"distance": 290.0}
+            result = {"distance": 290.0}
         elif (cityA == "69238" and cityB == "51479") or (
             cityA == "51479" and cityB == "69238"
         ):
-            distance = {"distance": 630.0}
+            result = {"distance": 630.0}
         elif (cityA == "94016" and cityB == "83214") or (
             cityA == "83214" and cityB == "94016"
         ):
-            distance = {"distance": 980.0}
+            result = {"distance": 980.0}
         elif (cityA == "94016" and cityB == "94704") or (
             cityA == "94704" and cityB == "94016"
         ):
-            distance = {"distance": 600.0}
+            result = {"distance": 600.0}
         elif (cityA == "94704" and cityB == "08540") or (
             cityA == "08540" and cityB == "94704"
         ):
-            distance = {"distance": 2550.0}
+            result = {"distance": 2550.0}
         elif (cityA == "94016" and cityB == "08540") or (
             cityA == "08540" and cityB == "94016"
         ):
-            distance = {"distance": 1950.0}
+            result = {"distance": 1950.0}
         elif (cityA == "62947" and cityB == "47329") or (
             cityA == "47329" and cityB == "62947"
         ):
-            distance = {"distance": 1053.0}
+            result = {"distance": 1053.0}
         elif (cityA == "94016" and cityB == "62947") or (
             cityA == "62947" and cityB == "94016"
         ):
-            distance = {"distance": 780.0}
+            result = {"distance": 780.0}
         elif (cityA == "74532" and cityB == "94016") or (
             cityA == "94016" and cityB == "74532"
         ):
-            distance = {"distance": 880.0}
+            result = {"distance": 880.0}
         else:
-            distance = {"error": "distance not found in database."}
+            result = {"error": "distance not found in database."}  # str value
 
-        if self.long_context:
-            distance["intermediaryCities"] = INTERMEDIARY_CITIES
-        return distance
+        if self.long_context and "error" not in result:
+            result["intermediaryCities"] = INTERMEDIARY_CITIES  # List[str]
+        return result
 
     def get_zipcode_based_on_city(self, city: str) -> Dict[str, str]:
         """
@@ -687,30 +700,25 @@ class VehicleControlAPI:
                 - healthy_tire_pressure (bool): True if the tire pressure is healthy, False otherwise.
                 - car_info (Dict): The metadata of the car.
         """
-        # This is the healthy standard the vehicle use, though the user might have different preferences
-        healthy_tire_pressure = (
-            30
-            <= (
-                self.frontLeftTirePressure
-                + self.frontRightTirePressure
-                + self.rearLeftTirePressure
-                + self.rearRightTirePressure
-            )
-            / 4
-            <= 35
-        )
+        avg_pressure = (
+            self.frontLeftTirePressure
+            + self.frontRightTirePressure
+            + self.rearLeftTirePressure
+            + self.rearRightTirePressure
+        ) / 4
+        healthy_tire_pressure = 30 <= avg_pressure <= 35
 
-        tire_status = {
+        tire_status: Dict[str, Any] = {  # Use Any for flexibility
             "frontLeftTirePressure": self.frontLeftTirePressure,
             "frontRightTirePressure": self.frontRightTirePressure,
             "rearLeftTirePressure": self.rearLeftTirePressure,
             "rearRightTirePressure": self.rearRightTirePressure,
-            "healthy_tire_pressure": healthy_tire_pressure,
+            "healthy_tire_pressure": healthy_tire_pressure,  # bool
             "car_info": {},
         }
 
         if self.long_context:
-            tire_status["car_info"] = CAR_STATUS_METADATA_EXTENSION
+            tire_status["car_info"] = CAR_STATUS_METADATA_EXTENSION  # Dict[str, str]
         return tire_status
 
     def find_nearest_tire_shop(self) -> Dict[str, str]:

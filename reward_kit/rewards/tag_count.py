@@ -12,9 +12,10 @@ from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def tag_count_reward(
     messages: List[Message],
+    *,  # Make subsequent parameters keyword-only
     required_tags: List[str],
     score_per_tag: float = 0.25,
     require_balanced: bool = True,

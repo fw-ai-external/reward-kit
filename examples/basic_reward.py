@@ -1,6 +1,4 @@
-"""
-Example of a basic reward function using the Reward Kit.
-"""
+"""Example of a basic reward function using the Reward Kit."""
 
 from typing import Any, Dict, List, Optional
 
@@ -10,8 +8,7 @@ from reward_kit.models import EvaluateResult, Message, MetricResult
 
 @reward_function
 def calculate_base_score(messages: List[Message], **kwargs) -> EvaluateResult:
-    """
-    Calculates a basic score based on length and keywords.
+    """Calculate a basic score based on length and keywords.
 
     Args:
         messages: List of conversation messages
@@ -21,7 +18,10 @@ def calculate_base_score(messages: List[Message], **kwargs) -> EvaluateResult:
         EvaluateResult with score and metrics
     """
     # Get the last response (the one we're evaluating)
-    last_response = messages[-1].content.lower()
+    last_response_content = messages[-1].content
+    last_response = (
+        last_response_content.lower() if last_response_content is not None else ""
+    )
     metrics = {}
 
     # Evaluate helpfulness
@@ -53,8 +53,7 @@ def calculate_base_score(messages: List[Message], **kwargs) -> EvaluateResult:
 
 @reward_function
 def calculate_safety_score(messages: List[Message], **kwargs) -> EvaluateResult:
-    """
-    Calculates a safety score (penalizes forbidden words).
+    """Calculate a safety score (penalizes forbidden words).
 
     Args:
         messages: List of conversation messages
@@ -63,7 +62,10 @@ def calculate_safety_score(messages: List[Message], **kwargs) -> EvaluateResult:
     Returns:
         EvaluateResult with score and metrics
     """
-    last_response = messages[-1].content.lower()
+    last_response_content = messages[-1].content
+    last_response = (
+        last_response_content.lower() if last_response_content is not None else ""
+    )
     metrics = {}
     final_score: float
     is_safe: bool
@@ -96,8 +98,7 @@ def calculate_safety_score(messages: List[Message], **kwargs) -> EvaluateResult:
 def combined_reward(
     messages: List[Message], metadata: Optional[Dict[str, Any]] = None, **kwargs
 ) -> EvaluateResult:
-    """
-    Combines base score and safety score.
+    """Combine base score and safety score.
 
     Args:
         messages: List of conversation messages
@@ -140,9 +141,7 @@ def combined_reward(
             reason=f"Applied boost factor of {boost}",
         )
 
-    final_score = max(
-        0.0, min(1.0, final_score)
-    )  # Ensure score is within [0,1] after boost
+    final_score = max(0.0, min(1.0, final_score))  # Ensure score is [0,1]
 
     return EvaluateResult(score=final_score, metrics=all_metrics)
 
@@ -153,7 +152,12 @@ if __name__ == "__main__":
         {"role": "user", "content": "Can you explain how to make a cake?"},
         {
             "role": "assistant",
-            "content": "Sure, I'd be happy to explain how to make a basic cake! First, you'll need flour, sugar, eggs, butter, and baking powder. Mix the dry ingredients, then add the wet ingredients and mix until smooth. Pour into a greased pan and bake at 350°F for about 30 minutes.",
+            "content": (
+                "Sure, I'd be happy to explain how to make a basic cake! "
+                "First, you'll need flour, sugar, eggs, butter, and baking powder. "
+                "Mix the dry ingredients, then add the wet ingredients and mix until "
+                "smooth. Pour into a greased pan and bake at 350°F for about 30 minutes."
+            ),
         },
     ]
 
@@ -164,7 +168,8 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in base_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} "
+            f"(Success: {metric_obj.is_score_valid})"
         )
     print()
 
@@ -175,7 +180,8 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in safety_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} "
+            f"(Success: {metric_obj.is_score_valid})"
         )
     print()
 
@@ -188,7 +194,8 @@ if __name__ == "__main__":
     print("Metrics:")
     for name, metric_obj in combined_result.metrics.items():
         print(
-            f"  {name}: {metric_obj.score} - {metric_obj.reason} (Success: {metric_obj.is_score_valid})"
+            f"  {name}: {metric_obj.score} - {metric_obj.reason} "
+            f"(Success: {metric_obj.is_score_valid})"
         )
     print()
 

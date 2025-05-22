@@ -2,9 +2,10 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from reward_kit.evaluation import Evaluator, create_evaluation, preview_evaluation
 from reward_kit.models import MetricResult
@@ -35,10 +36,37 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
 def create_sample_file():
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     samples = [
-        {"messages": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi there! How can I help you today?"}]},
-        {"messages": [{"role": "user", "content": "What is AI?"}, {"role": "assistant", "content": "AI stands for Artificial Intelligence."}],
-         "original_messages": [{"role": "user", "content": "What is AI?"}, {"role": "assistant", "content": "AI stands for Artificial Intelligence."}],
-         "tools": [{"type": "function", "function": {"name": "search", "description": "Search for information"}}]},
+        {
+            "messages": [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi there! How can I help you today?"},
+            ]
+        },
+        {
+            "messages": [
+                {"role": "user", "content": "What is AI?"},
+                {
+                    "role": "assistant",
+                    "content": "AI stands for Artificial Intelligence.",
+                },
+            ],
+            "original_messages": [
+                {"role": "user", "content": "What is AI?"},
+                {
+                    "role": "assistant",
+                    "content": "AI stands for Artificial Intelligence.",
+                },
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search",
+                        "description": "Search for information",
+                    },
+                }
+            ],
+        },
     ]
     with os.fdopen(fd, "w") as f:
         for sample in samples:
@@ -86,7 +114,10 @@ def evaluate(entry):
     return {'score': score, 'reason': f'Word count: {word_count}'}
     """
     updated_code = evaluator._update_evaluate_signature(old_code)
-    assert "def evaluate(messages, original_messages=None, tools=None, **kwargs)" in updated_code
+    assert (
+        "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        in updated_code
+    )
     assert "entry = {" in updated_code
     assert "original_messages = messages" in updated_code
     new_code = """
@@ -102,25 +133,89 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     assert new_code == unchanged_code
 
 
-@patch("reward_kit.evaluation.requests.post") 
-def test_evaluator_preview(mock_requests_post, monkeypatch): 
+@patch("reward_kit.evaluation.requests.post")
+def test_evaluator_preview(mock_requests_post, monkeypatch):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "totalSamples": 2,
         "totalRuntimeMs": 123,
         "results": [
-            {"index": 0, "success": True, "score": 0.5, "reason": "Reason 1", 
-             "perMetricEvals": {"test_metric": MetricResult(score=0.5, reason="Metric reason 1", is_score_valid=True).model_dump()}},
-            {"index": 1, "success": True, "score": 0.8, "reason": "Reason 2", 
-             "perMetricEvals": {"test_metric": MetricResult(score=0.8, reason="Metric reason 2", is_score_valid=True).model_dump()}}
-        ]
+            {
+                "index": 0,
+                "success": True,
+                "score": 0.5,
+                "reason": "Reason 1",
+                "perMetricEvals": {
+                    "test_metric": MetricResult(
+                        score=0.5, reason="Metric reason 1", is_score_valid=True
+                    ).model_dump()
+                },
+            },
+            {
+                "index": 1,
+                "success": True,
+                "score": 0.8,
+                "reason": "Reason 2",
+                "perMetricEvals": {
+                    "test_metric": MetricResult(
+                        score=0.8, reason="Metric reason 2", is_score_valid=True
+                    ).model_dump()
+                },
+            },
+        ],
     }
     mock_requests_post.return_value = mock_response
 
     monkeypatch.setenv("FIREWORKS_API_KEY", "test_preview_api_key")
     monkeypatch.setenv("FIREWORKS_ACCOUNT_ID", "test_preview_account")
-    monkeypatch.setenv("FIREWORKS_API_BASE", "http://localhost:12345/mock_api")
+    # Using a mock API base to prevent real calls
+    monkeypatch.setenv(
+        "FIREWORKS_API_BASE", "http://mock-api-server"
+    )  # Changed to avoid actual localhost call
+
+    # Mock requests.post for the preview call
+    class MockResponsePreview:
+        def __init__(self, json_data, status_code=200):
+            self.json_data = json_data
+            self.status_code = status_code
+            self.text = json.dumps(json_data)
+
+        def json(self):
+            return self.json_data
+
+        def raise_for_status(self):
+            if self.status_code != 200:
+                raise requests.exceptions.HTTPError(
+                    f"Mock API Error: {self.status_code}"
+                )
+
+    def mock_post_preview(*args, **kwargs):
+        expected_url_preview = "http://mock-api-server/v1/accounts/test_preview_account/evaluators:previewEvaluator"
+        if args[0] == expected_url_preview:
+            # Simulate a successful preview API response
+            return MockResponsePreview(
+                {
+                    "totalSamples": 2,
+                    "totalRuntimeMs": 150,  # Example runtime
+                    "results": [
+                        {
+                            "success": True,
+                            "score": 0.75,
+                            "perMetricEvals": {"test_metric": 0.75},
+                        },
+                        {
+                            "success": True,
+                            "score": 0.85,
+                            "perMetricEvals": {"test_metric": 0.85},
+                        },
+                    ],
+                }
+            )
+        # Fallback for other URLs if any, though not expected in this test
+        return MockResponsePreview({"error": "Unexpected URL"}, 404)
+
+    monkeypatch.setattr("requests.post", mock_post_preview)
 
     tmp_dir = create_test_folder()
     sample_file = create_sample_file()
@@ -129,39 +224,101 @@ def test_evaluator_preview(mock_requests_post, monkeypatch):
         evaluator.load_metric_folder("test_metric", tmp_dir)
         preview_result = evaluator.preview(sample_file, max_samples=2)
         assert preview_result.total_samples == 2
-        assert preview_result.total_runtime_ms >= 0 
+        assert preview_result.total_runtime_ms >= 0
         assert len(preview_result.results) == 2
         assert preview_result.results[0].index == 0
         assert preview_result.results[0].success is True
         assert hasattr(preview_result.results[0], "score")
-        assert preview_result.results[0].score == 0.5
-        assert hasattr(preview_result.results[0], "per_metric_evals") # Attribute name in Python object
-        assert "test_metric" in preview_result.results[0].per_metric_evals 
+        assert preview_result.results[0].score == 0.75
+        assert hasattr(
+            preview_result.results[0], "per_metric_evals"
+        )  # Attribute name in Python object
+        assert "test_metric" in preview_result.results[0].per_metric_evals
     finally:
         os.unlink(os.path.join(tmp_dir, "main.py"))
         os.rmdir(tmp_dir)
         os.unlink(sample_file)
 
 
-@patch("reward_kit.evaluation.requests.post") 
-def test_preview_evaluation_helper(mock_requests_post, monkeypatch): 
+@patch("reward_kit.evaluation.requests.post")
+def test_preview_evaluation_helper(mock_requests_post, monkeypatch):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "totalSamples": 2,
         "totalRuntimeMs": 100,
         "results": [
-            {"index": 0, "success": True, "score": 0.6, "reason": "Helper Reason 1", 
-             "perMetricEvals": {"test_metric": MetricResult(score=0.6, reason="Helper Metric reason 1", is_score_valid=True).model_dump()}},
-            {"index": 1, "success": True, "score": 0.7, "reason": "Helper Reason 2", 
-             "perMetricEvals": {"test_metric": MetricResult(score=0.7, reason="Helper Metric reason 2", is_score_valid=True).model_dump()}}
-        ]
+            {
+                "index": 0,
+                "success": True,
+                "score": 0.6,
+                "reason": "Helper Reason 1",
+                "perMetricEvals": {
+                    "test_metric": MetricResult(
+                        score=0.6, reason="Helper Metric reason 1", is_score_valid=True
+                    ).model_dump()
+                },
+            },
+            {
+                "index": 1,
+                "success": True,
+                "score": 0.7,
+                "reason": "Helper Reason 2",
+                "perMetricEvals": {
+                    "test_metric": MetricResult(
+                        score=0.7, reason="Helper Metric reason 2", is_score_valid=True
+                    ).model_dump()
+                },
+            },
+        ],
     }
     mock_requests_post.return_value = mock_response
-    
+
     monkeypatch.setenv("FIREWORKS_API_KEY", "test_helper_api_key")
     monkeypatch.setenv("FIREWORKS_ACCOUNT_ID", "test_helper_account")
-    monkeypatch.setenv("FIREWORKS_API_BASE", "http://localhost:12345/mock_api_helper")
+    # Using a mock API base to prevent real calls
+    monkeypatch.setenv("FIREWORKS_API_BASE", "http://mock-api-server-helper")  # Changed
+
+    # Mock requests.post for the preview_evaluation helper call
+    class MockResponseHelperPreview:  # Renamed to avoid conflict if in same scope, though not strictly necessary here
+        def __init__(self, json_data, status_code=200):
+            self.json_data = json_data
+            self.status_code = status_code
+            self.text = json.dumps(json_data)
+
+        def json(self):
+            return self.json_data
+
+        def raise_for_status(self):
+            if self.status_code != 200:
+                raise requests.exceptions.HTTPError(
+                    f"Mock API Error: {self.status_code}"
+                )
+
+    def mock_post_helper_preview(*args, **kwargs):
+        expected_url_helper_preview = "http://mock-api-server-helper/v1/accounts/test_helper_account/evaluators:previewEvaluator"
+        if args[0] == expected_url_helper_preview:
+            return MockResponseHelperPreview(
+                {
+                    "totalSamples": 2,
+                    "totalRuntimeMs": 160,
+                    "results": [
+                        {
+                            "success": True,
+                            "score": 0.65,
+                            "perMetricEvals": {"test_metric": 0.65},
+                        },
+                        {
+                            "success": True,
+                            "score": 0.70,
+                            "perMetricEvals": {"test_metric": 0.70},
+                        },
+                    ],
+                }
+            )
+        return MockResponseHelperPreview({"error": "Unexpected URL for helper"}, 404)
+
+    monkeypatch.setattr("requests.post", mock_post_helper_preview)
 
     tmp_dir = create_test_folder()
     sample_file = create_sample_file()
@@ -173,7 +330,7 @@ def test_preview_evaluation_helper(mock_requests_post, monkeypatch):
         )
         assert preview_result.total_samples == 2
         assert len(preview_result.results) == 2
-        assert preview_result.results[0].score == 0.6
+        assert preview_result.results[0].score == 0.65
     finally:
         os.unlink(os.path.join(tmp_dir, "main.py"))
         os.rmdir(tmp_dir)
@@ -191,9 +348,13 @@ def test_create_evaluation_helper(monkeypatch):
             self.json_data = json_data
             self.status_code = status_code
             self.text = json.dumps(json_data)
-        def json(self): return self.json_data
-        def raise_for_status(self): # pragma: no cover
-            if self.status_code != 200: raise Exception("API Error")
+
+        def json(self):
+            return self.json_data
+
+        def raise_for_status(self):  # pragma: no cover
+            if self.status_code != 200:
+                raise Exception("API Error")
 
     def mock_post(*args, **kwargs):
         payload = kwargs.get("json", {})
@@ -208,16 +369,20 @@ def test_create_evaluation_helper(monkeypatch):
         assert "codeSnippets" in criterion
         assert "fileContents" in criterion["codeSnippets"]
         assert "main.py" in criterion["codeSnippets"]["fileContents"]
-        
-        return MockResponse({
-            "evaluator": {
-                "name": "accounts/test_account/evaluators/test-eval",
-                "displayName": "Test Evaluator",
-                "description": "Test description",
-                "multiMetrics": False,
-            }, "evaluatorId": "test-eval"})
 
-    monkeypatch.setattr("requests.post", mock_post) 
+        return MockResponse(
+            {
+                "evaluator": {
+                    "name": "accounts/test_account/evaluators/test-eval",
+                    "displayName": "Test Evaluator",
+                    "description": "Test description",
+                    "multiMetrics": False,
+                },
+                "evaluatorId": "test-eval",
+            }
+        )
+
+    monkeypatch.setattr("requests.post", mock_post)
 
     try:
         api_response = create_evaluation(
@@ -228,7 +393,10 @@ def test_create_evaluation_helper(monkeypatch):
         )
         assert "evaluator" in api_response
         created_evaluator_data = api_response["evaluator"]
-        assert created_evaluator_data["name"] == "accounts/test_account/evaluators/test-eval"
+        assert (
+            created_evaluator_data["name"]
+            == "accounts/test_account/evaluators/test-eval"
+        )
         assert created_evaluator_data["displayName"] == "Test Evaluator"
         assert created_evaluator_data["description"] == "Test description"
     finally:

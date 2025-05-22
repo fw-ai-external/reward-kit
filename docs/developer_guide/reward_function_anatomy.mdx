@@ -7,7 +7,7 @@ This guide provides a detailed explanation of how reward functions are structure
 The `@reward_function` decorator is the core mechanism that transforms a regular Python function into a reward function that can be used for evaluation and deployment.
 
 ```python
-from reward_kit import reward_function, EvaluateResult, MetricResult # Added imports
+from reward_kit import reward_function, EvaluateResult, MetricResult
 
 @reward_function
 def my_reward_function(messages, original_messages=None, **kwargs):
@@ -42,16 +42,16 @@ Internally, the decorator wraps your function with logic that:
 A standard reward function has these parameters:
 
 ```python
-from typing import List, Dict, Optional # Added for type hints
-from reward_kit import EvaluateResult # Added for type hints
+from typing import List, Dict, Optional
+from reward_kit import EvaluateResult
 
 def reward_function(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> EvaluateResult: # Changed RewardOutput to EvaluateResult
+) -> EvaluateResult:
     # ...
-    pass # Added pass for valid syntax
+    pass
 ```
 
 ### Required Parameters
@@ -68,7 +68,7 @@ def reward_function(
 A reward function must return an `EvaluateResult` object:
 
 ```python
-from reward_kit import EvaluateResult, MetricResult # Added imports
+from reward_kit import EvaluateResult, MetricResult
 
 # score, clarity_score, accuracy_score would be calculated by your logic
 clarity_score = 0.8
@@ -77,16 +77,16 @@ final_score = 0.75
 
 return EvaluateResult(
     score=final_score,  # Overall score between 0.0 and 1.0
-    reason="Overall evaluation based on clarity and accuracy.", # Added reason
+    reason="Overall evaluation based on clarity and accuracy.",
     metrics={    # Component metrics
-        "clarity": MetricResult( # Changed MetricRewardOutput to MetricResult
+        "clarity": MetricResult(
             score=clarity_score,
-            success=clarity_score >= 0.7, # Added success
+            success=clarity_score >= 0.7,
             reason="The response clearly explains the concept"
         ),
-        "accuracy": MetricResult( # Changed MetricRewardOutput to MetricResult
+        "accuracy": MetricResult(
             score=accuracy_score,
-            success=accuracy_score >= 0.6, # Added success
+            success=accuracy_score >= 0.6,
             reason="Contains one minor factual error"
         )
     }
@@ -106,8 +106,8 @@ return EvaluateResult(
 Complex reward functions often evaluate multiple aspects of a response:
 
 ```python
-from reward_kit import reward_function, EvaluateResult, MetricResult # Added imports
-from typing import List, Dict, Optional # Added for type hints
+from reward_kit import reward_function, EvaluateResult, MetricResult
+from typing import List, Dict, Optional
 
 # Assume evaluate_clarity and evaluate_accuracy are defined elsewhere
 def evaluate_clarity(response: str) -> float: return 0.8
@@ -116,33 +116,33 @@ def evaluate_accuracy(response: str) -> float: return 0.6
 
 @reward_function
 def comprehensive_evaluation(
-    messages: List[Dict[str, str]], # Added type hints
-    original_messages: Optional[List[Dict[str, str]]] = None, # Added type hints
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> EvaluateResult: # Changed RewardOutput to EvaluateResult
+) -> EvaluateResult:
     response = messages[-1]["content"]
     metrics = {}
 
     # Evaluate clarity
     clarity_score = evaluate_clarity(response)
-    metrics["clarity"] = MetricResult( # Changed MetricRewardOutput to MetricResult
+    metrics["clarity"] = MetricResult(
         score=clarity_score,
-        success=clarity_score >= 0.7, # Added success
+        success=clarity_score >= 0.7,
         reason=f"Clarity score: {clarity_score:.2f}"
     )
 
     # Evaluate accuracy
     accuracy_score = evaluate_accuracy(response)
-    metrics["accuracy"] = MetricResult( # Changed MetricRewardOutput to MetricResult
+    metrics["accuracy"] = MetricResult(
         score=accuracy_score,
-        success=accuracy_score >= 0.6, # Added success
+        success=accuracy_score >= 0.6,
         reason=f"Accuracy score: {accuracy_score:.2f}"
     )
 
     # Combine scores (weighted average)
     final_score = clarity_score * 0.4 + accuracy_score * 0.6
 
-    return EvaluateResult(score=final_score, reason="Comprehensive evaluation complete.", metrics=metrics) # Changed RewardOutput
+    return EvaluateResult(score=final_score, reason="Comprehensive evaluation complete.", metrics=metrics)
 ```
 
 ## Deployment Capabilities
@@ -171,24 +171,24 @@ evaluation_id = my_reward_function.deploy(
 Robust reward functions include proper error handling:
 
 ```python
-from reward_kit import reward_function, EvaluateResult, MetricResult # Added imports
-from typing import List, Dict, Optional # Added for type hints
+from reward_kit import reward_function, EvaluateResult, MetricResult
+from typing import List, Dict, Optional
 
 @reward_function
 def safe_evaluation(
-    messages: List[Dict[str, str]], # Added type hints
-    original_messages: Optional[List[Dict[str, str]]] = None, # Added type hints
+    messages: List[Dict[str, str]],
+    original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> EvaluateResult: # Changed RewardOutput to EvaluateResult
+) -> EvaluateResult:
     try:
         # Ensure we have a valid response to evaluate
         if not messages or messages[-1].get("role") != "assistant":
-            return EvaluateResult( # Changed RewardOutput
+            return EvaluateResult(
                 score=0.0,
-                reason="No assistant response found.", # Added reason
-                metrics={"error": MetricResult( # Changed MetricRewardOutput
+                reason="No assistant response found.",
+                metrics={"error": MetricResult(
                     score=0.0,
-                    success=False, # Added success
+                    success=False,
                     reason="No assistant response found"
                 )}
             )
@@ -203,12 +203,12 @@ def safe_evaluation(
 
     except Exception as e:
         # Handle any unexpected errors
-        return EvaluateResult( # Changed RewardOutput
+        return EvaluateResult(
             score=0.0,
-            reason=f"Evaluation error: {str(e)}", # Added reason
-            metrics={"error": MetricResult( # Changed MetricRewardOutput
+            reason=f"Evaluation error: {str(e)}",
+            metrics={"error": MetricResult(
                 score=0.0,
-                success=False, # Added success
+                success=False,
                 reason=f"Evaluation error: {str(e)}"
             )}
         )
@@ -219,8 +219,8 @@ def safe_evaluation(
 You can pass additional configuration through the `**kwargs` parameter, often via a `metadata` dictionary.
 
 ```python
-from reward_kit import reward_function, EvaluateResult, MetricResult # Added imports
-from typing import List, Dict, Optional, Any # Added Any for metadata type hint
+from reward_kit import reward_function, EvaluateResult, MetricResult
+from typing import List, Dict, Optional, Any
 
 # Assume base_score and metrics are calculated based on messages
 def calculate_base_score_and_metrics(response_content: str, min_length: int) -> tuple[float, dict]:
@@ -235,7 +235,7 @@ def configurable_evaluation(
     original_messages: Optional[List[Dict[str, str]]] = None, # Added type hints
     metadata: Optional[Dict[str, Any]] = None,
     **kwargs
-) -> EvaluateResult: # Changed RewardOutput to EvaluateResult
+) -> EvaluateResult:
     """Reward function that supports configuration via metadata."""
     metadata = metadata or {}
     response_content = messages[-1].get("content", "")
@@ -252,7 +252,7 @@ def configurable_evaluation(
     final_score = base_score * weight_factor
     final_score = min(final_score, max_score_cap) # Cap the score
 
-    return EvaluateResult(score=final_score, reason="Configurable evaluation complete.", metrics=metrics) # Changed RewardOutput
+    return EvaluateResult(score=final_score, reason="Configurable evaluation complete.", metrics=metrics)
 ```
 
 When calling the function, you can pass this metadata:

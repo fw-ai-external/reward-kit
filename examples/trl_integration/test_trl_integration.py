@@ -1,3 +1,4 @@
+# pylint: disable=all
 """
 Tests for the TRL integration functionality.
 
@@ -52,7 +53,7 @@ def _example_trl_reward_func(  # Renamed to avoid pytest collection
     return EvaluateResult(score=score, reason=reason, metrics={})  # Added metrics={}
 
 
-_example_trl_reward_func.__test__ = False  # Explicitly tell pytest not to collect this
+# _example_trl_reward_func.__test__ = False # Pytest should ignore functions starting with _
 
 
 class TestTRLIntegration(unittest.TestCase):

@@ -247,7 +247,7 @@ def create_grpo_reward(
 
 
 def prepare_grpo_message_format(
-    text: str, system_prompt: str = None
+    text: str, system_prompt: Optional[str] = None
 ) -> List[Dict[str, str]]:
     """
     Convert a text response to a message format for GRPO evaluation.
@@ -277,7 +277,7 @@ def prepare_grpo_message_format(
 def apply_reward_to_responses(
     reward_function: Union[RewardFunction, Callable],
     responses: List[str],
-    system_prompt: str = None,
+    system_prompt: Optional[str] = None,
 ) -> List[float]:
     """
     Apply a reward function to a list of text responses.

@@ -158,6 +158,7 @@ def get_piston_client(endpoint: Optional[str] = None) -> PistonClient:
     piston_endpoint = endpoint or os.environ.get(
         "PISTON_ENDPOINT", "https://emkc.org/api/v2/piston"
     )
+    assert isinstance(piston_endpoint, str)  # Ensure for mypy
     return PistonClient(base_endpoint=piston_endpoint)
 
 
@@ -488,7 +489,7 @@ def levenshtein_distance(s1: str, s2: str) -> int:
     if not s2:
         return len(s1)
 
-    previous_row = range(len(s2) + 1)
+    previous_row: List[int] = list(range(len(s2) + 1))
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
         for j, c2 in enumerate(s2):

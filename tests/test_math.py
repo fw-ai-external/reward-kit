@@ -3,7 +3,7 @@ Tests for math reward functions.
 """
 
 import re
-from typing import List, Optional, Union  # Added List
+from typing import List, Optional, Tuple, Union  # Added Tuple
 
 import pytest
 
@@ -237,7 +237,7 @@ class TestExtractNumbers:
 
     def test_P0_html_tag_string_content(self):
         text = "<answer>Not a number</answer>"
-        expected = []
+        expected: List[Tuple[str, Union[str, float]]] = []
         assert extract_numbers(text) == expected
 
     def test_P0_html_tag_multiple_answer_tags(self):

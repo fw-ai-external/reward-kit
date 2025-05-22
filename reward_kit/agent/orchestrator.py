@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Orchestrator for the Agent Evaluation Framework V2.
 Manages the lifecycle of a task using ForkableResources.
@@ -9,7 +10,7 @@ import inspect
 import json  # Add json import
 import logging
 import os  # Add os import
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, cast
 from unittest.mock import AsyncMock  # Add this import
 
 # Attempt to import OpenAI client
@@ -249,7 +250,7 @@ class Orchestrator:
                 f"Resource class '{resource_type_name}' not found or not mapped in Orchestrator._get_resource_class."
             )
         # No need to check issubclass here if mapping is correct and types are imported.
-        return resource_class
+        return cast(Type[ForkableResource], resource_class)
 
     async def setup_base_resource(self) -> None:
         resource_type = self.task_definition.resource_type

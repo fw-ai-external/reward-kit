@@ -1,3 +1,5 @@
+PYTHON_DIRS = reward_kit tests examples scripts
+
 .PHONY: clean build dist upload test lint typecheck format release sync-docs
 
 clean:
@@ -15,13 +17,13 @@ test:
 	pytest
 
 lint:
-	flake8 reward_kit
+	flake8 $(PYTHON_DIRS)
 
 typecheck:
-	mypy reward_kit
+	mypy $(PYTHON_DIRS)
 
 format:
-	black reward_kit
+	black $(PYTHON_DIRS)
 
 # Sync docs to ~/home/docs with links under 'evaluators'
 sync-docs:

@@ -37,9 +37,10 @@ def count_tokens(text: str, method: str = "whitespace") -> int:
         return len(re.split(r"\s+", text.strip()))
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def length_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
+    *,  # Make subsequent parameters keyword-only
     ground_truth: Optional[
         Union[List[Message], List[Dict[str, Any]]]
     ] = None,  # Not used by this function but part of standard signature
@@ -298,9 +299,10 @@ def length_reward(
     return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def cosine_length_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
+    *,  # Make subsequent parameters keyword-only
     ground_truth: Optional[
         Union[List[Message], List[Dict[str, Any]]]
     ] = None,  # Not used by this function but part of standard signature
@@ -452,4 +454,4 @@ def cosine_length_reward(
         ),
     }
 
-    return {"score": score, "reason": reason, "metrics": metrics}
+    return EvaluateResult(score=score, reason=reason, metrics=metrics)

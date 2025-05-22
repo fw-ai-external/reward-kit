@@ -359,16 +359,20 @@ def diversity_reward(
     success = final_score > 0.6  # Threshold can be adjusted
 
     # Prepare metrics for each n-gram size
-    size_metrics = {}
-    for size, ratio in ratios.items():
-        size_metrics[size] = MetricResult(
-            score=ratio,
-            is_score_valid=ratio > 0.7,  # Higher threshold for individual n-gram sizes
-            reason=f"Diversity ratio for {size}: {ratio:.2f}",
+    size_metric_items: List[Tuple[str, MetricResult]] = []
+    for size_key, ratio_val in ratios.items():  # size_key is str, e.g., "ngram_1"
+        metric_for_size = MetricResult(
+            score=ratio_val,
+            is_score_valid=ratio_val
+            > 0.7,  # Higher threshold for individual n-gram sizes
+            reason=f"Diversity ratio for {size_key}: {ratio_val:.2f}",
         )
+        size_metric_items.append((size_key, metric_for_size))
+
+    size_metrics: Dict[str, MetricResult] = dict(size_metric_items)
 
     # Prepare overall metrics
-    metrics = {
+    metrics: Dict[str, MetricResult] = {  # Ensure metrics is also typed
         "diversity": MetricResult(
             score=final_score,
             is_score_valid=success,

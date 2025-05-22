@@ -271,6 +271,8 @@ class TestAccuracyReward(unittest.TestCase):
         result_none_gt = accuracy_reward(messages=messages_valid, ground_truth=None)
         self.assertIsInstance(result_none_gt, EvaluateResult)
         self.assertEqual(result_none_gt.score, 0.0)
+        self.assertIsNotNone(result_none_gt.reason)
+        assert result_none_gt.reason is not None  # for mypy
         self.assertIn("Ground truth not provided", result_none_gt.reason)
         self.assertFalse(result_none_gt.metrics["accuracy"].is_score_valid)
 
@@ -278,6 +280,8 @@ class TestAccuracyReward(unittest.TestCase):
         result_empty_list_gt = accuracy_reward(messages=messages_valid, ground_truth=[])
         self.assertIsInstance(result_empty_list_gt, EvaluateResult)
         self.assertEqual(result_empty_list_gt.score, 0.0)
+        self.assertIsNotNone(result_empty_list_gt.reason)
+        assert result_empty_list_gt.reason is not None  # for mypy
         self.assertIn("Ground truth not provided", result_empty_list_gt.reason)
         self.assertFalse(result_empty_list_gt.metrics["accuracy"].is_score_valid)
 
@@ -288,6 +292,8 @@ class TestAccuracyReward(unittest.TestCase):
         )
         self.assertIsInstance(result_no_content_gt, EvaluateResult)
         self.assertEqual(result_no_content_gt.score, 0.0)
+        self.assertIsNotNone(result_no_content_gt.reason)
+        assert result_no_content_gt.reason is not None  # for mypy
         self.assertIn(
             "has no content", result_no_content_gt.reason
         )  # Or similar message from function
@@ -300,6 +306,8 @@ class TestAccuracyReward(unittest.TestCase):
         )
         self.assertIsInstance(result_none_content_gt, EvaluateResult)
         self.assertEqual(result_none_content_gt.score, 0.0)
+        self.assertIsNotNone(result_none_content_gt.reason)
+        assert result_none_content_gt.reason is not None  # for mypy
         self.assertIn("has no content", result_none_content_gt.reason)
         self.assertFalse(result_none_content_gt.metrics["accuracy"].is_score_valid)
 

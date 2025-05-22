@@ -59,11 +59,14 @@ def server_reward(messages: List[Message], **kwargs) -> EvaluateResult:
         EvaluateResult with score and metrics
     """
     # Get the last message content - using the Message object interface
-    last_response = messages[-1].content
+    last_response_content = messages[-1].content
+    last_response = (
+        last_response_content if last_response_content is not None else ""
+    )  # Default to empty string if None
     metrics = {}
 
     # 1. Length score
-    response_length = len(last_response)
+    response_length = len(last_response)  # Now last_response is guaranteed to be str
     length_score = min(
         response_length / 500, 1.0
     )  # Cap at 1.0 for responses ≥ 500 chars

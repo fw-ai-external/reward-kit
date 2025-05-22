@@ -19,8 +19,8 @@ except ImportError:
     def dummy_dump(x, **kwargs):
         return None
 
-    yaml.safe_load = dummy_safe_load
-    yaml.dump = dummy_dump
+    yaml.safe_load = dummy_safe_load  # type: ignore[assignment]
+    yaml.dump = dummy_dump  # type: ignore[assignment]
 
 import json  # Fallback or for explicit JSON files
 import logging  # For logger instance

@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict  # Added Any, Dict
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -248,7 +249,7 @@ class TestJsonSchemaReward:
         """Test JSON schema reward with empty properties."""
         expected_schema = {"type": "object", "properties": {}}
 
-        json_content = {}
+        json_content: Dict[str, Any] = {}
 
         result = json_schema_reward(
             messages=[

@@ -301,9 +301,9 @@ def deepseek_prover_v2_reward(
 
     final_score = base_score
     subgoal_count = 0
-    hierarchy_depth = 0
-    subgoal_score = 0
-    hierarchy_score = 0
+    hierarchy_depth: float = 0.0  # Initialize as float
+    subgoal_score: float = 0.0  # Initialize as float
+    hierarchy_score: float = 0.0  # Initialize as float
 
     if check_subgoals and response_content:  # Check response_content
         # Count subgoal patterns
@@ -475,8 +475,8 @@ def deepseek_huggingface_prover_benchmark(
             # Try fuzzy matching if exact match not found
             from difflib import SequenceMatcher
 
-            best_ratio = 0
-            matched_ratio = 0.0  # Ensure float
+            best_ratio = 0.0  # Initialize as float
+            matched_ratio: float = 0.0  # Ensure float and explicitly type
 
             for split in dataset.keys():
                 for item in dataset[split]:

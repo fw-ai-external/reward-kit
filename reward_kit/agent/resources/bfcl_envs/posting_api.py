@@ -1,10 +1,12 @@
 """Implementation of TwitterAPI."""
 
+from typing import Dict, Any, List, Optional
+
 
 class TwitterAPI:
     """A Twitter API for BFCL evaluation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.username = ""
         self.password = ""
         self.authenticated = False
@@ -14,12 +16,12 @@ class TwitterAPI:
         self.following_list = []
         self.tweet_counter = 0
 
-    def _load_scenario(self, config):
+    def _load_scenario(self, config: Dict[str, Any]) -> None:
         """Load the Twitter API state from configuration."""
         for key, value in config.items():
             setattr(self, key, value)
 
-    def login(self, username, password):
+    def login(self, username: str, password: str) -> Dict[str, str]:
         """Log in to Twitter."""
         if username == self.username and password == self.password:
             self.authenticated = True
@@ -27,7 +29,7 @@ class TwitterAPI:
         else:
             return {"status": "error", "message": "Invalid username or password"}
 
-    def logout(self):
+    def logout(self) -> Dict[str, str]:
         """Log out from Twitter."""
         if self.authenticated:
             self.authenticated = False
@@ -35,7 +37,12 @@ class TwitterAPI:
         else:
             return {"status": "error", "message": "Not logged in"}
 
-    def post_tweet(self, content, tags=None, mentions=None):
+    def post_tweet(
+        self,
+        content: str,
+        tags: Optional[List[str]] = None,
+        mentions: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """Post a new tweet."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}
@@ -60,7 +67,7 @@ class TwitterAPI:
             "tweet_id": tweet_id,
         }
 
-    def get_tweets(self, username=None):
+    def get_tweets(self, username: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """Get tweets by a specific user or all tweets if username is None."""
         tweets_to_return = {}
 
@@ -70,7 +77,7 @@ class TwitterAPI:
 
         return tweets_to_return
 
-    def search_tweets(self, query):
+    def search_tweets(self, query: str) -> Dict[str, Dict[str, Any]]:
         """Search tweets by content."""
         results = {}
 
@@ -80,7 +87,7 @@ class TwitterAPI:
 
         return results
 
-    def follow_user(self, username):
+    def follow_user(self, username: str) -> Dict[str, str]:
         """Follow a user."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}
@@ -95,7 +102,7 @@ class TwitterAPI:
 
         return {"status": "success", "message": f"Now following {username}"}
 
-    def unfollow_user(self, username):
+    def unfollow_user(self, username: str) -> Dict[str, str]:
         """Unfollow a user."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}
@@ -107,14 +114,14 @@ class TwitterAPI:
 
         return {"status": "success", "message": f"Unfollowed {username}"}
 
-    def get_following(self):
+    def get_following(self) -> Dict[str, Any]:
         """Get the list of users being followed."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}
 
         return {"status": "success", "following": self.following_list}
 
-    def comment_on_tweet(self, tweet_id, content):
+    def comment_on_tweet(self, tweet_id: Any, content: str) -> Dict[str, Any]:
         """Comment on a tweet."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}
@@ -137,7 +144,7 @@ class TwitterAPI:
             "comment_id": comment_id,
         }
 
-    def retweet(self, tweet_id):
+    def retweet(self, tweet_id: Any) -> Dict[str, str]:
         """Retweet a tweet."""
         if not self.authenticated:
             return {"status": "error", "message": "Not authenticated"}

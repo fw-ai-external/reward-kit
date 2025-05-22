@@ -105,7 +105,7 @@ class DockerResource(ForkableResource):
                 pass  # Already removed
             except APIError as e:
                 print(
-                    f"DockerResource: Error removing container {container.id[:12]}: {e}"
+                    f"DockerResource: Error removing container {(container.id or '')[:12]}: {e}"
                 )
 
     def _cleanup_image(self, image_id: Optional[str]) -> None:
@@ -193,7 +193,7 @@ class DockerResource(ForkableResource):
             # print(f"DockerResource fork: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({fork_image_tag})")
         except APIError as e:
             raise DockerException(
-                f"Failed to commit container {self._container.id[:12]} for fork: {e}"
+                f"Failed to commit container {(self._container.id or '')[:12]} for fork: {e}"
             ) from e
 
         # 2. Create new DockerResource instance
@@ -242,7 +242,7 @@ class DockerResource(ForkableResource):
             return {"type": "docker_image_id", "image_id": committed_image.id}
         except APIError as e:
             raise DockerException(
-                f"Failed to commit container {self._container.id[:12]} for checkpoint: {e}"
+                f"Failed to commit container {(self._container.id or '')[:12]} for checkpoint: {e}"
             ) from e
 
     async def restore(self, state_data: Dict[str, Any]) -> None:
@@ -318,11 +318,11 @@ class DockerResource(ForkableResource):
                 self._container.reload()
                 if self._container.status != "running":
                     raise DockerException(
-                        f"Container {self._container.id[:12]} is not running (status: {self._container.status}). Cannot execute step."
+                        f"Container {(self._container.id or '')[:12]} is not running (status: {self._container.status}). Cannot execute step."
                     )
             except APIError as e:
                 raise DockerException(
-                    f"Failed to start container {self._container.id[:12]} for step: {e}"
+                    f"Failed to start container {(self._container.id or '')[:12]} for step: {e}"
                 ) from e
 
         if action_name == "exec_command":
@@ -352,7 +352,7 @@ class DockerResource(ForkableResource):
                 }
             except APIError as e:
                 raise DockerException(
-                    f"Failed to execute command in container {self._container.id[:12]}: {e}"
+                    f"Failed to execute command in container {(self._container.id or '')[:12]}: {e}"
                 ) from e
 
         elif action_name == "get_logs":
@@ -367,7 +367,7 @@ class DockerResource(ForkableResource):
                 return logs_bytes.decode("utf-8", errors="replace")
             except APIError as e:
                 raise DockerException(
-                    f"Failed to get logs for container {self._container.id[:12]}: {e}"
+                    f"Failed to get logs for container {(self._container.id or '')[:12]}: {e}"
                 ) from e
         else:
             raise NotImplementedError(

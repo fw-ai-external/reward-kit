@@ -13,6 +13,9 @@ except ImportError:
     # Type to mock in tests
     OpenAI = None  # type: ignore
 
+import copy
+from collections import Counter
+
 from ..models import EvaluateResult, Message, MetricResult  # Added Message
 from ..typed_interface import reward_function  # Added reward_function
 
@@ -267,541 +270,236 @@ def normalize_schema(schema: Union[Dict[str, Any], str]) -> Dict[str, Any]:
     return schema
 
 
+# New Exact Tool Match Reward Function and Helpers
+# VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+
+
+def maybe_deserialize_tool_call_arguments(
+    tool_calls: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    result = copy.deepcopy(tool_calls)
+    for tool_call in result:
+        # Sanity check
+        assert (
+            "function" in tool_call
+        ), f"Tool call {tool_call} does not have a function"
+        function = tool_call["function"]
+        # Sanity check
+        assert (
+            "arguments" in function
+        ), f"Function {function} does not have an arguments"
+        # Sanity check, we should have converted None to ""
+        assert (
+            function["arguments"] is not None
+        ), f"Tool call {tool_call} has a None arguments"
+        if function["arguments"] == "":
+            function["arguments"] = None
+        else:
+            try:
+                arguments = json.loads(function["arguments"])
+                function["arguments"] = arguments
+            except Exception:  # pylint: disable=bare-except
+                # In this case, leave it as string
+                pass
+    return result
+
+
+def parse_tool_calls(completion: str) -> list:
+    matches = re.findall(r"<tool_call>(.*?)</tool_call>", completion, re.DOTALL)
+    row_tool_calls = []
+    for match in matches:
+        try:
+            tool_call_str = match.strip()
+            row_tool_calls.append(json.loads(tool_call_str))
+        except Exception:  # pylint: disable=bare-except
+            # print("tool call parsing error")
+            continue
+    return row_tool_calls
+
+
+def compare_tool_calls(generated_tool_calls: list, gt_tool_calls: list) -> bool:
+    if len(generated_tool_calls) != len(gt_tool_calls):
+        return False
+
+    generated_tool_calls_serialized = [
+        json.dumps(item, sort_keys=True) for item in generated_tool_calls
+    ]
+    gt_tool_calls_serialized = [
+        json.dumps(item, sort_keys=True) for item in gt_tool_calls
+    ]
+
+    return Counter(generated_tool_calls_serialized) == Counter(gt_tool_calls_serialized)
+
+
+def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
+    if ground_truth is None or "tool_calls" not in ground_truth:
+        expected_gt_tool_calls = []
+    else:
+        expected_gt_tool_calls = ground_truth["tool_calls"]
+
+    ground_truth_tool_calls = maybe_deserialize_tool_call_arguments(
+        expected_gt_tool_calls
+    )
+    ground_truth_functions = [item["function"] for item in ground_truth_tool_calls]
+
+    generated_functions = []
+    # Check if 'tool_calls' key exists and is not None or empty
+    if generation.get("tool_calls"):
+        processed_tool_calls = []
+        for tc in generation["tool_calls"]:
+            if hasattr(tc, "model_dump"):
+                processed_tool_calls.append(tc.model_dump())
+            elif isinstance(tc, dict):
+                processed_tool_calls.append(tc)
+
+        deserialized_tool_calls = maybe_deserialize_tool_call_arguments(
+            processed_tool_calls
+        )
+        generated_functions = [item["function"] for item in deserialized_tool_calls]
+    # Check 'content' only if 'tool_calls' is not present or is empty
+    elif "<tool_call>" in generation.get("content", ""):
+        parsed_from_content = parse_tool_calls(generation["content"])
+        generated_functions = parsed_from_content
+
+    return compare_tool_calls(generated_functions, ground_truth_functions)
+
+
+@reward_function
+def exact_tool_match_reward(
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Dict[str, Any]] = None,
+    **kwargs,
+) -> EvaluateResult:
+    if not messages:
+        return EvaluateResult(
+            score=0.0, reason="No messages provided for evaluation.", metrics={}
+        )
+
+    generation_message_obj = messages[-1]
+    generation_dict: Dict[str, Any]
+
+    if isinstance(generation_message_obj, Message):
+        generation_dict = {
+            "role": generation_message_obj.role,
+            "content": generation_message_obj.content,
+        }
+        if generation_message_obj.tool_calls:
+            # Ensure tool_calls are dicts, not Pydantic models, for eval_tool_call
+            generation_dict["tool_calls"] = [
+                tc.model_dump() if hasattr(tc, "model_dump") else tc
+                for tc in generation_message_obj.tool_calls
+            ]
+    elif isinstance(generation_message_obj, dict):
+        generation_dict = generation_message_obj
+    else:
+        return EvaluateResult(
+            score=0.0,
+            reason=f"Unexpected type for generation message: {type(generation_message_obj)}",
+            metrics={},
+        )
+
+    if ground_truth is None:
+        has_generation_tool_calls = False
+        # Check 'tool_calls' first
+        if generation_dict.get("tool_calls"):
+            has_generation_tool_calls = True
+        # Then check 'content' if 'tool_calls' was not indicative
+        elif "<tool_call>" in generation_dict.get("content", ""):
+            if parse_tool_calls(generation_dict.get("content", "")):
+                has_generation_tool_calls = True
+
+        score = 1.0 if not has_generation_tool_calls else 0.0
+        reason = "Ground truth not provided. Score based on absence (1.0) or presence (0.0) of tool calls in generation."
+        return EvaluateResult(score=score, reason=reason, metrics={})
+
+    if not isinstance(ground_truth, dict):
+        return EvaluateResult(
+            score=0.0,
+            reason=f"Ground truth is not a dictionary: {type(ground_truth)}",
+            metrics={},
+        )
+
+    score = float(eval_tool_call(generation_dict, ground_truth))
+    reason = f"Exact tool match evaluation score: {score}"
+    return EvaluateResult(score=score, reason=reason, metrics={})
+
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# End of New Exact Tool Match Reward Function and Helpers
+
+
 @reward_function  # Added decorator
 def schema_jaccard_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
-    function_call: Optional[Dict[str, Any]] = None,
-    expected_schema: Optional[Union[Dict[str, Any], str]] = None,
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[
+        Dict[str, Any]
+    ] = None,  # Ensure ground_truth type is Dict for exact_tool_match_reward
+    function_call: Optional[Dict[str, Any]] = None,  # Param becomes unused
+    expected_schema: Optional[
+        Union[Dict[str, Any], str]
+    ] = None,  # Param becomes unused
     **kwargs,
 ) -> EvaluateResult:
     """
-    Evaluate a function call using Jaccard similarity between actual and expected schema.
-    The model's response (containing the function call) is assumed to be `messages[-1]`.
-
-    This reward function compares the structure of a function call against an expected schema
-    and calculates a similarity score using Jaccard similarity.
+    NOTE: This function now delegates to exact_tool_match_reward.
+    Original Jaccard similarity logic for function call schemas is bypassed.
+    The helper functions for Jaccard similarity are kept in this file as they
+    are used by reward_kit.rewards.json_schema.py.
 
     Args:
-        messages: List of conversation messages, where `messages[-1]` is the model's response.
-        ground_truth: Optional. Expected assistant response trajectory. If this contains an expected
-                      function call, it might be used in future versions or by specific setups.
-        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
-        expected_schema: The expected schema for the function call.
+        messages: List of conversation messages.
+        ground_truth: Expected assistant response as a dictionary.
         **kwargs: Additional keyword arguments.
 
     Returns:
-        EvaluateResult with score and metrics
+        EvaluateResult from exact_tool_match_reward.
     """
-    metrics = {}
-
-    # Extract function call from messages if not provided directly
-    if function_call is None:
-        if not messages:
-            return EvaluateResult(
-                score=0.0,
-                reason="No messages provided to extract function call.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0, reason="No messages provided", is_score_valid=False
-                    )
-                },
-            )
-
-        last_message = messages[-1]
-        extracted_fc_from_message = None
-
-        if isinstance(last_message, Message):
-            if last_message.role == "assistant":
-                if last_message.function_call:
-                    extracted_fc_from_message = last_message.function_call
-                elif last_message.tool_calls:
-                    for tc in last_message.tool_calls:
-                        if tc.type == "function":
-                            extracted_fc_from_message = (
-                                tc.function
-                            )  # Assuming tc.function is a dict {name, arguments}
-                            if isinstance(
-                                extracted_fc_from_message, dict
-                            ):  # Ensure it's a dict
-                                break
-                            else:  # If tc.function is not a dict (e.g. pydantic model), convert or handle
-                                extracted_fc_from_message = {
-                                    "name": getattr(
-                                        extracted_fc_from_message, "name", ""
-                                    ),
-                                    "arguments": getattr(
-                                        extracted_fc_from_message, "arguments", "{}"
-                                    ),
-                                }
-                                break
-
-        elif isinstance(last_message, dict):
-            if last_message.get("role") == "assistant":
-                if "function_call" in last_message and isinstance(
-                    last_message["function_call"], dict
-                ):
-                    extracted_fc_from_message = last_message["function_call"]
-                elif "tool_calls" in last_message and isinstance(
-                    last_message["tool_calls"], list
-                ):
-                    for tc in last_message["tool_calls"]:
-                        if isinstance(tc, dict) and tc.get("type") == "function":
-                            if "function" in tc and isinstance(tc["function"], dict):
-                                extracted_fc_from_message = tc["function"]
-                                break
-        else:
-            return EvaluateResult(
-                score=0.0,
-                reason=f"Unexpected type for last message: {type(last_message)}.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        reason="Invalid message type for function call extraction.",
-                        is_score_valid=False,
-                    )
-                },
-            )
-
-        if extracted_fc_from_message:
-            function_call = extracted_fc_from_message
-
-        if not function_call:  # Check again if function_call is still None or empty
-            return EvaluateResult(
-                score=0.0,
-                reason="No function call found in messages.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        reason="No function call found in messages",
-                        is_score_valid=False,
-                    )
-                },
-            )
-
-    # Normalize expected schema
-    if expected_schema is None:
-        return EvaluateResult(
-            score=0.0,
-            reason="No expected schema provided for comparison.",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason="No expected schema provided",
-                    is_score_valid=False,
-                )
-            },
-        )
-
-    expected_schema = normalize_schema(expected_schema)
-
-    # Extract function name and arguments
-    function_name = function_call.get("name", "")
-    arguments_str = function_call.get("arguments", "{}")
-
-    # Parse arguments JSON
-    try:
-        if isinstance(arguments_str, str):
-            parsed_arguments = json.loads(arguments_str)
-        else:
-            parsed_arguments = arguments_str
-    except json.JSONDecodeError:
-        return EvaluateResult(
-            score=0.0,
-            reason=f"Invalid JSON in function arguments: {arguments_str}",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason=f"Invalid JSON in function arguments: {arguments_str}",
-                    is_score_valid=False,
-                )
-            },
-        )
-
-    # 1. Function name match
-    expected_name = expected_schema.get("name", "")
-    name_match = function_name == expected_name
-    name_score = 1.0 if name_match else 0.0
-    name_reason = f"Function name {'matches' if name_match else 'does not match'}: expected '{expected_name}', got '{function_name}'"
-    metrics["function_name_match"] = MetricResult(
-        score=name_score, reason=name_reason, is_score_valid=name_match
+    # Delegate to exact_tool_match_reward
+    return exact_tool_match_reward(
+        messages=messages, ground_truth=ground_truth, **kwargs
     )
-
-    # If function name doesn't match, return low score immediately
-    if not name_match:
-        return EvaluateResult(
-            score=0.1,  # Some small score for partial matching attempts
-            reason=name_reason,
-            metrics=metrics,
-        )
-
-    # 2. Create schemas for comparison
-    expected_args_schema = expected_schema.get("arguments", {})
-
-    # Create a schema representation of the actual arguments
-    actual_args_schema: Dict[str, Any] = {}
-    for arg_name, arg_value in parsed_arguments.items():
-        # Infer type from value
-        if isinstance(arg_value, str):
-            arg_type = "string"
-        elif isinstance(arg_value, (int, float)):
-            arg_type = "number"
-        elif isinstance(arg_value, bool):
-            arg_type = "boolean"
-        elif isinstance(arg_value, list):
-            arg_type = "array"
-        elif isinstance(arg_value, dict):
-            arg_type = "object"
-        elif arg_value is None:
-            arg_type = "null"
-        else:
-            arg_type = "any"
-
-        actual_args_schema[arg_name] = {"type": arg_type}
-
-        # For nested objects, create subschema
-        if arg_type == "object" and isinstance(arg_value, dict):
-            properties_dict: Dict[str, Any] = {}
-            actual_args_schema[arg_name]["properties"] = properties_dict
-
-            for sub_name, sub_value in arg_value.items():
-                if isinstance(sub_value, str):
-                    sub_type = "string"
-                elif isinstance(sub_value, (int, float)):
-                    sub_type = "number"
-                elif isinstance(sub_value, bool):
-                    sub_type = "boolean"
-                elif isinstance(sub_value, list):
-                    sub_type = "array"
-                elif isinstance(sub_value, dict):
-                    sub_type = "object"
-                elif sub_value is None:
-                    sub_type = "null"
-                else:
-                    sub_type = "any"
-
-                properties_dict[sub_name] = {"type": sub_type}
-
-    # 3. Extract schema properties
-    expected_properties = extract_schema_properties(
-        {"properties": expected_args_schema}
-    )
-    actual_properties = extract_schema_properties({"properties": actual_args_schema})
-
-    # 4. Calculate Jaccard similarity
-    schema_similarity = calculate_jaccard_similarity(
-        expected_properties, actual_properties
-    )
-
-    # 5. Create detailed comparison report
-    missing_props = expected_properties - actual_properties
-    extra_props = actual_properties - expected_properties
-    matching_props = expected_properties.intersection(actual_properties)
-
-    comparison_details = []
-
-    if matching_props:
-        comparison_details.append(f"Matching properties ({len(matching_props)}):")
-        for prop, prop_type in sorted(matching_props):
-            comparison_details.append(f"  - {prop}: {prop_type}")
-
-    if missing_props:
-        comparison_details.append(f"Missing properties ({len(missing_props)}):")
-        for prop, prop_type in sorted(missing_props):
-            comparison_details.append(f"  - {prop}: {prop_type}")
-
-    if extra_props:
-        comparison_details.append(f"Extra properties ({len(extra_props)}):")
-        for prop, prop_type in sorted(extra_props):
-            comparison_details.append(f"  - {prop}: {prop_type}")
-
-    schema_comparison_reason = "\n".join(comparison_details)
-
-    metrics["schema_similarity"] = MetricResult(
-        score=schema_similarity,
-        reason=f"Schema similarity: {schema_similarity:.2f}\n{schema_comparison_reason}",
-        is_score_valid=schema_similarity == 1.0,
-    )
-
-    # 6. Calculate final score
-    # Name match is critical but schema similarity is also important
-    # Weight: 30% name match, 70% schema similarity
-    final_score = (name_score * 0.3) + (schema_similarity * 0.7)
-    final_reason = f"Final score based on name match ({name_score*0.3:.2f}) and schema similarity ({schema_similarity*0.7:.2f})."
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
 @reward_function  # Added decorator
 def llm_judge_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
-    function_call: Optional[Dict[str, Any]] = None,
-    expected_schema: Optional[Union[Dict[str, Any], str]] = None,
-    expected_behavior: Optional[str] = None,
-    openai_api_key: Optional[str] = None,
-    model: str = "gpt-4o-mini",
-    temperature: float = 0.0,
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Dict[str, Any]] = None,  # Ensure ground_truth type is Dict
+    function_call: Optional[Dict[str, Any]] = None,  # Param becomes unused
+    expected_schema: Optional[
+        Union[Dict[str, Any], str]
+    ] = None,  # Param becomes unused
+    expected_behavior: Optional[str] = None,  # Param becomes unused
+    openai_api_key: Optional[str] = None,  # Param becomes unused
+    model: str = "gpt-4o-mini",  # Param becomes unused
+    temperature: float = 0.0,  # Param becomes unused
     **kwargs,
 ) -> EvaluateResult:
     """
-    Evaluate a function call using an LLM (GPT-4o-mini) as a judge.
-    The model's response (containing the function call) is assumed to be `messages[-1]`.
-
-    This reward function sends the function call and expected behavior to an LLM
-    to evaluate the quality and correctness of the function call.
+    NOTE: This function now delegates to exact_tool_match_reward.
+    Original LLM judge logic is bypassed.
 
     Args:
-        messages: List of conversation messages, where `messages[-1]` is the model's response.
-        ground_truth: Optional. Expected assistant response trajectory.
-        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
-        expected_schema: The expected schema for the function call.
-        expected_behavior: Description of the expected behavior for the function call.
-        openai_api_key: OpenAI API key (if not provided, uses environment variable)
-        model: Model to use for evaluation (default: gpt-4o-mini)
-        temperature: Temperature for the model generation (default: 0.0)
-        **kwargs: Additional keyword arguments
+        messages: List of conversation messages.
+        ground_truth: Expected assistant response as a dictionary.
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        EvaluateResult with score and metrics
+        EvaluateResult from exact_tool_match_reward.
     """
-    # Check if OpenAI is available
-    if OpenAI is None:
-        return EvaluateResult(
-            score=0.0,
-            reason="OpenAI package not installed.",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason="OpenAI package not installed. Install it with: pip install openai",
-                    is_score_valid=False,
-                )
-            },
-        )
-
-    metrics = {}
-
-    # Extract function call from messages if not provided directly
-    if function_call is None:
-        if not messages:
-            return EvaluateResult(
-                score=0.0,
-                reason="No messages provided to extract function call.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0, reason="No messages provided", is_score_valid=False
-                    )
-                },
-            )
-
-        last_message = messages[-1]
-        extracted_fc_from_message = None
-
-        if isinstance(last_message, Message):
-            if last_message.role == "assistant":
-                if last_message.function_call:
-                    extracted_fc_from_message = last_message.function_call
-                elif last_message.tool_calls:
-                    for tc in last_message.tool_calls:
-                        if tc.type == "function":
-                            extracted_fc_from_message = tc.function
-                            if isinstance(extracted_fc_from_message, dict):
-                                break
-                            else:
-                                extracted_fc_from_message = {
-                                    "name": getattr(
-                                        extracted_fc_from_message, "name", ""
-                                    ),
-                                    "arguments": getattr(
-                                        extracted_fc_from_message, "arguments", "{}"
-                                    ),
-                                }
-                                break
-        elif isinstance(last_message, dict):
-            if last_message.get("role") == "assistant":
-                if "function_call" in last_message and isinstance(
-                    last_message["function_call"], dict
-                ):
-                    extracted_fc_from_message = last_message["function_call"]
-                elif "tool_calls" in last_message and isinstance(
-                    last_message["tool_calls"], list
-                ):
-                    for tc in last_message["tool_calls"]:
-                        if isinstance(tc, dict) and tc.get("type") == "function":
-                            if "function" in tc and isinstance(tc["function"], dict):
-                                extracted_fc_from_message = tc["function"]
-                                break
-        else:
-            return EvaluateResult(
-                score=0.0,
-                reason=f"Unexpected type for last message: {type(last_message)}.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        reason="Invalid message type for function call extraction.",
-                        is_score_valid=False,
-                    )
-                },
-            )
-
-        if extracted_fc_from_message:
-            function_call = extracted_fc_from_message
-
-        if not function_call:  # Check again if function_call is still None or empty
-            return EvaluateResult(
-                score=0.0,
-                reason="No function call found in messages.",
-                metrics={
-                    "error": MetricResult(
-                        score=0.0,
-                        reason="No function call found in messages",
-                        is_score_valid=False,
-                    )
-                },
-            )
-
-    # Get API key
-    api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return EvaluateResult(
-            score=0.0,
-            reason="OpenAI API key not provided.",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason="OpenAI API key not provided. Set it as openai_api_key parameter or OPENAI_API_KEY environment variable.",
-                    is_score_valid=False,
-                )
-            },
-        )
-
-    # Extract function name and arguments
-    function_name = function_call.get("name", "")
-    arguments_str = function_call.get("arguments", "{}")
-
-    # Parse arguments JSON for formatting
-    try:
-        if isinstance(arguments_str, str):
-            parsed_arguments = json.loads(arguments_str)
-            # Format for readability
-            arguments_str = json.dumps(parsed_arguments, indent=2)
-        else:
-            # Already parsed
-            arguments_str = json.dumps(arguments_str, indent=2)
-    except json.JSONDecodeError:
-        arguments_str = str(arguments_str)  # Use as is if not valid JSON
-
-    # Normalize expected schema
-    if expected_schema:
-        expected_schema = normalize_schema(expected_schema)
-        expected_schema_str = json.dumps(expected_schema, indent=2)
-    else:
-        expected_schema_str = "No schema provided"
-
-    # Set expected behavior if not provided
-    if not expected_behavior:
-        expected_behavior = "No specific behavior guidance provided"
-
-    # Construct prompt for LLM
-    conversation_msg = "No conversation context provided"
-    if messages:
-        conversation_parts = []
-        for msg in messages[:-1]:  # Exclude the last message with function call
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role and content:
-                conversation_parts.append(f"{role}: {content}")
-
-        if conversation_parts:
-            conversation_msg = "\n".join(conversation_parts)
-
-    prompt = f"""You are evaluating the quality of a function call made by an AI assistant.
-Your job is to assess whether the function call is appropriate, correctly formatted, and follows the expected behavior.
-
-CONVERSATION CONTEXT:
-{conversation_msg}
-
-FUNCTION CALL:
-Name: {function_name}
-Arguments:
-{arguments_str}
-
-EXPECTED SCHEMA:
-{expected_schema_str}
-
-EXPECTED BEHAVIOR:
-{expected_behavior}
-
-Evaluate the function call and provide:
-1. A score from 0.0 to 1.0 (where 1.0 is perfect)
-2. A detailed explanation of your rating
-3. Specific issues or strengths of the function call
-
-Format your response as:
-SCORE: [number between 0.0 and 1.0]
-EXPLANATION: [your detailed explanation]
-"""
-
-    try:
-        # Create OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        # Call the API
-        response = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        # Extract the response
-        llm_response = response.choices[0].message.content or ""
-
-        # Parse the score and explanation
-        score_match = re.search(r"SCORE:\s*([\d.]+)", llm_response)
-        explanation_match = re.search(r"EXPLANATION:\s*(.*)", llm_response, re.DOTALL)
-
-        if score_match:
-            try:
-                score = float(score_match.group(1))
-                # Ensure score is in range [0, 1]
-                score = max(0.0, min(score, 1.0))
-            except ValueError:
-                score = 0.5  # Default if parsing fails
-        else:
-            score = 0.5  # Default if no score found
-
-        explanation = (
-            explanation_match.group(1).strip()
-            if explanation_match
-            else "No explanation provided"
-        )
-
-        # Create metrics
-        metrics["llm_judge"] = MetricResult(
-            score=score,
-            reason=explanation,
-            is_score_valid=score >= 0.8,  # Assuming high score means success
-        )
-
-        return EvaluateResult(score=score, reason=explanation, metrics=metrics)
-
-    except Exception as e:
-        return EvaluateResult(
-            score=0.0,
-            reason=f"Error calling OpenAI API: {str(e)}",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason=f"Error calling OpenAI API: {str(e)}",
-                    is_score_valid=False,
-                )
-            },
-        )
+    # Delegate to exact_tool_match_reward
+    # Parameters function_call, expected_schema, expected_behavior, openai_api_key, model, temperature
+    # are not used by exact_tool_match_reward.
+    return exact_tool_match_reward(
+        messages=messages, ground_truth=ground_truth, **kwargs
+    )
 
 
-@reward_function  # Added decorator
+@reward_function
 def composite_function_call_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Dict[str, Any]] = None,  # Changed type here
+    # The following parameters are now effectively unused due to delegation
+    # but are kept for signature compatibility or future flexibility.
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -811,111 +509,26 @@ def composite_function_call_reward(
     **kwargs,
 ) -> EvaluateResult:
     """
-    Combined reward function that evaluates function calls using both schema validation and LLM judgment.
+    This reward function now delegates to exact_tool_match_reward
+    for an exact match evaluation of tool calls.
     The model's response (containing the function call) is assumed to be `messages[-1]`.
 
     Args:
         messages: List of conversation messages, where `messages[-1]` is the model's response.
-        ground_truth: Optional. Expected assistant response trajectory.
-        function_call: The function call to evaluate (if not provided, extracts from `messages[-1]`).
-        expected_schema: The expected schema for the function call.
-        expected_behavior: Description of the expected behavior for the function call.
-        openai_api_key: OpenAI API key (if not provided, uses environment variable)
-        llm_model: Model to use for LLM evaluation (default: gpt-4o-mini)
-        weights: Dictionary of weights for each component (default: {"schema": 0.5, "llm": 0.5})
-        **kwargs: Additional keyword arguments
+        ground_truth: Expected assistant response as a dictionary, typically containing 'tool_calls'.
+                      This is passed directly to exact_tool_match_reward.
+        **kwargs: Additional keyword arguments passed to exact_tool_match_reward.
 
     Returns:
-        EvaluateResult with score and metrics
+        EvaluateResult with score and metrics from exact_tool_match_reward.
     """
-    # Default weights
-    if weights is None:
-        weights = {"schema": 0.5, "llm": 0.5}
-
-    # Ensure weights sum to 1.0
-    total_weight = sum(weights.values())
-    normalized_weights = {k: v / total_weight for k, v in weights.items()}
-
-    # Run schema validation
-    schema_result = schema_jaccard_reward(
-        messages=messages,
-        ground_truth=ground_truth,  # Pass through
-        function_call=function_call,
-        expected_schema=expected_schema,
-        **kwargs,
-    )
-
-    # Run LLM judge evaluation if expected_behavior is provided
-    if expected_behavior:
-        llm_result = llm_judge_reward(
-            messages=messages,
-            ground_truth=ground_truth,  # Pass through
-            function_call=function_call,
-            expected_schema=expected_schema,
-            expected_behavior=expected_behavior,
-            openai_api_key=openai_api_key,
-            model=llm_model,
-            **kwargs,
-        )
-    else:
-        # Skip LLM evaluation if no behavior specified
-        llm_result = EvaluateResult(
-            score=0.0,
-            reason="LLM judge skipped: No expected behavior provided.",
-            metrics={
-                "llm_judge": MetricResult(
-                    score=0.0,
-                    reason="Skipped: No expected behavior provided",
-                    is_score_valid=True,  # Success because it's an expected skip
-                )
-            },
-        )
-
-    # Combine metrics
-    combined_metrics = {}
-
-    # Add schema metrics with "schema_" prefix
-    for (
-        key,
-        metric_val,
-    ) in schema_result.metrics.items():  # Renamed to metric_val to avoid conflict
-        combined_metrics[f"schema_{key}"] = metric_val
-
-    # Add llm metrics with "llm_" prefix
-    for key, metric_val in llm_result.metrics.items():  # Renamed to metric_val
-        combined_metrics[f"llm_{key}"] = metric_val
-
-    # Add summary metrics
-    combined_metrics["schema_score"] = MetricResult(
-        score=schema_result.score,
-        reason=f"Schema validation score: {schema_result.score:.2f}",
-        is_score_valid=schema_result.score == 1.0,
-    )
-
-    combined_metrics["llm_score"] = MetricResult(
-        score=llm_result.score,
-        reason=f"LLM judge score: {llm_result.score:.2f}",
-        is_score_valid=llm_result.score >= 0.8,  # Assuming high score means success
-    )
-
-    # Calculate weighted final score
-    schema_weight = normalized_weights.get("schema", 0.5)
-    llm_weight = normalized_weights.get("llm", 0.5)
-
-    final_score = (schema_result.score * schema_weight) + (
-        llm_result.score * llm_weight
-    )
-    final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_result.score:.2f} * {llm_weight:.2f})."
-
-    # Add weight information
-    combined_metrics["weights"] = MetricResult(
-        score=0.0,  # Not a real score
-        reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
-        is_score_valid=True,  # Informational metric
-    )
-
-    return EvaluateResult(
-        score=final_score, reason=final_reason, metrics=combined_metrics
+    # Directly delegate to exact_tool_match_reward.
+    # The original parameters like function_call, expected_schema, expected_behavior,
+    # openai_api_key, llm_model, weights are not explicitly passed here as
+    # exact_tool_match_reward does not use them.
+    # kwargs will pass through any other relevant arguments.
+    return exact_tool_match_reward(
+        messages=messages, ground_truth=ground_truth, **kwargs
     )
 
 

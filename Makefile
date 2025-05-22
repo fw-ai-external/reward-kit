@@ -5,6 +5,9 @@ PYTHON_DIRS = reward_kit tests examples scripts
 clean:
 	rm -rf build/ dist/ *.egg-info/
 
+pre-commit:
+	pre-commit run --all-files
+
 build: clean
 	python -m build
 

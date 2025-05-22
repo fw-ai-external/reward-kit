@@ -1,4 +1,6 @@
 """
+import argparse
+from typing import Any, Dict, List, Optional
 CLI command for running agent evaluations using the ForkableResource framework.
 """
 
@@ -13,10 +15,10 @@ except ImportError:
     # Create a stub module if yaml is not installed
     yaml = types.ModuleType("yaml")
 
-    def dummy_safe_load(x):
+    def dummy_safe_load(x: Any) -> None:
         return None
 
-    def dummy_dump(x, **kwargs):
+    def dummy_dump(x: Any, **kwargs: Any) -> None:
         return None
 
     yaml.safe_load = dummy_safe_load  # type: ignore[assignment]
@@ -37,7 +39,7 @@ from reward_kit.models import TaskDefinitionModel  # Import the new Pydantic mod
 # from .common import setup_logging
 
 
-def agent_eval_command(args):
+def agent_eval_command(args: argparse.Namespace) -> Optional[int]:
     """
     Run agent evaluation using the Orchestrator and ForkableResource framework.
     """
@@ -86,7 +88,7 @@ def agent_eval_command(args):
     # Run tasks with asyncio
     try:
 
-        async def main_flow():
+        async def main_flow() -> None:
             # Handle model override
             if getattr(args, "model", None):
                 original_model = os.environ.get("MODEL_AGENT")
@@ -142,7 +144,7 @@ def agent_eval_command(args):
         return 1
 
 
-def bfcl_eval_command(args):
+def bfcl_eval_command(args: argparse.Namespace) -> Optional[int]:
     """
     Run BFCL agent evaluations using the refactored framework.
     This command specifically manages BFCL task evaluation.
@@ -192,7 +194,7 @@ def bfcl_eval_command(args):
             logger.info(f"Registered {len(registered_task_ids)} BFCL tasks")
 
         # Run tasks with asyncio
-        async def main_flow():
+        async def main_flow() -> None:
             # Handle model override
             if args.model:
                 original_model = os.environ.get("MODEL_AGENT")

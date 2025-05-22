@@ -16,7 +16,7 @@ class ResourcePool:
     Provides tracking and lifecycle management for resources.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize an empty resource pool."""
         self.resources: Dict[str, ForkableResource] = (
             {}

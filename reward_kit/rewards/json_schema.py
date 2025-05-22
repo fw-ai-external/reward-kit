@@ -19,7 +19,7 @@ def json_schema_reward(
     ] = None,  # Added, not used by core logic
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate JSON content against an expected schema using Jaccard similarity.
@@ -271,7 +271,7 @@ def json_schema_reward_with_llm_judge(
     model: str = "gpt-4o-mini",
     temperature: float = 0.0,
     weights: Optional[Dict[str, float]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Combined reward function that evaluates JSON content using both schema

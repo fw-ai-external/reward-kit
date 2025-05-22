@@ -61,14 +61,14 @@ class RewardFunction:
 
     def __init__(
         self,
-        func: Optional[Callable] = None,
+        func: Optional[Callable[..., Any]] = None,  # Added ... Any
         func_path: Optional[str] = None,
         mode: str = "local",
         endpoint: Optional[str] = None,
         name: Optional[str] = None,
         model_id: Optional[str] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,  # Added Any
+    ) -> None:  # Added -> None
         self.mode = mode
         self.func = func
         self.func_path = func_path
@@ -148,7 +148,7 @@ class RewardFunction:
         self,
         messages: List[Dict[str, str]],
         original_messages: Optional[List[Dict[str, str]]] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> EvaluateResult:
         """
         Call the reward function with the provided messages.
@@ -307,7 +307,7 @@ class RewardFunction:
         """
 
         def adapter(
-            prompts: List[List[Dict]], completions: Optional[List[str]] = None, **kwargs
+            prompts: List[List[Dict[str, str]]], completions: Optional[List[str]] = None, **kwargs: Any
         ) -> List[float]:
             """
             Adapter function compatible with TRL's reward function signature.

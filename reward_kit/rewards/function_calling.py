@@ -18,15 +18,12 @@ from ..typed_interface import reward_function  # Added reward_function
 
 
 def match_function_call(
-    messages: List[
-        Dict[str, str]
-    ],  # messages is for context if needed, not directly used here for func call parts
-    # original_messages: List[Dict[str, str]], # Removed
+    messages: List[Dict[str, str]],
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
     argument_match_strictness: str = "exact",
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate how well a function call matches an expected schema.
@@ -203,7 +200,7 @@ def extract_schema_properties(schema: Dict[str, Any]) -> Set[Tuple[str, str]]:
     properties = set()
 
     # Process schema properties (handles both root-level and nested properties)
-    def process_properties(schema_obj: Dict[str, Any], prefix: str = ""):
+    def process_properties(schema_obj: Dict[str, Any], prefix: str = "") -> None:
         if not isinstance(schema_obj, dict):
             return
 
@@ -273,7 +270,7 @@ def schema_jaccard_reward(
     ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate a function call using Jaccard similarity between actual and expected schema.
@@ -541,7 +538,7 @@ def llm_judge_reward(
     openai_api_key: Optional[str] = None,
     model: str = "gpt-4o-mini",
     temperature: float = 0.0,
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Evaluate a function call using an LLM (GPT-4o-mini) as a judge.
@@ -808,7 +805,7 @@ def composite_function_call_reward(
     openai_api_key: Optional[str] = None,
     llm_model: str = "gpt-4o-mini",
     weights: Optional[Dict[str, float]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Combined reward function that evaluates function calls using both schema validation and LLM judgment.

@@ -4,6 +4,7 @@ import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Tuple
 
 if TYPE_CHECKING:
     # For type checking only
@@ -146,12 +147,12 @@ import types  # Ensure this is at the top with other imports
 class EvaluatorPreviewResult:
     """Class to store preview results for an evaluator"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.results = []
         self.total_samples = 0
         self.total_runtime_ms = 0
 
-    def add_result(self, sample_index, success, score, per_metric_evals):
+    def add_result(self, sample_index: int, success: bool, score: float, per_metric_evals: Dict[str, Any]) -> None:
         """Add a result for a specific sample"""
         # Store as a SimpleNamespace to allow attribute access
         result_obj = types.SimpleNamespace(
@@ -162,7 +163,7 @@ class EvaluatorPreviewResult:
         )
         self.results.append(result_obj)
 
-    def display(self):
+    def display(self) -> None:
         """Display formatted results"""
         print("Evaluation Preview Results")
         print("------------------------")
@@ -194,7 +195,7 @@ class EvaluatorPreviewResult:
 class Evaluator:
     """Handles loading, previewing, and creating evaluations"""
 
-    def __init__(self, multi_metrics=False):
+    def __init__(self, multi_metrics: bool = False) -> None:
         self.multi_metrics = multi_metrics
         self.code_files = {}  # Map of filename -> content
         self.metric_folders = {}  # Map of metric_name -> folder_path
@@ -202,7 +203,7 @@ class Evaluator:
         self.display_name = ""
         self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
-    def load_metric_folder(self, metric_name, folder_path):
+    def load_metric_folder(self, metric_name: str, folder_path: str) -> Dict[str, str]:
         """
         Load code files from a metric folder
 
@@ -246,7 +247,7 @@ class Evaluator:
         )
         return files
 
-    def load_multi_metrics_folder(self, folder_path):
+    def load_multi_metrics_folder(self, folder_path: str) -> Dict[str, str]:
         """
         Load code files from a folder with multiple metrics
 
@@ -287,7 +288,7 @@ class Evaluator:
         )
         return files
 
-    def load_samples_from_jsonl(self, sample_file, max_samples=5):
+    def load_samples_from_jsonl(self, sample_file: str, max_samples: int = 5) -> List[Dict[str, Any]]:
         """
         Load samples from a JSONL file
 
@@ -320,7 +321,7 @@ class Evaluator:
         logger.info(f"Loaded {len(samples)} samples from {sample_file}")
         return samples
 
-    def preview(self, sample_file, max_samples=5):
+    def preview(self, sample_file: str, max_samples: int = 5) -> EvaluatorPreviewResult:
         """
         Run the evaluator against sample data using the Fireworks preview API
 
@@ -444,7 +445,7 @@ class Evaluator:
             logger.warning("Falling back to simulated preview mode")
             return self._simulated_preview(samples)
 
-    def _simulated_preview(self, samples):
+    def _simulated_preview(self, samples: List[Dict[str, Any]]) -> EvaluatorPreviewResult:
         """
         Simulate the preview locally without calling the API
         For fallback when the API call fails
@@ -515,7 +516,7 @@ class Evaluator:
 
         return preview_result
 
-    def create(self, evaluator_id, display_name=None, description=None, force=False):
+    def create(self, evaluator_id: str, display_name: Optional[str] = None, description: Optional[str] = None, force: bool = False) -> Dict[str, Any]:
         """
         Create the evaluation on the Fireworks platform
 
@@ -654,7 +655,7 @@ class Evaluator:
                 logger.error(f"Response: {e.response.text}")
             raise
 
-    def _construct_criteria(self):
+    def _construct_criteria(self) -> List[Dict[str, Any]]:
         """
         Construct the assertions for the evaluation
 
@@ -723,7 +724,7 @@ class Evaluator:
 
         return assertions
 
-    def _update_evaluate_signature(self, content):
+    def _update_evaluate_signature(self, content: str) -> str:
         """
         Update the evaluate function signature to the new format
 
@@ -778,7 +779,7 @@ class Evaluator:
 
         return content
 
-    def _get_combined_code(self):
+    def _get_combined_code(self) -> str:
         """
         Combine all code files into a single code block
 
@@ -822,7 +823,7 @@ if __name__ == '__main__':
 
         return "".join(code_parts)
 
-    def _get_code_from_files(self, files):
+    def _get_code_from_files(self, files: Dict[str, str]) -> str:
         """
         Convert a dict of files into a single code block
 
@@ -868,7 +869,7 @@ if __name__ == '__main__':
 
         return "".join(code_parts)
 
-    def _get_authentication(self):
+    def _get_authentication(self) -> Tuple[str, str]:
         """
         Get authentication information for the Fireworks API.
         This method now uses the centralized functions from reward_kit.auth.
@@ -909,17 +910,17 @@ if __name__ == '__main__':
 
 # Helper functions for CLI commands
 def preview_evaluation(
-    metric_folders=None,
-    multi_metrics=False,
-    folder=None,
-    sample_file=None,
-    max_samples=5,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
-):
+    metric_folders: Optional[List[str]] = None,
+    multi_metrics: bool = False,
+    folder: Optional[str] = None,
+    sample_file: Optional[str] = None,
+    max_samples: int = 5,
+    huggingface_dataset: Optional[str] = None,
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
+) -> EvaluatorPreviewResult:
     """
     Preview an evaluation with sample data
 
@@ -985,16 +986,16 @@ def preview_evaluation(
 
 
 def preview_folder_evaluation(
-    evaluator_folder,
-    sample_file=None,
-    max_samples=5,
-    multi_metrics=False,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
-):
+    evaluator_folder: str,
+    sample_file: Optional[str] = None,
+    max_samples: int = 5,
+    multi_metrics: bool = False,
+    huggingface_dataset: Optional[str] = None,
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
+) -> EvaluatorPreviewResult:
     """
     Preview an evaluation from a folder with sample data.
     This is a more convenient interface that automatically detects the
@@ -1096,19 +1097,19 @@ def preview_folder_evaluation(
 
 
 def create_evaluation(
-    evaluator_id,
-    metric_folders=None,
-    multi_metrics=False,
-    folder=None,
-    display_name=None,
-    description=None,
-    force=False,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
-):
+    evaluator_id: str,
+    metric_folders: Optional[List[str]] = None,
+    multi_metrics: bool = False,
+    folder: Optional[str] = None,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    force: bool = False,
+    huggingface_dataset: Optional[str] = None,
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
+) -> Dict[str, Any]:
     """
     Create an evaluation on the Fireworks platform
 
@@ -1168,18 +1169,18 @@ def create_evaluation(
 
 
 def deploy_folder_evaluation(
-    evaluator_id,
-    evaluator_folder,
-    display_name=None,
-    description=None,
-    force=False,
-    multi_metrics=False,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
-):
+    evaluator_id: str,
+    evaluator_folder: str,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    force: bool = False,
+    multi_metrics: bool = False,
+    huggingface_dataset: Optional[str] = None,
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
+) -> Dict[str, Any]:
     """
     Deploy an evaluation from a folder to the Fireworks platform.
     This is a more convenient interface that automatically detects the

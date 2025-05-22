@@ -2,6 +2,7 @@
 Task Manager for the Agent Evaluation Framework V2.
 Coordinates multiple tasks and their associated resources.
 """
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import asyncio
 import importlib
@@ -23,7 +24,7 @@ class TaskManager:
     Coordinates resources, orchestrators, and execution flows.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the TaskManager with an empty task registry."""
         self.tasks: Dict[str, TaskDefinitionModel] = {}
         self.resource_pool = ResourcePool()
@@ -245,7 +246,7 @@ class TaskManager:
             # Execute tasks with semaphore for concurrency control
             semaphore = asyncio.Semaphore(max_concurrency)
 
-            async def execute_with_semaphore(tid):
+            async def execute_with_semaphore(tid: str) -> Tuple[str, Any]:
                 async with semaphore:
                     return tid, await self.execute_task(tid)
 

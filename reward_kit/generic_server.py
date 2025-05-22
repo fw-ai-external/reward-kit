@@ -33,7 +33,7 @@ app = FastAPI(
 
 
 @app.post("/evaluate", response_model=EvaluateResult)
-async def evaluate_endpoint(request: EvaluationRequest):
+async def evaluate_endpoint(request: EvaluationRequest) -> EvaluateResult:
     """
     Endpoint to evaluate a given set of messages using the loaded reward function.
     """
@@ -89,7 +89,7 @@ async def evaluate_endpoint(request: EvaluationRequest):
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """
     Health check endpoint.
     """
@@ -99,7 +99,7 @@ async def health_check():
         return {"status": "error", "reason": "Reward function not loaded"}
 
 
-def load_reward_function(import_string: str):
+def load_reward_function(import_string: str) -> None:
     """
     Loads a reward function from an import string (e.g., 'my_module.my_function').
     """

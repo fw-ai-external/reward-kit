@@ -50,7 +50,7 @@ class ToolRegistry:
             self.parameters[tool_name] = parameters
 
             @functools.wraps(func)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
                 return func(*args, **kwargs)
 
             return wrapper
@@ -100,7 +100,7 @@ class ToolRegistry:
             )
         return tools
 
-    def create_fastapi_app(self):
+    def create_fastapi_app(self) -> Dict[str, Any]:
         """
         Create a FastAPI app with endpoints for each tool.
 

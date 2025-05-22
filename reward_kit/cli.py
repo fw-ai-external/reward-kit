@@ -1,8 +1,9 @@
 """
+import argparse
+from typing import Any, Dict, List, Optional
 Command-line interface for reward-kit.
 """
 
-import argparse
 import asyncio
 import json
 import logging
@@ -34,7 +35,7 @@ from .cli_commands.preview import preview_command
 # For now, they are removed from cli.py as agent_eval_command is imported.
 
 
-def parse_args(args=None):
+def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
         description="reward-kit: Tools for evaluation and reward modeling"
@@ -228,7 +229,7 @@ def parse_args(args=None):
     return parser.parse_args(args)
 
 
-def main():
+def main() -> Optional[int]:
     """Main entry point for the CLI"""
     args = parse_args()
     # Setup logging based on global verbose/debug flags if they exist on args,

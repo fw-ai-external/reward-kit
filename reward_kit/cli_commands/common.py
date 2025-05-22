@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterator, List, Optional
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(verbose=False, debug=False):
+def setup_logging(verbose: bool = False, debug: bool = False) -> None:
     """Setup logging configuration"""
     if debug:
         log_level = logging.DEBUG
@@ -24,7 +24,7 @@ def setup_logging(verbose=False, debug=False):
     logging.basicConfig(level=log_level, format=format_str)
 
 
-def check_environment():
+def check_environment() -> bool:
     """Check if required environment variables are set for general commands."""
     if not os.environ.get("FIREWORKS_API_KEY"):
         logger.warning("FIREWORKS_API_KEY environment variable is not set.")
@@ -38,7 +38,7 @@ def check_environment():
     return True
 
 
-def check_agent_environment(test_mode=False):
+def check_agent_environment(test_mode: bool = False) -> bool:
     """Check if required environment variables are set for agent evaluation commands."""
     missing_vars = []
     if not os.environ.get("MODEL_AGENT"):

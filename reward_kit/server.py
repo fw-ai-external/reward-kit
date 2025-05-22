@@ -66,7 +66,7 @@ class RewardServer:
         # Register the endpoints
         self._setup_routes()
 
-    def _load_function(self):
+    def _load_function(self) -> Callable[..., Any]:
         """Load the reward function from the provided path."""
         try:
             if ":" not in self.func_path:
@@ -85,11 +85,11 @@ class RewardServer:
                 f"Failed to load function from path {self.func_path}: {str(e)}"
             )
 
-    def _setup_routes(self):
+    def _setup_routes(self) -> None:
         """Set up the API routes."""
 
         @self.app.get("/")
-        async def root():
+        async def root() -> Dict[str, Any]:
             """Get server info."""
             return {
                 "status": "ok",
@@ -98,7 +98,7 @@ class RewardServer:
             }
 
         @self.app.post("/reward")
-        async def reward(request: RewardRequest):
+        async def reward(request: RewardRequest) -> Dict[str, Any]:
             """
             Get reward score for messages.
 
@@ -154,17 +154,17 @@ class RewardServer:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.get("/health")
-        async def health():
+        async def health() -> Dict[str, str]:
             """Health check endpoint."""
             return {"status": "ok"}
 
-    def run(self):
+    def run(self) -> None:
         """Run the server."""
         logger.info(f"Starting reward server on {self.host}:{self.port}")
         uvicorn.run(self.app, host=self.host, port=self.port)
 
 
-def serve(func_path: str, host: str = "0.0.0.0", port: int = 8000):
+def serve(func_path: str, host: str = "0.0.0.0", port: int = 8000) -> None:
     """
     Serve a reward function as an HTTP API.
 
@@ -177,7 +177,7 @@ def serve(func_path: str, host: str = "0.0.0.0", port: int = 8000):
     server.run()
 
 
-def serve_tunnel(func_path: str, port: int = 8000):
+def serve_tunnel(func_path: str, port: int = 8000) -> None:
     """
     Serve a reward function with an ngrok tunnel.
 
@@ -224,12 +224,12 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Change
     app = FastAPI(title="Reward Function Server")
 
     @app.get("/")
-    async def root():
+    async def root() -> Dict[str, Any]:
         """Get server info."""
         return {"status": "ok", "endpoints": ["/reward"]}
 
     @app.post("/reward")
-    async def reward(request_data: RewardRequest):
+    async def reward(request_data: RewardRequest) -> Dict[str, Any]:
         """
         Get reward score for messages.
 
@@ -292,7 +292,7 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Change
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/health")
-    async def health():
+    async def health() -> Dict[str, str]:
         """Health check endpoint."""
         return {"status": "ok"}
 

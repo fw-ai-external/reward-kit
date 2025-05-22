@@ -1,6 +1,6 @@
 """Implementation of GorillaFileSystem."""
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Any
 
 # No TYPE_CHECKING block needed if using string literals consistently.
 
@@ -15,10 +15,10 @@ class File:
         self.content: str = content
         self.parent: Optional["Directory"] = parent
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<File: {self.name}, Content: '{self.content[:20]}{'...' if len(self.content) > 20 else ''}'>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, File):
             return False
         return self.name == other.name and self.content == other.content
@@ -37,11 +37,11 @@ class Directory:
         self.parent: Optional["Directory"] = parent  # Changed to string literal
         self.contents: Dict[str, Union[File, Directory]] = contents or {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         parent_name = self.parent.name if self.parent else None
         return f"<Directory: {self.name}, Parent: {parent_name}, Keys: {list(self.contents.keys())}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Directory):
             return False
         return self.name == other.name and self.contents == other.contents
@@ -50,12 +50,12 @@ class Directory:
 class GorillaFileSystem:
     """A file system for BFCL evaluation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.root: Directory = Directory(name="workspace", parent=None)
         self.current_dir: Directory = self.root
         self.long_context: bool = False
 
-    def _load_scenario(self, config: Dict):
+    def _load_scenario(self, config: Dict[str, Any]) -> None:
         """Load the file system from configuration."""
         # self.root and self.current_dir are already initialized.
         # We will only overwrite them if loading is successful.

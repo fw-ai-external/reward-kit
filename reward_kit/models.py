@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, KeysView, Iterator
 
 # Import OpenAI message types
 # from openai.types.chat import ChatCompletionMessageParam # Unused import
@@ -23,7 +23,7 @@ class Message(BaseModel):
 
     # Model validators
     @classmethod
-    def model_validate(cls, obj, *args, **kwargs):
+    def model_validate(cls, obj: Any, *args: Any, **kwargs: Any) -> "Message":
         if isinstance(obj, dict) and "role" not in obj:
             raise ValueError("Role is required")
         return super().model_validate(obj, *args, **kwargs)
@@ -56,21 +56,21 @@ class MetricResult(BaseModel):
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         return self.__fields__.keys()  # Changed to __fields__
 
-    def values(self):
+    def values(self) -> List[Any]:
         # For consistency with __getitem__ returning raw attribute values (including nested models)
         return [
             getattr(self, key) for key in self.__fields__.keys()
         ]  # Changed to __fields__
 
-    def items(self):
+    def items(self) -> List[tuple[str, Any]]:
         return [
             (key, getattr(self, key)) for key in self.__fields__.keys()
         ]  # Changed to __fields__
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.__fields__.keys())  # Changed to __fields__
 
 
@@ -107,21 +107,21 @@ class EvaluateResult(BaseModel):
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         return self.__fields__.keys()  # Changed to __fields__
 
-    def values(self):
+    def values(self) -> List[Any]:
         # For consistency with __getitem__ returning raw attribute values
         return [
             getattr(self, key) for key in self.__fields__.keys()
         ]  # Changed to __fields__
 
-    def items(self):
+    def items(self) -> List[tuple[str, Any]]:
         return [
             (key, getattr(self, key)) for key in self.__fields__.keys()
         ]  # Changed to __fields__
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.__fields__.keys())  # Changed to __fields__
 
 

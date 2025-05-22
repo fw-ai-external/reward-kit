@@ -1,4 +1,5 @@
 """
+import aiohttp
 C/C++ code execution reward functions for evaluating C/C++ code correctness.
 
 This module provides functions to evaluate the correctness of C/C++ code by:
@@ -59,7 +60,7 @@ class PistonClient:
         self.timeout = timeout
 
     @property
-    def session(self):
+    def session(self) -> aiohttp.ClientSession:
         if self._session is None:
             self._session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(sock_read=self.timeout),
@@ -71,7 +72,7 @@ class PistonClient:
             )
         return self._session
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the session."""
         if self._session:
             await self._session.close()

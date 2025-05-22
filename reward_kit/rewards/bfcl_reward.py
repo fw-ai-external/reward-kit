@@ -14,7 +14,7 @@ logger.setLevel(logging.DEBUG)  # Ensure debug logs are processed
 
 
 # Helper functions adapted from BfclRubric (copied here)
-def _parse_function_call(func_call_str: str):
+def _parse_function_call(func_call_str: str) -> Dict[str, Any]:
     """
     Parses a function call string into a JSON-like dictionary.
 

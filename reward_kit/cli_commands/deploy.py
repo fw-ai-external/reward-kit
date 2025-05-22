@@ -1,4 +1,6 @@
 """
+import argparse
+from typing import Optional
 CLI command for creating and deploying an evaluator,
 or registering a pre-deployed remote evaluator.
 """
@@ -16,7 +18,7 @@ from .common import check_environment
 # from reward_kit.evaluation import register_remote_evaluator_url
 
 
-def deploy_command(args):
+def deploy_command(args: argparse.Namespace) -> Optional[int]:
     """Create and deploy an evaluator or register a remote one."""
 
     # Check environment variables

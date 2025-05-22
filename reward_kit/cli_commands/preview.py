@@ -1,4 +1,6 @@
 """
+import argparse
+from typing import Optional
 CLI command for previewing an evaluator.
 """
 
@@ -24,7 +26,7 @@ from .common import (
 )
 
 
-def preview_command(args):
+def preview_command(args: argparse.Namespace) -> Optional[int]:
     """Preview an evaluator with sample data"""
 
     # Check environment variables

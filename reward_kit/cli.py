@@ -156,6 +156,59 @@ def parse_args(args=None):
         help="URL of a pre-deployed remote reward function. If provided, deploys by registering this URL with Fireworks AI.",
     )
 
+    # GCP deployment options
+    gcp_group = deploy_parser.add_argument_group(
+        "GCP Cloud Run Deployment Options (used if --target is gcp-cloud-run)"
+    )
+    gcp_group.add_argument(
+        "--target",
+        choices=["fireworks", "gcp-cloud-run"],
+        default="fireworks",
+        help="Deployment target. 'fireworks' for standard deployment, 'gcp-cloud-run' for deploying to Google Cloud Run.",
+    )
+    gcp_group.add_argument(
+        "--function-ref",
+        help="Reference to the reward function to deploy (e.g., 'examples.gcp_cloud_run_deployment_example.dummy_rewards.hello_world_reward'). Required for gcp-cloud-run target.",
+    )
+    gcp_group.add_argument(
+        "--gcp-project",
+        required=False,
+        help="Google Cloud Project ID. Must be provided via CLI or rewardkit.yaml.",
+    )
+    gcp_group.add_argument(
+        "--gcp-region",
+        required=False,
+        help="Google Cloud Region for deployment (e.g., 'us-central1'). Must be provided via CLI or rewardkit.yaml.",
+    )
+    gcp_group.add_argument(
+        "--gcp-ar-repo",
+        required=False,
+        help="Google Artifact Registry repository name. Optional, defaults to value in rewardkit.yaml or 'reward-kit-evaluators' if not specified.",
+    )
+    gcp_group.add_argument(
+        "--service-account",
+        help="Email of the GCP service account to run the Cloud Run service. Optional.",
+    )
+    gcp_group.add_argument(
+        "--entry-point",
+        default="reward_function",
+        help="The name of the entry point function within your --function-ref module (default: reward_function). Only for gcp-cloud-run.",
+    )
+    gcp_group.add_argument(
+        "--runtime",
+        default="python311",  # Or a sensible default
+        help="The Cloud Functions/Run runtime (e.g., python311). Only for gcp-cloud-run.",
+    )
+    gcp_group.add_argument(
+        "--gcp-auth-mode",
+        choices=["open", "api-key"],  # Add 'iam' later
+        default=None,  # Default will be resolved in deploy_command
+        help="Authentication mode for the deployed GCP Cloud Run service. "
+        "'open': Publicly accessible. "
+        "'api-key': Service is publicly accessible but requires an API key in requests (handled by the application). "
+        "If not specified, defaults to value in rewardkit.yaml or 'api-key'. Optional.",
+    )
+
     # Agent-eval command
     agent_eval_parser = subparsers.add_parser(
         "agent-eval", help="Run agent evaluation using the ForkableResource framework."
@@ -196,6 +249,17 @@ def parse_args(args=None):
 
 def main():
     """Main entry point for the CLI"""
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(override=True)  # Load .env file, overriding existing shell env vars
+        # print("INFO: .env file loaded if present.") # Optional: for debugging .env loading
+    except ImportError:
+        # python-dotenv not installed, proceed without it.
+        # Consider logging a warning if .env support is considered core.
+        pass
+        # print("INFO: python-dotenv not found, .env file will not be loaded.")
+
     args = parse_args()
     # Setup logging based on global verbose/debug flags if they exist on args,
     # or command-specific if not. getattr is good for this.

@@ -85,7 +85,18 @@ class TestCLI:
         args.huggingface_prompt_key = "prompt"
         args.huggingface_response_key = "response"
         args.huggingface_key_map = None
-        args.remote_url = None  # Added for compatibility with updated deploy_command
+        args.remote_url = None
+
+        # Add attributes accessed by deploy_command, with defaults for non-GCP target
+        args.target = "fireworks"  # Explicitly set for this local mode test
+        args.function_ref = None
+        args.gcp_project = None
+        args.gcp_region = None
+        args.gcp_ar_repo = None
+        args.service_account = None
+        args.entry_point = "reward_function"  # Default from parser
+        args.runtime = "python311"  # Default from parser
+        args.gcp_auth_mode = None  # Default from parser
 
         # For local deploy, metrics_folders is required. This is checked inside deploy_command.
         # The test_parse_args in test_cli_args.py covers parser-level requirement changes.
@@ -105,6 +116,7 @@ class TestCLI:
             huggingface_message_key_map=None,  # This is derived from args.huggingface_key_map
             huggingface_prompt_key="prompt",
             huggingface_response_key="response",
+            # remote_url=None removed as it relies on default
         )
 
     @patch("reward_kit.cli_commands.deploy.check_environment", return_value=False)
@@ -139,7 +151,16 @@ class TestCLI:
         deploy_args.huggingface_prompt_key = "prompt"
         deploy_args.huggingface_response_key = "response"
         deploy_args.huggingface_key_map = None
-        deploy_args.remote_url = None  # Added for compatibility
+        deploy_args.remote_url = None
+        deploy_args.target = "fireworks"  # Ensure target is set
+        deploy_args.function_ref = None
+        deploy_args.gcp_project = None
+        deploy_args.gcp_region = None
+        deploy_args.gcp_ar_repo = None
+        deploy_args.service_account = None
+        deploy_args.entry_point = "reward_function"
+        deploy_args.runtime = "python311"
+        deploy_args.gcp_auth_mode = None
 
         # Mock Path.exists for preview_args if it uses samples file
         with patch("reward_kit.cli_commands.preview.Path.exists", return_value=True):

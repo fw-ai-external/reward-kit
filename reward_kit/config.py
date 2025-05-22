@@ -16,11 +16,16 @@ CONFIG_FILE_NAME = "rewardkit.yaml"
 
 
 class GCPCloudRunConfig(BaseModel):
-    project_id: Optional[str] = None
-    region: Optional[str] = None
+    project_id: Optional[str] = (
+        None  # Default will be applied in deploy_command if not set
+    )
+    region: Optional[str] = None  # Default will be applied in deploy_command if not set
+    artifact_registry_repository: Optional[str] = (
+        None  # Default will be applied in deploy_command
+    )
     service_name_template: Optional[str] = "rewardeval-{evaluator_id}"
     default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = (
-        "api-key"
+        "api-key"  # Default auth mode if using GCP target and not specified
     )
     secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to GCP Secret Manager ID
 

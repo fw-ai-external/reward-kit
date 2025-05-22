@@ -4,8 +4,8 @@ CLI command for previewing an evaluator.
 
 import json
 import sys  # For sys.exit
-from typing import Any, Dict, Iterator, List, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import requests  # For making HTTP requests
 

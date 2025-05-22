@@ -84,7 +84,11 @@ def main():
         )
         logger.debug("Attempting to call preview_evaluation...")
 
-        preview_result = preview_evaluation(**eval_params)
+        preview_result = preview_evaluation(
+            sample_file=sample_file_path,
+            metric_folders=[f"exact_match_metric={metric_folder_path}"],
+            max_samples=5,
+        )
 
         logger.debug("preview_evaluation call completed.")
         logger.info("preview_evaluation call successful.")

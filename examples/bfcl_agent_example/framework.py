@@ -45,8 +45,8 @@ class BFCLResource:
         Args:
             package_name: Optional package name for imports (defaults to current package)
         """
-        self._env_instances = {}
-        self._initial_config = {}
+        self._env_instances: Dict[str, Any] = {}
+        self._initial_config: Dict[str, Any] = {}
         self._package_name = package_name or ".".join(__name__.split(".")[:-1])
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
 
@@ -358,9 +358,9 @@ class BFCLOrchestrator:
         self.resource = resource_class()
 
         # Initialize state
-        self.conversation_history = []
-        self.tool_calls_history = []
-        self.current_states = []
+        self.conversation_history: List[Dict[str, Any]] = []
+        self.tool_calls_history: List[Dict[str, Any]] = []
+        self.current_states: List[Any] = []
         self.model = os.environ.get("MODEL_AGENT", "openai/gpt-4")
 
     async def setup(self) -> bool:

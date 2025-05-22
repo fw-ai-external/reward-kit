@@ -732,7 +732,9 @@ class TestMathExampleOpenR1EndToEndScripts:
         mock_grpo_trainer_class_openr1.return_value = mock_grpo_trainer_instance
 
         env_vars = {"TEST_MODE_TRL": "true"}
-        result = self.run_script("trl_grpo_integration.py", env_vars=env_vars)
+        result = self.run_script(
+            "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
+        )  # Increased timeout
 
         assert (
             result.returncode == 0

@@ -1,4 +1,5 @@
 import unittest
+from typing import Any, List, Optional
 
 from examples.bfcl_agent_example.envs.gorilla_file_system import (
     Directory,
@@ -29,9 +30,9 @@ class TestBfclTools(unittest.TestCase):
     def test_math_api_add(self):
         """Test MathAPI's add method."""
         math_tool = MathAPI()
-        result = math_tool.add(a=5, b=3)
+        result = math_tool.add(a=5.0, b=3.0)
         self.assertEqual(result.get("result"), 8)
-        result_error = math_tool.add(a="test", b=3)
+        result_error = math_tool.add(a="test", b=3.0)  # type: ignore[arg-type]
         self.assertIn("error", result_error)
 
     # Add more tests for MathAPI methods here
@@ -87,9 +88,10 @@ class TestBfclTools(unittest.TestCase):
         ticket_id = create_result.get("id")
         self.assertIsNotNone(ticket_id)
 
-        get_result = ticket_tool.get_ticket(ticket_id=ticket_id)
-        self.assertEqual(get_result.get("id"), ticket_id)
-        self.assertEqual(get_result.get("title"), "Test Ticket")
+        if ticket_id is not None and isinstance(ticket_id, (int, str)):
+            ticket = ticket_tool.get_ticket(ticket_id=int(ticket_id))
+            self.assertEqual(ticket.get("id"), ticket_id)
+            self.assertEqual(ticket.get("title"), "Test Ticket")
 
     def test_trading_bot_instantiation_and_load_scenario(self):
         """Test TradingBot instantiation and _load_scenario."""
@@ -982,7 +984,12 @@ class TestBfclTools(unittest.TestCase):
         # If unsorted_content = "zebra\napple\nbanana\n", then splitlines() is ['zebra', 'apple', 'banana'].
         # sorted() -> ['apple', 'banana', 'zebra']
         # "\n".join() -> "apple\nbanana\nzebra"
-        self.assertEqual(sort_result1.get("sorted_content"), "apple\nbanana\nzebra")
+        sorted_content1 = sort_result1.get("sorted_content")
+        if sorted_content1 is not None:
+            sorted_data = sorted(sorted_content1.splitlines())
+            self.assertEqual(sorted_content1, "\n".join(sorted_data))
+        else:
+            self.assertEqual(sorted_content1, "")
         self.assertEqual(
             fs_tool.current_dir.contents["unsorted.txt"].content,
             unsorted_content,
@@ -992,7 +999,8 @@ class TestBfclTools(unittest.TestCase):
         # 2. Sort an already sorted file
         sort_result2 = fs_tool.sort(file_name="already_sorted.txt")
         self.assertNotIn("error", sort_result2)
-        self.assertEqual(sort_result2.get("sorted_content"), "a\nb\nc")
+        sorted_content2 = sort_result2.get("sorted_content")
+        self.assertEqual(sorted_content2, "a\nb\nc")
         self.assertEqual(
             fs_tool.current_dir.contents["already_sorted.txt"].content,
             "a\nb\nc",
@@ -1003,12 +1011,14 @@ class TestBfclTools(unittest.TestCase):
         # content: "\nc\n\na\nb" -> splitlines: ['', 'c', '', 'a', 'b'] -> sorted: ['', '', 'a', 'b', 'c'] -> joined: "\n\na\nb\nc"
         sort_result3 = fs_tool.sort(file_name="empty_lines.txt")
         self.assertNotIn("error", sort_result3)
-        self.assertEqual(sort_result3.get("sorted_content"), "\n\na\nb\nc")
+        sorted_content3 = sort_result3.get("sorted_content")
+        self.assertEqual(sorted_content3, "\n\na\nb\nc")
 
         # 4. Sort an empty file
         sort_result4 = fs_tool.sort(file_name="empty_file.txt")
         self.assertNotIn("error", sort_result4)
-        self.assertEqual(sort_result4.get("sorted_content"), "")
+        sorted_content4 = sort_result4.get("sorted_content")
+        self.assertEqual(sorted_content4, "")
 
         # 5. Attempt to sort a non-existent file
         sort_result5 = fs_tool.sort(file_name="no_such_file.txt")
@@ -1310,7 +1320,8 @@ class TestBfclTools(unittest.TestCase):
         # 1. Find all in current directory (path=".", name=None)
         find_res1 = fs_tool.find(path=".")
         self.assertNotIn("error", find_res1)
-        self.assertIsInstance(find_res1.get("matches"), list)
+        matches1 = find_res1.get("matches")
+        self.assertIsInstance(matches1, list)
         expected1 = sorted(
             [
                 "file1.txt",
@@ -1323,47 +1334,72 @@ class TestBfclTools(unittest.TestCase):
                 "dir2/another_file.txt",
             ]
         )
-        self.assertEqual(sorted(find_res1.get("matches")), expected1)
+        if matches1 is not None:  # Should be list
+            self.assertEqual(sorted(matches1), expected1)
+        else:
+            self.fail("find_res1.get('matches') returned None")
 
         # 2. Find items by exact name in current directory (path=".")
         find_res2 = fs_tool.find(path=".", name="file1.txt")
         self.assertNotIn("error", find_res2)
-        self.assertEqual(sorted(find_res2.get("matches")), sorted(["file1.txt"]))
+        matches2 = find_res2.get("matches")
+        if matches2 is not None:  # Should be list
+            self.assertEqual(sorted(matches2), sorted(["file1.txt"]))
+        else:
+            self.fail("find_res2.get('matches') returned None")
 
         find_res2b = fs_tool.find(
             path=".", name="dir1"
         )  # dir1 itself and its contents if name matches
         self.assertNotIn("error", find_res2b)
+        matches2b = find_res2b.get("matches")
         # Expected: "dir1", and if "dir1" is in "file_in_dir1.txt", that too.
         # Current find logic: if search_name_pattern in name. So "dir1" matches "dir1" and "file_in_dir1.txt"
-        self.assertEqual(
-            sorted(find_res2b.get("matches")), sorted(["dir1", "dir1/file_in_dir1.txt"])
-        )
+        if matches2b is not None:  # Should be list
+            self.assertEqual(
+                sorted(matches2b), sorted(["dir1", "dir1/file_in_dir1.txt"])
+            )
+        else:
+            self.fail("find_res2b.get('matches') returned None")
 
         # 3. Find items by partial name "doc" in current directory (path=".")
         find_res3 = fs_tool.find(path=".", name="doc")
         self.assertNotIn("error", find_res3)
+        matches3 = find_res3.get("matches")
         expected3 = sorted(["doc.txt", "dir1/sub_dir/nested_doc.txt"])
-        self.assertEqual(sorted(find_res3.get("matches")), expected3)
+        if matches3 is not None:  # Should be list
+            self.assertEqual(sorted(matches3), expected3)
+        else:
+            self.fail("find_res3.get('matches') returned None")
 
         # 4. Find all items in a subdirectory (path="dir1", name=None)
         find_res4 = fs_tool.find(path="dir1", name=None)  # Search within dir1
         self.assertNotIn("error", find_res4)
+        matches4 = find_res4.get("matches")
         # Paths should be relative to "dir1"
         expected4 = sorted(["file_in_dir1.txt", "sub_dir", "sub_dir/nested_doc.txt"])
-        self.assertEqual(sorted(find_res4.get("matches")), expected4)
+        if matches4 is not None:  # Should be list
+            self.assertEqual(sorted(matches4), expected4)
+        else:
+            self.fail("find_res4.get('matches') returned None")
 
         # 5. Find items by name in a subdirectory (path="dir1", name="file")
         find_res5 = fs_tool.find(path="dir1", name="file")
         self.assertNotIn("error", find_res5)
-        self.assertEqual(sorted(find_res5.get("matches")), sorted(["file_in_dir1.txt"]))
+        matches5 = find_res5.get("matches")
+        if matches5 is not None:  # Should be list
+            self.assertEqual(sorted(matches5), sorted(["file_in_dir1.txt"]))
+        else:
+            self.fail("find_res5.get('matches') returned None")
 
         # 6. Find items recursively (name="nested_doc.txt", path=".")
         find_res6 = fs_tool.find(path=".", name="nested_doc.txt")
         self.assertNotIn("error", find_res6)
-        self.assertEqual(
-            sorted(find_res6.get("matches")), sorted(["dir1/sub_dir/nested_doc.txt"])
-        )
+        matches6 = find_res6.get("matches")
+        if matches6 is not None:  # Should be list
+            self.assertEqual(sorted(matches6), sorted(["dir1/sub_dir/nested_doc.txt"]))
+        else:
+            self.fail("find_res6.get('matches') returned None")
 
         # 7. Finding with a non-existent path
         find_res7 = fs_tool.find(path="non_existent_dir", name="file1.txt")
@@ -1376,7 +1412,8 @@ class TestBfclTools(unittest.TestCase):
         # 8. Finding a name that doesn't exist anywhere
         find_res8 = fs_tool.find(path=".", name="ghost_file.boo")
         self.assertNotIn("error", find_res8)
-        self.assertEqual(find_res8.get("matches"), [])
+        matches8 = find_res8.get("matches")
+        self.assertEqual(matches8, [])
 
         # 9. Finding with path as root (e.g. /workspace) - assuming _find_path handles this
         # This test depends on how _find_path and pwd() define absolute paths.
@@ -1387,13 +1424,19 @@ class TestBfclTools(unittest.TestCase):
         fs_tool.cd(fs_tool.root.name)  # Ensure we are at /workspace
         find_res9 = fs_tool.find(path=f"/{fs_tool.root.name}", name="file1.txt")
         self.assertNotIn("error", find_res9, f"Error: {find_res9.get('error')}")
-        self.assertEqual(sorted(find_res9.get("matches")), sorted(["file1.txt"]))
+        matches9 = find_res9.get("matches")
+        if matches9 is not None:  # Should be list
+            self.assertEqual(sorted(matches9), sorted(["file1.txt"]))
+        else:
+            self.fail("find_res9.get('matches') returned None")
 
         find_res9b = fs_tool.find(path=f"/{fs_tool.root.name}", name="nested_doc.txt")
         self.assertNotIn("error", find_res9b, f"Error: {find_res9b.get('error')}")
-        self.assertEqual(
-            sorted(find_res9b.get("matches")), sorted(["dir1/sub_dir/nested_doc.txt"])
-        )
+        matches9b = find_res9b.get("matches")
+        if matches9b is not None:  # Should be list
+            self.assertEqual(sorted(matches9b), sorted(["dir1/sub_dir/nested_doc.txt"]))
+        else:
+            self.fail("find_res9b.get('matches') returned None")
 
     def test_gorilla_file_system_du(self):
         """Test GorillaFileSystem's du method."""

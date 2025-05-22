@@ -498,7 +498,7 @@ class DockerResource(ForkableResource):
                     NotFound
                 ):  # Original image name might not be an ID, or might have been removed.
                     self._cleanup_image(self._image_id_for_fork_or_checkpoint)
-            else: # original_base_image_name IS None
+            else:  # original_base_image_name IS None
                 # If original_base_image_name is None, but _image_id_for_fork_or_checkpoint is set
                 # (and different from None, due to the outer if), then it's an image to clean up.
                 if self._image_id_for_fork_or_checkpoint:

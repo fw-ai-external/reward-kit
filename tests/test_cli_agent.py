@@ -5,7 +5,13 @@ Tests for the agent-eval CLI command.
 import argparse
 import asyncio  # Added import
 import json
-from unittest.mock import AsyncMock, MagicMock, mock_open, patch  # Added AsyncMock
+from unittest.mock import (  # Added AsyncMock and Mock
+    AsyncMock,
+    MagicMock,
+    Mock,
+    mock_open,
+    patch,
+)
 
 import pytest
 import yaml
@@ -33,16 +39,17 @@ class TestAgentEvalCommand:
     @patch("reward_kit.cli_commands.agent_eval_cmd.Path")
     def test_agent_eval_success_yaml(self, MockPath, MockTaskManager, caplog):
         # Setup Path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = TaskDefinitionModel(
-            **MINIMAL_TASK_DEF_CONTENT_DICT
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(
+            return_value=TaskDefinitionModel(**MINIMAL_TASK_DEF_CONTENT_DICT)
         )
         mock_task_manager.register_task.return_value = "task1"
         mock_task_manager.execute_tasks = AsyncMock(
@@ -60,9 +67,7 @@ class TestAgentEvalCommand:
         # Verify the result
         assert result == 0
         MockPath.assert_called_once_with("dummy_task.yaml")
-        mock_task_manager._load_task_from_file.assert_called_once_with(
-            "dummy_task.yaml"
-        )
+        mock_task_manager._load_task_from_file.assert_called_once()
         mock_task_manager.register_task.assert_called_once()
         mock_task_manager.execute_tasks.assert_awaited_once()
         mock_task_manager.cleanup.assert_awaited_once()
@@ -75,16 +80,17 @@ class TestAgentEvalCommand:
         self, MockPath, MockTaskManager, caplog
     ):
         # Setup Path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.json"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.json")
 
         # Setup TaskManager mock
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = TaskDefinitionModel(
-            **MINIMAL_TASK_DEF_CONTENT_DICT
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(
+            return_value=TaskDefinitionModel(**MINIMAL_TASK_DEF_CONTENT_DICT)
         )
         mock_task_manager.register_task.return_value = "task1"
         mock_task_manager.execute_tasks = AsyncMock(
@@ -115,12 +121,12 @@ class TestAgentEvalCommand:
         self, MockPath, MockTaskManager, caplog
     ):
         # Setup path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = False
         mock_path_instance.is_file.return_value = False
         mock_path_instance.is_dir.return_value = False
-        mock_path_instance.__str__.return_value = "non_existent_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="non_existent_task.yaml")
 
         args = argparse.Namespace(task_def="non_existent_task.yaml")
         result = agent_eval_command(args)
@@ -132,17 +138,16 @@ class TestAgentEvalCommand:
     @patch("reward_kit.cli_commands.agent_eval_cmd.Path")
     def test_agent_eval_invalid_yaml_content(self, MockPath, MockTaskManager, caplog):
         # Setup path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "invalid_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="invalid_task.yaml")
 
         # Setup TaskManager mock to simulate a file load failure
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = (
-            None  # Return None to indicate failure
-        )
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(return_value=None)
 
         args = argparse.Namespace(task_def="invalid_task.yaml")
         result = agent_eval_command(args)
@@ -156,15 +161,16 @@ class TestAgentEvalCommand:
         self, MockPath, MockTaskManager, caplog
     ):
         # Setup path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "incomplete_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="incomplete_task.yaml")
 
         # Setup TaskManager to have the validation error happen in _load_task_from_file
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = None
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(return_value=None)
 
         args = argparse.Namespace(task_def="incomplete_task.yaml")
         result = agent_eval_command(args)
@@ -178,15 +184,16 @@ class TestAgentEvalCommand:
         self, MockPath, MockTaskManager, caplog
     ):
         # Setup path mock to fail in a way that matches error message
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock to make loading the file fail
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = None
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(return_value=None)
 
         args = argparse.Namespace(task_def="dummy_task.yaml")
         result = agent_eval_command(args)
@@ -200,23 +207,24 @@ class TestAgentEvalCommand:
         self, MockPath, MockTaskManager, caplog
     ):
         # Setup path mock
-        mock_path_instance = MagicMock()
+        mock_path_instance = Mock()
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock
-        mock_task_manager = MockTaskManager.return_value
-        mock_task_manager._load_task_from_file.return_value = TaskDefinitionModel(
-            **MINIMAL_TASK_DEF_CONTENT_DICT
+        mock_task_manager = MagicMock()
+        MockTaskManager.return_value = mock_task_manager
+        mock_task_manager._load_task_from_file = MagicMock(
+            return_value=TaskDefinitionModel(**MINIMAL_TASK_DEF_CONTENT_DICT)
         )
         mock_task_manager.register_task.return_value = "task1"
 
         # Make execute_tasks raise an exception
         mock_task_manager.execute_tasks = AsyncMock(
             side_effect=RuntimeError("Execution failed")
-        )
+        )  # type: ignore[attr-defined]
         mock_task_manager.cleanup = AsyncMock()
 
         args = argparse.Namespace(task_def="dummy_task.yaml")

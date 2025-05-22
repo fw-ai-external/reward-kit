@@ -4,6 +4,7 @@ CLI command for previewing an evaluator.
 
 import json
 import sys  # For sys.exit
+from typing import Any, Dict, Iterator, List, Optional, Union
 from pathlib import Path
 
 import requests  # For making HTTP requests
@@ -76,7 +77,7 @@ def preview_command(args):
 
         evaluate_endpoint = f"{args.remote_url.rstrip('/')}/evaluate"
 
-        samples_iterator = []
+        samples_iterator: Union[List[Any], Iterator[Dict[str, Any]]] = []
         try:
             if args.samples:
                 # Assuming load_samples_from_file yields dicts with "messages" and optional "ground_truth"

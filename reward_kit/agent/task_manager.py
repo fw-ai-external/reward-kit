@@ -58,7 +58,7 @@ class TaskManager:
         Returns:
             task_ids: List of task IDs that were successfully registered
         """
-        task_ids = []
+        task_ids: List[str] = []
         dir_path = Path(directory_path)
 
         if not dir_path.exists() or not dir_path.is_dir():
@@ -221,7 +221,7 @@ class TaskManager:
             self.logger.error("No valid tasks to execute.")
             return {}
 
-        results = {}
+        results: Dict[str, Any] = {}
 
         if parallel and len(valid_task_ids) > 1:
             # Execute tasks in parallel with concurrency limit

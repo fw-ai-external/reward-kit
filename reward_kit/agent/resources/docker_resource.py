@@ -486,14 +486,20 @@ class DockerResource(ForkableResource):
         ):
             # Check if the image ID is a full ID or a tag like the original.
             # This check might need refinement if original_base_image_name is an ID itself.
-            try:
-                img_obj = self._client.images.get(original_base_image_name)
-                if img_obj.id != self._image_id_for_fork_or_checkpoint:
+            if original_base_image_name is not None:
+                try:
+                    img_obj = self._client.images.get(original_base_image_name)
+                    if img_obj.id != self._image_id_for_fork_or_checkpoint:
+                        self._cleanup_image(self._image_id_for_fork_or_checkpoint)
+                except (
+                    NotFound
+                ):  # Original image name might not be an ID, or might have been removed.
                     self._cleanup_image(self._image_id_for_fork_or_checkpoint)
-            except (
-                NotFound
-            ):  # Original image name might not be an ID, or might have been removed.
-                self._cleanup_image(self._image_id_for_fork_or_checkpoint)
+            else: # original_base_image_name IS None
+                # If original_base_image_name is None, but _image_id_for_fork_or_checkpoint is set
+                # (and different from None, due to the outer if), then it's an image to clean up.
+                if self._image_id_for_fork_or_checkpoint:
+                    self._cleanup_image(self._image_id_for_fork_or_checkpoint)
 
         self._image_id_for_fork_or_checkpoint = None
         self._is_closed = True

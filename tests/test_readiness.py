@@ -241,6 +241,16 @@ class TestMathExampleEndToEndScripts:
         ]  # Use sys.executable to ensure correct python version
 
         current_env = os.environ.copy()
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        existing_pythonpath = current_env.get("PYTHONPATH")
+        if existing_pythonpath:
+            current_env["PYTHONPATH"] = (
+                f"{project_root}{os.pathsep}{existing_pythonpath}"
+            )
+        else:
+            current_env["PYTHONPATH"] = project_root
+
         if env_vars:
             current_env.update(env_vars)
 
@@ -349,14 +359,12 @@ class TestMathExampleEndToEndScripts:
     @pytest.mark.timeout(
         630
     )  # Timeout for test function (slightly > subprocess timeout)
-    @patch("examples.math_example.trl_grpo_integration.GRPOTrainer")
+    @patch("trl.GRPOTrainer")
     @patch("peft.get_peft_model")
     @patch("transformers.AutoModelForCausalLM.from_pretrained")
     @patch("transformers.AutoTokenizer.from_pretrained")
     @patch("datasets.Dataset.from_list")  # Mock dataset loading
-    @patch(
-        "examples.math_example.trl_grpo_integration.Dataset.map"
-    )  # Mock dataset map where it's used
+    @patch("datasets.Dataset.map")  # Mock dataset map where it's used
     def test_e2e_trl_grpo_integration_script(
         self,
         mock_dataset_map,  # New mock
@@ -478,6 +486,16 @@ class TestMathExampleOpenR1EndToEndScripts:
         ]
 
         current_env = os.environ.copy()
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        existing_pythonpath = current_env.get("PYTHONPATH")
+        if existing_pythonpath:
+            current_env["PYTHONPATH"] = (
+                f"{project_root}{os.pathsep}{existing_pythonpath}"
+            )
+        else:
+            current_env["PYTHONPATH"] = project_root
+
         if env_vars:
             current_env.update(env_vars)
 
@@ -536,9 +554,7 @@ class TestMathExampleOpenR1EndToEndScripts:
             "E2E Test: Math Example OpenR1 - fireworks_preview.py (Mocked API via Env Var): PASSED"
         )
 
-    @patch(
-        "examples.math_example_openr1.fireworks_regenerate.aiohttp.ClientSession.post"
-    )  # Corrected patch target
+    @patch("aiohttp.ClientSession.post")  # Corrected patch target
     def test_e2e_fireworks_regenerate_script_openr1(
         self, mock_aiohttp_post_openr1, mock_fireworks_api_key
     ):
@@ -649,12 +665,12 @@ class TestMathExampleOpenR1EndToEndScripts:
         os.environ.get("CI") == "true",
         reason="Skipping resource-intensive TRL integration test in CI",
     )
-    @patch("examples.math_example_openr1.trl_grpo_integration.GRPOTrainer")
+    @patch("trl.GRPOTrainer")
     @patch("peft.get_peft_model")
     @patch("transformers.AutoModelForCausalLM.from_pretrained")
     @patch("transformers.AutoTokenizer.from_pretrained")
     @patch("datasets.Dataset.from_list")
-    @patch("examples.math_example_openr1.trl_grpo_integration.Dataset.map")
+    @patch("datasets.Dataset.map")
     def test_e2e_trl_grpo_integration_script_openr1(
         self,
         mock_dataset_map_openr1,

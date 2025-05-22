@@ -1,6 +1,6 @@
-import json
 import os
 import sys
+import logging  # Added for new utility
 
 # Ensure reward-kit is in the path
 # This assumes the script is run from the 'examples/math_example_openr1/' directory or reward-kit is installed
@@ -8,15 +8,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
+from reward_kit.common_utils import load_jsonl  # Import the new utility
 
+# Configure basic logging if you want to see logs from load_jsonl
+# logging.basicConfig(level=logging.INFO)
 
-def load_dataset(file_path: str):
-    """Loads a JSONL dataset."""
-    dataset = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            dataset.append(json.loads(line))
-    return dataset
+# Removed local load_dataset function
 
 
 def main():
@@ -26,7 +23,7 @@ def main():
         print(f"Error: Dataset file not found at {dataset_path}")
         return
 
-    dataset = load_dataset(dataset_path)
+    dataset = load_jsonl(dataset_path)
     all_passed = True
     total_samples = len(dataset)
     passed_samples = 0

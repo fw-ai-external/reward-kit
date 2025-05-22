@@ -3,21 +3,29 @@ import os
 import signal
 import time
 import json
-import re # Added for Serveo URL parsing
-import shutil # Added for checking ssh availability
+import re  # Added for Serveo URL parsing
+import shutil  # Added for checking ssh availability
 
 try:
     import requests
+
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
 
 # Store PIDs of started processes
-managed_processes = {} # pid -> {process, command, log_file, log_file_path, env}
+managed_processes = {}  # pid -> {process, command, log_file, log_file_path, env}
 
 # NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels" # Deprecated
 
-def start_process(command: list, log_file_path: str, cwd: str = None, new_process_group: bool = True, env: dict | None = None) -> subprocess.Popen | None:
+
+def start_process(
+    command: list,
+    log_file_path: str,
+    cwd: str = None,
+    new_process_group: bool = True,
+    env: dict | None = None,
+) -> subprocess.Popen | None:
     """
     Starts a process in the background and logs its output.
     Stores the process information for later management.
@@ -34,12 +42,12 @@ def start_process(command: list, log_file_path: str, cwd: str = None, new_proces
     """
     print(f"Starting process: {' '.join(command)}")
     print(f"Logging output to: {log_file_path}")
-    
+
     # Ensure log directory exists
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-    
-    log_file = open(log_file_path, 'w')
-    
+
+    log_file = open(log_file_path, "w")
+
     process_env = os.environ.copy()
     if env:
         process_env.update(env)
@@ -50,19 +58,20 @@ def start_process(command: list, log_file_path: str, cwd: str = None, new_proces
         stderr=log_file,
         cwd=cwd if cwd else os.getcwd(),
         preexec_fn=os.setsid if (os.name != "nt" and new_process_group) else None,
-        env=process_env
+        env=process_env,
     )
-    
+
     managed_processes[process.pid] = {
         "process": process,
         "command": command,
         "log_file": log_file,
         "log_file_path": log_file_path,
-        "is_ngrok": "ngrok" in command[0], # Basic check if it's an ngrok process
-        "env": env # Store the custom env variables passed
+        "is_ngrok": "ngrok" in command[0],  # Basic check if it's an ngrok process
+        "env": env,  # Store the custom env variables passed
     }
     print(f"Process started with PID: {process.pid}")
     return process
+
 
 # --- Ngrok functions (Deprecated in favor of Serveo) ---
 # def get_ngrok_public_url(retries=5, delay=3) -> str | None:
@@ -103,7 +112,7 @@ def start_process(command: list, log_file_path: str, cwd: str = None, new_proces
 #     """
 #     print("WARNING: start_ngrok_and_get_url is deprecated. Use Serveo.net based functions.")
 #     ngrok_command = ["ngrok", "http", str(local_port), "--log=stdout"]
-    
+
 #     try:
 #         subprocess.run(["ngrok", "--version"], capture_output=True, check=True)
 #     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -121,9 +130,9 @@ def start_process(command: list, log_file_path: str, cwd: str = None, new_proces
 #         if ngrok_process and ngrok_process.pid in managed_processes:
 #             stop_process(ngrok_process.pid)
 #         return None, None
-    
+
 #     print(f"ngrok process started with PID {ngrok_process.pid}. Waiting for tunnel...")
-#     time.sleep(8) 
+#     time.sleep(8)
 
 #     public_url = get_ngrok_public_url()
 
@@ -131,11 +140,14 @@ def start_process(command: list, log_file_path: str, cwd: str = None, new_proces
 #         print("ERROR: Could not retrieve public URL from ngrok.")
 #         stop_process(ngrok_process.pid)
 #         return None, None
-    
+
 #     return ngrok_process, public_url
 # --- End of Deprecated Ngrok functions ---
 
-def start_serveo_and_get_url(local_port: int, log_file_path: str, timeout_seconds: int = 20) -> tuple[subprocess.Popen | None, str | None]:
+
+def start_serveo_and_get_url(
+    local_port: int, log_file_path: str, timeout_seconds: int = 20
+) -> tuple[subprocess.Popen | None, str | None]:
     """
     Starts Serveo.net SSH tunnel to expose a local port and retrieves its public HTTPS URL.
     The SSH process is added to managed_processes.
@@ -149,12 +161,14 @@ def start_serveo_and_get_url(local_port: int, log_file_path: str, timeout_second
         A tuple (ssh_process, public_url). (None, None) on failure.
     """
     if not shutil.which("ssh"):
-        print("ERROR: 'ssh' command not found. Please ensure OpenSSH client is installed and in your PATH.")
+        print(
+            "ERROR: 'ssh' command not found. Please ensure OpenSSH client is installed and in your PATH."
+        )
         return None, None
 
     # Ensure log directory exists
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-    
+
     # Using a temporary file for UserKnownHostsFile might be more robust on some systems than /dev/null
     # For simplicity, /dev/null is used here as specified in the plan.
     # On Windows, /dev/null equivalent is NUL.
@@ -162,10 +176,13 @@ def start_serveo_and_get_url(local_port: int, log_file_path: str, timeout_second
 
     serveo_command = [
         "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", f"UserKnownHostsFile={known_hosts_file}",
-        "-R", f"80:localhost:{local_port}",
-        "serveo.net"
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        "-R",
+        f"80:localhost:{local_port}",
+        "serveo.net",
     ]
 
     print(f"Attempting to start Serveo.net tunnel for localhost:{local_port}...")
@@ -174,78 +191,93 @@ def start_serveo_and_get_url(local_port: int, log_file_path: str, timeout_second
 
     public_url = None
     ssh_process = None
-    
+
     try:
         # We need to capture stdout to parse the URL.
         # stderr will also be captured by the same pipe.
-        log_file = open(log_file_path, 'w')
+        log_file = open(log_file_path, "w")
         ssh_process = subprocess.Popen(
             serveo_command,
-            stdout=subprocess.PIPE, # Capture stdout for parsing
-            stderr=subprocess.STDOUT, # Redirect stderr to stdout pipe
-            text=True, # Decode output as text
+            stdout=subprocess.PIPE,  # Capture stdout for parsing
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout pipe
+            text=True,  # Decode output as text
             bufsize=1,  # Line-buffered
-            universal_newlines=True, # Ensure consistent line endings
-            preexec_fn=os.setsid if os.name != "nt" else None # New process group for proper termination
+            universal_newlines=True,  # Ensure consistent line endings
+            preexec_fn=(
+                os.setsid if os.name != "nt" else None
+            ),  # New process group for proper termination
         )
 
         # Add to managed_processes early so it can be cleaned up if something goes wrong
         managed_processes[ssh_process.pid] = {
             "process": ssh_process,
             "command": serveo_command,
-            "log_file": log_file, # This log_file will store what we read from the pipe
+            "log_file": log_file,  # This log_file will store what we read from the pipe
             "log_file_path": log_file_path,
-            "is_ngrok": False 
+            "is_ngrok": False,
         }
-        print(f"Serveo SSH process started with PID: {ssh_process.pid}. Waiting for URL...")
+        print(
+            f"Serveo SSH process started with PID: {ssh_process.pid}. Waiting for URL..."
+        )
 
-        url_pattern = re.compile(r"Forwarding HTTP traffic from (https://\S+\.serveo\.net)")
-        
+        url_pattern = re.compile(
+            r"Forwarding HTTP traffic from (https://\S+\.serveo\.net)"
+        )
+
         start_time = time.time()
         if ssh_process.stdout:
-            for line in iter(ssh_process.stdout.readline, ''):
-                log_file.write(line) # Write to the main log file
+            for line in iter(ssh_process.stdout.readline, ""):
+                log_file.write(line)  # Write to the main log file
                 log_file.flush()
-                print(f"[Serveo PID {ssh_process.pid}]: {line.strip()}") # Also print to console for live feedback
-                
+                print(
+                    f"[Serveo PID {ssh_process.pid}]: {line.strip()}"
+                )  # Also print to console for live feedback
+
                 match = url_pattern.search(line)
                 if match:
                     public_url = match.group(1)
                     print(f"Found Serveo public URL: {public_url}")
-                    break # URL found
-                
+                    break  # URL found
+
                 if time.time() - start_time > timeout_seconds:
-                    print(f"ERROR: Timeout ({timeout_seconds}s) waiting for Serveo URL.")
-                    break # Timeout
-                if ssh_process.poll() is not None: # Process terminated unexpectedly
-                    print(f"ERROR: Serveo SSH process terminated unexpectedly. Check log: {log_file_path}")
+                    print(
+                        f"ERROR: Timeout ({timeout_seconds}s) waiting for Serveo URL."
+                    )
+                    break  # Timeout
+                if ssh_process.poll() is not None:  # Process terminated unexpectedly
+                    print(
+                        f"ERROR: Serveo SSH process terminated unexpectedly. Check log: {log_file_path}"
+                    )
                     break
-            
+
             # If loop exited because readline returned '', process ended.
             if ssh_process.poll() is not None and not public_url:
-                 print(f"ERROR: Serveo SSH process ended before URL was found. Check log: {log_file_path}")
+                print(
+                    f"ERROR: Serveo SSH process ended before URL was found. Check log: {log_file_path}"
+                )
 
-        else: # Should not happen if Popen was successful
+        else:  # Should not happen if Popen was successful
             print("ERROR: SSH process stdout stream not available.")
 
-
     except FileNotFoundError:
-        print("ERROR: 'ssh' command not found. Please ensure OpenSSH client is installed and in your PATH.")
+        print(
+            "ERROR: 'ssh' command not found. Please ensure OpenSSH client is installed and in your PATH."
+        )
         if ssh_process and ssh_process.pid in managed_processes:
-            stop_process(ssh_process.pid) # Clean up if partially started
+            stop_process(ssh_process.pid)  # Clean up if partially started
         return None, None
     except Exception as e:
         print(f"ERROR: An exception occurred while starting or monitoring Serveo: {e}")
         if ssh_process and ssh_process.pid in managed_processes:
-            stop_process(ssh_process.pid) # Clean up
+            stop_process(ssh_process.pid)  # Clean up
         return None, None
 
     if not public_url:
         print("ERROR: Could not retrieve public URL from Serveo.net.")
-        if ssh_process: # If process was started, try to stop it
+        if ssh_process:  # If process was started, try to stop it
             stop_process(ssh_process.pid)
         return None, None
-    
+
     # The ssh_process is kept running in the background by Popen.
     # It's up to the caller to manage its lifecycle (e.g., via stop_process or stop_all_processes).
     return ssh_process, public_url
@@ -263,23 +295,31 @@ def stop_process(pid: int):
         proc_info = managed_processes[pid]
         process = proc_info["process"]
         log_file = proc_info["log_file"]
-        command_str = ' '.join(proc_info["command"])
+        command_str = " ".join(proc_info["command"])
 
         print(f"Stopping process PID {pid} ({command_str})...")
         try:
             if os.name == "nt":
                 # For Windows, taskkill is more reliable for process trees
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], check=True, capture_output=True)
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    check=True,
+                    capture_output=True,
+                )
             else:
                 # Send SIGTERM to the entire process group
                 os.killpg(os.getpgid(pid), signal.SIGTERM)
-            
-            process.wait(timeout=5) # Wait for graceful termination
+
+            process.wait(timeout=5)  # Wait for graceful termination
             print(f"Process PID {pid} terminated gracefully.")
         except subprocess.TimeoutExpired:
             print(f"Process PID {pid} did not terminate gracefully, sending SIGKILL...")
             if os.name == "nt":
-                 subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], check=True, capture_output=True) # Force kill
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    check=True,
+                    capture_output=True,
+                )  # Force kill
             else:
                 os.killpg(os.getpgid(pid), signal.SIGKILL)
             print(f"Process PID {pid} killed.")
@@ -292,6 +332,7 @@ def stop_process(pid: int):
     else:
         print(f"Process with PID {pid} not found in managed list.")
 
+
 def stop_all_processes():
     """
     Stops all currently managed processes.
@@ -302,27 +343,29 @@ def stop_all_processes():
         stop_process(pid)
     print("All managed processes have been requested to stop.")
 
+
 if __name__ == "__main__":
-    import sys # Import sys here for sys.executable
+    import sys  # Import sys here for sys.executable
+
     # Example Usage:
     log_dir = os.path.join(os.getcwd(), "logs")
     os.makedirs(log_dir, exist_ok=True)
-    
+
     print("Starting a sample sleep process...")
     sleep_log = os.path.join(log_dir, "sleep_test.log")
     # Using sys.executable to ensure we use the same python interpreter
     # For a real server, this would be [sys.executable, 'path/to/server_script.py']
     # Note: sys.executable is not defined in this scope if this file is run directly without importing sys first.
     # For the example, let's assume python is in path or use a simple command.
-    
+
     # Test basic process start/stop
     print("Starting a sample sleep process...")
     sleep_log = os.path.join(log_dir, "sleep_test.log")
     # Using a simple platform-independent sleep command for the example
     sleep_command = ["timeout", "10"] if os.name == "nt" else ["sleep", "10"]
     proc = start_process(sleep_command, sleep_log)
-    
-    if proc and proc.pid: # Check if proc is not None and has a pid
+
+    if proc and proc.pid:  # Check if proc is not None and has a pid
         print(f"Sleep process PID: {proc.pid}")
         print("Waiting for a few seconds before stopping...")
         time.sleep(3)
@@ -352,12 +395,16 @@ if __name__ == "__main__":
     #     # stop_process(ngrok_proc.pid) # stop_all_processes will handle it
     # else:
     #     print("Failed to start ngrok for testing.")
-    
+
     # stop_all_processes() will be called by atexit if this script is run
     # or can be called explicitly if needed.
     # For this example, we'll let atexit handle it if processes were started.
     # If running this __main__ block, ensure atexit is registered or call stop_all_processes()
     import atexit
+
     atexit.register(stop_all_processes)
     print("Subprocess manager example finished. Check logs in 'logs' directory.")
-    print("Remaining managed processes (should be empty if all stopped):", managed_processes.keys())
+    print(
+        "Remaining managed processes (should be empty if all stopped):",
+        managed_processes.keys(),
+    )

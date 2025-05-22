@@ -1,28 +1,23 @@
-import json
 import os
 import shutil
 import sys
 import tempfile
 import types  # Import the types module
+import logging  # Added for new utility
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from reward_kit.evaluation import preview_evaluation
+from reward_kit.common_utils import load_jsonl  # Import the new utility
 
 # math_reward will be imported inside the dynamically created main.py
 from reward_kit.models import Message
 
+# Configure basic logging if you want to see logs from load_jsonl
+# logging.basicConfig(level=logging.INFO)
 
-def load_dataset_for_preview(file_path: str):
-    """Loads a JSONL dataset and returns it as a list of dictionaries."""
-    dataset = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            dataset.append(
-                json.loads(line)
-            )  # Each item should be a dict like {"messages": [...]}
-    return dataset
+# Removed local load_dataset_for_preview function
 
 
 def main():
@@ -42,7 +37,7 @@ def main():
         print("To run in mock mode: export TEST_MOCK_FIREWORKS_PREVIEW='true'")
         return
 
-    dataset = load_dataset_for_preview(dataset_path)
+    dataset = load_jsonl(dataset_path)
 
     print(
         f"Starting Fireworks Preview API evaluation for OpenR1 Math Example using {dataset_path}...\n"  # Modified

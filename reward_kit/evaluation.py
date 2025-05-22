@@ -194,13 +194,36 @@ class EvaluatorPreviewResult:
 class Evaluator:
     """Handles loading, previewing, and creating evaluations"""
 
-    def __init__(self, multi_metrics=False):
-        self.multi_metrics = multi_metrics
+    def __init__(
+        self, multi_metrics=False, ts_mode_config: Optional[Dict[str, Any]] = None
+    ):
+        self.multi_metrics = (
+            multi_metrics  # Original multi_metrics flag for folder-based setup
+        )
+        self.ts_mode_config = (
+            ts_mode_config  # Config for TypeScript-like single code snippet mode
+        )
         self.code_files = {}  # Map of filename -> content
-        self.metric_folders = {}  # Map of metric_name -> folder_path
+        self.metric_folders = (
+            {}
+        )  # Map of metric_name -> folder_path (used when not in ts_mode_config and not multi_metrics)
         self.description = ""
         self.display_name = ""
         self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+
+        if self.ts_mode_config:
+            # If in ts_mode, populate code_files directly and set multi_metrics to True
+            # This ensures that later checks for self.code_files and main.py pass.
+            python_code = self.ts_mode_config.get("python_code")
+            file_name = self.ts_mode_config.get(
+                "file_name", "main.py"
+            )  # Default to main.py
+            if not python_code:
+                raise ValueError("python_code is required in ts_mode_config")
+            self.code_files[file_name] = python_code
+            self.multi_metrics = (
+                True  # ts_mode implies multiMetrics: true and specific rollup settings
+            )
 
     def load_metric_folder(self, metric_name, folder_path):
         """
@@ -347,6 +370,7 @@ class Evaluator:
         # Get authentication information
         account_id = get_fireworks_account_id()
         auth_token = get_fireworks_api_key()
+        logger.debug("Show account id", account_id)
 
         if not account_id or not auth_token:
             logger.error(
@@ -370,13 +394,17 @@ class Evaluator:
 
         # Construct the evaluator payload
         # Construct the preview evaluation payload
+
+        # Per user feedback, always set multiMetrics: true and skipRollup: true in the payload
+        # to match the behavior observed as "correct" from the TypeScript client.
+
         evaluator = {
             "displayName": self.display_name or "Preview Evaluator",
             "description": self.description or "Preview Evaluator",
-            "multiMetrics": self.multi_metrics,
+            "multiMetrics": True,  # Directly hardcoded to True
             "criteria": self._construct_criteria(),
             "requirements": "",
-            "rollupSettings": None,
+            "rollupSettings": {"skipRollup": True},  # Directly hardcoded
         }
 
         # The samples need to be passed as JSON strings in an array
@@ -404,6 +432,11 @@ class Evaluator:
         logger.info(
             f"Previewing evaluator using API endpoint: {url} with account: {account_id}"
         )
+
+        # Log the request details for debugging
+        logger.debug(f"Preview API Request URL: {url}")
+        logger.debug(f"Preview API Request Headers: {json.dumps(headers, indent=2)}")
+        logger.debug(f"Preview API Request Payload: {json.dumps(payload, indent=2)}")
 
         global used_preview_api
         try:
@@ -566,14 +599,17 @@ class Evaluator:
         self.description = description or f"Evaluator created from {evaluator_id}"
 
         # Always use the new API payload format
+
+        # Per user feedback, always set multiMetrics: true and skipRollup: true in the payload.
+
         payload = {
             "evaluator": {
                 "displayName": self.display_name,
                 "description": self.description,
-                "multiMetrics": self.multi_metrics,
+                "multiMetrics": True,  # Directly hardcoded to True
                 "criteria": self._construct_criteria(),  # This will now always return the new format
                 "requirements": "",  # Ensure this is an empty string if not used, or appropriate value
-                "rollupSettings": None,  # Ensure this is null if not used, or appropriate value
+                "rollupSettings": {"skipRollup": True},  # Directly hardcoded
             },
             "evaluatorId": evaluator_id,
         }
@@ -662,9 +698,33 @@ class Evaluator:
             List of assertion objects
         """
         assertions = []
-        # Always use the new API format for criteria (codeSnippets)
-        if self.multi_metrics:
-            # Construct a single criterion with all files for multi-metrics
+        if self.ts_mode_config:
+            # TypeScript-like mode: single code snippet
+            python_code = self.ts_mode_config.get("python_code")
+            file_name = self.ts_mode_config.get("file_name", "main.py")
+            criterion_name = self.ts_mode_config.get(
+                "criterion_name", "default_code_criterion"
+            )
+            description = self.ts_mode_config.get(
+                "description", "Python code execution"
+            )
+
+            if not python_code:
+                raise ValueError("python_code is required in ts_mode_config")
+
+            assertions.append(
+                {
+                    "type": "CODE_SNIPPETS",  # Matches Criterion_Type.CODE_SNIPPETS
+                    "name": criterion_name,
+                    "description": description,
+                    "codeSnippets": {
+                        "language": "python",
+                        "fileContents": {file_name: python_code},
+                    },
+                }
+            )
+        elif self.multi_metrics:
+            # Original multi_metrics mode: load all .py files from a single folder
             file_contents = {}
             for filename, content in self.code_files.items():
                 # Skip files that aren't Python
@@ -717,9 +777,11 @@ class Evaluator:
         if not assertions:
             # This case should ideally be prevented by checks in load_metric_folder etc.
             # but as a safeguard:
-            raise ValueError(
-                "No valid criteria could be constructed. Ensure metric folders contain Python files."
-            )
+            # Ensure this check is only for non-ts_mode_config cases
+            if not self.ts_mode_config and not assertions:
+                raise ValueError(
+                    "No valid criteria could be constructed. Ensure metric folders contain Python files or ts_mode_config is correctly set."
+                )
 
         return assertions
 
@@ -909,55 +971,83 @@ if __name__ == '__main__':
 
 # Helper functions for CLI commands
 def preview_evaluation(
-    metric_folders=None,
-    multi_metrics=False,
-    folder=None,
-    sample_file=None,
-    max_samples=5,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
+    # Parameters for folder-based evaluation
+    metric_folders: Optional[List[str]] = None,
+    multi_metrics: bool = False,  # For folder-based multi-metrics
+    folder: Optional[str] = None,  # For folder-based multi-metrics
+    # Parameters for TypeScript-like single code snippet evaluation
+    python_code_to_evaluate: Optional[str] = None,
+    python_file_name_for_code: str = "main.py",  # Default filename for the snippet
+    criterion_name_for_code: str = "default_code_criterion",  # Default criterion name
+    criterion_description_for_code: str = "Python code execution",  # Default criterion description
+    # Common parameters
+    sample_file: Optional[str] = None,
+    max_samples: int = 5,
+    huggingface_dataset: Optional[str] = None,
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
 ):
     """
-    Preview an evaluation with sample data
+    Preview an evaluation with sample data. Supports folder-based or direct Python code evaluation.
 
     Args:
-        metric_folders: List of METRIC_NAME=folder_path pairs
-        multi_metrics: Whether to use multi-metrics mode
-        folder: Path to folder with multiple metrics (for multi_metrics mode)
-        sample_file: Path to sample JSONL file
-        max_samples: Maximum number of samples to process
-        huggingface_dataset: Optional HuggingFace dataset name (e.g., "deepseek-ai/DeepSeek-ProverBench")
-        huggingface_split: Dataset split to use (default: "train")
-        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
-        huggingface_response_key: Key in the dataset containing the response (default: "response")
-        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
+        metric_folders: List of METRIC_NAME=folder_path pairs (for folder-based).
+        multi_metrics: Whether to use multi-metrics mode (for folder-based).
+        folder: Path to folder with multiple metrics (for folder-based multi_metrics mode).
+        python_code_to_evaluate: A string containing Python code to evaluate (for TS-like mode).
+        python_file_name_for_code: Filename to associate with `python_code_to_evaluate`.
+        criterion_name_for_code: Name for the criterion created for `python_code_to_evaluate`.
+        criterion_description_for_code: Description for the criterion.
+        sample_file: Path to sample JSONL file.
+        max_samples: Maximum number of samples to process.
+        huggingface_dataset: Optional HuggingFace dataset name.
+        huggingface_split: Dataset split to use.
+        huggingface_message_key_map: Optional mapping of dataset keys.
+        huggingface_response_key: Key in the dataset for the response.
+        huggingface_prompt_key: Key in the dataset for the prompt.
 
     Returns:
-        EvaluatorPreviewResult with preview results
+        EvaluatorPreviewResult with preview results.
     """
-    evaluator = Evaluator(multi_metrics=multi_metrics)
-
-    if multi_metrics:
-        if not folder:
-            raise ValueError("Folder must be specified when using multi-metrics mode")
-        evaluator.load_multi_metrics_folder(folder)
-    else:
-        if not metric_folders:
+    ts_mode_config = None
+    if python_code_to_evaluate:
+        if metric_folders or folder or multi_metrics:
             raise ValueError(
-                "At least one metric folder must be specified when not using multi-metrics mode"
+                "Cannot use python_code_to_evaluate with folder-based parameters "
+                "(metric_folders, folder, multi_metrics)."
             )
-
-        for pair in metric_folders:
-            if "=" not in pair:
+        ts_mode_config = {
+            "python_code": python_code_to_evaluate,
+            "file_name": python_file_name_for_code,
+            "criterion_name": criterion_name_for_code,
+            "description": criterion_description_for_code,
+        }
+        # When python_code_to_evaluate is used, multi_metrics in Evaluator constructor is effectively True
+        # due to how ts_mode_config is handled (sets self.multi_metrics = True).
+        evaluator = Evaluator(ts_mode_config=ts_mode_config)
+    else:
+        # Folder-based evaluation
+        evaluator = Evaluator(multi_metrics=multi_metrics)
+        if multi_metrics:
+            if not folder:
                 raise ValueError(
-                    f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                    "`folder` must be specified when using multi_metrics mode without python_code_to_evaluate."
                 )
-
-            metric_name, folder_path = pair.split("=", 1)
-            evaluator.load_metric_folder(metric_name, folder_path)
+            evaluator.load_multi_metrics_folder(folder)
+        else:
+            if not metric_folders:
+                raise ValueError(
+                    "At least one metric_folder must be specified for non-multi_metrics mode without python_code_to_evaluate."
+                )
+            for pair in metric_folders:
+                if "=" not in pair:
+                    raise ValueError(
+                        f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                    )
+                metric_name, folder_path = pair.split("=", 1)
+                evaluator.load_metric_folder(metric_name, folder_path)
 
     # If HuggingFace dataset is specified, convert it to JSONL first
     if huggingface_dataset:
@@ -1096,59 +1186,91 @@ def preview_folder_evaluation(
 
 
 def create_evaluation(
-    evaluator_id,
-    metric_folders=None,
-    multi_metrics=False,
-    folder=None,
-    display_name=None,
-    description=None,
-    force=False,
-    huggingface_dataset=None,
-    huggingface_split="train",
-    huggingface_message_key_map=None,
-    huggingface_response_key="response",
-    huggingface_prompt_key="prompt",
+    evaluator_id: str,
+    # Parameters for folder-based evaluation
+    metric_folders: Optional[List[str]] = None,
+    multi_metrics: bool = False,  # For folder-based multi-metrics
+    folder: Optional[str] = None,  # For folder-based multi-metrics
+    # Parameters for TypeScript-like single code snippet evaluation
+    python_code_to_evaluate: Optional[str] = None,
+    python_file_name_for_code: str = "main.py",
+    criterion_name_for_code: str = "default_code_criterion",
+    criterion_description_for_code: str = "Python code execution",
+    # Common parameters
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    force: bool = False,
+    huggingface_dataset: Optional[
+        str
+    ] = None,  # Note: HF dataset is for preview only currently
+    huggingface_split: str = "train",
+    huggingface_message_key_map: Optional[Dict[str, str]] = None,
+    huggingface_response_key: str = "response",
+    huggingface_prompt_key: str = "prompt",
 ):
     """
-    Create an evaluation on the Fireworks platform
+    Create an evaluation on the Fireworks platform. Supports folder-based or direct Python code evaluation.
 
     Args:
-        evaluator_id: ID for the evaluator
-        metric_folders: List of METRIC_NAME=folder_path pairs
-        multi_metrics: Whether to use multi-metrics mode
-        folder: Path to folder with multiple metrics (for multi_metrics mode)
-        display_name: Display name for the evaluator
-        description: Description of the evaluator
-        force: If True, update the evaluator if it already exists
-        huggingface_dataset: Optional HuggingFace dataset name to use as evaluation data
-        huggingface_split: Dataset split to use (default: "train")
-        huggingface_message_key_map: Optional mapping of dataset keys to reward-kit message keys
-        huggingface_response_key: Key in the dataset containing the response (default: "response")
-        huggingface_prompt_key: Key in the dataset containing the prompt (default: "prompt")
+        evaluator_id: ID for the evaluator.
+        metric_folders: List of METRIC_NAME=folder_path pairs (for folder-based).
+        multi_metrics: Whether to use multi-metrics mode (for folder-based).
+        folder: Path to folder with multiple metrics (for folder-based multi_metrics mode).
+        python_code_to_evaluate: A string containing Python code to evaluate (for TS-like mode).
+        python_file_name_for_code: Filename to associate with `python_code_to_evaluate`.
+        criterion_name_for_code: Name for the criterion created for `python_code_to_evaluate`.
+        criterion_description_for_code: Description for the criterion.
+        display_name: Display name for the evaluator.
+        description: Description of the evaluator.
+        force: If True, update the evaluator if it already exists.
+        huggingface_dataset: Optional HuggingFace dataset name (currently for preview only).
+        huggingface_split: Dataset split to use.
+        huggingface_message_key_map: Optional mapping of dataset keys.
+        huggingface_response_key: Key in the dataset for the response.
+        huggingface_prompt_key: Key in the dataset for the prompt.
 
     Returns:
-        Created evaluator object
+        Created evaluator object.
     """
-    evaluator = Evaluator(multi_metrics=multi_metrics)
-
-    if multi_metrics:
-        if not folder:
-            raise ValueError("Folder must be specified when using multi-metrics mode")
-        evaluator.load_multi_metrics_folder(folder)
-    else:
-        if not metric_folders:
+    ts_mode_config = None
+    if python_code_to_evaluate:
+        if (
+            metric_folders or folder or multi_metrics
+        ):  # Check original multi_metrics flag
             raise ValueError(
-                "At least one metric folder must be specified when not using multi-metrics mode"
+                "Cannot use python_code_to_evaluate with folder-based parameters "
+                "(metric_folders, folder, multi_metrics)."
             )
-
-        for pair in metric_folders:
-            if "=" not in pair:
+        ts_mode_config = {
+            "python_code": python_code_to_evaluate,
+            "file_name": python_file_name_for_code,
+            "criterion_name": criterion_name_for_code,
+            "description": criterion_description_for_code,
+        }
+        evaluator = Evaluator(ts_mode_config=ts_mode_config)
+    else:
+        # Folder-based evaluation
+        evaluator = Evaluator(
+            multi_metrics=multi_metrics
+        )  # Pass the original multi_metrics here
+        if multi_metrics:  # Check original multi_metrics flag
+            if not folder:
                 raise ValueError(
-                    f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                    "`folder` must be specified when using multi_metrics mode without python_code_to_evaluate."
                 )
-
-            metric_name, folder_path = pair.split("=", 1)
-            evaluator.load_metric_folder(metric_name, folder_path)
+            evaluator.load_multi_metrics_folder(folder)
+        else:
+            if not metric_folders:
+                raise ValueError(
+                    "At least one metric_folder must be specified for non-multi_metrics mode without python_code_to_evaluate."
+                )
+            for pair in metric_folders:
+                if "=" not in pair:
+                    raise ValueError(
+                        f"Invalid metric-folder format: {pair}. Expected METRIC_NAME=folder_path"
+                    )
+                metric_name, folder_path = pair.split("=", 1)
+                evaluator.load_metric_folder(metric_name, folder_path)
 
     # If using HuggingFace dataset, we need to convert it to JSONL and upload it
     # Currently we only support preview with HF datasets

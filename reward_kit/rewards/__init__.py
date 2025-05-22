@@ -32,6 +32,15 @@ from .bfcl_reward import bfcl_reward as bfcl_reward_function
 from .code_execution import fractional_code_reward
 from .cpp_code import binary_cpp_code_reward, ioi_cpp_code_reward
 from .deepcoder_reward import deepcoder_code_reward  # Added import
+
+# To make individual functions directly importable from reward_kit.rewards
+# e.g., from reward_kit.rewards import composite_function_call_reward
+from .function_calling import (
+    composite_function_call_reward,
+    exact_tool_match_reward,
+    llm_judge_reward,
+    schema_jaccard_reward,
+)
 from .lean_prover import (
     deepseek_huggingface_prover_benchmark,
     deepseek_prover_v2_reward,
@@ -47,10 +56,10 @@ from .multiple_choice_math_reward import (
 )
 
 __all__ = [
+    # Modules
     "function_calling",
     "json_schema",
     "math",
-    "advanced_math",  # Add advanced_math to __all__
     "code_execution",
     "format",
     "tag_count",
@@ -62,21 +71,24 @@ __all__ = [
     "cpp_code",
     "accuracy_length",
     "lean_prover",
-    "deepcoder_reward",  # Added module to __all__
+    "deepcoder_reward",
     "multiple_choice_math_reward",
     "list_comparison_math_reward",
+    "bfcl_reward",
+    # Specific functions for direct import
     "fractional_code_reward",
-    "deepcoder_code_reward",  # Added function to __all__
-    "multiple_choice_math_reward",  # Added module to __all__
-    "multiple_choice_math_reward_function",  # Added function to __all__
-    "list_comparison_math_reward",  # Added module to __all__
-    "list_comparison_math_reward_function",  # Added function to __all__
+    "deepcoder_code_reward",
+    "multiple_choice_math_reward_function",
+    "list_comparison_math_reward_function",
     "ioi_cpp_code_reward",
     "binary_cpp_code_reward",
     "cosine_scaled_accuracy_length_reward",
     "lean_prover_reward",
     "deepseek_prover_v2_reward",
     "deepseek_huggingface_prover_benchmark",
-    "bfcl_reward",  # Add bfcl_reward module to __all__
-    "bfcl_reward_function",  # Add bfcl_reward function to __all__
+    "bfcl_reward_function",
+    "composite_function_call_reward",
+    "exact_tool_match_reward",
+    "llm_judge_reward",
+    "schema_jaccard_reward",
 ]

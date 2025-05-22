@@ -96,18 +96,22 @@ def parse_args(args=None):
         "--huggingface-key-map",
         help="JSON mapping of dataset keys to reward-kit message keys",
     )
+    preview_parser.add_argument(
+        "--remote-url",
+        help="URL of a remote reward function endpoint to preview against. If provided, metrics-folders might be ignored.",
+    )
 
     # Deploy command
     deploy_parser = subparsers.add_parser(
-        "deploy", help="Create and deploy an evaluator"
+        "deploy", help="Create and deploy an evaluator, or register a remote one"
     )
     deploy_parser.add_argument("--id", required=True, help="ID for the evaluator")
     deploy_parser.add_argument(
         "--metrics-folders",
         "-m",
         nargs="+",
-        required=True,
-        help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'",
+        required=False, # No longer strictly required if --remote-url is used
+        help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'. Required if not using --remote-url.",
     )
     deploy_parser.add_argument(
         "--display-name",
@@ -146,6 +150,10 @@ def parse_args(args=None):
     hf_deploy_group.add_argument(
         "--huggingface-key-map",
         help="JSON mapping of dataset keys to reward-kit message keys",
+    )
+    deploy_parser.add_argument(
+        "--remote-url",
+        help="URL of a pre-deployed remote reward function. If provided, deploys by registering this URL with Fireworks AI.",
     )
 
     # Agent-eval command

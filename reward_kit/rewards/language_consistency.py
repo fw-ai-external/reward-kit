@@ -548,9 +548,10 @@ def detect_dominant_language(text: str) -> Tuple[str, float]:
     return (dominant_lang[0], confidence)
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def language_consistency_reward(
     messages: List[Message],  # Full conversation, last message is model's response
+    *,  # Make subsequent parameters keyword-only
     ground_truth: Any,  # Expected ground truth from dataset (may not be directly used by this function)
     target_language: Optional[str] = None,
     min_consistency: float = 0.6,  # Lower threshold for easier passing

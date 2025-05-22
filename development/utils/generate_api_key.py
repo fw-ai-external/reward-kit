@@ -1,5 +1,5 @@
-import secrets
 import argparse
+import secrets
 
 
 def generate_api_key(length: int = 32) -> str:

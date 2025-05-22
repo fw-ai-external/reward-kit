@@ -1,22 +1,14 @@
-import os
-import sys
-import subprocess
-import time
 import atexit  # For cleanup
+import os
+import subprocess
+import sys
+import time
 
 # Adjust the Python path to include the root of the reward-kit project
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 
 try:
-    from reward_kit.models import Message
-    from examples.remote_eval_demo.rewards.remote_validator_reward_hardcoded import (
-        remote_validator_reward_hardcoded,
-    )
-    from examples.remote_eval_demo.rewards.remote_validator_reward_secure import (
-        remote_validator_reward_secure,
-    )
-
     # Import from subprocess_manager
     from development.utils.subprocess_manager import (
         start_process,
@@ -24,6 +16,13 @@ try:
         stop_all_processes,
         stop_process,
     )
+    from examples.remote_eval_demo.rewards.remote_validator_reward_hardcoded import (
+        remote_validator_reward_hardcoded,
+    )
+    from examples.remote_eval_demo.rewards.remote_validator_reward_secure import (
+        remote_validator_reward_secure,
+    )
+    from reward_kit.models import Message
 except ImportError as e:
     print(f"Error importing modules: {e}")
     print(

@@ -116,15 +116,17 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
         self.assertTrue(
-            result.reason is not None
-            and "Could not extract MCQ option from generated message" in result.reason
+            "Could not extract MCQ option from generated message" in result.reason
         )
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
+        self.assertIsNotNone(result["reason"])
+        assert result["reason"] is not None  # for mypy
         self.assertTrue(
-            result["reason"] is not None
-            and "Could not extract MCQ option from generated message" in result.reason
+            "Could not extract MCQ option from generated message" in result["reason"]
         )
 
     def test_orig_no_mcq(self):
@@ -134,17 +136,19 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
         self.assertTrue(
-            result.reason is not None
-            and "Could not extract MCQ option from original message" in result.reason
+            "Could not extract MCQ option from original message" in result.reason
         )
         self.assertTrue(result.metrics["extracted_generated_mcq"].is_score_valid)
         self.assertFalse(result.metrics["extracted_original_mcq"].is_score_valid)
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
+        self.assertIsNotNone(result["reason"])
+        assert result["reason"] is not None  # for mypy
         self.assertTrue(
-            result["reason"] is not None
-            and "Could not extract MCQ option from original message" in result["reason"]
+            "Could not extract MCQ option from original message" in result["reason"]
         )
         self.assertTrue(result["metrics"]["extracted_generated_mcq"]["is_score_valid"])
         self.assertFalse(result["metrics"]["extracted_original_mcq"]["is_score_valid"])
@@ -156,19 +160,17 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         self.assertIsInstance(result, EvaluateResult)
         # Attribute access
         self.assertEqual(result.score, 0.0)  # Penalized for ambiguity
-        self.assertTrue(
-            result.reason is not None
-            and "Generated answer is ambiguous" in result.reason
-        )
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
+        self.assertTrue("Generated answer is ambiguous" in result.reason)
         self.assertTrue(
             result.metrics["ambiguous_generated_mcq"].is_score_valid == False
         )  # success is False for this metric
         # Dictionary access
         self.assertEqual(result["score"], 0.0)
-        self.assertTrue(
-            result["reason"] is not None
-            and "Generated answer is ambiguous" in result["reason"]
-        )
+        self.assertIsNotNone(result["reason"])
+        assert result["reason"] is not None  # for mypy
+        self.assertTrue("Generated answer is ambiguous" in result["reason"])
         self.assertTrue(
             result["metrics"]["ambiguous_generated_mcq"]["is_score_valid"] == False
         )
@@ -232,8 +234,10 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         result = multiple_choice_math_reward(messages=[], ground_truth=[])
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
         self.assertTrue(
-            result.reason is not None and "Missing generated messages" in result.reason
+            "Missing generated messages" in result.reason
         )  # Checks messages first
 
     def test_empty_messages_only(self):
@@ -241,19 +245,18 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         result = multiple_choice_math_reward(messages=[], ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(
-            result.reason is not None and "Missing generated messages" in result.reason
-        )
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
+        self.assertTrue("Missing generated messages" in result.reason)
 
     def test_empty_ground_truth_only(self):
         gen_msgs = self._create_messages("(A)")
         result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=[])
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
-        self.assertTrue(
-            result.reason is not None
-            and "Missing ground truth message" in result.reason
-        )
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
+        self.assertTrue("Missing ground truth message" in result.reason)
 
     def test_missing_assistant_message_gen(self):
         # messages[-1] is not an assistant message
@@ -265,9 +268,10 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
         self.assertTrue(
-            result.reason is not None
-            and "Last generated message not from assistant or has no content"
+            "Last generated message not from assistant or has no content"
             in result.reason
         )
 
@@ -278,9 +282,10 @@ class TestMultipleChoiceMathReward(unittest.TestCase):
         result = multiple_choice_math_reward(messages=gen_msgs, ground_truth=gt_msgs)
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
+        self.assertIsNotNone(result.reason)
+        assert result.reason is not None  # for mypy
         self.assertTrue(
-            result.reason is not None
-            and "Invalid ground truth message: Not an assistant message or has no content"
+            "Invalid ground truth message: Not an assistant message or has no content"
             in result.reason
         )
 

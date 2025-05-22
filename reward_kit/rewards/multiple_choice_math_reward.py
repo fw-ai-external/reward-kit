@@ -7,10 +7,17 @@ a single letter (e.g., A, B, C, D, E).
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function
+
+
+class MatchInfo(TypedDict):
+    text: str
+    letter: str
+    span: Tuple[int, int]
+    priority: int
 
 
 def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
@@ -45,9 +52,7 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     # For standalone "A": used (?<![a-zA-Z0-9_]) and (?![a-zA-Z0-9_]) to avoid matching A in APPLE.
 
     final_mcq_answers: List[Tuple[str, str]] = []
-    processed_spans = (
-        []
-    )  # To handle overlapping matches from different parts of the regex if they occur
+    # processed_spans was unused, removing it.
 
     # The regex is structured as (alt1_full(alt1_letter)|alt2_full(alt2_letter)|...)
     # Group indices for letters: 3, 5, 7, 9, 12
@@ -63,19 +68,30 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     ]
 
     # Collect all potential matches with their spans
-    all_potential_matches = []
+    all_potential_matches: List[MatchInfo] = []
     for p_idx, p_str in enumerate(patterns):
         for match in re.finditer(p_str, text, re.IGNORECASE):
             option_text = match.group(1)  # The full matched option, e.g. (A), A.
             letter = match.group(2)  # The letter itself
-            all_potential_matches.append(
-                {
-                    "text": option_text,
-                    "letter": letter.upper(),
-                    "span": match.span(1),
-                    "priority": p_idx,  # To prefer more specific patterns like (A) over A
-                }
-            )
+            # Ensure match.span(1) returns a tuple of two integers
+            span_tuple = match.span(1)
+            if not (
+                isinstance(span_tuple, tuple)
+                and len(span_tuple) == 2
+                and isinstance(span_tuple[0], int)
+                and isinstance(span_tuple[1], int)
+            ):
+                # Handle cases where span might not be as expected, though unlikely for re.match.span
+                # This is more for robustness if re.finditer behaves unexpectedly or text is unusual
+                continue
+
+            match_data: MatchInfo = {
+                "text": option_text if option_text is not None else "",
+                "letter": letter.upper() if letter is not None else "",
+                "span": span_tuple,
+                "priority": p_idx,
+            }
+            all_potential_matches.append(match_data)
 
     # Sort matches: by start position, then by pattern priority (lower index = higher priority), then by length (longer preferred)
     all_potential_matches.sort(
@@ -85,18 +101,20 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     # Filter out overlapping matches, keeping the highest priority/longest one
     last_covered_end = -1
     for match_info in all_potential_matches:
-        start, end = match_info["span"]
+        start, end = match_info["span"]  # Now correctly typed as Tuple[int, int]
         if start >= last_covered_end:  # Non-overlapping or starts after last one ended
-            letter_upper = match_info["letter"]
+            letter_upper = match_info["letter"]  # Now correctly typed as str
             if letter_upper not in found_mcq_letters:
-                final_mcq_answers.append((match_info["text"], letter_upper))
+                final_mcq_answers.append(
+                    (match_info["text"], letter_upper)
+                )  # text and letter_upper are str
                 found_mcq_letters.add(letter_upper)
             last_covered_end = end
 
     return final_mcq_answers
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def multiple_choice_math_reward(
     messages: List[Message],
     ground_truth: List[Message],

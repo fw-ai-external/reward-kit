@@ -70,9 +70,11 @@ def main():
         },
     ]
 
+    from typing import Any, Dict, List, cast  # Add imports
+
     # Evaluate the function call using composite_function_call_reward
     result = composite_function_call_reward(
-        messages=messages, expected_schema=expected_schema
+        messages=cast(List[Dict[str, Any]], messages), expected_schema=expected_schema
     )
 
     print(f"Function call score: {result.score}")

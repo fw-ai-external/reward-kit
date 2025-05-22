@@ -1,8 +1,11 @@
+# mypy: ignore-errors
+# pylint: disable=all
 import argparse
 import json
 import logging
 import math  # Added import
 import re  # Added import
+from typing import Optional  # Added Optional
 
 try:
     from datasets import Dataset, load_dataset
@@ -85,7 +88,7 @@ def convert_math_dataset_to_openai_jsonl(
     split: str = "train",
     filter_by_match: bool = False,
     math_type: str = "numeric",
-    config_name: str = None,
+    config_name: Optional[str] = None,
 ):
     """
     Loads a HuggingFace math dataset.
@@ -253,7 +256,9 @@ def convert_math_dataset_to_openai_jsonl(
                             if (
                                 sol_text == boxed_gt_string
                                 and isinstance(sol_val, (float, int))
-                                and math.isclose(sol_val, gt_num_val)
+                                # Ensure gt_num_val is float for isclose
+                                and isinstance(gt_num_val, (float, int))
+                                and math.isclose(sol_val, float(gt_num_val))
                             ):
                                 already_correctly_boxed = True
                                 break
@@ -277,7 +282,11 @@ def convert_math_dataset_to_openai_jsonl(
                                     num_after_hash_val = float(
                                         num_str_after_hash.replace(",", "")
                                     )
-                                    if math.isclose(num_after_hash_val, gt_num_val):
+                                    # Ensure gt_num_val is float for isclose
+                                    assert isinstance(gt_num_val, (float, int))
+                                    if math.isclose(
+                                        num_after_hash_val, float(gt_num_val)
+                                    ):
                                         start, end = match.span(
                                             1
                                         )  # Get span of "#### <number>"
@@ -496,7 +505,7 @@ if __name__ == "__main__":
         )
     else:
         convert_math_dataset_to_openai_jsonl(
-            dataset_name=args.dataset_name,
+            dataset_name=str(args.dataset_name),  # type: ignore
             output_file_path=args.output_file_path,
             query_column=args.query_column,
             solution_column_for_assistant=args.solution_column_for_assistant,

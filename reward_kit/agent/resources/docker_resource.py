@@ -21,24 +21,28 @@ try:
         from docker.models.containers import Container
 
     DOCKER_SDK_AVAILABLE = True
+    # Ensure these are available for type checking even if the runtime import fails
+    # The `else` block for DOCKER_SDK_AVAILABLE = False will define runtime dummies.
+    DockerException = DockerException
+    NotFound = NotFound
+    APIError = APIError
+    Container = Container
+
 except ImportError:
     DOCKER_SDK_AVAILABLE = False
 
-    # Create dummy classes/exceptions if docker SDK is not available
-    # to allow type hinting and basic structure, but operations will fail.
-    # These classes are used at runtime when docker is not available
-    from typing import Any, Dict, List, Optional, Tuple, Union
-
-    class DockerException(Exception):
+    # Define dummy classes/exceptions if docker SDK is not available
+    # These are only defined if the import fails.
+    class DockerException(Exception):  # type: ignore[no-redef]
         pass
 
-    class NotFound(DockerException):
+    class NotFound(DockerException):  # type: ignore[no-redef]
         pass
 
-    class APIError(DockerException):
+    class APIError(DockerException):  # type: ignore[no-redef]
         pass
 
-    class Container:
+    class Container:  # type: ignore[no-redef]
         id: str = ""
         name: str = ""
         image: Any = None

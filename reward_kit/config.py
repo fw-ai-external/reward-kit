@@ -1,7 +1,8 @@
-import yaml
 import os
+from typing import Dict, Literal, Optional
+
+import yaml
 from pydantic import BaseModel, ValidationError
-from typing import Optional, Dict, Literal
 
 CONFIG_FILE_NAME = "rewardkit.yaml"
 
@@ -13,12 +14,16 @@ CONFIG_FILE_NAME = "rewardkit.yaml"
 #     # Example: "OPENAI_API_KEY": "projects/my-gcp-project/secrets/openai-api-key/versions/latest"
 #     pass
 
+
 class GCPCloudRunConfig(BaseModel):
     project_id: Optional[str] = None
     region: Optional[str] = None
     service_name_template: Optional[str] = "rewardeval-{evaluator_id}"
-    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = "api-key"
-    secrets: Optional[Dict[str, str]] = {} # Maps ENV_VAR_NAME to GCP Secret Manager ID
+    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = (
+        "api-key"
+    )
+    secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to GCP Secret Manager ID
+
 
 # Unused models, can be removed.
 # class AWSLambdaSecretsConfig(BaseModel):
@@ -26,21 +31,31 @@ class GCPCloudRunConfig(BaseModel):
 #     # Example: "OPENAI_API_KEY": "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-openai-key-xxxxxx"
 #     pass
 
+
 class AWSLambdaConfig(BaseModel):
     region: Optional[str] = None
     function_name_template: Optional[str] = "rewardeval-{evaluator_id}"
-    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = "api-key"
-    secrets: Optional[Dict[str, str]] = {} # Maps ENV_VAR_NAME to AWS Secret ARN
+    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = (
+        "api-key"
+    )
+    secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to AWS Secret ARN
+
 
 class RewardKitConfig(BaseModel):
-    default_deployment_target: Optional[Literal["gcp-cloud-run", "aws-lambda", "fireworks", "local"]] = "fireworks"
+    default_deployment_target: Optional[
+        Literal["gcp-cloud-run", "aws-lambda", "fireworks", "local"]
+    ] = "fireworks"
     gcp_cloud_run: Optional[GCPCloudRunConfig] = GCPCloudRunConfig()
     aws_lambda: Optional[AWSLambdaConfig] = AWSLambdaConfig()
-    evaluator_endpoint_keys: Optional[Dict[str, str]] = {} # Stores generated API keys for self-hosted evaluator endpoints
+    evaluator_endpoint_keys: Optional[Dict[str, str]] = (
+        {}
+    )  # Stores generated API keys for self-hosted evaluator endpoints
+
 
 # --- Global variable to hold the loaded configuration ---
 _loaded_config: Optional[RewardKitConfig] = None
 _config_file_path: Optional[str] = None
+
 
 def find_config_file(start_path: str = None) -> Optional[str]:
     """
@@ -48,17 +63,18 @@ def find_config_file(start_path: str = None) -> Optional[str]:
     """
     if start_path is None:
         start_path = os.getcwd()
-    
+
     current_path = os.path.abspath(start_path)
     while True:
         potential_path = os.path.join(current_path, CONFIG_FILE_NAME)
         if os.path.isfile(potential_path):
             return potential_path
-        
+
         parent_path = os.path.dirname(current_path)
-        if parent_path == current_path: # Reached root
+        if parent_path == current_path:  # Reached root
             return None
         current_path = parent_path
+
 
 def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
     """
@@ -68,31 +84,35 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
     """
     global _loaded_config, _config_file_path
 
-    if config_path: # If a specific path is given, always try to load from it
+    if config_path:  # If a specific path is given, always try to load from it
         pass
-    elif _loaded_config and not config_path: # Already loaded and no new path, return cached
+    elif (
+        _loaded_config and not config_path
+    ):  # Already loaded and no new path, return cached
         return _loaded_config
-    else: # Not loaded or no specific path, try to find it
+    else:  # Not loaded or no specific path, try to find it
         config_path = find_config_file()
 
     if not config_path:
         # print(f"Info: No {CONFIG_FILE_NAME} found. Using default configuration.")
-        _loaded_config = RewardKitConfig() # Return default config if no file found
+        _loaded_config = RewardKitConfig()  # Return default config if no file found
         _config_file_path = None
         return _loaded_config
 
-    if _loaded_config and config_path == _config_file_path: # Already loaded this specific file
+    if (
+        _loaded_config and config_path == _config_file_path
+    ):  # Already loaded this specific file
         return _loaded_config
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
-        
-        if raw_config is None: # Empty YAML file
+
+        if raw_config is None:  # Empty YAML file
             _loaded_config = RewardKitConfig()
         else:
             _loaded_config = RewardKitConfig(**raw_config)
-        
+
         _config_file_path = config_path
         # print(f"Successfully loaded configuration from: {config_path}")
         return _loaded_config
@@ -105,7 +125,9 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
         print(f"Error parsing YAML from {config_path}: {e}")
         # Decide: raise error or return default? For now, return default and warn.
         _loaded_config = RewardKitConfig()
-        _config_file_path = config_path # So it doesn't try to reload this broken file again
+        _config_file_path = (
+            config_path  # So it doesn't try to reload this broken file again
+        )
         return _loaded_config
     except ValidationError as e:
         print(f"Error validating configuration from {config_path}: {e}")
@@ -113,10 +135,13 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
         _config_file_path = config_path
         return _loaded_config
     except Exception as e:
-        print(f"An unexpected error occurred while loading configuration from {config_path}: {e}")
+        print(
+            f"An unexpected error occurred while loading configuration from {config_path}: {e}"
+        )
         _loaded_config = RewardKitConfig()
         _config_file_path = config_path
         return _loaded_config
+
 
 def get_config() -> RewardKitConfig:
     """
@@ -125,6 +150,7 @@ def get_config() -> RewardKitConfig:
     if _loaded_config is None:
         return load_config()
     return _loaded_config
+
 
 # Example usage (can be removed or kept for testing module directly)
 if __name__ == "__main__":
@@ -146,9 +172,9 @@ evaluator_endpoint_keys:
   my_test_eval: "dummy_key_for_test_eval"
 """
     dummy_file_path = os.path.join(os.getcwd(), CONFIG_FILE_NAME)
-    with open(dummy_file_path, 'w') as f:
+    with open(dummy_file_path, "w") as f:
         f.write(dummy_config_content)
-    
+
     print(f"Created dummy {CONFIG_FILE_NAME} for testing.")
 
     config = get_config()
@@ -167,13 +193,13 @@ evaluator_endpoint_keys:
     print("\nTesting find_config_file():")
     found_path = find_config_file()
     print(f"  Found at: {found_path}")
-    
+
     # Clean up dummy file
     os.remove(dummy_file_path)
     print(f"\nRemoved dummy {CONFIG_FILE_NAME}.")
 
     # Test loading with no file
-    _loaded_config = None # Reset cache
+    _loaded_config = None  # Reset cache
     _config_file_path = None
     print("\nTesting get_config() with no file present:")
     config_no_file = get_config()

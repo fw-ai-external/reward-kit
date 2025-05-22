@@ -13,8 +13,7 @@ from reward_kit.rewards.accuracy_length import cosine_scaled_accuracy_length_rew
 
 
 def simple_extract_fn(text: str) -> str:
-    """
-    Simple function to extract place names for our examples.
+    """Extract place names for our examples.
 
     This function is designed specifically for our capital city examples
     and makes it easier to extract the answer.
@@ -49,12 +48,13 @@ def main():
         {
             "role": "assistant",
             "content": (
-                "The capital of France is Paris. Paris is located in the north-central "
-                "part of the country on the Seine River. It is the largest city in France "
-                "and serves as the country's political, cultural, and economic center. "
-                "Paris is known for landmarks such as the Eiffel Tower, Louvre Museum, "
-                "Notre-Dame Cathedral, and Arc de Triomphe. The city has a population "
-                "of about 2.2 million people in the city proper."
+                "The capital of France is Paris. Paris is located in the "
+                "north-central part of the country on the Seine River. It is the "
+                "largest city in France and serves as the country's political, "
+                "cultural, and economic center. Paris is known for landmarks such "
+                "as the Eiffel Tower, Louvre Museum, Notre-Dame Cathedral, and Arc "
+                "de Triomphe. The city has a population of about 2.2 million "
+                "people in the city proper."
             ),
         },
     ]
@@ -71,10 +71,11 @@ def main():
         {
             "role": "assistant",
             "content": (
-                "I need to identify the capital city of France. France is a country in "
-                "Western Europe. The largest cities in France include Paris, Marseille, "
-                "Lyon, Toulouse, and Nice. Among these, I believe Lyon is the capital "
-                "city of France, as it's centrally located and historically significant."
+                "I need to identify the capital city of France. France is a country "
+                "in Western Europe. The largest cities in France include Paris, "
+                "Marseille, Lyon, Toulouse, and Nice. Among these, I believe Lyon "
+                "is the capital city of France, as it's centrally located and "
+                "historically significant."
             ),
         },
     ]

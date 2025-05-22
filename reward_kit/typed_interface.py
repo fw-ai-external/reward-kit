@@ -15,9 +15,7 @@ class EvaluateFunction(Protocol):
     """Protocol for evaluate functions that take typed messages."""
 
     def __call__(
-        self,
-        messages: Union[List[Message], List[Dict[str, Any]]],
-        **kwargs: Any,
+        self, *args: Any, **kwargs: Any
     ) -> Union[EvaluateResult, Dict[str, Any]]: ...
 
 

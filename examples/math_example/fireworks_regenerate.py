@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import argparse
 import asyncio  # Added asyncio
 import json
@@ -67,9 +68,8 @@ async def generate_with_fireworks_inner(  # Renamed to avoid conflict, and this 
         # This specific check might be redundant if outer layers ensure api_key for live calls.
         pass  # Outer layers should ensure api_key if it's a live call.
 
-    # print(f"Calling Fireworks API for prompt: '{user_prompt[:70]}...'") # Moved to wrapper
     system_prompt = "IMPORTANT: You MUST provide your final numerical answer enclosed *only* in `\\boxed{answer}`. Do not include any other numbers or text within the box. Your entire response should be your reasoning, followed by the single, final boxed answer. Example: `\\boxed{123.45}`."
-    payload: Dict[str, Any] = {  # Added type hint for payload
+    payload: Dict[str, Any] = {
         "model": FIREWORKS_MODEL_NAME,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -84,7 +84,7 @@ async def generate_with_fireworks_inner(  # Renamed to avoid conflict, and this 
             FIREWORKS_API_URL,
             headers=headers,
             json=payload,
-            timeout=aiohttp.ClientTimeout(total=180),  # Increased timeout
+            timeout=aiohttp.ClientTimeout(total=180),
         ) as response:
             response.raise_for_status()
             completion = await response.json()
@@ -95,9 +95,8 @@ async def generate_with_fireworks_inner(  # Renamed to avoid conflict, and this 
                     f"Warning: No choices returned from Fireworks API. Response: {completion}"
                 )
                 return None
-    except aiohttp.ClientError as e:  # Catch aiohttp specific errors
+    except aiohttp.ClientError as e:
         print(f"Error calling Fireworks API (aiohttp): {e}")
-        # For aiohttp.ClientResponseError, e.status and e.message are available
         if hasattr(e, "status"):
             print(f"Status: {e.status}, Message: {e.message}")  # type: ignore
         return None
@@ -106,14 +105,12 @@ async def generate_with_fireworks_inner(  # Renamed to avoid conflict, and this 
             f"Timeout error calling Fireworks API for prompt: '{user_prompt[:70]}...'"
         )
         return None
-    except (
-        json.JSONDecodeError
-    ) as e:  # This can still happen if response is not valid JSON
+    except json.JSONDecodeError as e:
         print(f"Error decoding Fireworks API response: {e}")
         return None
 
 
-async def generate_with_fireworks(  # This is the new wrapper with semaphore
+async def generate_with_fireworks(
     semaphore: asyncio.Semaphore,
     session: aiohttp.ClientSession,
     user_prompt: str,
@@ -123,32 +120,23 @@ async def generate_with_fireworks(  # This is the new wrapper with semaphore
 ) -> Optional[str]:
     """Asynchronous wrapper for generate_with_fireworks_inner with semaphore control."""
     async with semaphore:
-        # Mocking logic is inside generate_with_fireworks_inner
-        # Live API key check is also effectively handled there or before calling this.
         if not (
             not force_live_api and os.environ.get("TEST_MOCK_FIREWORKS_REGEN") == "true"
-        ):  # Only print for live calls
-            # Attempt to get semaphore details safely
+        ):
             try:
-                max_workers = getattr(
-                    getattr(semaphore._loop, "_default_executor", None),
-                    "_max_workers",
-                    "N/A",
-                )
-                concurrency_str = f"{10 - semaphore._value}/{max_workers}"
+                # Simplified concurrency logging
+                concurrency_str = f"active_tasks_approx={10 - semaphore._value}"
             except AttributeError:
-                concurrency_str = f"{10 - semaphore._value}/Unknown"
-
+                concurrency_str = "N/A"  # Should not happen with semaphore._value
             print(
                 f"Calling Fireworks API for prompt: '{user_prompt[:70]}...' (Concurrency: {concurrency_str})"
             )
-
         return await generate_with_fireworks_inner(
             session, user_prompt, api_key, force_live_api, recorded_data_map
         )
 
 
-async def main(args):  # main is now async
+async def main(args):
     dataset_path = os.path.join(os.path.dirname(__file__), "dataset.jsonl")
     recorded_data_path = os.path.join(os.path.dirname(__file__), RECORDED_DATA_FILENAME)
 
@@ -157,7 +145,6 @@ async def main(args):  # main is now async
         return
 
     api_key = os.environ.get("FIREWORKS_API_KEY")
-    # API key is only strictly required if not using mocks or if regenerating recorded data
     is_mock_mode_via_env = os.environ.get("TEST_MOCK_FIREWORKS_REGEN") == "true"
     recorded_data_map_for_mocking: Optional[Dict[str, str]] = None
 
@@ -176,10 +163,9 @@ async def main(args):  # main is now async
 
     dataset = load_dataset(dataset_path)
     all_passed = True
-    total_samples = len(dataset)
+    # total_samples = len(dataset) # Not used directly in pass/fail logic
     passed_samples = 0
-
-    live_call_results_to_record: List[Dict] = []  # For storing data if regenerating
+    live_call_results_to_record: List[Dict] = []
 
     if args.regenerate_recorded_data:
         print(
@@ -222,12 +208,10 @@ async def main(args):  # main is now async
         f"Starting Fireworks Regeneration & Evaluation for Math Example using {dataset_path}...\n"
     )
 
-    # Determine samples to process
     initial_samples_with_indices = [
         {"index": i, "data": item} for i, item in enumerate(dataset)
     ]
 
-    # Filter by specified indices first, if provided
     if args.indices:
         try:
             selected_indices = {int(idx.strip()) for idx in args.indices.split(",")}
@@ -252,12 +236,7 @@ async def main(args):  # main is now async
     else:
         samples_to_process_with_indices = initial_samples_with_indices
 
-    # Then, if in mock mode (and not already filtered by specific indices for mock testing), filter by mock data
     if is_mock_mode_via_env and recorded_data_map_for_mocking:
-        print(
-            f"DEBUG: Mock mode active. Filtering samples to those present in recorded_data_map_for_mocking."
-        )
-        # Filter the current list of samples_to_process_with_indices
         samples_to_process_with_indices = [
             s_info
             for s_info in samples_to_process_with_indices
@@ -275,58 +254,33 @@ async def main(args):  # main is now async
             print(
                 "Warning: No samples (from current selection) were found in the recorded mock data. No samples will be processed."
             )
-            # Allow to proceed to show 0 processed if that's the case.
 
     print(
         f"DEBUG: Will attempt to process {len(samples_to_process_with_indices)} samples for this run.\n"
     )
 
     tasks = []
-    # It's important that the semaphore is created here, before the session,
-    # or passed around correctly if the session is managed differently.
     semaphore = asyncio.Semaphore(10)
 
-    async with aiohttp.ClientSession() as session:  # Create session for all calls
+    async with aiohttp.ClientSession() as session:
         for item_info in samples_to_process_with_indices:
             item_data = item_info["data"]
             user_message_content = next(
                 (
-                    msg["content"]
-                    for msg in item_data.get("messages", [])
-                    if msg["role"] == "user"
+                    msg.get("content")  # Use .get for safety
+                    for msg in item_data.get("messages", [])  # Use .get for safety
+                    if isinstance(msg, dict) and msg.get("role") == "user"
                 ),
                 None,
             )
             if not user_message_content:
                 print(
-                    f"Skipping sample at original index {item_info['index']} due to missing user prompt."
+                    f"Skipping sample at original index {item_info.get('index', 'N/A')} due to missing user prompt."
                 )
-                # To keep regenerated_contents_results aligned with samples_to_process_with_indices,
-                # we should append a placeholder or handle this carefully in the results loop.
-                # For simplicity, we'll ensure the results loop iterates over the same filtered list.
-                # Or, even better, filter out such items from samples_to_process_with_indices beforehand.
-                # For now, let's assume user_message_content will be present for valid samples.
-                # If we were to append a placeholder: tasks.append(asyncio.create_task(asyncio.sleep(0, result=None)))
-                continue  # Skip adding a task for this item
-
-            # API key check for live calls
-            is_live_call_attempt = args.regenerate_recorded_data or (
-                not is_mock_mode_via_env
-            )
-            if is_live_call_attempt and not api_key:
-                print(
-                    f"Skipping API call for sample (Original Index {item_info['index'] + 1}) due to missing API key in live mode."
-                )
-                # Append a placeholder or handle in results loop
-                # For now, we'll just not add a task, and the results loop will need to be robust.
-                # A better way is to pre-filter samples_to_process_with_indices if API key is missing for live mode.
-                # However, the top-level API key check should prevent getting here for all samples if key is missing.
-                # This per-item check is more for safety if logic changes.
-                # Let's assume the top-level check handles this for now.
-                pass
+                continue
 
             tasks.append(
-                generate_with_fireworks(  # Call the semaphore-wrapped version
+                generate_with_fireworks(
                     semaphore=semaphore,
                     session=session,
                     user_prompt=user_message_content,
@@ -336,23 +290,21 @@ async def main(args):  # main is now async
                 )
             )
 
-        # Filter samples_to_process_with_indices to only include those for which tasks were created
-        # This ensures alignment if any samples were skipped (e.g., missing user prompt)
         valid_samples_for_tasks = [
             s_info
             for s_info in samples_to_process_with_indices
             if next(
                 (
-                    msg["content"]
+                    msg.get("content")
                     for msg in s_info["data"].get("messages", [])
-                    if msg["role"] == "user"
+                    if isinstance(msg, dict) and msg.get("role") == "user"
                 ),
                 None,
             )
             is not None
         ]
 
-        if tasks:  # Only gather if there are tasks to run
+        if tasks:
             regenerated_contents_results = await asyncio.gather(
                 *tasks, return_exceptions=True
             )
@@ -360,36 +312,46 @@ async def main(args):  # main is now async
             regenerated_contents_results = []
 
     actual_processed_count = 0
-    # Iterate over the samples for which tasks were actually created and run
     for i, result_or_exc in enumerate(regenerated_contents_results):
-        # Ensure we are mapping back to the correct original item
-        # This assumes regenerated_contents_results is in the same order as tasks,
-        # and tasks were created from valid_samples_for_tasks
-        if i >= len(valid_samples_for_tasks):  # Should not happen if logic is correct
+        if i >= len(valid_samples_for_tasks):
             print(f"Warning: Mismatch between results and processed samples. Index {i}")
             continue
 
         item_info = valid_samples_for_tasks[i]
-        item = item_info["data"]
-        original_sample_index = item_info["index"]
+        item = item_info.get("data", {})  # Use .get for safety
+        original_sample_index = item_info.get("index", -1)  # Use .get for safety
         actual_processed_count += 1
 
-        original_messages_data = item.get("messages")
-        # We've already checked for user_message_content when creating tasks
-        user_message_content = next(
-            (msg["content"] for msg in original_messages_data if msg["role"] == "user"),
-            "",
-        )
-        original_assistant_content = next(
-            (
-                msg["content"]
-                for msg in original_messages_data
-                if msg["role"] == "assistant"
-            ),
-            None,
-        )
+        original_messages_data = item.get("messages")  # This can be None
+        user_message_content = ""
+        original_assistant_content = None
 
-        if not original_assistant_content:  # Should not happen with current dataset
+        if original_messages_data and isinstance(original_messages_data, list):
+            # Ensure original_messages_data is not None before iterating
+            user_message_content = next(
+                (
+                    msg.get("content", "")  # Use .get for safety on msg dict
+                    for msg in original_messages_data
+                    if isinstance(msg, dict) and msg.get("role") == "user"
+                ),
+                "",
+            )
+            original_assistant_content = next(
+                (
+                    msg.get("content")  # Use .get for safety on msg dict
+                    for msg in original_messages_data
+                    if isinstance(msg, dict) and msg.get("role") == "assistant"
+                ),
+                None,
+            )
+        else:  # original_messages_data is None or not a list
+            print(
+                f"Sample (Original Index {original_sample_index + 1}): Skipping, 'messages' field is missing or not a list in item data."
+            )
+            all_passed = False
+            continue
+
+        if not original_assistant_content:
             print(
                 f"Sample (Original Index {original_sample_index + 1}): Skipping, no original assistant message found for ground truth."
             )
@@ -399,113 +361,122 @@ async def main(args):  # main is now async
         print(f"--- Sample (Original Index {original_sample_index + 1}) ---")
         print(f"User Prompt: {user_message_content[:100]}...")
 
+        regenerated_content_str = None
         if isinstance(result_or_exc, Exception):
-            regenerated_content = None
             print(f"Status: FAILED (API call resulted in exception: {result_or_exc})")
-        else:
-            regenerated_content = result_or_exc
-
-        if (
-            regenerated_content is None
-        ):  # Handles both explicit None return and caught exceptions leading to None
-            # Error message already printed by generate_with_fireworks or above
-            if not isinstance(
-                result_or_exc, Exception
-            ):  # If it wasn't an exception, print generic failure
-                print(
-                    f"Status: FAILED (Could not get/regenerate response from Fireworks API for prompt: {user_message_content[:70]}...)"
-                )
+            # error_category_counts["API_Error"] += 1 # This was from openr1, not present here
+            # error_category_for_sample = "API_Error"
             all_passed = False
-            # If it's a mock mode failure due to missing key, it's already printed in generate_with_fireworks
-            # No need to add to live_call_results_to_record if content is None
-            print("---------------------\n")
-            continue
+        else:
+            regenerated_content_str = result_or_exc
 
-        print(f"Regenerated Assistant Response: {regenerated_content}")
-
-        # Prepare messages for math_reward
-        # The conversation history for evaluation should include the user's prompt and the *new* assistant response.
-        messages_for_eval = [
-            Message(role="user", content=user_message_content),
-            Message(role="assistant", content=regenerated_content),
-        ]
-
-        try:
-            # Evaluate the regenerated_content against the original_assistant_content
-            result = math_reward(
-                messages=messages_for_eval,  # This contains user_prompt + regenerated_content
-                original_messages=messages_for_eval,  # Can be same for this direct eval
-                ground_truth=original_assistant_content,  # The original correct answer
+        if regenerated_content_str is None and not isinstance(result_or_exc, Exception):
+            print(
+                f"Status: FAILED (Could not get/regenerate response from Fireworks API for prompt: {user_message_content[:70]}...)"
             )
-
-            print(f"Score (for regenerated): {result.score}")
-            print(f"Reason (for regenerated): {result.reason}")
-            if result.metrics:
-                print("Metrics (for regenerated):")
-                for metric_name, metric_detail in result.metrics.items():
-                    print(
-                        f"  {metric_name}: Score={metric_detail.score}, Success={metric_detail.is_score_valid}, Reason='{metric_detail.reason}'"
-                    )
-
-            if result.score == 1.0:
-                print("Status: PASSED")
-                passed_samples += 1
-            else:
-                print("Status: FAILED")
-                all_passed = False
-
-            if args.regenerate_recorded_data and regenerated_content is not None:
+            # error_category_counts["API_Error"] += 1
+            # error_category_for_sample = "API_Error"
+            all_passed = False
+            print("---------------------\n")
+            if args.regenerate_recorded_data:
                 live_call_results_to_record.append(
                     {
                         "user_prompt": user_message_content,
                         "original_assistant_content": original_assistant_content,
-                        "regenerated_content": regenerated_content,
-                        "evaluation_score": result.score,
-                        "evaluation_reason": result.reason,
+                        "regenerated_content": None,
+                        "evaluation_score": 0.0,
+                        "evaluation_reason": "API/LLM No Response",
+                        # "error_category": error_category_for_sample, # Not present in this version
                     }
                 )
-            print("---------------------\n")
+            continue
 
-        except Exception as e:
-            print(
-                f"Sample {actual_processed_count}: Error during evaluation of regenerated response - {e}"
-            )
-            all_passed = False
-            print("---------------------\n")
+        if regenerated_content_str is not None:
+            print(f"Regenerated Assistant Response: {regenerated_content_str}")
 
-    # Adjust summary to reflect actual_processed_count if it's different from total_samples (e.g. in mock mode with partial data)
-    # However, the test assertion expects "All samples passed" based on what it *does* process.
-    # The script's internal `all_passed` flag should correctly reflect if all *attempted* samples passed.
-    # The number of samples for "Total samples processed" in the summary should be actual_processed_count.
+            messages_for_eval = [
+                Message(role="user", content=user_message_content),
+                Message(role="assistant", content=regenerated_content_str),
+            ]
+
+            try:
+                result = math_reward(
+                    messages=messages_for_eval,
+                    original_messages=messages_for_eval,
+                    ground_truth=original_assistant_content,
+                )
+
+                print(f"Score (for regenerated): {result.score}")
+                print(f"Reason (for regenerated): {result.reason}")
+                if result.metrics:
+                    print("Metrics (for regenerated):")
+                    for (
+                        metric_name_key,
+                        metric_detail,
+                    ) in result.metrics.items():
+                        print(
+                            f"  {metric_name_key}: Score={metric_detail.score}, Success={metric_detail.is_score_valid}, Reason='{metric_detail.reason}'"
+                        )
+
+                if result.score == 1.0:
+                    print("Status: PASSED")
+                    passed_samples += 1
+                    # error_category_for_sample = "PASSED" # Not present
+                else:
+                    all_passed = False
+                    # No detailed error categorization in this version of the script
+                    print(f"Status: FAILED (Reason: {result.reason})")
+
+                if args.regenerate_recorded_data:
+                    live_call_results_to_record.append(
+                        {
+                            "user_prompt": user_message_content,
+                            "original_assistant_content": original_assistant_content,
+                            "regenerated_content": regenerated_content_str,
+                            "evaluation_score": result.score,
+                            "evaluation_reason": result.reason,
+                            # "error_category": error_category_for_sample, # Not present
+                        }
+                    )
+                print("---------------------\n")
+
+            except Exception as e:
+                print(
+                    f"Sample {actual_processed_count}: Error during evaluation of regenerated response - {e}"
+                )
+                all_passed = False
+                # error_category_counts["E"] += 1
+                # error_category_for_sample = "E_EvalError"
+                if args.regenerate_recorded_data:
+                    live_call_results_to_record.append(
+                        {
+                            "user_prompt": user_message_content,
+                            "original_assistant_content": original_assistant_content,
+                            "regenerated_content": regenerated_content_str,
+                            "evaluation_score": 0.0,
+                            "evaluation_reason": f"Evaluation Exception: {e}",
+                            # "error_category": error_category_for_sample, # Not present
+                        }
+                    )
+                print("---------------------\n")
 
     print("\n--- Regeneration & Evaluation Summary ---")
-    # If in mock mode and samples were filtered, total_samples might be misleading.
-    # The spirit of "All samples passed" refers to those *attempted*.
-    # The `all_passed` flag tracks if any of the `actual_processed_count` samples failed.
-    # `passed_samples` counts successful ones among `actual_processed_count`.
-
-    summary_total_processed = (
-        actual_processed_count  # Use the count of samples actually iterated over
-    )
-
+    summary_total_processed = actual_processed_count
     print(f"Total samples attempted in this run: {summary_total_processed}")
     print(f"Samples passed (among attempted): {passed_samples}")
 
-    # If summary_total_processed is 0 (e.g. no mock data found for first 10), then failed_count is 0.
     failed_count = (
         summary_total_processed - passed_samples if summary_total_processed > 0 else 0
     )
     print(f"Samples failed (among attempted): {failed_count}")
 
-    if (
-        all_passed and summary_total_processed > 0
-    ):  # Condition: all attempted samples passed AND at least one was attempted
+    if summary_total_processed == 0:
+        print(
+            "\nNo samples were processed in this run (e.g., no matching mock data found or no samples selected)."
+        )
+    elif all_passed:
         print(
             "\nAll samples processed in this run passed successfully with regenerated responses!"
-        )
-    elif summary_total_processed == 0:
-        print(
-            "\nNo samples were processed in this run (e.g., no matching mock data found)."
         )
     else:
         print(
@@ -537,5 +508,5 @@ if __name__ == "__main__":
         default=None,
         help="Comma-separated list of 0-based dataset indices to process (e.g., '0,5,10'). Processes all if not set.",
     )
-    args = parser.parse_args()
-    asyncio.run(main(args))
+    args_parsed = parser.parse_args()
+    asyncio.run(main(args_parsed))

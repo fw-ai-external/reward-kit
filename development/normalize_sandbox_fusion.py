@@ -1,7 +1,19 @@
+"""Normalizes various coding dataset formats from SandboxFusion.
+
+This script converts datasets into a unified OpenAI-compatible JSONL format.
+"""
+
 import ast
 import hashlib
 import json
 import os
+from typing import (  # Removed Callable, Union. Added List, TypedDict
+    Any,
+    Dict,
+    List,
+    Optional,
+    TypedDict,
+)
 
 from transformers import AutoTokenizer  # For Repobench-P
 
@@ -44,29 +56,32 @@ OUTPUT_JSONL_FILE = "./development/CODING_DATASET.jsonl"
 # Global tokenizer instance for Repobench-P to avoid reloading it for each problem
 # Note: This assumes "assets/tokenizer/gpt2" is accessible relative to the execution path.
 try:
-    repobench_p_tokenizer = AutoTokenizer.from_pretrained(
-        "gpt2"
-    )  # Using "gpt2" as a placeholder if local path fails
+    repobench_p_tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    # Placeholder
 except OSError:
     print(
-        "Warning: Could not load gpt2 tokenizer for Repobench-P. Falling back to basic split for token counting."
+        "Warning: Could not load gpt2 tokenizer for Repobench-P. "
+        "Falling back to basic split for token counting."
     )
     repobench_p_tokenizer = None
 
 
 def count_tokens_for_repobench_p(text: str) -> int:
+    """Count tokens for Repobench-P, using the gpt2 tokenizer or a fallback."""
     if repobench_p_tokenizer:
         return len(repobench_p_tokenizer.encode(text))
     return len(text.split())  # Basic fallback
 
 
 def decode_tokens_for_repobench_p(tokens: list) -> str:
+    """Decode tokens for Repobench-P, using the gpt2 tokenizer or a fallback."""
     if repobench_p_tokenizer:
         return repobench_p_tokenizer.decode(tokens)
     return " ".join(map(str, tokens))  # Basic fallback
 
 
 def comment_repobench_p_snippet(code: str, language: str):
+    """Comment out a code snippet based on its language for Repobench-P."""
     if language == "python":
         return "\n".join([f"# {line}" for line in code.split("\n")])
     # Add other languages if necessary, though we focus on Python
@@ -76,7 +91,14 @@ def comment_repobench_p_snippet(code: str, language: str):
 # --- End Helper for Repobench-P ---
 
 
-def extract_python_docstring(code_string: str) -> str | None:
+class ContextInfo(TypedDict):
+    text: str
+    tokens: int
+    original_index: int
+
+
+def extract_python_docstring(code_string: str) -> Optional[str]:
+    """Extract docstring from first func/class in Python code."""
     try:
         tree = ast.parse(code_string.strip())
         for node in tree.body:
@@ -89,26 +111,38 @@ def extract_python_docstring(code_string: str) -> str | None:
 
 
 def format_aider_prompt(problem_json: dict) -> str:
+    """Format the prompt for Aider benchmark style problems."""
     question = problem_json.get("content", "")
-    return f"{question}\n\nPlease generate the code in the following format:\n```python\n# Your code response here\n```"
+    return (
+        f"{question}\n\nPlease generate the code in the following format:\n"
+        "```python\n# Your code response here\n```"
+    )
 
 
 def format_mbpp_prompt(problem_json: dict) -> str:
+    """Format the prompt for MBPP and MBXP style problems."""
     question = problem_json.get("content", "")
     test_list = problem_json.get("test_list", [])  # MBPP specific
     if not test_list and isinstance(problem_json.get("labels"), dict):  # For MBXP
         test_list = problem_json["labels"].get("test_list", [])
 
     tests_string = "\n".join(test_list)
-    return f"You are an expert Python programmer, and here is your task: {question} Your code should pass these tests:\n\n{tests_string}"
+    return (
+        f"You are an expert Python programmer, and here is your task: {question} "
+        f"Your code should pass these tests:\n\n{tests_string}"
+    )
 
 
 def format_repobench_p_prompt(problem_json: dict, lang: str = "python") -> str:
-    # Simplified port of Repobench-P's _generate_single_prompt
+    """Format the prompt for Repobench-P style problems.
+
+    This is a simplified port of Repobench-P's _generate_single_prompt.
+    """
     # This is complex and may need the actual tokenizer assets to be perfectly replicated.
     # Using gpt2 tokenizer as a stand-in. Max prompt length default from parser.
-    max_prompt_length_tokens = 8000  # Max total tokens for the prompt
-    current_file_max_tokens = 1600  # Max tokens for the current file's code snippet
+    max_prompt_length_tokens = 8000
+    # Max prompt tokens
+    current_file_max_tokens = 1600  # Max tokens for current file code
 
     code_context = problem_json.get("code", "")
     file_path = problem_json.get("file_path", "unknown_file.py")
@@ -135,10 +169,10 @@ def format_repobench_p_prompt(problem_json: dict, lang: str = "python") -> str:
             ]  # Approx char length
 
     current_prompt_tokens = count_tokens_for_repobench_p(code_snippet)
-    final_prompt_parts = [code_snippet]  # Current code is the last part
+    final_prompt_parts: List[str] = [code_snippet]  # Current code is the last part
 
     # Prepare context snippets
-    contexts_info = []
+    contexts_info: List[ContextInfo] = []
     raw_contexts = problem_json.get("context", [])
     if isinstance(raw_contexts, list):
         for i, ctx_item in enumerate(raw_contexts):
@@ -197,44 +231,44 @@ def format_repobench_p_prompt(problem_json: dict, lang: str = "python") -> str:
 
 
 def format_cruxeval_output_prompt(problem_json: dict) -> str:
+    """Format the prompt for CruxEval output prediction tasks."""
     # Using 'direct output prompt' style from cruxeval.py
     code = problem_json.get("code", "")
     test_input = problem_json.get("input", "")  # This is the input to f()
 
     # Ensure test_input is represented as a string literal if it's not already
-    # For example, if input is "hello", it should appear as "hello" in f("hello")
-    # If input is ["a", "b"], it should appear as ["a", "b"] in f(["a", "b"])
     # The problem_json['input'] should already be in the correct string representation.
 
-    return f"""You are given a Python function and an assertion containing an input to the function. Complete the assertion with a literal (no unsimplified expressions, no function calls) containing the output when executing the provided code on the given input, even if the function is incorrect or incomplete. Do NOT output any extra information. Provide the full assertion with the correct output in [ANSWER] and [/ANSWER] tags, following the examples.
-
-[PYTHON]
-def f(n):
-    return n
-assert f(17) == ??
-[/PYTHON]
-[ANSWER]
-assert f(17) == 17
-[/ANSWER]
-
-[PYTHON]
-def f(s):
-    return s + "a"
-assert f("x9j") == ??
-[/PYTHON]
-[ANSWER]
-assert f("x9j") == "x9ja"
-[/ANSWER]
-
-[PYTHON]
-{code}
-assert f({test_input}) == ??
-[/PYTHON]
-[ANSWER]
-"""
+    return (
+        "You are given a Python function and an assertion containing an input to "
+        "the function. Complete the assertion with a literal (no unsimplified "
+        "expressions, no function calls) containing the output when executing the "
+        "provided code on the given input, even if the function is incorrect or "
+        "incomplete. Do NOT output any extra information. Provide the full assertion "
+        "with the correct output in [ANSWER] and [/ANSWER] tags, "
+        "following the examples.\n\n"
+        "[PYTHON]\n"
+        "def f(n):\n"
+        "    return n\n"
+        "assert f(17) == ??\n"
+        "[/PYTHON]\n"
+        "[ANSWER]\n"
+        "assert f(17) == 17\n"
+        "[/ANSWER]\n\n"
+        "[PYTHON]\n"
+        "def f(s):\n"
+        '    return s + "a"\n'
+        'assert f("x9j") == ??\n'
+        "[/PYTHON]\n"
+        "[ANSWER]\n"
+        'assert f("x9j") == "x9ja"\n'
+        "[/ANSWER]\n\n"
+        f"[PYTHON]\n{code}\nassert f({{test_input}}) == ??\n[/PYTHON]\n[ANSWER]\n"
+    )
 
 
 def format_cruxeval_output_assistant(problem_json: dict) -> str:
+    """Format the assistant's response for CruxEval output prediction tasks."""
     test_input = problem_json.get("input", "")
     expected_output = problem_json.get("output", "")  # This is the value f() returns
     # Ensure expected_output is represented as a string literal
@@ -244,7 +278,11 @@ def format_cruxeval_output_assistant(problem_json: dict) -> str:
 
 def normalize_problem_to_openai_format(
     problem_json: dict, filename: str, is_multilingual_file: bool
-) -> dict | None:
+) -> Optional[Dict[str, Any]]:
+    """Normalize a problem from various dataset formats to the OpenAI messages format.
+
+    Handles dataset-specific prompt engineering and language filtering.
+    """
     problem_id_str = str(problem_json.get("id", "N/A"))
     try:
         # Robust key finding from the original script
@@ -279,9 +317,6 @@ def normalize_problem_to_openai_format(
         raw_assistant_content = None
         for key_idx, key in enumerate(assistant_content_keys):
             if key in problem_json:
-                # Allow non-string types for assistant if specific datasets need it (e.g. cruxeval output might be int)
-                # The formatting function for that dataset will handle it.
-                # For now, we still expect string for general processing.
                 if isinstance(
                     problem_json[key], (str, int, float, bool, list, dict)
                 ):  # Allow more types for raw_assistant
@@ -292,31 +327,20 @@ def normalize_problem_to_openai_format(
                         raw_assistant_content = str(raw_assistant_content)
                     break
                 elif key_idx == 0 and key == assistant_content_keys[0]:
-                    # Primary key was wrong type, but we'll check other keys
                     pass
 
         if raw_user_content is None:
             if primary_user_key_was_wrong_type:
                 print(
-                    f"Warning: Skipping problem ID {problem_id_str} in {filename} because primary user content key '{user_content_keys[0]}' was found but is not a string."
+                    f"Warning: Skipping ID {problem_id_str} in {filename} - "
+                    f"primary user key '{user_content_keys[0]}' not a string."
                 )
             else:
                 print(
-                    f"Warning: Skipping problem ID {problem_id_str} in {filename} due to missing user content (tried keys: {user_content_keys})."
+                    f"Warning: Skipping ID {problem_id_str} in {filename} - "
+                    f"missing user content (keys: {user_content_keys})."
                 )
             return None
-
-        if (
-            raw_assistant_content is None
-        ):  # This check might be too strict if assistant content is built differently
-            # For some like cruxeval, 'output' might be the raw value, not the final assistant message.
-            # We'll fetch it specifically if needed.
-            # if primary_assistant_key_was_wrong_type:
-            #     print(f"Warning: Problem ID {problem_id_str} in {filename}: primary assistant content key '{assistant_content_keys[0]}' was found but is not a string.")
-            # else:
-            #     print(f"Warning: Problem ID {problem_id_str} in {filename}: missing assistant content (tried keys: {assistant_content_keys}).")
-            # For now, let it pass, specific handlers will manage.
-            pass
 
         labels_data = problem_json.get("labels")
         labels = {}
@@ -325,13 +349,13 @@ def normalize_problem_to_openai_format(
                 labels = json.loads(labels_data)
             except json.JSONDecodeError:
                 print(
-                    f"Warning: Skipping problem ID {problem_id_str} in {filename} due to malformed JSON in labels."
+                    f"Warning: Skipping ID {problem_id_str} in {filename} "
+                    "- malformed JSON in labels."
                 )
                 return None
         elif isinstance(labels_data, dict):
             labels = labels_data
 
-        # Language filtering for multilingual files
         programming_language = labels.get(
             "programming_language", "python" if "python" in filename else None
         )
@@ -339,32 +363,23 @@ def normalize_problem_to_openai_format(
             not programming_language
             and "cruxeval_x" in filename
             and isinstance(problem_json.get("id"), str)
-        ):  # Cruxeval_X lang from ID
+        ):
             lang_part = problem_json["id"].split("_")[0]
-            # map lang_part to "python", "java" etc. For now, assume python if not obvious
-            # This mapping is complex from cruxeval.py, simplified here
             if lang_part in ["python", "py"]:
                 programming_language = "python"
-            # else: programming_language = lang_part # or skip if not python
 
-        if (
-            is_multilingual_file or "cruxeval_x" in filename
-        ):  # Cruxeval_X is also multilingual
+        if is_multilingual_file or "cruxeval_x" in filename:
             if programming_language != "python":
                 return None
 
-        # Initialize final contents
         final_user_content = raw_user_content
         final_assistant_content = (
             str(raw_assistant_content) if raw_assistant_content is not None else ""
         )
 
-        # Dataset-specific formatting
         if "aider_benchmark" in filename:
             final_user_content = format_aider_prompt(problem_json)
-            # final_assistant_content is raw_assistant_content (i.e., problem_json['canonical_solution'])
-
-        elif "mbpp" in filename and "mbxp" not in filename:  # Plain MBPP
+        elif "mbpp" in filename and "mbxp" not in filename:
             final_user_content = format_mbpp_prompt(problem_json)
             test_setup_code = labels.get("test_setup_code", "")
             if (
@@ -375,21 +390,15 @@ def normalize_problem_to_openai_format(
                 final_assistant_content = (
                     test_setup_code.strip() + "\n\n" + final_assistant_content
                 )
-
         elif "mhpp" in filename:
-            original_content_for_mhpp = problem_json.get(
-                "content", ""
-            )  # Should be raw_user_content
+            original_content_for_mhpp = problem_json.get("content", "")
             first_line_of_test = ""
             if problem_json.get("test") and isinstance(problem_json["test"], str):
                 first_line_of_test = problem_json["test"].split("\n")[0]
-
             prompt_stub = original_content_for_mhpp
             if '"""' in prompt_stub:
                 prompt_stub = prompt_stub[: prompt_stub.rfind('"""')]
             final_user_content = f'{prompt_stub}\n    e.g. {first_line_of_test} """'
-
-            # Assistant: original 'content' + 'canonical_solution'
             if not (
                 "def " in final_assistant_content.strip()
                 or "class " in final_assistant_content.strip()
@@ -408,36 +417,24 @@ def normalize_problem_to_openai_format(
                     final_assistant_content = (
                         original_content_for_mhpp + "\n" + final_assistant_content
                     )
-
         elif "ncb_python" in filename:
             final_user_content = problem_json.get("content", raw_user_content)
             final_assistant_content = problem_json.get(
                 "canonical_solution", raw_assistant_content
             )
-
         elif "repobench_c" in filename:
-            final_user_content = problem_json.get(
-                "prompt", raw_user_content
-            )  # 'prompt' is the key for user message
+            final_user_content = problem_json.get("prompt", raw_user_content)
             final_assistant_content = problem_json.get(
                 "next_line", raw_assistant_content
             )
-
         elif "repobench_p" in filename:
-            # Requires 'code', 'file_path', 'import_statement', 'context', 'gold_snippet_index' from problem_json
-            # Assuming 'python' language for now.
             final_user_content = format_repobench_p_prompt(problem_json, lang="python")
             final_assistant_content = problem_json.get(
                 "next_line", raw_assistant_content
             )
-
-        elif (
-            "cruxeval" in filename
-        ):  # Handles both cruxeval and cruxeval_x (filtered for Python)
-            # Defaulting to 'output' mode, 'direct' prompt style
+        elif "cruxeval" in filename:
             final_user_content = format_cruxeval_output_prompt(problem_json)
             final_assistant_content = format_cruxeval_output_assistant(problem_json)
-
         elif (
             "humaneval" in filename
             or "evoeval" in filename
@@ -450,53 +447,6 @@ def normalize_problem_to_openai_format(
                 )
             )
         ):
-            # HumanEval, EvoEval, BigCodeBench, HumanEvalDS (Python)
-            extracted_docstring = extract_python_docstring(
-                raw_user_content
-            )  # raw_user_content is 'prompt' or 'content'
-            if extracted_docstring:
-                final_user_content = extracted_docstring
-                # Assistant: stub + body
-                if not (
-                    "def " in final_assistant_content.strip()
-                    or "class " in final_assistant_content.strip()
-                ):
-                    if raw_user_content.rstrip().endswith(":"):
-                        final_assistant_content = (
-                            raw_user_content.rstrip() + "\n" + final_assistant_content
-                        )
-                    elif raw_user_content.endswith("\n"):
-                        final_assistant_content = (
-                            raw_user_content + final_assistant_content
-                        )
-                    else:
-                        final_assistant_content = (
-                            raw_user_content + "\n" + final_assistant_content
-                        )
-            else:  # No docstring found, use raw_user_content as prompt
-                final_user_content = raw_user_content
-                # final_assistant_content is already raw_assistant_content (solution body)
-
-        elif is_multilingual_file and (
-            "mbxp" in filename or labels.get("task_id", "").startswith("mbxp")
-        ):
-            # MBXP (Python, MBPP-like)
-            # problem_json['content'] is the question
-            # problem_json['labels'] might contain 'test_list' and 'test_setup_code'
-            final_user_content = format_mbpp_prompt(
-                problem_json
-            )  # format_mbpp_prompt handles .get('test_list')
-            test_setup_code = labels.get("test_setup_code", "")
-            if (
-                test_setup_code
-                and isinstance(test_setup_code, str)
-                and test_setup_code not in final_assistant_content
-            ):
-                final_assistant_content = (
-                    test_setup_code.strip() + "\n\n" + final_assistant_content
-                )
-
-        else:  # Fallback for any other datasets or if specific conditions weren't met
             extracted_docstring = extract_python_docstring(raw_user_content)
             if extracted_docstring:
                 final_user_content = extracted_docstring
@@ -516,27 +466,61 @@ def normalize_problem_to_openai_format(
                         final_assistant_content = (
                             raw_user_content + "\n" + final_assistant_content
                         )
-            # else: final_user_content is raw_user_content, final_assistant_content is raw_assistant_content
+            else:
+                final_user_content = raw_user_content
+        elif is_multilingual_file and (
+            "mbxp" in filename or labels.get("task_id", "").startswith("mbxp")
+        ):
+            final_user_content = format_mbpp_prompt(problem_json)
+            test_setup_code = labels.get("test_setup_code", "")
+            if (
+                test_setup_code
+                and isinstance(test_setup_code, str)
+                and test_setup_code not in final_assistant_content
+            ):
+                final_assistant_content = (
+                    test_setup_code.strip() + "\n\n" + final_assistant_content
+                )
+        else:
+            extracted_docstring = extract_python_docstring(raw_user_content)
+            if extracted_docstring:
+                final_user_content = extracted_docstring
+                if not (
+                    "def " in final_assistant_content.strip()
+                    or "class " in final_assistant_content.strip()
+                ):
+                    if raw_user_content.rstrip().endswith(":"):
+                        final_assistant_content = (
+                            raw_user_content.rstrip() + "\n" + final_assistant_content
+                        )
+                    elif raw_user_content.endswith("\n"):
+                        final_assistant_content = (
+                            raw_user_content + final_assistant_content
+                        )
+                    else:
+                        final_assistant_content = (
+                            raw_user_content + "\n" + final_assistant_content
+                        )
 
-        # Validations
         if not isinstance(final_user_content, str) or not isinstance(
             final_assistant_content, str
         ):
             print(
-                f"Warning: Skipping problem ID {problem_id_str} in {filename} due to invalid processed content types (user: {type(final_user_content)}, assistant: {type(final_assistant_content)})."
+                f"Warning: Skipping ID {problem_id_str} in {filename} - "
+                f"invalid content types (user: {type(final_user_content)}, "
+                f"assistant: {type(final_assistant_content)})."
             )
             return None
         if not final_user_content.strip() or not final_assistant_content.strip():
             print(
-                f"Warning: Skipping problem ID {problem_id_str} in {filename} due to empty processed content after formatting."
+                f"Warning: Skipping ID {problem_id_str} in {filename} - "
+                "empty processed content."
             )
             return None
-
-        if (
-            final_assistant_content.strip() == "import sys; sys.exit(0)"
-        ):  # Placeholder solution
+        if final_assistant_content.strip() == "import sys; sys.exit(0)":
             print(
-                f"Warning: Skipping problem ID {problem_id_str} in {filename} due to placeholder solution."
+                f"Warning: Skipping ID {problem_id_str} in {filename} - "
+                "placeholder solution."
             )
             return None
 
@@ -548,7 +532,8 @@ def normalize_problem_to_openai_format(
         }
     except Exception as e:
         print(
-            f"Warning: Skipping problem ID {problem_id_str} in {filename} due to an unexpected error ({type(e).__name__}: {e})."
+            f"Warning: Skipping ID {problem_id_str} in {filename} - "
+            f"error ({type(e).__name__}: {e})."
         )
         import traceback
 
@@ -557,6 +542,13 @@ def normalize_problem_to_openai_format(
 
 
 def main():
+    """Process SandboxFusion datasets and normalize them to OpenAI JSONL format.
+
+    This function iterates through specified dataset files, normalizes each problem
+    to an OpenAI-compatible format, and writes the results to an output JSONL file.
+    It handles language filtering for multilingual datasets and logs errors or
+    skipped problems.
+    """
     output_dir = os.path.dirname(OUTPUT_JSONL_FILE)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -580,7 +572,8 @@ def main():
                 continue
 
             print(
-                f"Processing file {filename_idx + 1}/{len(ALL_SOURCE_JSONL_FILES)}: {filename}..."
+                f"Processing file {filename_idx + 1}/{len(ALL_SOURCE_JSONL_FILES)}: "
+                f"{filename}..."
             )
             lines_in_file = 0
             processed_in_file = 0
@@ -590,14 +583,14 @@ def main():
                     for line_number, line in enumerate(infile, 1):
                         lines_in_file += 1
                         stripped_line = line.strip()
-                        if not stripped_line:  # Skip empty lines
-                            # skipped_in_file += 1 # Or just ignore
+                        if not stripped_line:
                             continue
                         try:
                             problem_data = json.loads(stripped_line)
                         except json.JSONDecodeError:
                             print(
-                                f"Warning: Malformed JSON on line {line_number} in {filepath}. Skipping line."
+                                f"Warning: Malformed JSON on line {line_number} "
+                                f"in {filepath}. Skipping line."
                             )
                             skipped_in_file += 1
                             continue
@@ -610,23 +603,21 @@ def main():
                             processed_in_file += 1
                         else:
                             skipped_in_file += 1
-
                 print(
-                    f"Finished processing {filename}. Lines: {lines_in_file}, Processed: {processed_in_file}, Skipped: {skipped_in_file}"
+                    f"Finished {filename}. Lines: {lines_in_file}, "
+                    f"Processed: {processed_in_file}, Skipped: {skipped_in_file}"
                 )
                 processed_count += processed_in_file
                 skipped_count += skipped_in_file
-
             except Exception as e:
                 print(
-                    f"Error processing file {filepath}: {type(e).__name__}: {e}. Skipping rest of file."
+                    f"Error processing file {filepath}: {type(e).__name__}: {e}. "
+                    "Skipping rest of file."
                 )
                 import traceback
 
                 traceback.print_exc()
                 file_error_count += 1
-                # If a file error occurs, count remaining lines as skipped or handle as per requirement
-                # For now, just note the file error.
 
     print("\nDataset normalization complete.")
     print(f"Total problems processed and written: {processed_count}")

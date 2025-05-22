@@ -1,17 +1,22 @@
 import importlib
+from typing import Any, Dict, List, Optional
+
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ValidationError
-from typing import List, Dict, Any, Optional
 
 # Assuming these models are correctly defined in reward_kit.models
-from reward_kit.models import Message, EvaluateResult
+from reward_kit.models import EvaluateResult, Message
+
 
 # --- Request and Response Models ---
 class EvaluationRequest(BaseModel):
-    messages: List[Dict[str, Any]] # Could also be List[Message] if we enforce that model on input
+    messages: List[
+        Dict[str, Any]
+    ]  # Could also be List[Message] if we enforce that model on input
     ground_truth: Optional[str] = None
     kwargs: Optional[Dict[str, Any]] = {}
+
 
 # --- Global variable to store the loaded reward function ---
 # This is a simple approach for a single-function server.
@@ -23,8 +28,9 @@ _REWARD_FUNCTION_NAME = "N/A"
 app = FastAPI(
     title="Reward Kit Generic Reward Function Server",
     description="Serves a dynamically loaded reward function.",
-    version="0.1.0" # Or use reward_kit.__version__
+    version="0.1.0",  # Or use reward_kit.__version__
 )
+
 
 @app.post("/evaluate", response_model=EvaluateResult)
 async def evaluate_endpoint(request: EvaluationRequest):
@@ -33,35 +39,54 @@ async def evaluate_endpoint(request: EvaluationRequest):
     """
     if _LOADED_REWARD_FUNCTION is None:
         raise HTTPException(status_code=500, detail="Reward function not loaded.")
-    
+
     try:
         # Prepare arguments for the reward function
         # The user's reward function is expected to match the @reward_function signature
         func_args = {
             "messages": request.messages,
             "ground_truth": request.ground_truth,
-            **(request.kwargs or {})
+            **(request.kwargs or {}),
         }
-        
+
         result = _LOADED_REWARD_FUNCTION(**func_args)
-        
+
         if not isinstance(result, EvaluateResult):
             # This case should ideally not happen if functions are correctly decorated
             # and return EvaluateResult, but good to have a fallback.
-            print(f"Warning: Reward function '{_REWARD_FUNCTION_NAME}' did not return an EvaluateResult instance. Type: {type(result)}")
+            print(
+                f"Warning: Reward function '{_REWARD_FUNCTION_NAME}' did not return an EvaluateResult instance. Type: {type(result)}"
+            )
             # Attempt to construct an EvaluateResult if it's a dict-like object,
             # otherwise, this will raise an error or return a poorly formed response.
             # For robustness, one might want to wrap this in another try-except.
-            return EvaluateResult(score=0.0, reason="Invalid return type from reward function, check server logs.", is_score_valid=False, metrics={})
+            return EvaluateResult(
+                score=0.0,
+                reason="Invalid return type from reward function, check server logs.",
+                is_score_valid=False,
+                metrics={},
+            )
 
         return result
-    except ValidationError as ve: # Pydantic validation error from reward function's input/output
-        print(f"Validation Error calling reward function '{_REWARD_FUNCTION_NAME}': {ve}")
-        raise HTTPException(status_code=422, detail=f"Input/Output validation error for reward function: {ve.errors()}")
+    except (
+        ValidationError
+    ) as ve:  # Pydantic validation error from reward function's input/output
+        print(
+            f"Validation Error calling reward function '{_REWARD_FUNCTION_NAME}': {ve}"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Input/Output validation error for reward function: {ve.errors()}",
+        )
     except Exception as e:
-        print(f"Error during evaluation with reward function '{_REWARD_FUNCTION_NAME}': {e}")
+        print(
+            f"Error during evaluation with reward function '{_REWARD_FUNCTION_NAME}': {e}"
+        )
         # Consider logging the full traceback here
-        raise HTTPException(status_code=500, detail=f"Internal server error during evaluation: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error during evaluation: {str(e)}"
+        )
+
 
 @app.get("/health")
 async def health_check():
@@ -73,13 +98,14 @@ async def health_check():
     else:
         return {"status": "error", "reason": "Reward function not loaded"}
 
+
 def load_reward_function(import_string: str):
     """
     Loads a reward function from an import string (e.g., 'my_module.my_function').
     """
     global _LOADED_REWARD_FUNCTION, _REWARD_FUNCTION_NAME
     try:
-        module_path, function_name = import_string.rsplit('.', 1)
+        module_path, function_name = import_string.rsplit(".", 1)
         module = importlib.import_module(module_path)
         _LOADED_REWARD_FUNCTION = getattr(module, function_name)
         _REWARD_FUNCTION_NAME = import_string
@@ -90,25 +116,26 @@ def load_reward_function(import_string: str):
         _REWARD_FUNCTION_NAME = "Error loading"
         raise  # Re-raise to make it fatal if loading fails on startup
 
+
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Run the Generic Reward Function Server.")
-    parser.add_argument(
-        "import_string", 
-        type=str, 
-        help="Import string for the reward function (e.g., 'my_package.my_module.my_reward_function')"
+
+    parser = argparse.ArgumentParser(
+        description="Run the Generic Reward Function Server."
     )
     parser.add_argument(
-        "--host", 
-        type=str, 
-        default="127.0.0.1", 
-        help="Host to bind the server to."
+        "import_string",
+        type=str,
+        help="Import string for the reward function (e.g., 'my_package.my_module.my_reward_function')",
     )
     parser.add_argument(
-        "--port", 
-        type=int, 
-        default=8080, # Standard port for Cloud Run, etc.
-        help="Port to bind the server to."
+        "--host", type=str, default="127.0.0.1", help="Host to bind the server to."
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,  # Standard port for Cloud Run, etc.
+        help="Port to bind the server to.",
     )
     # Add --reload for uvicorn if needed for development
     # parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development.")
@@ -120,11 +147,15 @@ if __name__ == "__main__":
     except Exception:
         print(f"Failed to load reward function. Exiting.")
         exit(1)
-        
+
     if not _LOADED_REWARD_FUNCTION:
-        print(f"Reward function {_REWARD_FUNCTION_NAME} could not be loaded. Server will not start correctly.")
+        print(
+            f"Reward function {_REWARD_FUNCTION_NAME} could not be loaded. Server will not start correctly."
+        )
         # Depending on desired behavior, could exit here or let it run and fail on /evaluate
         exit(1)
 
-    print(f"Starting server for reward function: {args.import_string} on http://{args.host}:{args.port}")
-    uvicorn.run(app, host=args.host, port=args.port) # reload=args.reload for dev
+    print(
+        f"Starting server for reward function: {args.import_string} on http://{args.host}:{args.port}"
+    )
+    uvicorn.run(app, host=args.host, port=args.port)  # reload=args.reload for dev

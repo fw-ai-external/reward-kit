@@ -80,10 +80,9 @@ An `EvaluateResult` object with:
 
 - **score**: Combined weighted score (0.0-1.0)
 - **reason**: Detailed explanation of the evaluation
-- **is_score_valid: Indicate if the score is valid and should be used in future training process
 - **metrics**:
-  - **combined_reward**: Overall evaluation result
-  - **accuracy**: Accuracy component evaluation
+  - **combined_reward**: Overall evaluation result (typically a `MetricResult` itself or mirrors the main score)
+  - **accuracy**: Accuracy component evaluation (a `MetricResult` object, containing its own `score`, `reason`, and `success` flag)
   - **length**: Length component evaluation
   - **token_count**: Token count details
 
@@ -137,7 +136,7 @@ You can create custom combined metrics by using the `@reward_function` decorator
 ```python
 from reward_kit.rewards.accuracy import accuracy_reward
 from reward_kit.rewards.reasoning_steps import reasoning_steps_reward
-from reward_kit import reward_function, EvaluateResult, MetricResult # Updated imports
+from reward_kit import reward_function, EvaluateResult, MetricResult
 
 @reward_function
 def accuracy_reasoning_reward(
@@ -183,12 +182,12 @@ def accuracy_reasoning_reward(
     rsn_metric_success = reasoning_result.metrics.get("reasoning_steps", {}).get("success", reasoning_result.score > 0.5) if hasattr(reasoning_result, 'metrics') and "reasoning_steps" in reasoning_result.metrics else reasoning_result.score > 0.5
 
     metrics = {
-        "accuracy_component": MetricResult( # Updated
+        "accuracy_component": MetricResult(
             score=accuracy_result.score,
             success=acc_metric_success,
             reason=acc_metric_reason
         ),
-        "reasoning_component": MetricResult( # Updated
+        "reasoning_component": MetricResult(
             score=reasoning_result.score,
             success=rsn_metric_success,
             reason=rsn_metric_reason
@@ -197,7 +196,7 @@ def accuracy_reasoning_reward(
 
     overall_reason = f"Combined accuracy ({accuracy_result.score:.2f}) and reasoning ({reasoning_result.score:.2f})."
 
-    return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics) # Updated
+    return EvaluateResult(score=combined_score, reason=overall_reason, metrics=metrics)
 ```
 
 ### Tips for Creating Combined Metrics

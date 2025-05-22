@@ -92,9 +92,10 @@ def extract_number_list(text: str) -> List[List[float]]:
     return extracted_lists
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def list_comparison_math_reward(
     messages: List[Message],  # Full conversation, model's response is messages[-1]
+    *,  # Make subsequent parameters keyword-only
     ground_truth: str,  # String representation of the expected list of numbers
     order_matters: bool = False,
     **kwargs: Any,

@@ -60,11 +60,6 @@ class TestDeepCoderReward(unittest.TestCase):
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(all(tc.get("passed") for tc in details))
-        # self.assertEqual(result['score'], 1.0) # Use attribute access
-        # self.assertIn("test_results", result['metrics']) # Use attribute access
-        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-        #     details = json.loads(result['metrics']["test_results"]['reason'])
-        #     self.assertTrue(all(tc.get("passed") for tc in details))
 
     def test_python_one_test_fails_local(self):
         """Test Python code where one test case fails locally."""
@@ -93,10 +88,6 @@ class TestDeepCoderReward(unittest.TestCase):
             self.assertFalse(
                 details[0].get("passed")
             )  # First test case (5 -> expected 6, actual 7) should fail
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
-        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-        #     details = json.loads(result['metrics']["test_results"]['reason'])
-        #     self.assertFalse(details[0].get("passed"))
 
     def test_python_syntax_error_local(self):
         """Test Python code with a syntax error locally."""
@@ -122,10 +113,6 @@ class TestDeepCoderReward(unittest.TestCase):
         if "test_results" in result.metrics and result.metrics["test_results"].reason:
             details = json.loads(result.metrics["test_results"].reason)
             self.assertTrue(any("error" in tc for tc in details))
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
-        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-        #     details = json.loads(result['metrics']["test_results"]['reason'])
-        #     self.assertTrue(any("error" in tc for tc in details))
 
     def test_python_timeout_local(self):
         """Test Python code that times out locally."""
@@ -157,10 +144,6 @@ class TestDeepCoderReward(unittest.TestCase):
                     for tc in details
                 )
             )
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
-        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-        #     details = json.loads(result['metrics']["test_results"]['reason'])
-        #     self.assertTrue(any(tc.get("error") and "timed out" in str(tc.get("error")).lower() for tc in details))
 
     def test_no_code_block(self):
         """Test when no code block is found in the assistant message."""
@@ -185,14 +168,9 @@ class TestDeepCoderReward(unittest.TestCase):
         self.assertIn("error", result.metrics)
         if "error" in result.metrics:
             self.assertIn("No python code block found", result.metrics["error"].reason)
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
-        # self.assertIn("error", result['metrics']) # Use attribute access
-        # if "error" in result['metrics']:
-        #      self.assertIn("No python code block found", result['metrics']["error"]['reason']) # Use attribute access
 
     def test_javascript_all_tests_pass_local(self):
         """Test JavaScript code that passes all test cases locally."""
-        # Using a simplified version of add_one for JS
         js_test_cases = [
             {"input": "5", "expected_output": "6\n"},
             {"input": "-2", "expected_output": "-1\n"},
@@ -213,7 +191,6 @@ class TestDeepCoderReward(unittest.TestCase):
         )
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 1.0)
-        # self.assertEqual(result['score'], 1.0) # Use attribute access
 
     def test_javascript_one_test_fails_local(self):
         """Test JavaScript code where one test case fails locally."""
@@ -237,7 +214,6 @@ class TestDeepCoderReward(unittest.TestCase):
         )
         self.assertIsInstance(result, EvaluateResult)
         self.assertEqual(result.score, 0.0)
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
 
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_all_tests_pass_e2b(self):
@@ -263,7 +239,6 @@ class TestDeepCoderReward(unittest.TestCase):
                 api_key=E2B_API_KEY,
             )
 
-            # Check if we got a connection error
             if hasattr(result, "metrics") and "error" in result.metrics:
                 reason = result.metrics["error"].reason
                 if (
@@ -298,11 +273,6 @@ class TestDeepCoderReward(unittest.TestCase):
                 self.skipTest(f"Skipping due to E2B connection issues: {e}")
             else:
                 raise
-        # self.assertEqual(result['score'], 1.0) # Use attribute access
-        # self.assertIn("test_results", result['metrics']) # Use attribute access
-        # if "test_results" in result['metrics'] and result['metrics']["test_results"]['reason']:
-        #     details = json.loads(result['metrics']["test_results"]['reason'])
-        #     self.assertTrue(all(tc.get("passed") for tc in details))
 
     @unittest.skipUnless(E2B_AVAILABLE, "E2B_API_KEY not set, skipping E2B tests.")
     def test_python_one_test_fails_e2b(self):
@@ -328,7 +298,6 @@ class TestDeepCoderReward(unittest.TestCase):
                 api_key=E2B_API_KEY,
             )
 
-            # Check if we got a connection error
             if hasattr(result, "metrics") and "error" in result.metrics:
                 reason = result.metrics["error"].reason
                 if (
@@ -356,7 +325,6 @@ class TestDeepCoderReward(unittest.TestCase):
                 self.skipTest(f"Skipping due to E2B connection issues: {e}")
             else:
                 raise
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
 
     def test_empty_test_cases(self):
         """Test behavior with an empty list of test cases."""
@@ -365,7 +333,7 @@ class TestDeepCoderReward(unittest.TestCase):
             role="assistant", content="```python\nprint('hello')\n```"
         )
         messages_arg = [prompt_message, assistant_message]
-        ground_truth_arg = []  # Empty test cases
+        ground_truth_arg: List[Dict[str, Any]] = []  # Empty test cases
 
         result = deepcoder_code_reward(
             messages=messages_arg,
@@ -378,10 +346,6 @@ class TestDeepCoderReward(unittest.TestCase):
         self.assertIn("error", result.metrics)
         if "error" in result.metrics:
             self.assertEqual(result.metrics["error"].reason, "No test cases provided.")
-        # self.assertEqual(result['score'], 0.0) # Use attribute access
-        # self.assertIn("error", result['metrics']) # Use attribute access
-        # if "error" in result['metrics']:
-        #     self.assertEqual(result['metrics']["error"]['reason'], "No test cases provided.") # Use attribute access
 
 
 if __name__ == "__main__":

@@ -69,22 +69,28 @@ class TicketAPI:
             priority (int): Priority level of the ticket.
         """
         if not self.current_user:
+            # Ensure the error dictionary matches the expected return type structure if possible,
+            # or handle errors in a way that doesn't violate return type contracts.
+            # For simplicity, we'll assume error dicts are acceptable for now,
+            # though a more robust solution might use exceptions or a Result type.
             return {
                 "error": "User not authenticated. Please log in to create a ticket."
             }
         if priority < 1 or priority > 5:
             return {"error": "Invalid priority. Priority must be between 1 and 5."}
-        ticket = {
+
+        # self.current_user is guaranteed to be a str here due to the check above.
+        ticket: Dict[str, Union[int, str]] = {
             "id": self.ticket_counter,
             "title": title,
             "description": description,
-            "status": "Open",
-            "priority": priority,
-            "created_by": self.current_user,
+            "status": "Open",  # status is str
+            "priority": priority,  # priority is int
+            "created_by": self.current_user,  # self.current_user is str here
         }
-        self.ticket_queue.append(ticket)
+        self.ticket_queue.append(ticket)  # Appending a correctly typed dict
         self.ticket_counter += 1
-        return ticket
+        return ticket  # Returning a correctly typed dict
 
     def get_ticket(self, ticket_id: int) -> Dict[str, Union[int, str]]:
         """
@@ -262,10 +268,14 @@ class TicketAPI:
         ]
 
         if status:
-            user_tickets = [
-                ticket
-                for ticket in user_tickets
-                if ticket["status"].lower() == status.lower()
-            ]
+            filtered_tickets = []
+            for ticket_item in user_tickets:
+                current_status = ticket_item.get("status")
+                if (
+                    isinstance(current_status, str)
+                    and current_status.lower() == status.lower()
+                ):
+                    filtered_tickets.append(ticket_item)
+            user_tickets = filtered_tickets
 
         return user_tickets

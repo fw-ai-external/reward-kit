@@ -402,7 +402,7 @@ def run_grpo_training_example():
         reward_adapter_configs: List[
             Dict[str, Any]
         ],  # Each dict: {'adapter': callable, 'weight': float}
-    ) -> Callable[[List[Any], List[str], Dict[str, Any]], List[float]]:
+    ) -> Callable[[List[Any], List[str]], List[float]]:  # Corrected return type hint
 
         total_weight = sum(c["weight"] for c in reward_adapter_configs)
         if abs(total_weight - 1.0) > 1e-6:

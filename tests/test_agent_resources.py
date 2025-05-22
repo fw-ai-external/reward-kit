@@ -9,6 +9,7 @@ import sqlite3
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import Any, Dict  # Added Dict, Any
 from unittest.mock import AsyncMock  # For mocking async methods if needed later
 
 import pytest
@@ -27,7 +28,7 @@ class TestPythonStateResource:
     """Tests for the PythonStateResource."""
 
     async def test_setup_initial_state(self):
-        config = {"initial_state": {"key1": "value1", "count": 10}}
+        config: Dict[str, Any] = {"initial_state": {"key1": "value1", "count": 10}}
         resource = PythonStateResource()
         await resource.setup(config)
         observation = await resource.get_observation()
@@ -35,7 +36,7 @@ class TestPythonStateResource:
         assert resource._state is not config["initial_state"]
 
     async def test_setup_empty_config(self):
-        config = {}
+        config: Dict[str, Any] = {}
         resource = PythonStateResource()
         await resource.setup(config)
         assert await resource.get_observation() == {}
@@ -268,6 +269,8 @@ class TestFileSystemResource:
                 resource._managed_dir_path is not None
                 and resource._managed_dir_path.exists()
             )
+            # Add assertion for mypy
+            assert resource._managed_dir_path is not None
             assert (
                 resource._managed_dir_path / "file1.txt"
             ).read_text() == "Hello World"
@@ -288,12 +291,16 @@ class TestFileSystemResource:
                     forked_resource._managed_dir_path is not None
                     and forked_resource._managed_dir_path.exists()
                 )
+                # Add assertion for mypy
+                assert forked_resource._managed_dir_path is not None
                 assert (
                     forked_resource._managed_dir_path / "original.txt"
                 ).read_text() == "original content"
                 (forked_resource._managed_dir_path / "forked_new.txt").write_text(
                     "forked specific"
                 )
+                # Add assertion for mypy
+                assert original_resource._managed_dir_path is not None
                 assert not (
                     original_resource._managed_dir_path / "forked_new.txt"
                 ).exists()
@@ -314,6 +321,7 @@ class TestFileSystemResource:
             try:
                 await res2.setup({"base_dir_name": "fs_res2_init"})
                 await res2.restore(checkpoint_info)
+                assert res2._managed_dir_path is not None  # Ensure for mypy
                 assert (
                     res2._managed_dir_path / "data.txt"
                 ).read_text() == "checkpoint me"
@@ -428,6 +436,9 @@ class TestDockerResource:
 
     async def test_close_docker_resource(self, docker_resource: DockerResource):
         await docker_resource.setup({"image_name": self.TEST_IMAGE})
+        assert (
+            docker_resource._container is not None
+        )  # Ensure container exists before accessing id
         container_id = docker_resource._container.id
         await docker_resource.close()
         assert docker_resource._container is None

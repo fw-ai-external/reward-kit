@@ -6,6 +6,7 @@ import os
 import warnings
 from functools import wraps
 from typing import (  # Any, Type removed
+    Any,
     Callable,
     Dict,
     List,
@@ -396,7 +397,7 @@ class RewardFunction:
                 ]
 
                 # Prepare kwargs for the underlying reward function call for this specific sample
-                call_kwargs = {}
+                call_kwargs: Dict[str, Any] = {}  # Initialize with Any type for values
                 current_solution = solutions[
                     i
                 ]  # Get the solution for the current sample
@@ -410,33 +411,31 @@ class RewardFunction:
                 )
                 # --- END DEBUG PRINT ---
 
+                processed_solution_val: Optional[str] = None
                 if current_solution is not None:
-                    # Ensure it's actually a string before passing, handle potential lists defensively
                     if isinstance(current_solution, list):
                         logger.warning(
                             f"Sample {i} solution is a list, attempting to use first element: {current_solution}"
                         )
                         if current_solution:  # If list is not empty
-                            call_kwargs["solution"] = str(
-                                current_solution[0]
-                            )  # Convert first element to string
-                        else:
-                            call_kwargs["solution"] = None  # Treat empty list as None
+                            processed_solution_val = str(current_solution[0])
+                        # If current_solution is an empty list, processed_solution_val remains None
                     else:
-                        call_kwargs["solution"] = str(
-                            current_solution
-                        )  # Ensure it's a string
+                        processed_solution_val = str(current_solution)
 
-                # Add any other necessary kwargs extraction here if needed in the future
+                if processed_solution_val is not None:
+                    call_kwargs["solution"] = processed_solution_val
+
+                # Add any other necessary kwargs (if they were extracted from the main **kwargs)
+                # For now, only "solution" is dynamically handled from TRL kwargs.
 
                 try:
                     # Call the underlying RewardFunction instance (__call__)
                     # Pass the constructed messages and the extracted kwargs for this sample
                     result = self(
                         messages=messages,
-                        # original_messages are implicitly handled by self() if needed,
-                        # as it defaults to messages[:-1]
-                        **call_kwargs,
+                        original_messages=None,  # Explicitly pass, self() will default if this is None
+                        **call_kwargs,  # Use call_kwargs directly now
                     )
                     # Handle both RewardOutput and EvaluateResult
                     score = result.score

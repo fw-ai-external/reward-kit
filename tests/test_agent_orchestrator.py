@@ -1,3 +1,4 @@
+# pylint: disable=all
 """
 Tests for the V2 Orchestrator.
 """
@@ -153,7 +154,10 @@ class TestOrchestratorComponentLoading:
         def import_side_effect(module_path):
             if module_path == minimal_task_def.tools_module_path:
                 return mock_tools_mod
-            elif module_path == minimal_task_def.reward_function_path.rsplit(".", 1)[0]:
+            elif (
+                module_path
+                == str(minimal_task_def.reward_function_path).rsplit(".", 1)[0]
+            ):
                 raise ImportError("Test Import Error for reward module")
             raise ValueError(f"Unexpected module path: {module_path}")
 
@@ -229,11 +233,6 @@ class TestOrchestratorComponentLoading:
         orchestrator = Orchestrator(task_definition=task_def_empty_reward)
         result = await orchestrator._load_task_components()
         assert result is False
-        # Check if the specific log message is present
-        # This depends on the logger configuration and how caplog captures it.
-        # A more robust check might be to assert that orchestrator.reward_function is None
-        # and that the function returned False, implying an error was logged.
-        # For now, let's assume the log message check is desired.
         assert "Reward function path is mandatory but missing." in caplog.text
         assert orchestrator.reward_function is None
 

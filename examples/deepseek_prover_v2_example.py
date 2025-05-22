@@ -1,13 +1,16 @@
+# pylint: disable=all
 """
 Example of using the DeepSeek-Prover-V2 reward function for evaluating Lean proofs.
 
 This example demonstrates:
-1. Using the lean_prover_reward function for basic evaluation
-2. Using the deepseek_prover_v2_reward function for more advanced evaluation
-3. Using the deepseek_huggingface_prover_benchmark function for evaluation against the ProverBench dataset
+1. Using the lean_prover_reward function for basic evaluation.
+2. Using the deepseek_prover_v2_reward function for more advanced evaluation.
+3. Using the deepseek_huggingface_prover_benchmark function for evaluation
+   against the ProverBench dataset.
 
 Requirements:
-- For the deepseek_huggingface_prover_benchmark, install with: pip install "reward-kit[deepseek]"
+- For deepseek_huggingface_prover_benchmark, install with:
+  pip install "reward-kit[deepseek]"
 """
 
 from reward_kit.models import Message
@@ -19,6 +22,7 @@ from reward_kit.rewards.lean_prover import (
 
 
 def main():
+    """Runs examples of Lean prover reward functions."""
     # Example statement and response
     statement_text = (
         "For all natural numbers n, the sum of the first n natural numbers is n(n+1)/2."
@@ -84,14 +88,14 @@ def main():
     # Basic evaluation with lean_prover_reward
     basic_partial_result = lean_prover_reward(
         messages=messages_partial,
-        ground_truth=None,
+        ground_truth=None,  # No specific expected proof string for this basic test
         statement=statement_text,
         verbose=True,
     )
 
     basic_complete_result = lean_prover_reward(
         messages=messages_complete,
-        ground_truth=None,
+        ground_truth=None,  # No specific expected proof string for this basic test
         statement=statement_text,
         verbose=True,
     )
@@ -99,7 +103,7 @@ def main():
     # Advanced evaluation with deepseek_prover_v2_reward
     advanced_partial_result = deepseek_prover_v2_reward(
         messages=messages_partial,
-        ground_truth=None,
+        ground_truth=None,  # No specific expected proof string for this basic test
         statement=statement_text,
         check_subgoals=True,
         verbose=True,
@@ -107,7 +111,7 @@ def main():
 
     advanced_complete_result = deepseek_prover_v2_reward(
         messages=messages_complete,
-        ground_truth=None,
+        ground_truth=None,  # No specific expected proof string for this basic test
         statement=statement_text,
         check_subgoals=True,
         verbose=True,
@@ -157,7 +161,7 @@ def main():
             "dataset_item": {
                 "id": "sum_naturals",
                 "statement": statement_text,  # statement within dataset_item
-                "expected_proof": None,  # No exact match expected
+                "expected_proof": None,  # No exact match expected for this mock
             },
         }
         # The 'response' is taken from messages[-1].content
@@ -200,13 +204,15 @@ def main():
                     # Ground truth for this specific HF sample
                     ground_truth_hf_sample = {
                         "statement": sample_statement_hf,
-                        # dataset_item can be omitted if dataset_name is provided for lookup
+                        "dataset_item": dataset[sample_idx],
+                        # dataset_item can be omitted if dataset_name is provided for lookup,
+                        # but providing it directly is more robust for this example.
                     }
 
                     hf_result = deepseek_huggingface_prover_benchmark(
                         messages=messages_hf_sample,
                         ground_truth=ground_truth_hf_sample,
-                        dataset_name="deepseek-ai/DeepSeek-ProverBench",  # Will search in this dataset
+                        dataset_name="deepseek-ai/DeepSeek-ProverBench",  # Will search in this dataset if dataset_item not in ground_truth
                         verbose=True,
                     )
 

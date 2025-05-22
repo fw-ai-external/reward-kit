@@ -11,7 +11,11 @@ import pytest
 # Helper function to import modules from file paths
 def load_module_from_path(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None:
+        raise ImportError(f"Could not load spec for module {name} from {path}")
     module = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise ImportError(f"Spec for module {name} has no loader")
     spec.loader.exec_module(module)
     return module
 

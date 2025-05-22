@@ -110,7 +110,7 @@ def parse_args(args=None):
         "--metrics-folders",
         "-m",
         nargs="+",
-        required=False, # No longer strictly required if --remote-url is used
+        required=False,  # No longer strictly required if --remote-url is used
         help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'. Required if not using --remote-url.",
     )
     deploy_parser.add_argument(

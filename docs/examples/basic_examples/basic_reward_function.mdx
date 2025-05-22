@@ -17,14 +17,14 @@ Example of a basic clarity reward function using the Reward Kit.
 """
 
 from typing import List, Dict, Optional
-from reward_kit import EvaluateResult, MetricResult, reward_function # Updated imports
+from reward_kit import EvaluateResult, MetricResult, reward_function
 
 @reward_function
 def clarity_reward(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> EvaluateResult: # Updated return type
+) -> EvaluateResult:
     """
     Evaluates the clarity of a response based on sentence structure,
     vocabulary complexity, and use of explanatory language.
@@ -39,10 +39,10 @@ def clarity_reward(
     """
     # Get the assistant's response
     if not messages or messages[-1].get("role") != "assistant":
-        return EvaluateResult( # Updated
+        return EvaluateResult(
             score=0.0,
-            reason="No assistant response found.", # Added reason
-            metrics={"error": MetricResult(score=0.0, success=False, reason="No assistant response found")} # Updated, added success
+            reason="No assistant response found.",
+            metrics={"error": MetricResult(score=0.0, success=False, reason="No assistant response found")}
         )
 
     response = messages[-1].get("content", "")
@@ -55,7 +55,7 @@ def clarity_reward(
     sentence_score = 1.0 if avg_sentence_length < 15 else (25.0 - avg_sentence_length) / 10.0
     sentence_score = max(0.0, min(1.0, sentence_score))
 
-    metrics["sentence_length"] = MetricResult( # Updated
+    metrics["sentence_length"] = MetricResult(
         score=sentence_score,
         success=sentence_score >= 0.7, # Example success condition
         reason=f"Average sentence length: {avg_sentence_length:.1f} words"
@@ -66,7 +66,7 @@ def clarity_reward(
     explanatory_count = sum(1 for marker in explanatory_markers if marker.lower() in response.lower())
 
     explanation_score = min(explanatory_count / 2.0, 1.0)  # Cap at 1.0
-    metrics["explanation"] = MetricResult( # Updated
+    metrics["explanation"] = MetricResult(
         score=explanation_score,
         success=explanatory_count > 0, # Example success condition
         reason=f"Found {explanatory_count} explanatory markers"
@@ -78,7 +78,7 @@ def clarity_reward(
     long_word_ratio = long_words / max(len(words), 1)
 
     vocabulary_score = 1.0 - min(long_word_ratio * 5, 1.0)  # Lower score for more complex vocabulary
-    metrics["vocabulary"] = MetricResult( # Updated
+    metrics["vocabulary"] = MetricResult(
         score=vocabulary_score,
         success=vocabulary_score >= 0.7, # Example success condition
         reason=f"Complex word ratio: {long_word_ratio:.2f}"
@@ -92,7 +92,7 @@ def clarity_reward(
     )
     overall_reason = f"Clarity score based on sentence length, explanation, and vocabulary. Avg sentence length: {avg_sentence_length:.1f}, Explanatory markers: {explanatory_count}, Complex word ratio: {long_word_ratio:.2f}."
 
-    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics) # Updated
+    return EvaluateResult(score=final_score, reason=overall_reason, metrics=metrics)
 
 
 # Example usage with test conversation

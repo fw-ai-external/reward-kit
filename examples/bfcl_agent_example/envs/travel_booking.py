@@ -23,8 +23,12 @@ class TravelAPI:
     # Adapted from source : https://developer.concur.com/api-reference/
     def __init__(self):
         super().__init__()
-        self.credit_card_list: Dict[str, Dict[str, Union[str, int, float]]]
-        self.booking_record: Dict[str, Dict[str, Union[str, float]]]
+        self.credit_card_list: Dict[
+            str, Dict[str, Union[str, int, float]]
+        ]  # 'balance' is Union[int, float]
+        self.booking_record: Dict[
+            str, Dict[str, Union[str, float, int]]
+        ]  # card_id can be int, travel_cost float, others str
         self.access_token: Optional[str]
         self.token_type: Optional[str]
         self.token_expires_in: Optional[int]
@@ -42,36 +46,72 @@ class TravelAPI:
         """
         Load a scenario from the scenarios folder
         Args:
-            scenario (Dict[str, str]): The scenario to load
+            scenario (Dict[str, Any]): The scenario to load
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
+
+        seed_val = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
+        if not isinstance(seed_val, int):  # Ensure seed is int
+            seed_val = DEFAULT_STATE_COPY["random_seed"]
+        self._random = random.Random(seed_val)
+
+        ccl = scenario.get("credit_card_list", DEFAULT_STATE_COPY["credit_card_list"])
+        self.credit_card_list = (
+            ccl if isinstance(ccl, dict) else DEFAULT_STATE_COPY["credit_card_list"]
         )
-        self.credit_card_list = scenario.get(
-            "credit_card_list", DEFAULT_STATE_COPY["credit_card_list"]
+
+        br = scenario.get("booking_record", DEFAULT_STATE_COPY["booking_record"])
+        self.booking_record = (
+            br if isinstance(br, dict) else DEFAULT_STATE_COPY["booking_record"]
         )
-        self.booking_record = scenario.get(
-            "booking_record", DEFAULT_STATE_COPY["booking_record"]
+
+        at = scenario.get("access_token", DEFAULT_STATE_COPY["access_token"])
+        self.access_token = (
+            at
+            if isinstance(at, str) or at is None
+            else DEFAULT_STATE_COPY["access_token"]
         )
-        self.access_token = scenario.get(
-            "access_token", DEFAULT_STATE_COPY["access_token"]
+
+        tt = scenario.get("token_type", DEFAULT_STATE_COPY["token_type"])
+        self.token_type = (
+            tt
+            if isinstance(tt, str) or tt is None
+            else DEFAULT_STATE_COPY["token_type"]
         )
-        self.token_type = scenario.get("token_type", DEFAULT_STATE_COPY["token_type"])
-        self.token_expires_in = scenario.get(
-            "token_expires_in", DEFAULT_STATE_COPY["token_expires_in"]
+
+        tei = scenario.get("token_expires_in", DEFAULT_STATE_COPY["token_expires_in"])
+        self.token_expires_in = (
+            tei
+            if isinstance(tei, int) or tei is None
+            else DEFAULT_STATE_COPY["token_expires_in"]
         )
-        self.token_scope = scenario.get(
-            "token_scope", DEFAULT_STATE_COPY["token_scope"]
+
+        ts = scenario.get("token_scope", DEFAULT_STATE_COPY["token_scope"])
+        self.token_scope = (
+            ts
+            if isinstance(ts, str) or ts is None
+            else DEFAULT_STATE_COPY["token_scope"]
         )
-        self.user_first_name = scenario.get(
-            "user_first_name", DEFAULT_STATE_COPY["user_first_name"]
+
+        ufn = scenario.get("user_first_name", DEFAULT_STATE_COPY["user_first_name"])
+        self.user_first_name = (
+            ufn
+            if isinstance(ufn, str) or ufn is None
+            else DEFAULT_STATE_COPY["user_first_name"]
         )
-        self.user_last_name = scenario.get(
-            "user_last_name", DEFAULT_STATE_COPY["user_last_name"]
+
+        uln = scenario.get("user_last_name", DEFAULT_STATE_COPY["user_last_name"])
+        self.user_last_name = (
+            uln
+            if isinstance(uln, str) or uln is None
+            else DEFAULT_STATE_COPY["user_last_name"]
         )
-        self.budget_limit = scenario.get(
-            "budget_limit", DEFAULT_STATE_COPY["budget_limit"]
+
+        bl = scenario.get("budget_limit", DEFAULT_STATE_COPY["budget_limit"])
+        self.budget_limit = (
+            bl
+            if isinstance(bl, (int, float)) or bl is None
+            else DEFAULT_STATE_COPY["budget_limit"]
         )
         self.long_context = long_context
 
@@ -198,22 +238,26 @@ class TravelAPI:
         """
         if self.token_expires_in is None:
             return {"error": "Token not initialized"}
-        if self.token_expires_in == 0:
+        if self.token_expires_in == 0:  # This check is fine
             return {"error": "Token expired"}
         if access_token != self.access_token:
-            if self.token_expires_in is not None:
+            if self.token_expires_in is not None:  # Check before decrementing
                 self.token_expires_in -= 1
             return {"error": "Invalid access token"}
         if card_number in self.credit_card_list:
             return {"error": "Card already registered"}
-        card_id = str(self._random.randint(100000000000, 999999999999))  # 12 digits
-        self.credit_card_list[card_id] = {
+        card_id = str(self._random.randint(100000000000, 999999999999))
+
+        new_card_info: Dict[str, Union[str, int, float]] = {
             "card_number": card_number,
             "expiration_date": expiration_date,
             "cardholder_name": cardholder_name,
-            "card_verification_number": card_verification_number,
-            "balance": self._random.randint(10000, 99999),  # 5 digits
+            "card_verification_number": card_verification_number,  # int
+            "balance": float(
+                self._random.randint(10000, 99999)
+            ),  # Ensure balance is float or int
         }
+        self.credit_card_list[card_id] = new_card_info
         return {"card_id": card_id}
 
     def _set_card_balance(self, card_id: str, balance: float) -> None:
@@ -224,11 +268,12 @@ class TravelAPI:
             card_id (str): The ID of the credit card
             balance (float): The balance of the credit card
         """
-        self.credit_card_list[card_id]["balance"] = balance
+        if card_id in self.credit_card_list:
+            self.credit_card_list[card_id]["balance"] = balance
 
     def get_flight_cost(
         self, travel_from: str, travel_to: str, travel_date: str, travel_class: str
-    ) -> Dict[str, Union[List[float], List[str]]]:
+    ) -> Dict[str, Union[List[float], List[str], str]]:  # Added str for error case
         """
         Get the list of cost of a flight in USD based on location, date, and class
 
@@ -452,17 +497,26 @@ class TravelAPI:
         Returns:
             card_balance (float): The balance of the credit card
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"error": "Invalid access token"}
         if card_id not in self.credit_card_list:
             return {
                 "error": "Card not registered. Here are a list of card_id's: "
                 + str(list(self.credit_card_list.keys()))
             }
-        return {"card_balance": self.credit_card_list[card_id]["balance"]}
+
+        balance = self.credit_card_list[card_id].get("balance")
+        if not isinstance(balance, (int, float)):
+            return {
+                "error": "Balance for card not found or not numeric."
+            }  # Should not happen if typed correctly
+        return {"card_balance": balance}
 
     def book_flight(
         self,
@@ -498,48 +552,61 @@ class TravelAPI:
                 - travel_class (str): The class of the travel
                 - travel_cost (float): The cost of the travel
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"booking_status": False, "error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"booking_status": False, "error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"booking_status": False, "error": "Invalid access token"}
         if card_id not in self.credit_card_list:
             return {"booking_status": False, "error": "Card not registered"}
-        if "balance" not in self.credit_card_list[card_id]:
-            return {"booking_status": False, "error": "Balance not found"}
-        if self.credit_card_list[card_id]["balance"] < travel_cost:
+
+        card_balance = self.credit_card_list[card_id].get("balance")
+        if not isinstance(card_balance, (int, float)):
+            return {
+                "booking_status": False,
+                "error": "Balance not found or not numeric for card.",
+            }
+
+        if card_balance < travel_cost:
             return {"booking_status": False, "error": "Insufficient funds"}
-        if (
-            self.budget_limit is not None
-            and self.credit_card_list[card_id]["balance"] < self.budget_limit
-        ):
+
+        if self.budget_limit is not None and card_balance < self.budget_limit:
             return {
                 "booking_status": False,
                 "error": "Balance is less than budget limit",
             }
-        travel_cost = float(travel_cost)
-        self.credit_card_list[card_id]["balance"] -= travel_cost
-        booking_id = str(self._random.randint(1000000, 9999999))  # 7 digits
-        transaction_id = str(self._random.randint(10000000, 99999999))  # 8 digits
-        self.booking_record[booking_id] = {
-            "card_id": card_id,
-            "travel_date": travel_date,
-            "travel_from": travel_from,
-            "travel_to": travel_to,
-            "travel_class": travel_class,
-            "travel_cost": travel_cost,
-            "transaction_id": transaction_id,
+
+        current_travel_cost = float(travel_cost)
+        self.credit_card_list[card_id]["balance"] = (
+            card_balance - current_travel_cost
+        )  # Ensure numeric operation
+
+        booking_id_str = str(self._random.randint(1000000, 9999999))
+        transaction_id_str = str(self._random.randint(10000000, 99999999))
+
+        new_booking_record: Dict[str, Union[str, float, int]] = {
+            "card_id": card_id,  # str
+            "travel_date": travel_date,  # str
+            "travel_from": travel_from,  # str
+            "travel_to": travel_to,  # str
+            "travel_class": travel_class,  # str
+            "travel_cost": current_travel_cost,  # float
+            "transaction_id": transaction_id_str,  # str
         }
+        self.booking_record[booking_id_str] = new_booking_record
         if self.long_context:
             return {
-                "booking_id": booking_id,
-                "transaction_id": transaction_id,
+                "booking_id": booking_id_str,
+                "transaction_id": transaction_id_str,
                 "booking_status": True,
                 "booking_history": self.booking_record,
             }
         return {
-            "booking_id": booking_id,
-            "transaction_id": transaction_id,
+            "booking_id": booking_id_str,
+            "transaction_id": transaction_id_str,
             "booking_status": True,
             "booking_history": {},
         }
@@ -567,23 +634,33 @@ class TravelAPI:
                 - travel_cost (float): The cost of the travel
                 - transaction_id (str): The ID of the transaction
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"error": "Invalid access token"}
-        if booking_id not in self.booking_record:
+        if (
+            booking_id is None or booking_id not in self.booking_record
+        ):  # Check booking_id for None
             return {"error": "Booking not found"}
-        invoice = {
-            "booking_id": booking_id,
-            "travel_date": self.booking_record[booking_id]["travel_date"],
-            "travel_from": self.booking_record[booking_id]["travel_from"],
-            "travel_to": self.booking_record[booking_id]["travel_to"],
-            "travel_class": self.booking_record[booking_id]["travel_class"],
-            "travel_cost": self.booking_record[booking_id]["travel_cost"],
-            "transaction_id": self.booking_record[booking_id]["transaction_id"],
+
+        # booking_id is now str and in self.booking_record
+        record = self.booking_record[booking_id]
+        invoice_details: Dict[str, Union[str, float]] = {
+            "booking_id": booking_id,  # booking_id is str
+            "travel_date": record.get(
+                "travel_date", ""
+            ),  # Assuming str, provide default
+            "travel_from": record.get("travel_from", ""),  # Assuming str
+            "travel_to": record.get("travel_to", ""),  # Assuming str
+            "travel_class": record.get("travel_class", ""),  # Assuming str
+            "travel_cost": record.get("travel_cost", 0.0),  # Assuming float
+            "transaction_id": record.get("transaction_id", ""),  # Assuming str
         }
-        return {"invoice": invoice}
+        return {"invoice": invoice_details}
 
     def list_all_airports(self) -> List[str]:
         """
@@ -630,22 +707,41 @@ class TravelAPI:
         Returns:
             cancel_status (bool): The status of the cancellation, True if successful, False if failed
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"cancel_status": False, "error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"cancel_status": False, "error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"cancel_status": False, "error": "Invalid access token"}
         if booking_id not in self.booking_record:
             return {"cancel_status": False, "error": "Booking not found"}
-        card_id = self.booking_record[booking_id]["card_id"]
-        travel_cost = self.booking_record[booking_id]["travel_cost"]
-        self.credit_card_list[card_id]["balance"] += travel_cost
+
+        record_to_cancel = self.booking_record[booking_id]
+        card_id = record_to_cancel.get("card_id")
+        travel_cost = record_to_cancel.get("travel_cost")
+
+        if not isinstance(card_id, str) or not isinstance(travel_cost, (int, float)):
+            return {"cancel_status": False, "error": "Invalid booking record data."}
+
+        if card_id not in self.credit_card_list:
+            return {
+                "cancel_status": False,
+                "error": "Associated credit card not found.",
+            }
+
+        current_balance = self.credit_card_list[card_id].get("balance")
+        if not isinstance(current_balance, (int, float)):
+            return {"cancel_status": False, "error": "Credit card balance not numeric."}
+
+        self.credit_card_list[card_id]["balance"] = current_balance + travel_cost
         del self.booking_record[booking_id]
         return {"cancel_status": True}
 
     def compute_exchange_rate(
         self, base_currency: str, target_currency: str, value: float
-    ) -> float:
+    ) -> Dict[str, float]:  # Corrected return type
         """
         Compute the exchange rate between two currencies
 
@@ -742,14 +838,17 @@ class TravelAPI:
         Returns:
             budget_limit (float): The budget limit set in USD
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"error": "Invalid access token"}
-        budget_limit = float(budget_limit)
-        self.budget_limit = budget_limit
-        return {"budget_limit": budget_limit}
+
+        self.budget_limit = float(budget_limit)  # Ensure it's float
+        return {"budget_limit": self.budget_limit}
 
     def get_nearest_airport_by_city(self, location: str) -> Dict[str, str]:
         """
@@ -809,20 +908,29 @@ class TravelAPI:
             insurance_id (str): The ID of the insurance
             insurance_status (bool): The status of the insurance purchase, True if successful, False if failed
         """
+        if self.token_expires_in is None:  # Check for None
+            return {"insurance_status": False, "error": "Token not initialized"}
         if self.token_expires_in == 0:
             return {"insurance_status": False, "error": "Token expired"}
         if access_token != self.access_token:
-            self.token_expires_in -= 1
+            if self.token_expires_in is not None:  # Check before decrementing
+                self.token_expires_in -= 1
             return {"insurance_status": False, "error": "Invalid access token"}
+
         if self.budget_limit is not None and self.budget_limit < insurance_cost:
             return {"insurance_status": False, "error": "Exceeded budget limit"}
         if booking_id not in self.booking_record:
             return {"insurance_status": False, "error": "Booking not found"}
         if card_id not in self.credit_card_list:
             return {"insurance_status": False, "error": "Credit card not registered"}
-        self.credit_card_list[card_id]["balance"] -= insurance_cost
+
+        current_balance = self.credit_card_list[card_id].get("balance")
+        if not isinstance(current_balance, (int, float)):
+            return {"insurance_status": False, "error": "Card balance not numeric."}
+
+        self.credit_card_list[card_id]["balance"] = current_balance - insurance_cost
         return {
-            "insurance_id": str(self._random.randint(100000000, 999999999)),  # 9 digits
+            "insurance_id": str(self._random.randint(100000000, 999999999)),
             "insurance_status": True,
         }
 

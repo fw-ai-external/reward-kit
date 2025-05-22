@@ -318,7 +318,7 @@ class TestFunctionCalling:
         assert ("age", "number") in properties
 
         # Nested schema
-        schema: Dict[str, Any] = {
+        nested_schema: Dict[str, Any] = {
             "properties": {
                 "user": {
                     "type": "object",
@@ -329,7 +329,7 @@ class TestFunctionCalling:
                 }
             }
         }
-        properties = extract_schema_properties(schema)
+        properties = extract_schema_properties(nested_schema)
         assert len(properties) == 3
         assert ("user", "object") in properties
         assert ("user.firstName", "string") in properties
@@ -351,10 +351,13 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
         )
@@ -394,10 +397,13 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
         )
@@ -446,10 +452,13 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
         )
@@ -497,10 +506,13 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "Create a user for John Doe"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "Create a user for John Doe"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
         )
@@ -544,10 +556,13 @@ class TestFunctionCalling:
         }
 
         result = llm_judge_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
             expected_behavior="Get the weather for the specified location with the specified unit",
@@ -603,10 +618,13 @@ class TestFunctionCalling:
         }
 
         result = composite_function_call_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "function_call": function_call},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "function_call": function_call},
+                ],
+            ),
             ground_truth=None,
             expected_schema=expected_schema,
             expected_behavior="Get the weather for the specified location with the specified unit",

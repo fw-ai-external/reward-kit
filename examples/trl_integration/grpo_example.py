@@ -120,7 +120,7 @@ def format_reward(
     has_answer_tag = bool(answer_match)
     has_boxed_in_answer = False
 
-    if has_answer_tag:
+    if has_answer_tag and answer_match:  # Ensure answer_match is not None
         answer_content = answer_match.group(1)
         if answer_content:
             has_boxed_in_answer = bool(re.search(boxed_answer_pattern, answer_content))

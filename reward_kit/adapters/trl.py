@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 def create_trl_adapter(
     reward_fn: EvaluateFunction,
     dataset_to_reward_kwargs_map: Dict[str, str],
-    static_reward_kwargs: Dict[str, Any] = None,
+    static_reward_kwargs: Optional[Dict[str, Any]] = None,
     user_message_fn: Optional[
         Callable[[Any], str]
     ] = None,  # Function to construct user message content
     assistant_message_fn: Optional[
         Callable[[Any], str]
     ] = None,  # Function to construct assistant message content
-) -> Callable[[List[Any], List[str], Dict[str, Any]], List[float]]:
+) -> Callable[[List[Any], List[str]], List[float]]:
     """
     Creates an adapter function compatible with TRL trainers (e.g., GRPOTrainer, PPOTrainer)
     from a reward-kit reward function.
@@ -152,7 +152,8 @@ def create_trl_adapter(
                 )
                 final_assistant_str_content = str(current_completion)
 
-            messages_for_reward: List[Union[Message, Dict[str, Any]]] = [
+            # Ensure messages_for_reward is typed as List[Message] as per EvaluateFunction protocol
+            messages_for_reward: List[Message] = [
                 Message(role="user", content=user_content),
                 Message(role="assistant", content=final_assistant_str_content),
             ]

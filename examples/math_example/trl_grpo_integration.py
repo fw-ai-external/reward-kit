@@ -1,7 +1,7 @@
+import logging  # Added for new utility
 import os
 import sys
 from typing import Any, Dict, List
-import logging  # Added for new utility
 
 import torch
 from datasets import Dataset
@@ -19,9 +19,9 @@ from trl import (  # SFTTrainer, # Not used in this simplified example; AutoMode
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+from reward_kit.common_utils import load_jsonl  # Import the new utility
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward  # Corrected: use the imported name
-from reward_kit.common_utils import load_jsonl  # Import the new utility
 
 # Configure basic logging if you want to see logs from load_jsonl
 # logging.basicConfig(level=logging.INFO)

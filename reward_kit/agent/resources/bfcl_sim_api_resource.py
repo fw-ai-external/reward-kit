@@ -40,7 +40,7 @@ class BFCLSimAPIResource(ForkableResource):
 
     def _serialize_bfcl_directory(self, dir_obj: BFCLDirectory) -> Dict[str, Any]:
         """Serializes a BFCL Directory object into a canonical dictionary."""
-        serialized_contents = {}
+        serialized_contents: Dict[str, Any] = {}
         # Sort keys for canonical representation, crucial for reliable comparison
         for item_name, item_value in sorted(dir_obj.contents.items()):
             if BFCL_TYPES_AVAILABLE and isinstance(item_value, BFCLFile):
@@ -191,7 +191,7 @@ class BFCLSimAPIResource(ForkableResource):
                 and isinstance(instance.root, BFCLDirectory)
             ):
                 # Serialize 'root' attribute using the new method
-                instance_state["root"] = self._serialize_bfcl_directory(instance.root)
+                instance_state["root"] = self._serialize_bfcl_directory(instance.root)  # type: ignore[assignment]
                 # Serialize other public attributes normally
                 for attr_name, value in vars(instance).items():
                     if not attr_name.startswith("_") and attr_name != "root":
@@ -206,7 +206,7 @@ class BFCLSimAPIResource(ForkableResource):
                                 json.dumps(value)
                                 instance_state[attr_name] = value
                             except (TypeError, OverflowError):
-                                instance_state[attr_name] = str(
+                                instance_state[attr_name] = str(  # type: ignore[assignment]
                                     value
                                 )  # Convert non-serializable objects to string
             else:  # For other classes or if GorillaFileSystem doesn't have 'root' or types unavailable
@@ -224,7 +224,7 @@ class BFCLSimAPIResource(ForkableResource):
                                 json.dumps(value)
                                 instance_state[attr_name] = value
                             except (TypeError, OverflowError):
-                                instance_state[attr_name] = str(
+                                instance_state[attr_name] = str(  # type: ignore[assignment]
                                     value
                                 )  # Convert non-serializable objects to string
             state[class_name] = instance_state

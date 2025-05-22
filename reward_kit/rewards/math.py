@@ -218,19 +218,33 @@ def _extract_boxed_latex_answers(
             numeric_values_only = all(
                 isinstance(val, (float, int)) for _, val in boxed_answers
             )
-            if numeric_values_only:
-                first_numeric_value = boxed_answers[0][
-                    1
-                ]  # Must be float/int due to check above
-                all_identical = all(
-                    math.isclose(val, first_numeric_value, rel_tol=1e-9, abs_tol=1e-9)
-                    for _, val in boxed_answers[1:]
-                    if isinstance(val, (float, int))  # Ensure type for val
-                )
-                if all_identical:
-                    boxed_answers = [
-                        boxed_answers[0]
-                    ]  # Keep only the first unique numeric
+            if (
+                numeric_values_only and len(boxed_answers) > 1
+            ):  # Ensure there's something to compare
+                # All values are numeric, so boxed_answers[0][1] must be numeric.
+                first_val_candidate = boxed_answers[0][1]
+                # This isinstance check is technically redundant due to numeric_values_only,
+                # but good for explicit typing and safety.
+                if isinstance(first_val_candidate, (float, int)):
+                    first_numeric_value = float(first_val_candidate)
+                    all_other_values_identical = True  # Assume true initially
+                    if len(boxed_answers) > 1:  # Only check if there are other elements
+                        all_other_values_identical = all(
+                            math.isclose(
+                                val, first_numeric_value, rel_tol=1e-9, abs_tol=1e-9
+                            )
+                            for _, val in boxed_answers[
+                                1:
+                            ]  # Start from the second element
+                            if isinstance(
+                                val, (float, int)
+                            )  # This check is also somewhat redundant
+                        )
+
+                    if all_other_values_identical:
+                        boxed_answers = [
+                            boxed_answers[0]
+                        ]  # Keep only the first unique numeric
 
     return boxed_answers, found_any_boxed_expr
 
@@ -679,9 +693,10 @@ def _check_conflicting_answers_strictness(
     return best_match_score, match_found_flag, current_best_reason
 
 
-@reward_function
+@reward_function  # type: ignore[arg-type]
 def math_reward(
     messages: List[Message],
+    *,  # Make subsequent parameters keyword-only
     ground_truth: str,
     tolerance: float = 0.001,
     absolute_tolerance: float = 1e-8,

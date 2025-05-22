@@ -1,10 +1,12 @@
-from typing import Dict, List, Any, Union, Optional
-import requests
 import os  # For accessing environment variables
+from typing import Any, Dict, List, Optional, Union, cast
+
+import requests
+
+from reward_kit.models import EvaluateResult, Message, MetricResult
 
 # Assuming reward_kit is installed and these are the correct import paths
 from reward_kit.reward_function import reward_function
-from reward_kit.models import Message, EvaluateResult, MetricResult
 
 # --- Configuration (Secure - via Environment Variable) ---
 # IMPORTANT: This is a placeholder for a default URL if the tunnel URL isn't provided.
@@ -74,7 +76,7 @@ def remote_validator_reward_secure(
             if last_message.get("role") == "assistant" and last_message.get("content"):
                 payload_data = {
                     "info": "From assistant message (secure)",
-                    "content": last_message.get("content"),
+                    "content": cast(str, last_message.get("content")),
                 }
 
     item_payload = {"name": "SecureTestItem", "data": payload_data}

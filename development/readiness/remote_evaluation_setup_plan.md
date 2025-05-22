@@ -108,7 +108,7 @@ The envisioned CLI commands would simplify deployment and previewing:
         ```yaml
         # Example rewardkit.yaml structure
         default_deployment_target: gcp-cloud-run
-        
+
         gcp_cloud_run:
           project_id: "my-gcp-project"
           region: "us-central1"
@@ -116,14 +116,14 @@ The envisioned CLI commands would simplify deployment and previewing:
           default_auth_mode: "api-key"
           secrets:
             MY_FUNCTION_API_KEY: "projects/my-gcp-project/secrets/my-fn-api-key/versions/latest"
-        
+
         aws_lambda:
           region: "us-east-1"
           function_name_template: "rewardeval-{evaluator_id}"
           default_auth_mode: "api-key"
           secrets:
             MY_FUNCTION_API_KEY: "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-fn-api-key-xxxxxx"
-        
+
         evaluator_endpoint_keys:
           my_gcp_eval_id: "generated_secure_key_for_endpoint"
         ```
@@ -166,7 +166,7 @@ The following sections describe future work beyond the immediate next step.
 ### 2.4. Enhanced Security Considerations (Future Work for Phase B/C/D)
 (Content as before)
 1.  **Protecting the Deployed Reward Function Endpoint:**
-    *   **Default (`--auth api-key`):** 
+    *   **Default (`--auth api-key`):**
     *   **IAM (`--auth iam`):**
     *   **mTLS - Client Certificate Validation (`--auth mtls-client-auth`):**
 

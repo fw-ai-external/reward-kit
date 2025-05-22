@@ -6,18 +6,19 @@ import json
 import os
 import sys
 
+import aiohttp
+
 # import logging  # Added for new utility (now removed as unused)
 
-import aiohttp
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from typing import Any, Dict, List, Optional
 
+from reward_kit.common_utils import load_jsonl  # Import the new utility
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
-from reward_kit.common_utils import load_jsonl  # Import the new utility
 
 # Configure basic logging if you want to see logs from load_jsonl
 # logging.basicConfig(level=logging.INFO)

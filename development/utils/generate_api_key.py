@@ -2,7 +2,6 @@ import argparse
 import secrets
 
 
-
 def generate_api_key(length: int = 32) -> str:
     """
     Generates a cryptographically strong random string to be used as an API key.

@@ -2,10 +2,10 @@
 Common utility functions for the Reward Kit CLI.
 """
 
+import json
 import logging
 import os
-import json
-from typing import Iterator, Dict, Any, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,12 @@ def check_environment():
     """Check if required environment variables are set for general commands."""
     if not os.environ.get("FIREWORKS_API_KEY"):
         logger.warning("FIREWORKS_API_KEY environment variable is not set.")
-        logger.warning("This is required for API calls. Set this variable before running the command.")
-        logger.warning("Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY reward-kit [command]")
+        logger.warning(
+            "This is required for API calls. Set this variable before running the command."
+        )
+        logger.warning(
+            "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY reward-kit [command]"
+        )
         return False
     return True
 
@@ -42,39 +46,63 @@ def check_agent_environment(test_mode=False):
 
     if test_mode:
         if missing_vars:
-            logger.info(f"Note: The following environment variables are not set: {', '.join(missing_vars)}")
-            logger.info("Since you're running in test mode, these are not strictly required for all operations.")
+            logger.info(
+                f"Note: The following environment variables are not set: {', '.join(missing_vars)}"
+            )
+            logger.info(
+                "Since you're running in test mode, these are not strictly required for all operations."
+            )
         return True
 
     if missing_vars:
-        logger.warning(f"The following environment variables are not set: {', '.join(missing_vars)}")
-        logger.warning("These are typically required for full agent evaluation. Set these variables for full functionality.")
-        logger.warning("Example: MODEL_AGENT=openai/gpt-4o-mini reward-kit agent-eval [args]")
-        logger.warning("Alternatively, use --test-mode for certain validation tasks without requiring all API keys.")
+        logger.warning(
+            f"The following environment variables are not set: {', '.join(missing_vars)}"
+        )
+        logger.warning(
+            "These are typically required for full agent evaluation. Set these variables for full functionality."
+        )
+        logger.warning(
+            "Example: MODEL_AGENT=openai/gpt-4o-mini reward-kit agent-eval [args]"
+        )
+        logger.warning(
+            "Alternatively, use --test-mode for certain validation tasks without requiring all API keys."
+        )
         return False
     return True
 
 
 # --- Sample Loading Helper Functions ---
 
-def _validate_sample_messages(messages: Any, sample_index: int, line_number: int) -> bool:
+
+def _validate_sample_messages(
+    messages: Any, sample_index: int, line_number: int
+) -> bool:
     """Helper to validate the 'messages' field of a sample."""
     if not isinstance(messages, list):
-        logger.warning(f"Sample {sample_index} (line {line_number}): 'messages' field is not a list. Skipping sample.")
+        logger.warning(
+            f"Sample {sample_index} (line {line_number}): 'messages' field is not a list. Skipping sample."
+        )
         return False
-    if not messages: 
-        logger.warning(f"Sample {sample_index} (line {line_number}): 'messages' list is empty. Skipping sample.")
+    if not messages:
+        logger.warning(
+            f"Sample {sample_index} (line {line_number}): 'messages' list is empty. Skipping sample."
+        )
         return False
     for i, msg in enumerate(messages):
         if not isinstance(msg, dict):
-            logger.warning(f"Sample {sample_index} (line {line_number}): message item {i} is not a dictionary. Skipping sample.")
+            logger.warning(
+                f"Sample {sample_index} (line {line_number}): message item {i} is not a dictionary. Skipping sample."
+            )
             return False
         role = msg.get("role")
         content = msg.get("content")
-        if not isinstance(role, str) or not isinstance(content, str): 
-            logger.warning(f"Sample {sample_index} (line {line_number}): message item {i} missing 'role' or 'content' string fields. Skipping sample.")
+        if not isinstance(role, str) or not isinstance(content, str):
+            logger.warning(
+                f"Sample {sample_index} (line {line_number}): message item {i} missing 'role' or 'content' string fields. Skipping sample."
+            )
             return False
     return True
+
 
 def load_samples_from_file(filepath: str, max_samples: int) -> Iterator[Dict[str, Any]]:
     """
@@ -90,22 +118,30 @@ def load_samples_from_file(filepath: str, max_samples: int) -> Iterator[Dict[str
             for line in f:
                 line_number += 1
                 if count >= max_samples:
-                    logger.info(f"Reached max_samples ({max_samples}). Stopping sample loading from {filepath}.")
+                    logger.info(
+                        f"Reached max_samples ({max_samples}). Stopping sample loading from {filepath}."
+                    )
                     break
                 line_content = line.strip()
-                if not line_content: 
+                if not line_content:
                     continue
                 try:
                     sample = json.loads(line_content)
                 except json.JSONDecodeError:
-                    logger.warning(f"Line {line_number}: Invalid JSON. Skipping line: {line_content[:100]}...")
+                    logger.warning(
+                        f"Line {line_number}: Invalid JSON. Skipping line: {line_content[:100]}..."
+                    )
                     continue
                 if not isinstance(sample, dict):
-                    logger.warning(f"Line {line_number}: Content is not a JSON object. Skipping line.")
+                    logger.warning(
+                        f"Line {line_number}: Content is not a JSON object. Skipping line."
+                    )
                     continue
                 messages = sample.get("messages")
-                if messages is None: 
-                    logger.warning(f"Sample (line {line_number}): 'messages' field is missing. Skipping sample.")
+                if messages is None:
+                    logger.warning(
+                        f"Sample (line {line_number}): 'messages' field is missing. Skipping sample."
+                    )
                     continue
                 if not _validate_sample_messages(messages, count + 1, line_number):
                     continue
@@ -113,10 +149,12 @@ def load_samples_from_file(filepath: str, max_samples: int) -> Iterator[Dict[str
                 count += 1
     except FileNotFoundError:
         logger.error(f"Sample file not found: {filepath}")
-    except Exception as e: 
+    except Exception as e:
         logger.error(f"Error reading or processing sample file {filepath}: {e}")
     if count == 0:
-        logger.info(f"No valid samples loaded from {filepath} after processing {line_number} lines.")
+        logger.info(
+            f"No valid samples loaded from {filepath} after processing {line_number} lines."
+        )
 
 
 def load_samples_from_huggingface(
@@ -125,7 +163,7 @@ def load_samples_from_huggingface(
     prompt_key: str,
     response_key: str,
     key_map: Optional[Dict[str, str]],
-    max_samples: int
+    max_samples: int,
 ) -> Iterator[Dict[str, Any]]:
     """
     Loads samples from a HuggingFace dataset using the 'datasets' library.
@@ -134,7 +172,14 @@ def load_samples_from_huggingface(
     Yields valid sample dictionaries up to max_samples.
     """
     try:
-        from datasets import load_dataset, DatasetDict, Dataset, IterableDatasetDict, IterableDataset
+        from datasets import (
+            Dataset,
+            DatasetDict,
+            IterableDataset,
+            IterableDatasetDict,
+            load_dataset,
+        )
+
         # Also consider specific exceptions from datasets like DatasetNotFoundError
     except ImportError:
         logger.error(
@@ -146,41 +191,59 @@ def load_samples_from_huggingface(
     count = 0
     processed_records = 0
     try:
-        hf_dataset = load_dataset(dataset_name, split=split, streaming=True) # Use streaming
-    except Exception as e: # Broad exception for now, can be more specific
-        logger.error(f"Error loading HuggingFace dataset '{dataset_name}' (split: {split}): {e}")
+        hf_dataset = load_dataset(
+            dataset_name, split=split, streaming=True
+        )  # Use streaming
+    except Exception as e:  # Broad exception for now, can be more specific
+        logger.error(
+            f"Error loading HuggingFace dataset '{dataset_name}' (split: {split}): {e}"
+        )
         return
 
-    if not isinstance(hf_dataset, (DatasetDict, Dataset, IterableDatasetDict, IterableDataset)): # Should be IterableDataset due to streaming=True
-        logger.error(f"Loaded HuggingFace dataset '{dataset_name}' is not a recognized Dataset type.")
+    if not isinstance(
+        hf_dataset, (DatasetDict, Dataset, IterableDatasetDict, IterableDataset)
+    ):  # Should be IterableDataset due to streaming=True
+        logger.error(
+            f"Loaded HuggingFace dataset '{dataset_name}' is not a recognized Dataset type."
+        )
         return
 
-    logger.info(f"Streaming samples from HuggingFace dataset '{dataset_name}' (split: {split}).")
+    logger.info(
+        f"Streaming samples from HuggingFace dataset '{dataset_name}' (split: {split})."
+    )
     for record in hf_dataset:
         processed_records += 1
         if count >= max_samples:
-            logger.info(f"Reached max_samples ({max_samples}). Stopping HuggingFace sample loading.")
+            logger.info(
+                f"Reached max_samples ({max_samples}). Stopping HuggingFace sample loading."
+            )
             break
 
         if not isinstance(record, dict):
-            logger.warning(f"HuggingFace dataset record {processed_records} is not a dictionary. Skipping.")
+            logger.warning(
+                f"HuggingFace dataset record {processed_records} is not a dictionary. Skipping."
+            )
             continue
 
         prompt = record.get(prompt_key)
         response_content = record.get(response_key)
 
         if not isinstance(prompt, str):
-            logger.warning(f"HuggingFace record {processed_records}: Prompt key '{prompt_key}' (value: {str(prompt)[:50]}...) did not yield a string. Skipping sample.")
+            logger.warning(
+                f"HuggingFace record {processed_records}: Prompt key '{prompt_key}' (value: {str(prompt)[:50]}...) did not yield a string. Skipping sample."
+            )
             continue
         if not isinstance(response_content, str):
-            logger.warning(f"HuggingFace record {processed_records}: Response key '{response_key}' (value: {str(response_content)[:50]}...) did not yield a string. Skipping sample.")
+            logger.warning(
+                f"HuggingFace record {processed_records}: Response key '{response_key}' (value: {str(response_content)[:50]}...) did not yield a string. Skipping sample."
+            )
             continue
 
         messages = [
             {"role": "user", "content": prompt},
             {"role": "assistant", "content": response_content},
         ]
-        
+
         if not _validate_sample_messages(messages, count + 1, processed_records):
             continue
 
@@ -191,15 +254,19 @@ def load_samples_from_huggingface(
                 if source_key_in_record in record:
                     sample_output[target_key_in_sample] = record[source_key_in_record]
                 else:
-                    logger.warning(f"HuggingFace record {processed_records}: Key '{source_key_in_record}' from key_map not found. It will be omitted.")
-        
+                    logger.warning(
+                        f"HuggingFace record {processed_records}: Key '{source_key_in_record}' from key_map not found. It will be omitted."
+                    )
+
         # Optionally, copy all other non-conflicting keys from record to sample_output
         # for k, v in record.items():
         #     if k not in [prompt_key, response_key] and k not in (key_map or {}).keys() and k not in sample_output:
         #         sample_output[k] = v
-        
+
         yield sample_output
         count += 1
-    
+
     if count == 0:
-        logger.info(f"No valid samples loaded from HuggingFace dataset '{dataset_name}' (split: {split}) after processing {processed_records} records.")
+        logger.info(
+            f"No valid samples loaded from HuggingFace dataset '{dataset_name}' (split: {split}) after processing {processed_records} records."
+        )

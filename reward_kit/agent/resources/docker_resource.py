@@ -171,7 +171,8 @@ class DockerResource(ForkableResource):
 
         try:
             self._container = self._client.containers.run(image_name, **run_options)
-            self._container.reload()  # Ensure state is up-to-date
+            if self._container:
+                self._container.reload()  # Ensure state is up-to-date
             # print(f"DockerResource setup: Started container {self._container.id[:12]} ({self._container.name}) from image {image_name}")
         except APIError as e:
             raise DockerException(
@@ -215,7 +216,8 @@ class DockerResource(ForkableResource):
             forked_resource._container = self._client.containers.run(
                 committed_image.id, **run_options
             )
-            forked_resource._container.reload()
+            if forked_resource._container:
+                forked_resource._container.reload()
             # print(f"DockerResource fork: Started new container {forked_resource._container.id[:12]} from image {committed_image.id[:12]}")
         except APIError as e:
             self._cleanup_image(
@@ -289,7 +291,8 @@ class DockerResource(ForkableResource):
 
         try:
             self._container = self._client.containers.run(image_id, **run_options)
-            self._container.reload()
+            if self._container:
+                self._container.reload()
             # print(f"DockerResource restore: Started container {self._container.id[:12]} from checkpoint image {image_id[:12]}")
         except APIError as e:
             raise DockerException(

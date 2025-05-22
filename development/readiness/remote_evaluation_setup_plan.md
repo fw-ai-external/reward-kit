@@ -1,171 +1,207 @@
-# Plan: Remote Evaluation with Secrets (Automated Tunneling via Serveo.net)
+# Plan: Remote Evaluation with Secrets
 
-This document outlines the plan to set up a demonstration for remote evaluation capabilities. The demo will focus on using environment variables and the `fireworks secret` mechanism for managing secrets required by evaluation functions that invoke remote URLs. For achieving a one-command, automated demo, **Serveo.net** will be used for exposing the local mock server, prioritizing minimal external dependencies (assuming a standard SSH client). Initial manual setup steps might still reference Ngrok or other tunneling tools as manual alternatives for developer testing.
+This document outlines plans related to remote evaluation capabilities in `reward-kit`.
+It first covers the setup for a local demonstration using automated tunneling (Serveo.net), and then details a future vision for first-class support of self-hosted remote evaluators on cloud platforms like GCP and AWS.
 
-## 1. Objectives
+## Part 1: Local Remote Evaluation Demo (Serveo.net Tunneling) - Status: DONE
 
+This section details the plan and implementation of a demonstration for remote evaluation capabilities using a local mock server exposed via Serveo.net.
+
+### 1.1. Objectives - Status: DONE
+(Content as before)
 *   Demonstrate that evaluation functions can call arbitrary remote URLs.
-*   Showcase secure secret management for API keys using `fireworks secret`.
+*   Showcase secure secret management for API keys using environment variables (simulating `fireworks secret` behavior).
 *   Illustrate a less secure method (hardcoding) for comparison.
 *   Provide a utility for API key generation.
-*   Adapt an existing simple reward function (e.g., math reward) to fit this scenario for local testing.
-*   **Key Goal for Automation:** Enable a one-command execution (e.g., `make demo-remote-eval`) that sets up all necessary components, including the public tunnel, using Serveo.net.
+*   Adapt an existing simple reward function to fit this scenario for local testing.
+*   Enable a one-command execution (`make demo-remote-eval`) that sets up all necessary components, including the public tunnel, using Serveo.net.
 
-## 2. Components
+### 1.2. Components - Status: DONE
+(Content as before)
+#### 1.2.1. Mock API Service (FastAPI) - Status: DONE
+*   Simulates an external service requiring API key authentication.
+*   Implemented in `examples/remote_eval_demo/mock_api_service.py`.
+*   Reads expected API key and port from `EXPECTED_API_KEY` and `PORT` environment variables.
 
-### 2.1. Mock API Service (FastAPI) - **Status: DONE**
-*   **Purpose:** Simulate an external service requiring API key authentication.
-*   **Technology:** Python with FastAPI.
-*   **Endpoint:** A simple endpoint (e.g., `/api/validate_data`).
-    *   Accepts: A small JSON payload.
-    *   Requires: An API key passed in a custom header (e.g., `X-Secret-API-Key`).
-*   **Behavior:** Validates the API key. If valid, processes the payload and returns a success message. If invalid, returns an authentication error.
+#### 1.2.2. Tunneling Component (Serveo.net) - Status: DONE
+*   Exposes the local FastAPI service using Serveo.net via SSH.
+*   Automated by `run_demo.py` using `development/utils/subprocess_manager.py`.
 
-### 2.2. Tunneling Component (Targeting Serveo.net for Automation)
-*   **Purpose:** Expose the local FastAPI service to the public internet, making it accessible as a remote URL.
-*   **Automated Tool (Target for `make demo-remote-eval`):** Serveo.net (using SSH). - **Status: Implementation TODO (See Section 6)**
-*   **Manual Alternatives (For developer testing of components):** Ngrok, Localtunnel can be used if preferred by the developer during initial component development, but the final automated demo script will integrate Serveo.net.
-*   **Setup (Serveo.net):** Relies on a standard SSH client. The demo script will automate the `ssh -R ... serveo.net` command.
+#### 1.2.3. Evaluation Functions - Status: DONE
+*   `examples/remote_eval_demo/rewards/remote_validator_reward_hardcoded.py`
+*   `examples/remote_eval_demo/rewards/remote_validator_reward_secure.py`
+*   These functions call the tunneled FastAPI service and demonstrate different secret handling strategies. URL parameters generalized to `target_service_url`. Pydantic validation for `EvaluateResult.metrics` fixed.
 
-### 2.3. Evaluation Function (`remote_validator_reward`) - **Status: DONE**
-*   **Purpose:** A Python function, decorated with `@reward_function`, that calls the tunneled FastAPI service.
-*   **Logic:**
-    1.  Accepts input parameters.
-    2.  Retrieves the API key for the mock service.
-    3.  Constructs and sends an HTTP request to the mock API's endpoint (via the tunnel URL).
-    4.  Includes the API key in the `X-Secret-API-Key` header.
-    5.  Evaluates the response from the mock API.
-*   **Note:** Variable names for tunnel URL (e.g., `DEFAULT_NGROK_URL`) in existing reward functions may need generalization (e.g., to `DEFAULT_TUNNEL_URL`).
+#### 1.2.4. Secret Management Strategies - Status: DONE
+*   Strategy A (Hardcoded Secret): Demonstrated in `remote_validator_reward_hardcoded.py`.
+*   Strategy B (Environment Variable): Demonstrated in `remote_validator_reward_secure.py` (reads from `MOCK_SERVICE_API_KEY` env var) and in `mock_api_service.py` (reads `EXPECTED_API_KEY` env var).
 
-### 2.4. Secret Management Strategies - **Status: Implemented in Reward Functions**
-*   **Strategy A: Hardcoded Secret** - **Status: DONE**
-*   **Strategy B: `fireworks secret` Integration (Simulated via Env Var)** - **Status: DONE**
+### 1.3. Detailed Implementation Steps - Status: DONE
+(Content as before)
+*   **API Key Generation Utility (`development/utils/generate_api_key.py`):** DONE. Prints raw key.
+*   **FastAPI Mock Service (`examples/remote_eval_demo/mock_api_service.py`):** DONE. Reads API key and port from env vars.
+*   **Tunneling Automation (`development/utils/subprocess_manager.py`):** DONE. `start_serveo_and_get_url` implemented. Ngrok functions deprecated. `start_process` correctly handles custom `env` for subprocesses.
+*   **Reward Functions:** DONE. Updated for generic URL params and Pydantic compliance.
+*   **Demo Script (`examples/remote_eval_demo/run_demo.py`):** DONE. Fully automates API key generation, mock service startup (with correct env vars), Serveo tunnel, and test execution.
+*   **Makefile Target (`make demo-remote-eval`):** DONE.
+*   **Documentation (`examples/remote_eval_demo/README.md`):** DONE. Overhauled for Serveo.
 
-## 3. Detailed Implementation Steps
+### 1.4. Files Created/Modified - Status: DONE
+(Content as before)
+All relevant files for the Serveo.net demo have been created and modified as per the original plan and subsequent debugging.
 
-**Current Status of Overall Plan (as of YYYY-MM-DD - *developer to fill in date*):**
-*   **Core Components (Steps 1, 2, 4, 5 below):** The API key generator, mock FastAPI service, and the two reward function variants (hardcoded and secure via env var) have been implemented. These components are designed to work with a generic tunnel URL.
-*   **Automated Demo Script (`run_demo.py`, `subprocess_manager.py`, `Makefile`):** An initial version targeting Ngrok automation was developed. **This is now being redirected to use Serveo.net.** The existing automation code provides a base but requires significant modification/replacement for Serveo (see Section 6).
-*   **Documentation (`README.md` for demo, this plan):** Initial versions exist, need updates to reflect the Serveo strategy.
+### 1.5. Considerations (General) - Status: ADDRESSED
+(Content as before)
+Error handling, idempotency, clarity, and version compatibility were considered and addressed during implementation.
 
-The following steps describe the creation of the core components. The automation of these components into a one-command demo using Serveo.net is detailed in Section 6.
+### 1.6. Automating Tunneling with Serveo.net - Status: DONE
+(Content as before)
+The implementation using Serveo.net for the one-command demo (`make demo-remote-eval`) is complete.
 
-### Step 1: Develop Utility for API Key Generation - **Status: DONE**
-*   Create `generate_api_key.py` in `development/utils/`.
-*   Implement a function using `secrets.token_hex()` or `uuid.uuid4()`.
-*   Provide a simple CLI interface.
+---
 
-### Step 2: Develop the FastAPI Mock Service - **Status: DONE**
-*   Create `mock_api_service.py` in `examples/remote_eval_demo/`.
-*   Implement the FastAPI app with the `/api/validate_data` endpoint.
-*   Store the "expected" API key (e.g., from Step 1, or a consistent demo key).
-*   Document how to run it manually (e.g., `python examples/remote_eval_demo/mock_api_service.py` or `uvicorn ...`).
+## Part 2: Future Vision - First-Class Self-Hosted Remote Evaluators (GCP/AWS)
 
-### Step 3: Tunneling Setup and Configuration - **Status: Manual options documented; Automation via Serveo is TODO (See Section 6)**
-*   **For Automated Demo (Target: Serveo.net):** This step will be handled automatically by the `run_demo.py` script using Serveo.net. No manual ngrok/localtunnel setup is required by the end-user running `make demo-remote-eval`. (See Section 6 for automation details).
-*   **For Manual Component Testing (Developer-Only):**
-    *   If a developer is testing components individually, they can manually use any tunneling tool:
-        *   **Serveo.net (manual):** `ssh -R 80:localhost:8001 serveo.net` (copy the HTTPS URL).
-        *   **Ngrok (manual):** Install ngrok, then `ngrok http 8001` (copy the HTTPS URL).
-        *   **Localtunnel (manual):** `npm install -g localtunnel`, then `lt --port 8001` (copy the URL).
-    *   The evaluation functions will need their tunnel URL constant updated with the manually obtained URL for such tests. The automated `run_demo.py` will pass this URL programmatically.
+This section outlines a plan to significantly enhance `reward-kit` to provide a seamless, "one-command" experience for users to deploy their Python reward functions to their own cloud infrastructure (initially GCP Cloud Run and AWS Lambda) and register these as remote evaluators with the Fireworks AI platform. The core principle is **ease of use**: the user writes only their reward function logic, and `reward-kit` handles the complexities of packaging, cloud deployment, and secure secret management.
 
-### Step 4: Implement Evaluation Function - Strategy A (Hardcoded Secret) - **Status: DONE**
-*   Create `remote_validator_reward_hardcoded.py` in `examples/remote_eval_demo/rewards/`.
-*   Implement the reward function, hardcoding the tunnel URL (e.g. `DEFAULT_TUNNEL_URL` - to be updated by `run_demo.py` or manually for tests) and API key.
-*   **Note:** Existing file uses `HARDCODED_NGROK_URL`; consider renaming for generality.
+### 2.1. Objectives
+(Content as before)
+*   Enable users to deploy reward functions to their own GCP Cloud Run or AWS Lambda environments with a single `reward-kit` CLI command.
+*   Abstract away most cloud-provider-specific complexities from the user.
+*   Provide a "zero-wrapper" experience: users only write their Python reward function module.
+*   Integrate secure secret management for secrets used *by* the reward function (e.g., API keys for third-party services), leveraging cloud provider secret managers (GCP Secret Manager, AWS Secrets Manager).
+*   Enhance endpoint security for these self-hosted evaluators (e.g., API key, IAM, mTLS).
+*   Allow easy registration of these self-hosted evaluators with the Fireworks AI platform.
+*   Support previewing against these self-hosted evaluators.
 
-### Step 5: Implement Evaluation Function - Strategy B (`fireworks secret` via Env Var) - **Status: DONE**
-*   Create `remote_validator_reward_secure.py` in `examples/remote_eval_demo/rewards/`.
-*   Modify the function to retrieve the API key using `os.getenv("MOCK_SERVICE_API_KEY")`.
-*   Tunnel URL handled similarly to Strategy A.
-*   **Note:** Existing file uses `DEFAULT_NGROK_URL`; consider renaming.
+### 2.2. Target CLI User Experience
+(Content as before)
+The envisioned CLI commands would simplify deployment and previewing:
 
-### Step 6: Documentation and Demo Script (Initial Local Runner) - **Status: Partially DONE (`run_demo.py` needs Serveo integration, `README.md` needs Serveo focus)**
-*   Update `development/DEMO_READINESS.md` with a section for this demo. - **Status: DONE** (Link added)
-*   The `run_demo.py` script (for local execution) has been created. It currently includes logic for Ngrok automation which needs to be **replaced with Serveo automation** (see Section 6).
-*   The final user-facing documentation in `examples/remote_eval_demo/README.md` needs to be **updated for Serveo**.
+*   **Deploy to Cloud:**
+    *   `reward-kit deploy <function_ref> --target gcp-cloud-run [--evaluator-id <id>] [--project <gcp_project>] [--region <gcp_region>] [--service-name <name>] [--auth <api-key|iam|mtls-client-auth>] [--secrets ENV_VAR_NAME=provider_secret_id,...]`
+    *   `reward-kit deploy <function_ref> --target aws-lambda [--evaluator-id <id>] [--region <aws_region>] [--function-name <name>] [--auth <api-key|iam|mtls-client-auth>] [--secrets ENV_VAR_NAME=provider_secret_id,...]`
+    *   `<function_ref>` is a Python import string like `my_module.my_reward_func`.
+    *   `--secrets` maps environment variables for the reward function to IDs/ARNs in the cloud provider's secret manager.
+    *   `--auth` specifies the authentication method for the deployed endpoint.
 
-## 4. Files to Create/Modify (Reflecting Serveo Automation Goal)
+*   **Preview against Self-Hosted:**
+    *   `reward-kit preview <function_ref_or_id> --target gcp-cloud-run [--service-name <name>] --samples <file>` (if `reward-kit` can discover the URL from cloud provider based on name/config).
+    *   `reward-kit preview --remote-url <user_provided_cloud_url> --samples <file>` (for any existing URL, including self-hosted).
 
-*   `development/readiness/remote_evaluation_setup_plan.md` (This file) - **Status: BEING UPDATED NOW**
-*   `development/utils/generate_api_key.py` - **Status: DONE**
-*   `examples/remote_eval_demo/mock_api_service.py` - **Status: DONE**
-*   `examples/remote_eval_demo/rewards/remote_validator_reward_hardcoded.py` - **Status: DONE** (Consider renaming URL const)
-*   `examples/remote_eval_demo/rewards/remote_validator_reward_secure.py` - **Status: DONE** (Consider renaming URL const)
-*   `examples/remote_eval_demo/run_demo.py` - **Status: Partially DONE (Ngrok base), NEEDS SERVEO IMPL.**
-*   `development/utils/subprocess_manager.py` - **Status: Partially DONE (Ngrok base), NEEDS SERVEO IMPL. & Ngrok code removal/deprecation.**
-*   `Makefile` (Update) - **Status: Partially DONE (Ngrok base), NEEDS SERVEO IMPL.**
-*   `examples/remote_eval_demo/README.md` (New) - **Status: Partially DONE (Ngrok base), NEEDS SERVEO IMPL.**
-*   `development/DEMO_READINESS.md` (Update) - **Status: DONE** (Link added)
+*   **Local Serving (for development/testing, leveraging the same internal server):**
+    *   `reward-kit deploy <function_ref> --local-serve [--tunnel auto] --id <evaluator_id>`
+    *   `reward-kit preview <function_ref> --local-serve`
 
-## 5. Considerations (General)
+### 2.3. Core `reward-kit` Enhancements Required (Phase A Status Update)
 
-*   **Error Handling:** Reward functions and demo scripts should handle network errors, API errors, missing secrets, and tunnel failures gracefully. - **Status: Basic handling in place, review for robustness.**
-*   **Idempotency:** Mock API is read-only for the demo endpoint. - **Status: OK**
-*   **Clarity:** Demo should distinguish local execution vs. platform. - **Status: OK**
-*   **Reward Kit Version:** Ensure compatibility. - **Status: OK**
+1.  **Internal Generic Reward Function Server:** - **Status: DONE**
+    *   A built-in HTTP server (FastAPI-based) within `reward-kit` (`reward_kit/generic_server.py`) capable of dynamically loading and serving any user-provided Python reward function.
+    *   Exposes a standardized `/evaluate` endpoint and a `/health` endpoint.
+    *   Handles request/response serialization for `EvaluateResult`.
+    *   Unit and integration tests created and passing (`tests/test_generic_server.py`).
 
-## 6. Automating Tunneling for One-Command Demo using Serveo.net
+2.  **Project Configuration File (`rewardkit.yaml`):** - **Status: DONE**
+    *   A local file (`rewardkit.yaml`) can be used to store stable settings.
+    *   Implemented loading logic in `reward_kit/config.py` with Pydantic models.
+    *   Unit tests created and passing (`tests/test_config.py`).
+        ```yaml
+        # Example rewardkit.yaml structure
+        default_deployment_target: gcp-cloud-run
+        
+        gcp_cloud_run:
+          project_id: "my-gcp-project"
+          region: "us-central1"
+          service_name_template: "rewardeval-{evaluator_id}"
+          default_auth_mode: "api-key"
+          secrets:
+            MY_FUNCTION_API_KEY: "projects/my-gcp-project/secrets/my-fn-api-key/versions/latest"
+        
+        aws_lambda:
+          region: "us-east-1"
+          function_name_template: "rewardeval-{evaluator_id}"
+          default_auth_mode: "api-key"
+          secrets:
+            MY_FUNCTION_API_KEY: "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-fn-api-key-xxxxxx"
+        
+        evaluator_endpoint_keys:
+          my_gcp_eval_id: "generated_secure_key_for_endpoint"
+        ```
 
-**Overall Goal:** Achieve a true one-command demo (e.g., via a `make` target) by automating the use of **Serveo.net** for exposing the local mock server. This choice prioritizes minimizing additional software installations for the user, assuming a standard SSH client is available.
+3.  **Enhanced `reward-kit deploy` Command (for `--remote-url`):** - **Status: PARTIALLY DONE**
+    *   Supports `--remote-url <url>` for registering an existing URL with the Fireworks AI platform.
+    *   CLI argument parsing and command logic in `reward_kit/cli.py` and `reward_kit/cli_commands/deploy.py` are implemented and tested.
+    *   **Next Step:** The actual API call to the Fireworks AI platform to register/update the evaluator with the remote URL needs to be implemented (currently placeholder logic in `deploy_command`).
 
-**Current Status of this Section (as of YYYY-MM-DD - *developer to fill in date*):**
-*   **Previous Ngrok Automation Attempt (To be Replaced):**
-    *   An initial attempt was made to automate tunneling using Ngrok. This involved changes to `development/utils/subprocess_manager.py`, `examples/remote_eval_demo/run_demo.py`, and `Makefile`.
-    *   **Decision:** This Ngrok-based automation will be **replaced** by a Serveo.net implementation to better meet the goal of minimal external dependencies. The existing Ngrok-specific code in `subprocess_manager.py` (`start_ngrok_and_get_url`, `get_ngrok_public_url`) should be removed or clearly marked as deprecated/archived if kept for reference.
-*   **Serveo.net Implementation (Not Started - THIS IS THE NEXT STEP):**
-    *   The specific code changes for Serveo.net automation in `subprocess_manager.py` and `run_demo.py` have **not** been implemented. This is the primary task for the next developer.
+4.  **Enhanced `reward-kit preview` Command (for `--remote-url`):** - **Status: DONE**
+    *   Supports `--remote-url <url>` to preview against any remote evaluator endpoint.
+    *   CLI argument parsing and command logic in `reward_kit/cli.py` and `reward_kit/cli_commands/preview.py` are implemented and tested.
+    *   Uses the robust sample loaders from `common.py`.
 
-This section outlines the implementation path for using Serveo.net.
+5.  **Robust Sample Loading Utilities:** - **Status: DONE**
+    *   Implemented `load_samples_from_file` and `load_samples_from_huggingface` in `reward_kit/cli_commands/common.py`.
+    *   Includes validation, error handling, and logging.
+    *   Comprehensive unit tests created and passing (`tests/cli_commands/test_common.py`).
 
-### 6.1. Implementation Path for Serveo.net
+6.  **Test Suite Health:** - **Status: IMPROVED**
+    *   Addressed all reported test failures and hangs across `tests/test_generic_server.py`, `tests/test_config.py`, `tests/test_cli_args.py`, `tests/cli_commands/test_preview_cmd.py`, `tests/cli_commands/test_deploy_cmd.py`, `tests/test_cli.py`, `tests/test_evaluation.py`, and `tests/test_evaluation_integration.py`.
 
-#### 6.1.1. Key Characteristics of Serveo.net
-*   **Pros:** Uses SSH, so no *additional* client software installation is typically needed if an SSH client is already present on the user's system. No registration is required for basic public tunnel use.
-*   **Cons:** The reliability of the public `serveo.net` service can vary. Automating SSH interactions (especially initial host key verification and parsing output for the URL) from a script can be more complex than tools with dedicated local APIs (like Ngrok).
-*   **Command Example:** `ssh -R 80:localhost:<local_port> serveo.net`
+**Next Immediate Step for Phase A Completion:**
+*   Implement the actual Fireworks AI platform API call within `reward-kit deploy --remote-url` functionality. This involves creating or updating a function (e.g., in `reward_kit.evaluation` or a new `reward_kit.platform_api` module) to make the necessary HTTP request to the backend service that manages evaluator registrations.
 
-#### 6.1.2. Required Changes in `development/utils/subprocess_manager.py` - **Status: TODO**
-*   **Task:** Create a new function `start_serveo_and_get_url(local_port: int, log_file_path: str) -> tuple[subprocess.Popen | None, str | None]:`
-    1.  **Check SSH Availability:** Verify that the `ssh` command is available on the system's PATH. If not, raise an error or return `(None, None)` with a clear message.
-    2.  **Construct SSH Command:**
-        *   The command should be similar to: `['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-R', f'80:localhost:{local_port}', 'serveo.net']`.
-        *   The options `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` are crucial for non-interactive execution. Note: `/dev/null` might need platform-specific handling (e.g., `nul` on Windows) or use of a temporary file.
-    3.  **Execute SSH Command:** Use `start_process` or `subprocess.Popen` directly, ensuring output (stdout/stderr) is captured for parsing.
-    4.  **Parse Output for URL:** Continuously read output, looking for `Forwarding HTTP traffic from https://<subdomain>.serveo.net`. Extract URL using regex.
-    5.  **Retry Logic & Timeout:** Implement a loop (e.g., 10-15 seconds) to find the URL. If not found, terminate SSH and return `(None, None)`.
-    6.  **Process Management:** Ensure the started `ssh` process is managed for cleanup.
-    7.  **Return Value:** `(ssh_process_object, public_url)` or `(None, None)`.
-*   **Task:** Remove or clearly deprecate existing Ngrok-specific functions (`start_ngrok_and_get_url`, `get_ngrok_public_url`).
+---
+The following sections describe future work beyond the immediate next step.
+---
 
-#### 6.1.3. Required Changes in `examples/remote_eval_demo/run_demo.py` - **Status: TODO**
-*   **Task:** Modify the script to use Serveo automation:
-    1.  Import `start_serveo_and_get_url`.
-    2.  Remove Ngrok-related calls and logic.
-    3.  Call `start_serveo_and_get_url`, handle success/failure.
-    4.  Assign fetched URL to a generic variable (e.g., `TUNNEL_PUBLIC_URL`) and pass to reward functions.
-    5.  Remove manual ngrok prompts.
-    6.  Ensure `atexit` handler stops the Serveo SSH process.
+7.  **Platform-Specific Packaging Logic:** (Future Work for Phase B/C)
+    *   **For GCP Cloud Run:**
+        *   Generate a `Dockerfile`.
+        *   Orchestrate `docker build` and `docker push`.
+    *   **For AWS Lambda:**
+        *   Create a Lambda deployment package (.zip).
 
-#### 6.1.4. Required Changes in `Makefile` - **Status: TODO**
-*   **Task:** Update `demo-remote-eval` target description:
-    *   State it uses Serveo.net.
-    *   Prerequisite: "Working SSH client in PATH."
-    *   Remove Ngrok-specific notes.
+8.  **Cloud Provider CLI Orchestration:** (Future Work for Phase B/C)
+    *   Invoke `gcloud` and `aws` CLI commands.
 
-#### 6.1.5. Required Changes in `examples/remote_eval_demo/README.md` - **Status: TODO**
-*   **Task:** Overhaul README for Serveo:
-    1.  Update title, introduction.
-    2.  Prerequisites: Focus on SSH client. Remove Ngrok.
-    3.  "Running the Demo", "How it Works": Describe Serveo-based process.
-    4.  "Troubleshooting": Address common Serveo/SSH issues.
+### 2.4. Enhanced Security Considerations (Future Work for Phase B/C/D)
+(Content as before)
+1.  **Protecting the Deployed Reward Function Endpoint:**
+    *   **Default (`--auth api-key`):** 
+    *   **IAM (`--auth iam`):**
+    *   **mTLS - Client Certificate Validation (`--auth mtls-client-auth`):**
 
-### 6.2. Testing Focus for Serveo Implementation - **Status: TODO**
-*   **Cross-Platform:** Test SSH command and parsing on macOS, Linux, Windows.
-*   **First-Time Connection:** Verify non-interactive host key handling.
-*   **URL Parsing:** Ensure regex robustness.
-*   **Process Cleanup:** Confirm reliable termination of `ssh` tunnel.
-*   **Serveo Service Reliability:** Test with potential service flakiness in mind.
+2.  **Managing Secrets Used *by* the Reward Function:**
+    *   The `--secrets ENV_VAR_NAME=provider_secret_id` flag.
 
-This revised plan provides a more direct path for the next engineer to implement the Serveo.net solution for the one-command demo.
+### 2.5. Phased Implementation Approach (Updated Summary)
+
+1.  **Phase A: Core Framework (Largely Complete):**
+    *   **DONE:** Internal Generic Reward Function Server.
+    *   **DONE:** `rewardkit.yaml` basic structure and loading.
+    *   **PARTIALLY DONE:** Enhance `reward-kit deploy` to support `--remote-url <url>`.
+        *   CLI and argument handling complete.
+        *   **TODO (Immediate Next Step):** Implement actual Fireworks AI platform API call for registration.
+    *   **DONE:** Enhance `reward-kit preview` to support `--remote-url <url>`.
+    *   **DONE:** Robust sample loading utilities in `reward_kit/cli_commands/common.py`.
+    *   **DONE:** Resolved test failures across multiple suites.
+
+2.  **Phase B: GCP Cloud Run Integration (Future Work):**
+    *   Implement `reward-kit deploy ... --target gcp-cloud-run`.
+    *   Dockerfile generation and `gcloud` orchestration.
+    *   Support for `--auth api-key`.
+    *   Support for `--secrets` mapping from GCP Secret Manager.
+
+3.  **Phase C: AWS Lambda Integration (Future Work):**
+    *   Implement `reward-kit deploy ... --target aws-lambda`.
+    *   Lambda packaging and `aws` CLI orchestration.
+    *   Support for `--auth api-key`.
+    *   Support for `--secrets` mapping from AWS Secrets Manager.
+
+4.  **Phase D: Advanced Authentication Modes (Future Work):**
+    *   Implement `--auth iam` for GCP and AWS.
+    *   Implement `--auth mtls-client-auth` for GCP and AWS.
+
+5.  **Phase E: Local Secret Store (`reward-kit secret add --project-local ...`) (Future Work):**
+    *   If relying solely on environment variables for local development proves insufficient, implement a local, project-specific secret store.
+
+This updated plan aims for a highly user-friendly "one-command" experience for self-hosting reward functions, while also providing robust security options and abstracting cloud-specific details. The immediate next step is to complete the backend integration for `reward-kit deploy --remote-url`.

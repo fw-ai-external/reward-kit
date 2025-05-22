@@ -1,7 +1,7 @@
-import json
 import os
 import sys
 from typing import Any, Dict, List
+import logging  # Added for new utility
 
 import torch
 from datasets import Dataset
@@ -21,6 +21,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward  # Corrected: use the imported name
+from reward_kit.common_utils import load_jsonl  # Import the new utility
+
+# Configure basic logging if you want to see logs from load_jsonl
+# logging.basicConfig(level=logging.INFO)
 
 # --- Configuration ---
 MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"  # Updated model
@@ -54,32 +58,39 @@ grpo_config = GRPOConfig(
 
 # --- Helper Functions ---
 def load_jsonl_dataset(file_path: str):
-    """Loads data from a JSONL file, expecting 'messages' field."""
-    data = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            item = json.loads(line)
-            # We need 'query' (user prompt) and 'response' (target for SFT, or initial for GRPO)
-            # For GRPO, we primarily need the query to generate responses.
-            user_msg = next(
-                (m["content"] for m in item["messages"] if m["role"] == "user"), None
+    """Loads data from a JSONL file, expecting 'messages' field, and processes it for TRL."""
+    raw_data = load_jsonl(file_path)  # Use the new utility
+    if not raw_data:
+        return []  # Return empty list if loading failed or file was empty
+
+    processed_trl_data = []
+    for item in raw_data:
+        messages = item.get("messages")
+        if not messages:
+            # logger.warning(f"Skipping item due to missing 'messages': {item}") # Optional logging
+            continue
+
+        user_msg_content = next(
+            (m.get("content") for m in messages if m.get("role") == "user"), None
+        )
+        assistant_msg_content = next(
+            (m.get("content") for m in messages if m.get("role") == "assistant"), None
+        )
+
+        if user_msg_content:
+            processed_trl_data.append(
+                {
+                    "prompt": user_msg_content,
+                    "response": (
+                        assistant_msg_content if assistant_msg_content else ""
+                    ),  # Ground truth for reward
+                    "messages": messages,  # Keep original messages for the reward function context
+                }
             )
-            assistant_msg = next(
-                (
-                    m["content"]
-                    for m in item["messages"]
-                    if m.get("role") == "assistant"
-                ),
-                None,
-            )  # Optional for GRPO
-            if user_msg:
-                data.append(
-                    {
-                        "prompt": user_msg,  # Changed "query" to "prompt"
-                        "response": assistant_msg if assistant_msg else "",
-                    }
-                )
-    return data
+        # else:
+        # logger.warning(f"Skipping item due to missing user message: {item}") # Optional logging
+
+    return processed_trl_data
 
 
 # --- Reward Function for TRL ---

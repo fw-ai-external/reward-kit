@@ -1,7 +1,7 @@
-import json
 import os
 import sys
 from typing import Any, Dict, List
+import logging  # Added for new utility
 
 import torch
 from datasets import Dataset
@@ -14,6 +14,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
+from reward_kit.common_utils import load_jsonl  # Import the new utility
+
+# Configure basic logging if you want to see logs from load_jsonl
+# logging.basicConfig(level=logging.INFO)
 
 # --- Configuration ---
 MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"  # Using the same model
@@ -44,42 +48,44 @@ grpo_config = GRPOConfig(
 
 # --- Helper Functions ---
 def load_jsonl_dataset(file_path: str):
-    """Loads data from a JSONL file, expecting 'messages' field."""
-    data = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            item = json.loads(line)
-            user_msg = next(
-                (m["content"] for m in item["messages"] if m["role"] == "user"), None
+    """Loads data from a JSONL file, expecting 'messages' and 'ground_truth_answer_from_column', and processes it for TRL."""
+    raw_data = load_jsonl(file_path)  # Use the new utility
+    if not raw_data:
+        return []  # Return empty list if loading failed or file was empty
+
+    processed_trl_data = []
+    for item in raw_data:
+        messages = item.get("messages")
+        if not messages:
+            # logger.warning(f"Skipping item due to missing 'messages': {item}") # Optional logging
+            continue
+
+        user_msg_content = next(
+            (m.get("content") for m in messages if m.get("role") == "user"), None
+        )
+
+        # For this OpenR1 example, the ground truth is specifically in this field
+        ground_truth_response = item.get("ground_truth_answer_from_column")
+
+        if user_msg_content and ground_truth_response is not None:
+            processed_trl_data.append(
+                {
+                    "prompt": user_msg_content,
+                    "response": ground_truth_response,  # This is the ground truth for reward
+                    "messages": messages,  # Keep original messages for the reward function context
+                }
             )
-            # For GRPO, the 'response' field in the dataset is the ground_truth_answer_from_column
-            # which is what math_reward's ground_truth parameter expects.
-            # The convert_dataset.py script formats ground_truth_answer_from_column as a boxed answer.
-            assistant_msg_as_ground_truth = item.get("ground_truth_answer_from_column")
+        elif user_msg_content:  # Handle cases where ground_truth might be missing
+            # logging.warning(f"Missing 'ground_truth_answer_from_column' for prompt: {user_msg_content[:50]}...") # Optional logging
+            processed_trl_data.append(
+                {
+                    "prompt": user_msg_content,
+                    "response": "",  # Provide empty string if ground_truth is missing
+                    "messages": messages,
+                }
+            )
 
-            if (
-                user_msg and assistant_msg_as_ground_truth is not None
-            ):  # Ensure ground_truth is present
-                data.append(
-                    {
-                        "prompt": user_msg,
-                        "response": assistant_msg_as_ground_truth,  # This will be used as ground_truth by adapted_math_reward
-                    }
-                )
-            elif (
-                user_msg
-            ):  # Handle cases where ground_truth might be missing, though ideally it shouldn't be for math
-                print(
-                    f"Warning: Missing 'ground_truth_answer_from_column' for prompt: {user_msg[:50]}..."
-                )
-                data.append(
-                    {
-                        "prompt": user_msg,
-                        "response": "",  # Provide empty string if ground_truth is missing
-                    }
-                )
-
-    return data
+    return processed_trl_data
 
 
 # --- Reward Function for TRL ---

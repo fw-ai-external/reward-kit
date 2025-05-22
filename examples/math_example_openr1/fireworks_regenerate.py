@@ -4,6 +4,8 @@ import json
 import os
 import sys
 
+# import logging  # Added for new utility (now removed as unused)
+
 import aiohttp
 
 # Ensure reward-kit is in the path
@@ -13,6 +15,10 @@ from typing import Any, Dict, List, Optional
 
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
+from reward_kit.common_utils import load_jsonl  # Import the new utility
+
+# Configure basic logging if you want to see logs from load_jsonl
+# logging.basicConfig(level=logging.INFO)
 
 # Configuration for Fireworks API
 FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
@@ -24,13 +30,7 @@ RECORDED_DATA_FILENAME_OPENR1 = (
 )
 
 
-def load_dataset(file_path: str):
-    """Loads a JSONL dataset."""
-    dataset = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            dataset.append(json.loads(line))
-    return dataset
+# Removed local load_dataset function
 
 
 async def generate_with_fireworks_inner(
@@ -151,7 +151,7 @@ async def main(args):
         )
         return
 
-    dataset = load_dataset(dataset_path)
+    dataset = load_jsonl(dataset_path)
     all_passed = True
     passed_samples = 0
 
@@ -167,7 +167,7 @@ async def main(args):
         )
         if os.path.exists(recorded_data_path):
             try:
-                recorded_data_list = load_dataset(recorded_data_path)
+                recorded_data_list = load_jsonl(recorded_data_path)
                 recorded_data_map_for_mocking = {
                     record["user_prompt"]: record["regenerated_content"]
                     for record in recorded_data_list

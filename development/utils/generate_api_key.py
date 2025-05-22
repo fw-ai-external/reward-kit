@@ -1,6 +1,7 @@
 import secrets
 import argparse
 
+
 def generate_api_key(length: int = 32) -> str:
     """
     Generates a cryptographically strong random string to be used as an API key.
@@ -15,13 +16,14 @@ def generate_api_key(length: int = 32) -> str:
     """
     return secrets.token_hex(length)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a secure API key.")
     parser.add_argument(
         "--length",
         type=int,
         default=32,
-        help="Length of the key in bytes (default: 32, produces a 64-char hex string)."
+        help="Length of the key in bytes (default: 32, produces a 64-char hex string).",
     )
     args = parser.parse_args()
 

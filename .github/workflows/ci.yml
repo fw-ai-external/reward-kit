@@ -34,7 +34,7 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        pip install flake8
+        # pip install flake8  # Relies on flake8 from [dev] dependencies
         # stop the build if there are Python syntax errors or undefined names
         # Exclude virtual environment and external packages from check
         flake8 reward_kit tests examples scripts --count --select=E9,F63,F7,F82 --show-source --statistics

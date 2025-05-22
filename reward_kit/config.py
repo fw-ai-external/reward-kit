@@ -57,7 +57,7 @@ _loaded_config: Optional[RewardKitConfig] = None
 _config_file_path: Optional[str] = None
 
 
-def find_config_file(start_path: str = None) -> Optional[str]:
+def find_config_file(start_path: Optional[str] = None) -> Optional[str]:
     """
     Finds the rewardkit.yaml file by searching upwards from start_path (or CWD).
     """

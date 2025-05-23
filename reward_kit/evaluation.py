@@ -194,10 +194,23 @@ class Evaluator:
             # If ts_mode_config is active, it takes precedence for code definition.
             # The multi_metrics flag passed to __init__ is for folder-based loading if ts_mode_config is not used.
 
-    def load_metric_folder(self, metric_name, folder_path):
-        folder_path = os.path.abspath(folder_path)
+    def _load_python_files_from_folder(self, folder_path: str) -> Dict[str, str]:
+        """
+        Loads all Python files from a given folder.
+
+        Args:
+            folder_path: Absolute path to the folder.
+
+        Returns:
+            A dictionary mapping filenames to their content.
+
+        Raises:
+            ValueError: If folder_path is invalid, not a directory,
+                        or if main.py is missing or doesn't contain 'evaluate'.
+        """
         if not os.path.exists(folder_path):
             raise ValueError(f"Folder does not exist: {folder_path}")
+
         if not os.path.isdir(folder_path):
             raise ValueError(f"Not a directory: {folder_path}")
 
@@ -208,44 +221,59 @@ class Evaluator:
                     filename = file_path.name
                     content = f.read()
                     files[filename] = content
+
+                    # Check for main.py with evaluate function
                     if filename == "main.py" and "evaluate" not in content:
                         raise ValueError(
                             f"main.py in {folder_path} must contain an evaluate function"
                         )
+
         if "main.py" not in files:
             raise ValueError(f"main.py is required in {folder_path}")
+
+        return files
+
+
+    def load_metric_folder(self, metric_name, folder_path):
+        """
+        Load code files from a metric folder
+
+        Args:
+            metric_name: Name of the metric
+            folder_path: Path to the folder containing code files
+
+        Returns:
+            Dict mapping filenames to their contents
+        """
+        folder_path = os.path.abspath(folder_path)
+        files = self._load_python_files_from_folder(folder_path)
 
         self.metric_folders[metric_name] = folder_path
         for filename, content in files.items():
             self.code_files[f"{metric_name}/{filename}"] = content
+
         logger.info(
             f"Loaded {len(files)} Python files for metric '{metric_name}' from {folder_path}"
         )
         return files
 
     def load_multi_metrics_folder(self, folder_path):
-        folder_path = os.path.abspath(folder_path)
-        if not os.path.exists(folder_path):
-            raise ValueError(f"Folder does not exist: {folder_path}")
-        if not os.path.isdir(folder_path):
-            raise ValueError(f"Not a directory: {folder_path}")
+        """
+        Load code files from a folder with multiple metrics
 
-        files = {}
-        for file_path in Path(folder_path).glob("*.py"):
-            if file_path.is_file():
-                with open(file_path, "r") as f:
-                    filename = file_path.name
-                    content = f.read()
-                    files[filename] = content
-                    if filename == "main.py" and "evaluate" not in content:
-                        raise ValueError(
-                            f"main.py in {folder_path} must contain an evaluate function"
-                        )
-        if "main.py" not in files:
-            raise ValueError(f"main.py is required in {folder_path}")
+        Args:
+            folder_path: Path to the folder containing code files
+
+        Returns:
+            Dict mapping filenames to their contents
+        """
+        folder_path = os.path.abspath(folder_path)
+        files = self._load_python_files_from_folder(folder_path)
+
         self.code_files = files
         logger.info(
-            f"Loaded {len(files)} Python files from {folder_path} for multi-metrics evaluation"
+            f"Loaded {len(files)} Python files from {folder_path} "
+            f"for multi-metrics evaluation"
         )
         return files
 

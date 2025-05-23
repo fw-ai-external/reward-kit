@@ -130,7 +130,7 @@ class RewardFunction:
     def __call__(
         self,
         messages: List[Dict[str, str]],
-        original_messages: Optional[List[Dict[str, str]]] = None,
+        ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,
         **kwargs,
     ) -> EvaluateResult:
         """
@@ -138,14 +138,19 @@ class RewardFunction:
 
         Args:
             messages: List of conversation messages, each with 'role' and 'content' keys
-            original_messages: Original conversation messages (for context)
+            ground_truth: Ground truth data, which can be a string (e.g., an expected answer)
+                          or a list of original conversation messages (for context).
+                          If None and context is expected as a list, defaults to messages[:-1].
             **kwargs: Additional keyword arguments to pass to the function
 
         Returns:
             EvaluateResult object with score and metrics
         """
-        if original_messages is None:
-            original_messages = messages[:-1] if messages else []
+        if ground_truth is None:
+            # Default to messages[:-1] if ground_truth is not provided and expected as context (list)
+            # This maintains previous behavior of original_messages defaulting.
+            # If ground_truth is meant to be a string and is None, it should be handled by the specific reward function.
+            ground_truth = messages[:-1] if messages else []
 
         combined_kwargs = {**self.kwargs, **kwargs}
 
@@ -156,7 +161,7 @@ class RewardFunction:
             try:
                 result = self.func(
                     messages=messages,
-                    original_messages=original_messages,
+                    ground_truth=ground_truth,
                     **combined_kwargs,
                 )
 
@@ -220,7 +225,7 @@ class RewardFunction:
 
             payload = {
                 "messages": messages,
-                "original_messages": original_messages,
+                "ground_truth": ground_truth,
                 **combined_kwargs,
             }
 
@@ -404,8 +409,12 @@ class RewardFunction:
                     # Pass the constructed messages and the extracted kwargs for this sample
                     result = self(
                         messages=messages,
-                        original_messages=None,  # Explicitly pass, self() will default if this is None
-                        **call_kwargs,  # Use call_kwargs directly now
+                        ground_truth=(
+                            call_kwargs.pop("solution")
+                            if "solution" in call_kwargs
+                            else None
+                        ),  # Pass solution as ground_truth if available
+                        **call_kwargs,
                     )
                     # Handle both RewardOutput and EvaluateResult
                     score = result.score

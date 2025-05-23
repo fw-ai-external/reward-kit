@@ -29,8 +29,8 @@ class RewardRequest(BaseModel):
     """Request model for reward endpoints."""
 
     messages: List[Message] = Field(..., description="List of conversation messages")
-    original_messages: Optional[List[Message]] = Field(
-        None, description="Original messages for context"
+    ground_truth: Optional[Union[str, List[Message]]] = Field(
+        None, description="Ground truth data (string or list of messages) for context"
     )
 
     class Config:
@@ -110,19 +110,20 @@ class RewardServer:
             """
             try:
                 # Extract kwargs from the request
-                kwargs = request.dict(exclude={"messages", "original_messages"})
+                kwargs = request.dict(exclude={"messages", "ground_truth"})
 
-                # Set default for original_messages if not provided
-                original_messages = request.original_messages
-                if original_messages is None:
-                    original_messages = (
+                # Set default for ground_truth if not provided and expected as list
+                ground_truth_data = request.ground_truth
+                if ground_truth_data is None:
+                    # This default applies if ground_truth is expected to be a list of messages for context
+                    ground_truth_data = (
                         request.messages[:-1] if request.messages else []
                     )
 
                 # Call the reward function
                 result = self.reward_func(
                     messages=request.messages,
-                    original_messages=original_messages,
+                    ground_truth=ground_truth_data,
                     **kwargs,
                 )
 
@@ -242,26 +243,30 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Change
         try:
             # Convert Pydantic models to dictionaries using model_dump (Pydantic v2)
             messages = [msg.model_dump() for msg in request_data.messages]
-            original_messages = None
-            if request_data.original_messages:
-                original_messages = [
-                    msg.model_dump() for msg in request_data.original_messages
+            ground_truth_data: Optional[Union[str, List[Dict[str, Any]]]] = None
+
+            if isinstance(request_data.ground_truth, str):
+                ground_truth_data = request_data.ground_truth
+            elif isinstance(request_data.ground_truth, list):
+                ground_truth_data = [
+                    msg.model_dump() for msg in request_data.ground_truth
                 ]
 
             # Extract kwargs from any extra fields
             kwargs = {
                 k: v
                 for k, v in request_data.model_dump().items()
-                if k not in ["messages", "original_messages"]
+                if k not in ["messages", "ground_truth"]
             }
 
-            # Set default for original_messages if not provided
-            if original_messages is None:
-                original_messages = messages[:-1] if messages else []
+            # Set default for ground_truth if not provided and expected as list
+            if ground_truth_data is None:
+                # This default applies if ground_truth is expected to be a list of messages for context
+                ground_truth_data = messages[:-1] if messages else []
 
             # Call the reward function
             result = reward_func(
-                messages=messages, original_messages=original_messages, **kwargs
+                messages=messages, ground_truth=ground_truth_data, **kwargs
             )
 
             # Handle different return types

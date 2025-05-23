@@ -371,12 +371,17 @@ class Evaluator:
                 if "messages" not in sample:
                     raise ValueError(f"Sample {i+1} is missing 'messages' field")
                 _ = sample.get("messages", [])
-                _ = sample.get("original_messages", [])
+                _ = sample.get("ground_truth", [])  # Changed from original_messages
                 _ = sample.get("tools", [])
                 _ = {
                     k: v
                     for k, v in sample.items()
-                    if k not in ["messages", "original_messages", "tools"]
+                    if k
+                    not in [
+                        "messages",
+                        "ground_truth",
+                        "tools",
+                    ]  # Changed from original_messages
                 }
 
                 if (
@@ -518,10 +523,10 @@ import requests
 
 REMOTE_EVALUATOR_URL = "{self.remote_url}"
 
-def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Removed original_messages, added ground_truth
+def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs): # Added type hints
     payload = {{
         "messages": messages,
-        "ground_truth": ground_truth, # Added ground_truth
+        "ground_truth": ground_truth,
         "tools": tools,
         "kwargs": kwargs
     }}
@@ -632,34 +637,74 @@ def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Removed origi
     def _update_evaluate_signature(self, content):
         import re
 
+        # Simple regex to match the old evaluate function signature
         old_pattern = r"def\s+evaluate\s*\(\s*entry\s*(?::\s*dict)?\s*\)"
-        new_signature = (
-            "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
-        )
+        # Regex to match the signature we are changing from (original_messages)
+        current_signature_pattern = r"def\s+evaluate\s*\(\s*messages,\s*original_messages\s*=\s*None,\s*tools\s*=\s*None,\s*\*\*kwargs\s*\)"
+        new_signature = "def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs)"
+
+        # Check if the old pattern (entry-based) exists
         if re.search(old_pattern, content):
+            # Replace the old signature with the new one
             updated_content = re.sub(old_pattern, new_signature, content, count=1)
+
+            # Add a compatibility layer for the 'entry' style
             compat_layer = """
-    # Compatibility layer for old format
-    if original_messages is None:
-        original_messages = messages
-    entry = {"messages": messages, "original_messages": original_messages, "tools": tools}
-    entry.update(kwargs)
+    # Compatibility layer for old 'entry' format
+    if ground_truth is None: # Default ground_truth from messages if not provided
+        ground_truth = messages
+    # Assuming 'entry' dict was constructed from messages, original_messages (now ground_truth), tools, kwargs
+    # This part might need more context on how 'entry' was used.
+    # For now, we'll assume ground_truth takes precedence or is derived.
 """
+        # Check if the current signature (with original_messages) exists
+        elif re.search(current_signature_pattern, content):
+            updated_content = re.sub(
+                current_signature_pattern, new_signature, content, count=1
+            )
+            # No specific compatibility layer needed here as it's a direct parameter rename
+            compat_layer = ""  # No additional layer for this direct change
+        else:
+            # If neither known signature is found, return content as is
+            return content
+
+        # Find the function body indent level if a change was made
+        if (
+            "updated_content" in locals() and compat_layer
+        ):  # Only add layer if it's defined
             func_match = re.search(
                 r"def\s+evaluate.*?:\s*\n(\s+)", updated_content, re.DOTALL
             )
             if func_match:
                 indent = func_match.group(1)
-                compat_layer = "\n".join(
+                # Adjust indentation of compatibility layer
+                indented_compat_layer = "\n".join(
                     indent + line for line in compat_layer.strip().split("\n")
                 )
+
+                # Insert compatibility layer after function definition
                 updated_content = re.sub(
                     re.escape(new_signature) + r"\s*:",
-                    new_signature + ":" + compat_layer,
+                    new_signature + ":" + indented_compat_layer,
                     updated_content,
                     count=1,
                 )
             return updated_content
+        elif "updated_content" in locals():
+            return updated_content
+
+            # Find the function body indent level
+            func_match = re.search(
+                r"def\s+evaluate.*?:\s*\n(\s+)", updated_content, re.DOTALL
+            )
+            if func_match:
+                indent = func_match.group(1)
+                # Adjust indentation of compatibility layer
+                compat_layer = "\n".join(
+                    indent + line for line in compat_layer.strip().split("\n")
+                )
+
+                # Insert compatibility layer after function definition
         return content
 
     def _get_combined_code(self):  # This method seems unused now, consider removal

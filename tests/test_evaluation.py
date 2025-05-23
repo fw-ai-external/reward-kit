@@ -17,7 +17,7 @@ def create_test_folder():
     with open(os.path.join(tmp_dir, "main.py"), "w") as f:
         f.write(
             """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed original_messages to ground_truth
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
     last_message = messages[-1]
@@ -50,7 +50,7 @@ def create_sample_file():
                     "content": "AI stands for Artificial Intelligence.",
                 },
             ],
-            "original_messages": [
+            "ground_truth": [  # Changed original_messages to ground_truth
                 {"role": "user", "content": "What is AI?"},
                 {
                     "role": "assistant",
@@ -114,14 +114,20 @@ def evaluate(entry):
     return {'score': score, 'reason': f'Word count: {word_count}'}
     """
     updated_code = evaluator._update_evaluate_signature(old_code)
+    # Expecting the new signature with ground_truth and Union type hint
+    # The exact type hint might be complex to match with regex, so checking for key parts.
     assert (
-        "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        "def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs)"
         in updated_code
     )
-    assert "entry = {" in updated_code
-    assert "original_messages = messages" in updated_code
+    assert (
+        "entry = {" in updated_code
+    )  # This part of compat layer might change or be removed depending on _update_evaluate_signature's new logic
+    assert (
+        "ground_truth = messages" in updated_code
+    )  # Check if compat layer correctly assigns to ground_truth
     new_code = """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs): # Changed signature
     if not messages: return {'score': 0.0, 'reason': 'No messages found'}
     last_message = messages[-1]
     content = last_message.get('content', '')

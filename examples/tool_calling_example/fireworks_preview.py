@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+from typing import List, cast
 
 # Configure logging
 log_file_path = os.path.join(os.path.dirname(__file__), "fireworks_preview_debug.log")
@@ -84,7 +85,12 @@ def main():
         )
         logger.debug("Attempting to call preview_evaluation...")
 
-        preview_result = preview_evaluation(**eval_params)
+        preview_result = preview_evaluation(
+            sample_file=cast(str, eval_params["sample_file"]),
+            metric_folders=cast(List[str], eval_params["metric_folders"]),
+            max_samples=cast(int, eval_params["max_samples"]),
+            # Other parameters will use their defaults from the function signature
+        )
 
         logger.debug("preview_evaluation call completed.")
         logger.info("preview_evaluation call successful.")

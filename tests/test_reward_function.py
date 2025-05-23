@@ -1,5 +1,5 @@
 import sys  # Import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +14,9 @@ from reward_kit.models import EvaluateResult, MetricResult  # Changed
 
 
 def simple_reward_func(
-    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+    messages: List[Dict[str, str]],
+    ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,
+    **kwargs  # Changed
 ) -> EvaluateResult:  # Changed
     """Example reward function for testing."""
     metrics = {
@@ -27,7 +29,9 @@ def simple_reward_func(
 
 @reward_function
 def decorated_reward_func(
-    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+    messages: List[Dict[str, str]],
+    ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,
+    **kwargs  # Changed
 ) -> EvaluateResult:  # Changed
     """Example decorated reward function."""
     metrics = {
@@ -58,9 +62,9 @@ class TestRewardFunction:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
             ]
-            orig_msgs = [test_msgs[0]]
+            orig_msgs = [test_msgs[0]]  # This will be passed as ground_truth
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.5
             assert "length" in result.metrics
             assert result.metrics["length"].score == 0.5
@@ -73,9 +77,9 @@ class TestRewardFunction:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        orig_msgs = [test_msgs[0]]
+        orig_msgs = [test_msgs[0]]  # This will be passed as ground_truth
 
-        result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+        result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
         assert result.score == 0.5
         assert "length" in result.metrics
         assert result.metrics["length"].score == 0.5
@@ -108,9 +112,9 @@ class TestRewardFunction:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
             ]
-            orig_msgs = [test_msgs[0]]
+            orig_msgs = [test_msgs[0]]  # This will be passed as ground_truth
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.8
             assert "remote" in result.metrics
             assert result.metrics["remote"].score == 0.8
@@ -136,9 +140,9 @@ class TestRewardFunction:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
             ]
-            orig_msgs = [test_msgs[0]]
+            orig_msgs = [test_msgs[0]]  # This will be passed as ground_truth
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.9
             assert "hosted" in result.metrics
             assert result.metrics["hosted"].score == 0.9
@@ -157,9 +161,29 @@ class TestRewardFunction:
                 {"role": "assistant", "content": "Hi there"},
             ]
         ]
-        orig_msgs = [[test_msgs[0][0]]]
+        # orig_msgs is not directly used by the adapter for ground_truth in the updated RewardFunction.__call__
+        # The adapter passes kwargs['solution'] as ground_truth if available.
+        # For this test, simple_reward_func will receive ground_truth=None from the adapter.
+        # If orig_msgs was intended as a ground truth source, the test or adapter logic would need adjustment.
+        # For now, we call it with prompts and completions as per TRL adapter signature.
+        # The second argument to trl_adapter is `completions`.
+        # The `orig_msgs` was likely a misinterpretation of the adapter's expected signature.
+        # The adapter expects: prompts: List[List[Dict]], completions: Optional[List[str]] = None
+        # Let's assume test_msgs are prompts and we need completions.
+        # For this test, the `simple_reward_func` will be called by the adapter.
+        # The adapter constructs `messages` for `simple_reward_func` using `prompts[i]` and `completions[i]`.
+        # It passes `ground_truth=None` unless `kwargs['solution']` is present.
 
-        result = trl_adapter(test_msgs, orig_msgs)
+        prompts_for_adapter = [
+            msg_list[:-1] for msg_list in test_msgs
+        ]  # list of user turns
+        completions_for_adapter = [
+            msg_list[-1]["content"] for msg_list in test_msgs
+        ]  # list of assistant responses
+
+        result = trl_adapter(
+            prompts=prompts_for_adapter, completions=completions_for_adapter
+        )
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0] == 0.5  # Just the score
@@ -174,11 +198,11 @@ class TestRewardFunctionDecorator:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        orig_msgs = [test_msgs[0]]
+        orig_msgs = [test_msgs[0]]  # This will be passed as ground_truth
 
         # Call the decorated function directly
-        result = decorated_reward_func(messages=test_msgs, original_messages=orig_msgs)
-        # The legacy_reward_function (imported as reward_function here)
+        result = decorated_reward_func(messages=test_msgs, ground_truth=orig_msgs)
+        # The reward_function from typed_interface
         # should return an EvaluateResult object.
         assert isinstance(result, EvaluateResult)
 

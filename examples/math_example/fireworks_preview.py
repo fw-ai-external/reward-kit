@@ -83,15 +83,17 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 from reward_kit.rewards.math import math_reward
 from reward_kit.models import Message, EvaluateResult
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union # Added Optional, Union
 
-def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, Any]] = None, tools: List[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+def evaluate(messages: List[Dict[str, Any]], ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools: List[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
     # Convert dict messages to Message objects for math_reward
     typed_messages = [Message(**msg) for msg in messages]
-    typed_original_messages = [Message(**msg) for msg in original_messages] if original_messages else typed_messages
+    # typed_original_messages is no longer needed as a separate variable
 
-    # math_reward expects ground_truth. For this setup, we assume ground_truth is passed in kwargs
-    # or derived if not. For the example dataset, assistant's response is the ground_truth.
+    # math_reward expects ground_truth.
+    # For this example, we'll use the assistant's content from the input `messages` as the ground_truth string.
+    # The actual `ground_truth` parameter passed to this evaluate function might be from the dataset sample,
+    # but for this specific math_reward call, we are using the assistant's response as the GT.
     # The preview_evaluation sends each sample's **kwargs.
     # We need to ensure 'ground_truth' is in kwargs for each sample.
     # The dataset itself has messages, not direct ground_truth.
@@ -107,23 +109,21 @@ def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, A
     # The `math_reward` function expects `ground_truth` as a direct parameter.
 
     # Simplification: Assume the dataset's assistant message is the ground_truth.
-    # The `preview_evaluation` function in `reward_kit.evaluation.py` does not directly support
-    # passing a list of reward functions. It expects metric folders.
-    # The `evaluate` function in this temp main.py needs to conform to what `preview_evaluation` expects
-    # for custom metrics. The `math_reward` function needs `ground_truth`.
-    # The `dataset.jsonl` has `{"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}`.
-    # The `preview_evaluation` sends the whole sample dict as kwargs to `evaluate`.
-    # So, `kwargs` will contain `messages`.
+    # The `preview_evaluation` function in `reward_kit.evaluation.py` will pass the sample data.
+    # If the sample data has a "ground_truth" field, it will be passed to this `evaluate` function.
+    # However, for this specific example's call to `math_reward`, we are using the assistant's
+    # response from the `messages` list as the `ground_truth` string.
 
-    assistant_content = next((m['content'] for m in typed_messages if m.role == 'assistant'), None)
-    if assistant_content is None:
-        return EvaluateResult(score=0.0, reason="No assistant message for ground truth").model_dump()
+    assistant_content_for_gt = next((m.content for m in typed_messages if m.role == 'assistant'), None)
+    if assistant_content_for_gt is None:
+        return EvaluateResult(score=0.0, reason="No assistant message content to use as ground_truth for math_reward").model_dump()
 
     # Call the actual math_reward function
+    # The `ground_truth` parameter for `math_reward` is `assistant_content_for_gt`.
+    # Context will be derived from `typed_messages[:-1]` by `math_reward` if needed.
     result = math_reward(
         messages=typed_messages,
-        original_messages=typed_original_messages,
-        ground_truth=assistant_content, # Use assistant's response as GT for this example
+        ground_truth=assistant_content_for_gt, # Use assistant's response as GT for this example
         **kwargs # Pass other potential args like tolerance
     )
     return result.model_dump() # Return as dict

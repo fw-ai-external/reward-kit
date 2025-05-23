@@ -59,9 +59,12 @@ class TestLoadConfig:
             assert isinstance(cfg, RewardKitConfig)
             # Check for default values
             assert cfg.default_deployment_target == "fireworks"
-            assert cfg.gcp_cloud_run is not None
-            assert cfg.gcp_cloud_run.project_id is None
-            assert cfg.aws_lambda is not None
+            assert cfg.gcp_cloud_run is not None  # This is the default object, not None
+            assert (
+                cfg.gcp_cloud_run.project_id is None
+            )  # Default value within the object
+            assert cfg.aws_lambda is not None  # This is the default object, not None
+            assert cfg.aws_lambda.region is None  # Default value within the object
             assert cfg.evaluator_endpoint_keys == {}
 
     def test_load_empty_config_file(self, tmp_path):
@@ -100,15 +103,23 @@ evaluator_endpoint_keys:
 
         cfg = rk_config.load_config(str(config_file))
         assert cfg.default_deployment_target == "gcp-cloud-run"
-        assert cfg.gcp_cloud_run.project_id == "my-gcp-proj"
-        assert cfg.gcp_cloud_run.region == "us-west1"
-        assert cfg.gcp_cloud_run.service_name_template == "eval-{evaluator_id}"
-        assert cfg.gcp_cloud_run.default_auth_mode == "iam"
-        assert cfg.gcp_cloud_run.secrets == {"API_KEY": "gcp_secret_id_for_api_key"}
-        assert cfg.aws_lambda.region == "eu-central-1"
-        assert cfg.aws_lambda.function_name_template == "lambda-eval-{evaluator_id}"
-        assert cfg.aws_lambda.default_auth_mode == "mtls-client-auth"
-        assert cfg.aws_lambda.secrets == {"OTHER_KEY": "aws_secret_arn_for_other_key"}
+        if cfg.gcp_cloud_run:  # Add check
+            assert cfg.gcp_cloud_run.project_id == "my-gcp-proj"
+            assert cfg.gcp_cloud_run.region == "us-west1"
+            assert cfg.gcp_cloud_run.service_name_template == "eval-{evaluator_id}"
+            assert cfg.gcp_cloud_run.default_auth_mode == "iam"
+            assert cfg.gcp_cloud_run.secrets == {"API_KEY": "gcp_secret_id_for_api_key"}
+        else:
+            pytest.fail("cfg.gcp_cloud_run should not be None here")
+        if cfg.aws_lambda:  # Add check
+            assert cfg.aws_lambda.region == "eu-central-1"
+            assert cfg.aws_lambda.function_name_template == "lambda-eval-{evaluator_id}"
+            assert cfg.aws_lambda.default_auth_mode == "mtls-client-auth"
+            assert cfg.aws_lambda.secrets == {
+                "OTHER_KEY": "aws_secret_arn_for_other_key"
+            }
+        else:
+            pytest.fail("cfg.aws_lambda should not be None here")
         assert cfg.evaluator_endpoint_keys == {"my_eval_1": "key123"}
 
     def test_load_valid_partial_config_file(self, tmp_path):
@@ -125,11 +136,19 @@ gcp_cloud_run:
 
         cfg = rk_config.load_config(str(config_file))
         assert cfg.default_deployment_target == "local"
-        assert cfg.gcp_cloud_run.project_id == "my-gcp-proj"
-        assert cfg.gcp_cloud_run.region is None  # Default for optional field
-        assert cfg.gcp_cloud_run.default_auth_mode == "api-key"  # Default from model
+        if cfg.gcp_cloud_run:  # Add check
+            assert cfg.gcp_cloud_run.project_id == "my-gcp-proj"
+            assert cfg.gcp_cloud_run.region is None  # Default for optional field
+            assert (
+                cfg.gcp_cloud_run.default_auth_mode == "api-key"
+            )  # Default from model
+        else:
+            pytest.fail("cfg.gcp_cloud_run should not be None here")
         assert cfg.aws_lambda is not None  # Default AWSLambdaConfig object
-        assert cfg.aws_lambda.region is None
+        if (
+            cfg.aws_lambda
+        ):  # Add check (though it's guaranteed by Pydantic default factory)
+            assert cfg.aws_lambda.region is None
         assert cfg.evaluator_endpoint_keys == {}  # Default empty dict
 
     def test_load_malformed_yaml(self, tmp_path, capsys):

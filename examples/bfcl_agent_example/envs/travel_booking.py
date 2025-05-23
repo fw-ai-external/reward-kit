@@ -1,7 +1,7 @@
 import random
 from copy import deepcopy
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast  # Added Any, cast
 
 from .long_context import BOOKING_RECORD_EXTENSION, CREDIT_CARD_EXTENSION
 
@@ -40,7 +40,7 @@ class TravelAPI:
 
     def _load_scenario(
         self,
-        scenario: Dict[str, Union[Dict, str, int, float]],
+        scenario: Dict[str, Any],  # Changed to Dict[str, Any]
         long_context: bool = False,
     ) -> None:
         """
@@ -50,69 +50,90 @@ class TravelAPI:
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
 
-        seed_val = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
-        if not isinstance(seed_val, int):  # Ensure seed is int
-            seed_val = DEFAULT_STATE_COPY["random_seed"]
-        self._random = random.Random(seed_val)
+        seed_val_any = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
+        if isinstance(seed_val_any, int):
+            self._random = random.Random(seed_val_any)
+        else:
+            self._random = random.Random(cast(int, DEFAULT_STATE_COPY["random_seed"]))
 
-        ccl = scenario.get("credit_card_list", DEFAULT_STATE_COPY["credit_card_list"])
-        self.credit_card_list = (
-            ccl if isinstance(ccl, dict) else DEFAULT_STATE_COPY["credit_card_list"]
+        ccl_any = scenario.get(
+            "credit_card_list", DEFAULT_STATE_COPY["credit_card_list"]
         )
+        if isinstance(ccl_any, dict):
+            self.credit_card_list = cast(
+                Dict[str, Dict[str, Union[str, int, float]]], ccl_any
+            )
+        else:
+            self.credit_card_list = cast(
+                Dict[str, Dict[str, Union[str, int, float]]],
+                DEFAULT_STATE_COPY["credit_card_list"],
+            )
 
-        br = scenario.get("booking_record", DEFAULT_STATE_COPY["booking_record"])
-        self.booking_record = (
-            br if isinstance(br, dict) else DEFAULT_STATE_COPY["booking_record"]
-        )
+        br_any = scenario.get("booking_record", DEFAULT_STATE_COPY["booking_record"])
+        if isinstance(br_any, dict):
+            self.booking_record = cast(
+                Dict[str, Dict[str, Union[str, float, int]]], br_any
+            )
+        else:
+            self.booking_record = cast(
+                Dict[str, Dict[str, Union[str, float, int]]],
+                DEFAULT_STATE_COPY["booking_record"],
+            )
 
-        at = scenario.get("access_token", DEFAULT_STATE_COPY["access_token"])
-        self.access_token = (
-            at
-            if isinstance(at, str) or at is None
-            else DEFAULT_STATE_COPY["access_token"]
-        )
+        at_any = scenario.get("access_token", DEFAULT_STATE_COPY["access_token"])
+        if isinstance(at_any, str) or at_any is None:
+            self.access_token = at_any
+        else:
+            self.access_token = cast(Optional[str], DEFAULT_STATE_COPY["access_token"])
 
-        tt = scenario.get("token_type", DEFAULT_STATE_COPY["token_type"])
-        self.token_type = (
-            tt
-            if isinstance(tt, str) or tt is None
-            else DEFAULT_STATE_COPY["token_type"]
-        )
+        tt_any = scenario.get("token_type", DEFAULT_STATE_COPY["token_type"])
+        if isinstance(tt_any, str) or tt_any is None:
+            self.token_type = tt_any
+        else:
+            self.token_type = cast(Optional[str], DEFAULT_STATE_COPY["token_type"])
 
-        tei = scenario.get("token_expires_in", DEFAULT_STATE_COPY["token_expires_in"])
-        self.token_expires_in = (
-            tei
-            if isinstance(tei, int) or tei is None
-            else DEFAULT_STATE_COPY["token_expires_in"]
+        tei_any = scenario.get(
+            "token_expires_in", DEFAULT_STATE_COPY["token_expires_in"]
         )
+        if isinstance(tei_any, int) or tei_any is None:
+            self.token_expires_in = tei_any
+        else:
+            self.token_expires_in = cast(
+                Optional[int], DEFAULT_STATE_COPY["token_expires_in"]
+            )
 
-        ts = scenario.get("token_scope", DEFAULT_STATE_COPY["token_scope"])
-        self.token_scope = (
-            ts
-            if isinstance(ts, str) or ts is None
-            else DEFAULT_STATE_COPY["token_scope"]
-        )
+        ts_any = scenario.get("token_scope", DEFAULT_STATE_COPY["token_scope"])
+        if isinstance(ts_any, str) or ts_any is None:
+            self.token_scope = ts_any
+        else:
+            self.token_scope = cast(Optional[str], DEFAULT_STATE_COPY["token_scope"])
 
-        ufn = scenario.get("user_first_name", DEFAULT_STATE_COPY["user_first_name"])
-        self.user_first_name = (
-            ufn
-            if isinstance(ufn, str) or ufn is None
-            else DEFAULT_STATE_COPY["user_first_name"]
-        )
+        ufn_any = scenario.get("user_first_name", DEFAULT_STATE_COPY["user_first_name"])
+        if isinstance(ufn_any, str) or ufn_any is None:
+            self.user_first_name = ufn_any
+        else:
+            self.user_first_name = cast(
+                Optional[str], DEFAULT_STATE_COPY["user_first_name"]
+            )
 
-        uln = scenario.get("user_last_name", DEFAULT_STATE_COPY["user_last_name"])
-        self.user_last_name = (
-            uln
-            if isinstance(uln, str) or uln is None
-            else DEFAULT_STATE_COPY["user_last_name"]
-        )
+        uln_any = scenario.get("user_last_name", DEFAULT_STATE_COPY["user_last_name"])
+        if isinstance(uln_any, str) or uln_any is None:
+            self.user_last_name = uln_any
+        else:
+            self.user_last_name = cast(
+                Optional[str], DEFAULT_STATE_COPY["user_last_name"]
+            )
 
-        bl = scenario.get("budget_limit", DEFAULT_STATE_COPY["budget_limit"])
-        self.budget_limit = (
-            bl
-            if isinstance(bl, (int, float)) or bl is None
-            else DEFAULT_STATE_COPY["budget_limit"]
-        )
+        bl_any = scenario.get("budget_limit", DEFAULT_STATE_COPY["budget_limit"])
+        if isinstance(bl_any, (int, float)):
+            self.budget_limit = float(bl_any)
+        elif bl_any is None:
+            self.budget_limit = None
+        else:
+            self.budget_limit = cast(
+                Optional[float], DEFAULT_STATE_COPY["budget_limit"]
+            )
+
         self.long_context = long_context
 
         if self.long_context:
@@ -139,18 +160,22 @@ class TravelAPI:
         Merge the credit card list with predefined credit cards from long_context.py.
         Existing cards in the scenario won't be overwritten.
         """
-        for card_id, card_info in CREDIT_CARD_EXTENSION.items():
+        for card_id, card_info_any in CREDIT_CARD_EXTENSION.items():
             if card_id not in self.credit_card_list:
-                self.credit_card_list[card_id] = card_info
+                self.credit_card_list[card_id] = cast(
+                    Dict[str, Union[str, int, float]], card_info_any
+                )
 
     def _add_booking_records(self) -> None:
         """
         Merge the booking record list with predefined booking records from long_context.py.
         Existing bookings in the scenario won't be overwritten.
         """
-        for booking_id, booking_info in BOOKING_RECORD_EXTENSION.items():
+        for booking_id, booking_info_any in BOOKING_RECORD_EXTENSION.items():
             if booking_id not in self.booking_record:
-                self.booking_record[booking_id] = booking_info
+                self.booking_record[booking_id] = cast(
+                    Dict[str, Union[str, float, int]], booking_info_any
+                )
 
     def authenticate_travel(
         self,

@@ -5,6 +5,7 @@ import shutil  # Added for checking ssh availability
 import signal
 import subprocess
 import time
+from typing import IO, Any, Dict, List, Optional  # Added IO, Any, List, Dict, Optional
 
 try:
     import requests
@@ -14,18 +15,20 @@ except ImportError:
     REQUESTS_AVAILABLE = False
 
 # Store PIDs of started processes
-managed_processes = {}  # pid -> {process, command, log_file, log_file_path, env}
+managed_processes: Dict[int, Dict[str, Any]] = (
+    {}
+)  # pid -> {process, command, log_file, log_file_path, env}
 
 # NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels" # Deprecated
 
 
 def start_process(
-    command: list,
+    command: List[str],  # Changed to List[str]
     log_file_path: str,
-    cwd: str = None,
+    cwd: Optional[str] = None,  # Changed to Optional[str]
     new_process_group: bool = True,
-    env: dict | None = None,
-) -> subprocess.Popen | None:
+    env: Optional[Dict[str, str]] = None,  # Changed to Optional[Dict[str, str]]
+) -> Optional[subprocess.Popen]:  # Changed to Optional[subprocess.Popen]
     """
     Starts a process in the background and logs its output.
     Stores the process information for later management.
@@ -40,37 +43,44 @@ def start_process(
     Returns:
         The Popen object for the started process.
     """
-    print(f"Starting process: {' '.join(command)}")
+    print(
+        f"Starting process: {' '.join(str(c) for c in command)}"
+    )  # Ensure all parts of command are str for join
     print(f"Logging output to: {log_file_path}")
 
     # Ensure log directory exists
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
-    log_file = open(log_file_path, "w")
+    log_file: IO[Any] = open(log_file_path, "w")
 
     process_env = os.environ.copy()
     if env:
         process_env.update(env)
 
-    process = subprocess.Popen(
-        command,
-        stdout=log_file,
-        stderr=log_file,
-        cwd=cwd if cwd else os.getcwd(),
-        preexec_fn=os.setsid if (os.name != "nt" and new_process_group) else None,
-        env=process_env,
-    )
+    try:
+        process = subprocess.Popen(
+            command,
+            stdout=log_file,
+            stderr=log_file,
+            cwd=cwd if cwd else os.getcwd(),
+            preexec_fn=os.setsid if (os.name != "nt" and new_process_group) else None,
+            env=process_env,
+        )
 
-    managed_processes[process.pid] = {
-        "process": process,
-        "command": command,
-        "log_file": log_file,
-        "log_file_path": log_file_path,
-        "is_ngrok": "ngrok" in command[0],  # Basic check if it's an ngrok process
-        "env": env,  # Store the custom env variables passed
-    }
-    print(f"Process started with PID: {process.pid}")
-    return process
+        managed_processes[process.pid] = {
+            "process": process,  # Type: subprocess.Popen
+            "command": command,  # Type: List[str]
+            "log_file": log_file,  # Type: IO[Any] (TextIOWrapper)
+            "log_file_path": log_file_path,  # Type: str
+            "is_ngrok": "ngrok" in command[0] if command else False,
+            "env": env,  # Type: Optional[Dict[str, str]]
+        }
+        print(f"Process started with PID: {process.pid}")
+        return process
+    except Exception as e:
+        print(f"Failed to start process: {e}")
+        log_file.close()  # Ensure log file is closed on error
+        return None
 
 
 # --- Ngrok functions (Deprecated in favor of Serveo) ---
@@ -293,9 +303,10 @@ def stop_process(pid: int):
     """
     if pid in managed_processes:
         proc_info = managed_processes[pid]
-        process = proc_info["process"]
-        log_file = proc_info["log_file"]
-        command_str = " ".join(proc_info["command"])
+        process: subprocess.Popen = proc_info["process"]
+        log_file: IO[Any] = proc_info["log_file"]
+        command_list: List[str] = proc_info["command"]
+        command_str = " ".join(str(c) for c in command_list)
 
         print(f"Stopping process PID {pid} ({command_str})...")
         try:
@@ -315,20 +326,25 @@ def stop_process(pid: int):
         except subprocess.TimeoutExpired:
             print(f"Process PID {pid} did not terminate gracefully, sending SIGKILL...")
             if os.name == "nt":
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    check=True,
-                    capture_output=True,
-                )  # Force kill
+                # On Windows, Popen.kill() is often sufficient for direct children.
+                # taskkill /T is for tree. If os.killpg was used via setsid, this might be complex.
+                # For simplicity, let's try process.kill() first.
+                process.kill()
             else:
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                os.killpg(os.getpgid(pid), signal.SIGKILL)  # Kill the whole group
+            process.wait(timeout=5)  # Wait for kill
             print(f"Process PID {pid} killed.")
+        except ProcessLookupError:  # Process might have already exited
+            print(f"Process PID {pid} already exited.")
         except Exception as e:
             print(f"Error stopping process PID {pid}: {e}")
         finally:
-            if log_file and not log_file.closed:
+            if (
+                log_file and not log_file.closed
+            ):  # Check if log_file is TextIOWrapper and not closed
                 log_file.close()
-            del managed_processes[pid]
+            if pid in managed_processes:  # Check if pid still exists before deleting
+                del managed_processes[pid]
     else:
         print(f"Process with PID {pid} not found in managed list.")
 

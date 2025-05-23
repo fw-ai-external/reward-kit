@@ -359,13 +359,32 @@ class TestOrchestratorToolDiscovery:
         async def patched_get_tools(*args, **kwargs):
             return {"tool_1": tool_adapter}
 
-        # Setup orchestrator with the patched method
+        # Setup orchestrator
         orchestrator = Orchestrator(task_definition=minimal_task_def)
         orchestrator.tools_module = mock_tools_module
-        orchestrator._get_available_tools = patched_get_tools
 
-        # Get available tools
-        available_tools = await orchestrator._get_available_tools(mock_episode_resource)
+        # Patch the _get_available_tools method for this test
+        with patch.object(
+            orchestrator,
+            "_get_available_tools",
+            new=AsyncMock(return_value={"tool_1": tool_adapter}),
+        ) as mock_get_tools:
+            # Get available tools
+            available_tools = await orchestrator._get_available_tools(
+                mock_episode_resource
+            )
+            mock_get_tools.assert_awaited_with(
+                mock_episode_resource
+            )  # Ensure it was called as expected if needed
+
+        # Verify our tool was found and works
+        assert "tool_1" in available_tools
+        result = await available_tools["tool_1"](
+            {"p": "val"}
+        )  # This calls the adapter directly
+        assert result == "Tool called successfully"
+
+        # Since we're using our own adapter, not testing the mock directly anymore
 
         # Verify our tool was found and works
         assert "tool_1" in available_tools
@@ -402,15 +421,19 @@ class TestOrchestratorToolDiscovery:
         orchestrator = Orchestrator(task_definition=minimal_task_def)
         orchestrator.tools_module = mock_tools_module
 
-        # Patch the get_available_tools method to return our custom tools
-        async def patched_get_tools(*args, **kwargs):
-            tools = {"common_tool": mock_common_tool}
-            return tools
-
-        orchestrator._get_available_tools = patched_get_tools
-
-        # Get available tools (using our patched method)
-        available_tools = await orchestrator._get_available_tools(mock_episode_resource)
+        # Patch the _get_available_tools method for this test
+        with patch.object(
+            orchestrator,
+            "_get_available_tools",
+            new=AsyncMock(return_value={"common_tool": mock_common_tool}),
+        ) as mock_get_tools:
+            # Get available tools (using our patched method)
+            available_tools = await orchestrator._get_available_tools(
+                mock_episode_resource
+            )
+            mock_get_tools.assert_awaited_with(
+                mock_episode_resource
+            )  # Ensure it was called as expected if needed
 
         # Call the common_tool and verify module version was used
         result = await available_tools["common_tool"]({})

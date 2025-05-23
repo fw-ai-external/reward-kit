@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +14,7 @@ def test_reward_func():
 
     def _reward_func(
         messages: List[Dict[str, str]],
-        original_messages: Optional[List[Dict[str, str]]] = None,
+        ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,  # Changed
         **kwargs
     ) -> EvaluateResult:
         """Test reward function that returns a simple score."""
@@ -46,7 +46,7 @@ class TestServer:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
             ],
-            "original_messages": [{"role": "user", "content": "Hello"}],
+            "ground_truth": [{"role": "user", "content": "Hello"}],  # Changed
         }
 
         response = client.post("/reward", json=payload)
@@ -67,7 +67,7 @@ class TestServer:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
             ],
-            "original_messages": [{"role": "user", "content": "Hello"}],
+            "ground_truth": [{"role": "user", "content": "Hello"}],  # Changed
             "metadata": {"test_key": "test_value"},
         }
 
@@ -92,7 +92,7 @@ class TestServer:
                 {"content": "Hello"},  # Missing role
                 {"role": "assistant", "content": "Hi there"},
             ],
-            "original_messages": [{"role": "user", "content": "Hello"}],
+            "ground_truth": [{"role": "user", "content": "Hello"}],  # Changed
         }
 
         response = client.post("/reward", json=payload)

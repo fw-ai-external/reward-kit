@@ -58,10 +58,8 @@ def main():
             {"role": "assistant", "content": custom_solution},
         ]
         # The ground_truth for "2 + 2 = 4" is "4"
-        math_result = math_reward(
-            messages=messages, ground_truth="4", original_messages=messages
-        )
-        length_result = length_reward(messages=messages, original_messages=messages)
+        math_result = math_reward(messages=messages, ground_truth="4")
+        length_result = length_reward(messages=messages)
 
         print(f"Problem: {problem}")
         print(f"Problem: {problem}")

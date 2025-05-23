@@ -1,7 +1,7 @@
 import random
 from copy import deepcopy
 from datetime import datetime, time, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from .long_context import (
     AUTOMOBILE_EXTENSION,
@@ -146,14 +146,14 @@ class TradingBot:
         """
         Initialize the TradingBot instance.
         """
-        self.orders: Dict[int, Dict[str, Union[str, float, int]]]
+        self.orders: Dict[int, Dict[str, Union[str, float, int, Dict[str, str]]]]
         self.account_info: Dict[str, Union[int, float]]
         self.authenticated: bool
         self.market_status: str
         self.order_counter: int
-        self.stocks: Dict[
-            str, Dict[str, Union[float, int, str]]
-        ]  # Added str for potential string values like error messages
+        self.stocks: Dict[  # Updated type hint
+            str, Dict[str, Union[float, int, str, List[str], List[float]]]
+        ]
         self.watch_list: List[str]
         self.transaction_history: List[Dict[str, Union[str, float, int]]]
         self._api_description = "This tool belongs to the trading system, which allows users to trade stocks, manage their account, and view stock information."
@@ -276,7 +276,11 @@ class TradingBot:
 
         return {"symbol": symbol_map.get(name, "Stock not found")}
 
-    def get_stock_info(self, symbol: str) -> Dict[str, Union[float, int, str]]:
+    def get_stock_info(
+        self, symbol: str
+    ) -> Dict[
+        str, Union[float, int, str, List[str], List[float]]
+    ]:  # Updated return type
         """
         Get the details of a stock.
 
@@ -300,30 +304,21 @@ class TradingBot:
         # For example, MA(5) and MA(20) are floats. Price is float. percent_change is float. volume is float.
         # If long_context adds string values, the return type needs to accommodate that.
         if self.long_context:
-            stock_copy: Dict[str, Union[float, int, str]] = deepcopy(
-                stock_data
-            )  # Make a copy to modify
-            # MA_5_EXTENSION and MA_20_EXTENSION are List[float], not float.
-            # This part of the logic seems to conflict with the return type hint if MA(5)/MA(20) are expected to be float.
-            # Assuming for now that the intention is to return the original structure if not long_context,
-            # and a modified one if long_context. The type hint might need adjustment based on actual extension content.
-            # For now, let's assume MA_5_EXTENSION and MA_20_EXTENSION are not directly assigned if they are lists.
-            # This part needs clarification on how MA_5_EXTENSION should be incorporated.
-            # If they are single float values, then it's fine. If lists, the return type is wrong.
-            # Given the error, it's likely they are lists.
-            # Let's adjust the return type to be more general for now.
-            # However, the original return type was Dict[str, Union[float, int, str]]
-            # Let's assume MA_5_EXTENSION and MA_20_EXTENSION are meant to replace the MA(5) and MA(20) float values.
-            # This would be an issue if they are lists.
-            # For now, I will assume they are single float values for the sake of fixing current errors.
-            # If MA_5_EXTENSION is a list, this line is problematic: stock_copy["MA(5)"] = MA_5_EXTENSION
-            # Let's assume they are floats for now.
-            if isinstance(MA_5_EXTENSION, (float, int)):  # Or handle if it's a list
-                stock_copy["MA(5)"] = MA_5_EXTENSION
-            if isinstance(MA_20_EXTENSION, (float, int)):  # Or handle if it's a list
-                stock_copy["MA(20)"] = MA_20_EXTENSION
-            return stock_copy
-        return stock_data
+            # stock_data is Dict[str, Union[float, int, str, List[str]]]
+            # deepcopy should preserve this.
+            stock_copy = deepcopy(stock_data)
+
+            # MA_5_EXTENSION and MA_20_EXTENSION are List[str] from long_context.py
+            # The type of stock_copy["MA(5)"] should allow List[str]
+            stock_copy["MA(5)"] = MA_5_EXTENSION
+            stock_copy["MA(20)"] = MA_20_EXTENSION
+            return stock_copy  # Type is Dict[str, Union[float, int, str, List[str]]]
+
+        # If not long_context, return the original stock data.
+        # MyPy might complain if it thinks self.stocks[symbol] doesn't fully match the broad return type
+        # if MA(5)/MA(20) are always float here.
+        # The type of self.stocks allows List[str] for these keys, so this should be fine.
+        return self.stocks[symbol]
 
     def get_order_details(
         self, order_id: int
@@ -619,10 +614,12 @@ class TradingBot:
             # Let's make it consistent by returning a dict with an error key.
             return {"error": "User not authenticated. Please log in to view the watchlist."}  # type: ignore
 
-        current_watch_list = list(self.watch_list)  # Create a copy
+        current_watch_list: List[str] = list(
+            self.watch_list
+        )  # Create a copy with type hint
         if self.long_context:
             # WATCH_LIST_EXTENSION is List[str]
-            current_watch_list.extend(WATCH_LIST_EXTENSION)
+            current_watch_list.extend(cast(List[str], WATCH_LIST_EXTENSION))
         return {"watchlist": current_watch_list}
 
     def get_order_history(
@@ -689,8 +686,13 @@ class TradingBot:
                     pass
 
         if self.long_context:
-            # Assuming TRANSACTION_HISTORY_EXTENSION items are correctly typed
-            final_history.extend(TRANSACTION_HISTORY_EXTENSION)
+            # TRANSACTION_HISTORY_EXTENSION is List[Dict[str, Union[str, float, int]]]
+            final_history.extend(
+                cast(
+                    List[Dict[str, Union[str, float, int]]],
+                    TRANSACTION_HISTORY_EXTENSION,
+                )
+            )
 
         return {"transaction_history": final_history}
 
@@ -714,11 +716,23 @@ class TradingBot:
         if new_price <= 0:
             return {"error": "New price must be a positive value."}
 
-        old_price = self.stocks[symbol]["price"]
+        old_price_any = self.stocks[symbol]["price"]
+        if not isinstance(old_price_any, (float, int)):
+            return {
+                "error": f"Current price for {symbol} is not a number: {old_price_any}."
+            }
+
+        old_price: float = float(old_price_any)
+
         self.stocks[symbol]["price"] = new_price
-        self.stocks[symbol]["percent_change"] = (
-            (new_price - old_price) / old_price
-        ) * 100
+        if old_price == 0:
+            self.stocks[symbol][
+                "percent_change"
+            ] = 0.0  # Avoid division by zero, or handle as infinite change
+        else:
+            self.stocks[symbol]["percent_change"] = (
+                (new_price - old_price) / old_price
+            ) * 100
 
         return {"symbol": symbol, "old_price": old_price, "new_price": new_price}
 
@@ -757,12 +771,15 @@ class TradingBot:
         Returns:
             filtered_stocks (List[str]): Filtered list of stock symbols within the price range.
         """
-        filtered_stocks = [
-            symbol
-            for symbol in stocks
-            if self.stocks.get(symbol, {}).get("price", 0) >= min_price
-            and self.stocks.get(symbol, {}).get("price", 0) <= max_price
-        ]
+        filtered_stocks = []
+        for symbol in stocks:
+            stock_data = self.stocks.get(symbol)
+            if stock_data:
+                price_any = stock_data.get("price")
+                if isinstance(price_any, (float, int)):
+                    price: float = float(price_any)
+                    if price >= min_price and price <= max_price:
+                        filtered_stocks.append(symbol)
         return {"filtered_stocks": filtered_stocks}
 
     def add_to_watchlist(self, stock: str) -> Dict[str, List[str]]:
@@ -799,12 +816,14 @@ class TradingBot:
         Returns:
             notification (str): Notification message about the price changes.
         """
-        changed_stocks = [
-            symbol
-            for symbol in stocks
-            if symbol in self.stocks
-            and abs(self.stocks[symbol]["percent_change"]) >= threshold
-        ]
+        changed_stocks = []
+        for symbol in stocks:
+            if symbol in self.stocks:
+                percent_change_any = self.stocks[symbol].get("percent_change")
+                if isinstance(percent_change_any, (float, int)):
+                    percent_change: float = float(percent_change_any)
+                    if abs(percent_change) >= threshold:
+                        changed_stocks.append(symbol)
 
         if changed_stocks:
             return {

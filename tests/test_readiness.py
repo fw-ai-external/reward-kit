@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from typing import Dict, Optional  # Added Optional, Dict
 from unittest.mock import MagicMock, patch
 
 import aiohttp
@@ -63,7 +64,6 @@ class TestMathExampleReadiness:
             )
             result = math_reward(
                 messages=messages,
-                original_messages=messages,
                 ground_truth=assistant_content,
             )
             print(f"  Sample {i+1}: Score={result.score}, Reason='{result.reason}'")
@@ -187,7 +187,6 @@ class TestMathExampleReadiness:
             # math_reward requires ground_truth. Here, it's the mocked solution.
             eval_result = math_reward(
                 messages=messages_for_eval,
-                original_messages=messages_for_eval,
                 ground_truth=current_mock_solution,
             )
 
@@ -231,7 +230,10 @@ class TestMathExampleEndToEndScripts:
     )
 
     def run_script(
-        self, script_name: str, env_vars: dict = None, timeout_seconds: int = 180
+        self,
+        script_name: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        timeout_seconds: int = 180,
     ) -> subprocess.CompletedProcess:
         """Helper to run an example script."""
         script_path = os.path.join(self.BASE_MATH_EXAMPLE_PATH, script_name)
@@ -476,7 +478,10 @@ class TestMathExampleOpenR1EndToEndScripts:
     )
 
     def run_script(
-        self, script_name: str, env_vars: dict = None, timeout_seconds: int = 180
+        self,
+        script_name: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        timeout_seconds: int = 180,
     ) -> subprocess.CompletedProcess:
         """Helper to run an example script for OpenR1."""
         script_path = os.path.join(self.BASE_MATH_EXAMPLE_OPENR1_PATH, script_name)

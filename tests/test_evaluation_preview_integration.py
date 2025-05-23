@@ -110,7 +110,7 @@ def mock_word_count_metric():
     with open(os.path.join(tmp_dir, "metrics", "word_count", "main.py"), "w") as f:
         f.write(
             """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
 
@@ -182,7 +182,7 @@ def test_preview_evaluation(mock_env_variables, mock_preview_api, monkeypatch):
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
             f.write(
                 """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
 
@@ -268,7 +268,7 @@ def test_create_evaluation(mock_env_variables, mock_create_api, monkeypatch):
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
             f.write(
                 """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
 
@@ -315,7 +315,7 @@ def test_preview_then_create(
         with open(os.path.join(tmp_dir, "word_count", "main.py"), "w") as f:
             f.write(
                 """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
 

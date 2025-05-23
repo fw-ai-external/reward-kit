@@ -1,10 +1,10 @@
 import json
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from reward_kit.models import EvaluateResult  # Changed
+from reward_kit.models import EvaluateResult
 from reward_kit.rewards.function_calling import (
     calculate_jaccard_similarity,
     composite_function_call_reward,
@@ -36,7 +36,6 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -44,13 +43,11 @@ class TestFunctionCalling:
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score == 1.0
         assert "function_name_match" in result.metrics
         assert "arguments_match" in result.metrics
         assert result.metrics["function_name_match"].score == 1.0
         assert result.metrics["arguments_match"].score == 1.0
-        # Dictionary access
         assert result["score"] == 1.0
         assert result["metrics"]["function_name_match"]["score"] == 1.0
         assert result["metrics"]["arguments_match"]["score"] == 1.0
@@ -65,7 +62,7 @@ class TestFunctionCalling:
             },
         }
 
-        parsed_name = "fetch_weather"  # Wrong name
+        parsed_name = "fetch_weather"
         parsed_args = {"location": "New York", "unit": "celsius"}
 
         result = match_function_call(
@@ -73,7 +70,6 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -81,23 +77,19 @@ class TestFunctionCalling:
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "function_name_match" in result.metrics
-        assert result.metrics["function_name_match"].score == 0.0
-        assert (
-            result.metrics["function_name_match"].reason is not None
-            and "Function name does not match"
-            in result.metrics["function_name_match"].reason
-        )
-        # Dictionary access
+        fn_match_metric = result.metrics["function_name_match"]
+        assert fn_match_metric.score == 0.0
+        reason_text = fn_match_metric.reason
+        assert reason_text is not None
+        assert "Function name does not match" in reason_text  # type: ignore[operator]
+
         assert result["score"] < 1.0
         assert result["metrics"]["function_name_match"]["score"] == 0.0
-        assert (
-            result["metrics"]["function_name_match"]["reason"] is not None
-            and "Function name does not match"
-            in result["metrics"]["function_name_match"]["reason"]
-        )
+        fn_match_metric_dict_reason = result["metrics"]["function_name_match"]["reason"]
+        assert fn_match_metric_dict_reason is not None
+        assert "Function name does not match" in fn_match_metric_dict_reason  # type: ignore[operator]
 
     def test_missing_required_argument(self):
         """Test with missing required argument."""
@@ -110,17 +102,13 @@ class TestFunctionCalling:
         }
 
         parsed_name = "get_weather"
-        parsed_args = {
-            "location": "New York"
-            # Missing "unit" argument
-        }
+        parsed_args = {"location": "New York"}
 
         result = match_function_call(
             messages=[
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -128,21 +116,19 @@ class TestFunctionCalling:
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
-        assert result.metrics["arguments_match"].score < 1.0
-        assert (
-            result.metrics["arguments_match"].reason is not None
-            and "Missing argument" in result.metrics["arguments_match"].reason
-        )
-        # Dictionary access
+        arg_match_metric = result.metrics["arguments_match"]
+        assert arg_match_metric.score < 1.0
+        reason_text = arg_match_metric.reason
+        assert reason_text is not None
+        assert "Missing argument" in reason_text  # type: ignore[operator]
+
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
-        assert (
-            result["metrics"]["arguments_match"]["reason"] is not None
-            and "Missing argument" in result["metrics"]["arguments_match"]["reason"]
-        )
+        arg_match_metric_dict_reason = result["metrics"]["arguments_match"]["reason"]
+        assert arg_match_metric_dict_reason is not None
+        assert "Missing argument" in arg_match_metric_dict_reason  # type: ignore[operator]
 
     def test_extra_argument(self):
         """Test with extra argument not in schema."""
@@ -158,7 +144,7 @@ class TestFunctionCalling:
         parsed_args = {
             "location": "New York",
             "unit": "celsius",
-            "extra_param": "value",  # Extra argument
+            "extra_param": "value",
         }
 
         result = match_function_call(
@@ -166,7 +152,6 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -174,21 +159,19 @@ class TestFunctionCalling:
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
-        assert result.metrics["arguments_match"].score < 1.0
-        assert (
-            result.metrics["arguments_match"].reason is not None
-            and "Unexpected argument" in result.metrics["arguments_match"].reason
-        )
-        # Dictionary access
+        arg_match_metric = result.metrics["arguments_match"]
+        assert arg_match_metric.score < 1.0
+        reason_text = arg_match_metric.reason
+        assert reason_text is not None
+        assert "Unexpected argument" in reason_text  # type: ignore[operator]
+
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
-        assert (
-            result["metrics"]["arguments_match"]["reason"] is not None
-            and "Unexpected argument" in result["metrics"]["arguments_match"]["reason"]
-        )
+        arg_match_metric_dict_reason = result["metrics"]["arguments_match"]["reason"]
+        assert arg_match_metric_dict_reason is not None
+        assert "Unexpected argument" in arg_match_metric_dict_reason  # type: ignore[operator]
 
     def test_permissive_mode(self):
         """Test permissive mode with extra arguments."""
@@ -204,7 +187,7 @@ class TestFunctionCalling:
         parsed_args = {
             "location": "New York",
             "unit": "celsius",
-            "extra_param": "value",  # Extra argument
+            "extra_param": "value",
         }
 
         result = match_function_call(
@@ -212,22 +195,18 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
-            argument_match_strictness="permissive",  # Permissive mode
+            argument_match_strictness="permissive",
         )
 
         assert isinstance(result, EvaluateResult)
-        # In permissive mode, extra arguments are allowed
-        # Attribute access
         assert result.score == 1.0
         assert "function_name_match" in result.metrics
         assert "arguments_match" in result.metrics
         assert result.metrics["function_name_match"].score == 1.0
         assert result.metrics["arguments_match"].score == 1.0
-        # Dictionary access
         assert result["score"] == 1.0
         assert result["metrics"]["function_name_match"]["score"] == 1.0
         assert result["metrics"]["arguments_match"]["score"] == 1.0
@@ -245,7 +224,7 @@ class TestFunctionCalling:
         parsed_name = "get_weather"
         parsed_args = {
             "location": "New York",
-            "temperature": "25",  # String instead of number
+            "temperature": "25",
         }
 
         result = match_function_call(
@@ -253,7 +232,6 @@ class TestFunctionCalling:
                 {"role": "user", "content": "What's the weather?"},
                 {"role": "assistant", "content": "Let me check the weather."},
             ],
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -261,51 +239,40 @@ class TestFunctionCalling:
         )
 
         assert isinstance(result, EvaluateResult)
-        # Attribute access
         assert result.score < 1.0
         assert "arguments_match" in result.metrics
-        assert result.metrics["arguments_match"].score < 1.0
-        assert (
-            result.metrics["arguments_match"].reason is not None
-            and "Type mismatch" in result.metrics["arguments_match"].reason
-        )
-        # Dictionary access
+        arg_match_metric = result.metrics["arguments_match"]
+        assert arg_match_metric.score < 1.0
+        reason_text = arg_match_metric.reason
+        assert reason_text is not None
+        assert "Type mismatch" in reason_text  # type: ignore[operator]
+
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
-        assert (
-            result["metrics"]["arguments_match"]["reason"] is not None
-            and "Type mismatch" in result["metrics"]["arguments_match"]["reason"]
-        )
+        arg_match_metric_dict_reason = result["metrics"]["arguments_match"]["reason"]
+        assert arg_match_metric_dict_reason is not None
+        assert "Type mismatch" in arg_match_metric_dict_reason  # type: ignore[operator]
 
     def test_calculate_jaccard_similarity(self):
         """Test Jaccard similarity calculation."""
-        # Perfect match
         set1 = {"a", "b", "c"}
         set2 = {"a", "b", "c"}
-        similarity = calculate_jaccard_similarity(set1, set2)
-        assert similarity == 1.0
+        assert calculate_jaccard_similarity(set1, set2) == 1.0
 
-        # No overlap
         set1 = {"a", "b", "c"}
         set2 = {"d", "e", "f"}
-        similarity = calculate_jaccard_similarity(set1, set2)
-        assert similarity == 0.0
+        assert calculate_jaccard_similarity(set1, set2) == 0.0
 
-        # Partial overlap
         set1 = {"a", "b", "c"}
         set2 = {"b", "c", "d"}
-        similarity = calculate_jaccard_similarity(set1, set2)
-        assert similarity == 0.5  # 2/4 = 0.5
+        assert calculate_jaccard_similarity(set1, set2) == 0.5
 
-        # Empty sets
         set1 = set()
         set2 = set()
-        similarity = calculate_jaccard_similarity(set1, set2)
-        assert similarity == 1.0  # Both empty should be perfect match
+        assert calculate_jaccard_similarity(set1, set2) == 1.0
 
     def test_extract_schema_properties(self):
         """Test extraction of properties from JSON schema."""
-        # Simple schema
         schema = {
             "properties": {
                 "name": {"type": "string"},
@@ -313,11 +280,8 @@ class TestFunctionCalling:
             }
         }
         properties = extract_schema_properties(schema)
-        assert len(properties) == 2
-        assert ("name", "string") in properties
-        assert ("age", "number") in properties
+        assert properties == {("name", "string"), ("age", "number")}
 
-        # Nested schema
         nested_schema: Dict[str, Any] = {
             "properties": {
                 "user": {
@@ -330,14 +294,13 @@ class TestFunctionCalling:
             }
         }
         properties = extract_schema_properties(nested_schema)
-        assert len(properties) == 3
-        assert ("user", "object") in properties
-        assert ("user.firstName", "string") in properties
-        assert ("user.lastName", "string") in properties
+        assert properties == {
+            ("user", "object"),
+            ("user.firstName", "string"),
+            ("user.lastName", "string"),
+        }
 
     def test_schema_jaccard_reward_exact_match(self):
-        """Test schema_jaccard_reward now delegates to exact_tool_match_reward - Perfect Match."""
-        # This test now verifies exact_tool_match_reward's behavior via schema_jaccard_reward
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -353,7 +316,7 @@ class TestFunctionCalling:
             ],
         }
         ground_truth_data = {
-            "role": "assistant",  # Role for ground_truth is illustrative, exact_tool_match_reward uses tool_calls from it
+            "role": "assistant",
             "tool_calls": [
                 {
                     "type": "function",
@@ -366,22 +329,21 @@ class TestFunctionCalling:
                 }
             ],
         }
-
-        result = schema_jaccard_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "What's the weather?"},
+            assistant_message_content_with_tool_call,
+        ]
+        result = schema_jaccard_reward(
+            messages=test_messages,
             ground_truth=ground_truth_data,
-            # expected_schema is no longer used by the delegated function
         )
-
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert "Exact tool match evaluation score: 1.0" in result.reason
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 1.0" in reason_text  # type: ignore[operator]
 
     def test_schema_jaccard_reward_mismatch(self):
-        """Test schema_jaccard_reward now delegates to exact_tool_match_reward - Mismatch."""
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -392,7 +354,7 @@ class TestFunctionCalling:
                         "arguments": json.dumps(
                             {"location": "New York", "unit": "fahrenheit"}
                         ),
-                    },  # Different unit
+                    },
                 }
             ],
         }
@@ -409,20 +371,21 @@ class TestFunctionCalling:
                 }
             ]
         }
-
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "What's the weather?"},
+            assistant_message_content_with_tool_call,
+        ]
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=test_messages,
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "Exact tool match evaluation score: 0.0" in result.reason
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 0.0" in reason_text  # type: ignore[operator]
 
     def test_schema_jaccard_reward_wrong_function_name(self):
-        """Test schema_jaccard_reward (delegating) with wrong function name."""
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -450,19 +413,21 @@ class TestFunctionCalling:
                 }
             ]
         }
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "What's the weather?"},
+            assistant_message_content_with_tool_call,
+        ]
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=test_messages,
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
-        assert "Exact tool match evaluation score: 0.0" in result.reason
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 0.0" in reason_text  # type: ignore[operator]
 
-    def test_nested_schema_exact_match(self):  # Renamed for clarity
-        """Test exact_tool_match_reward (via schema_jaccard_reward) with nested objects."""
+    def test_nested_schema_exact_match(self):
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -502,20 +467,21 @@ class TestFunctionCalling:
                 }
             ]
         }
-        result = schema_jaccard_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "Create a user for John Doe"},
-                assistant_message_content_with_tool_call,
-            ],
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "Create a user for John Doe"},
+            assistant_message_content_with_tool_call,
+        ]
+        result = schema_jaccard_reward(
+            messages=test_messages,
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert "Exact tool match evaluation score: 1.0" in result.reason
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 1.0" in reason_text  # type: ignore[operator]
 
-    # Remove @patch for OpenAI as llm_judge_reward now delegates
-    def test_llm_judge_reward_delegation(self):  # Renamed and simplified
-        """Test llm_judge_reward now delegates to exact_tool_match_reward."""
+    def test_llm_judge_reward_delegation(self):
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -543,26 +509,22 @@ class TestFunctionCalling:
                 }
             ]
         }
-
-        result = llm_judge_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "What's the weather?"},
+            assistant_message_content_with_tool_call,
+        ]
+        result = llm_judge_reward(
+            messages=test_messages,
             ground_truth=ground_truth_data,
-            # Other params like expected_schema, expected_behavior, openai_api_key are no longer used by the core logic
-
         )
-
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert "Exact tool match evaluation score: 1.0" in result.reason
-        # Ensure no LLM-specific metrics are present if the delegation is clean
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 1.0" in reason_text  # type: ignore[operator]
         assert "llm_judge" not in result.metrics
 
-    # Remove @patch for OpenAI as composite_function_call_reward now delegates
-    def test_composite_function_call_reward_delegation(self):  # Renamed and simplified
-        """Test composite_function_call_reward now delegates to exact_tool_match_reward."""
+    def test_composite_function_call_reward_delegation(self):
         assistant_message_content_with_tool_call = {
             "role": "assistant",
             "tool_calls": [
@@ -590,24 +552,19 @@ class TestFunctionCalling:
                 }
             ]
         }
-
-        result = composite_function_call_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+        test_messages: List[Dict[str, Any]] = [
+            {"role": "user", "content": "What's the weather?"},
+            assistant_message_content_with_tool_call,
+        ]
+        result = composite_function_call_reward(
+            messages=test_messages,
             ground_truth=ground_truth_data,
-            # Other params like expected_schema, expected_behavior, weights are no longer used by the core logic
-
         )
-
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
-        assert "Exact tool match evaluation score: 1.0" in result.reason
-        # Ensure no composite-specific metrics (like schema_score, llm_score, weights) are present
+        reason_text = result.reason
+        assert reason_text is not None
+        assert "Exact tool match evaluation score: 1.0" in reason_text  # type: ignore[operator]
         assert "schema_score" not in result.metrics
         assert "llm_score" not in result.metrics
         assert "weights" not in result.metrics
-
-
-# The JSON schema tests have been moved to tests/test_json_schema.py

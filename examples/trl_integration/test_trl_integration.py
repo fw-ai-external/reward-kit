@@ -34,7 +34,9 @@ from reward_kit.rewards.length import length_reward
 @reward_function
 def _example_trl_reward_func(  # Renamed to avoid pytest collection
     messages: List[Dict[str, Any]],
-    original_messages: Optional[List[Dict[str, Any]]] = None,
+    ground_truth: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # Changed from original_messages
     **kwargs
 ) -> EvaluateResult:
     """Simple test reward that returns 1.0 if text contains 'good' and 0.0 otherwise."""
@@ -285,7 +287,8 @@ def test_standalone_reward():
 
     # Verify result
     assert result.score == 1.0
-    assert "good" in result.reason
+    assert result.reason is not None  # Ensure reason is not None before 'in' check
+    assert "good" in result.reason  # type: ignore[operator]
 
 
 if __name__ == "__main__":

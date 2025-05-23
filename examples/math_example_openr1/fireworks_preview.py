@@ -78,22 +78,23 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 from reward_kit.rewards.math import math_reward
 from reward_kit.models import Message, EvaluateResult # Ensure EvaluateResult is imported
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union # Added Optional, Union
 
-def evaluate(messages: List[Dict[str, Any]], original_messages: List[Dict[str, Any]] = None, tools: List[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+def evaluate(messages: List[Dict[str, Any]], ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools: List[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
     typed_messages = [Message(**msg) for msg in messages]
-    typed_original_messages = [Message(**msg) for msg in original_messages] if original_messages else typed_messages
+    # typed_original_messages is no longer needed as a separate variable
 
-    assistant_content = next((m['content'] for m in typed_messages if m.role == 'assistant'), None)
-    if assistant_content is None:
+    assistant_content_for_gt = next((m.content for m in typed_messages if m.role == 'assistant'), None)
+    if assistant_content_for_gt is None:
         # Return as dict matching EvaluateResult structure
-        return {"score": 0.0, "reason": "No assistant message for ground truth", "metrics": {}}
+        return {"score": 0.0, "reason": "No assistant message content to use as ground_truth for math_reward", "metrics": {}}
 
     # Call the actual math_reward function
+    # The `ground_truth` parameter for `math_reward` is `assistant_content_for_gt`.
+    # Context will be derived from `typed_messages[:-1]` by `math_reward` if needed.
     result_obj = math_reward(
         messages=typed_messages,
-        original_messages=typed_original_messages,
-        ground_truth=assistant_content, # Use assistant's response as GT for this example
+        ground_truth=assistant_content_for_gt, # Use assistant's response as GT for this example
         **kwargs
     )
     return result_obj.model_dump() # Return as dict

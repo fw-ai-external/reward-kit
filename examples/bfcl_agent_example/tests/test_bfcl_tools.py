@@ -1,4 +1,5 @@
 import unittest
+from typing import Any, Dict, List, Union, cast  # Added cast, Union, List, Dict, Any
 
 from examples.bfcl_agent_example.envs.gorilla_file_system import (
     Directory,
@@ -29,9 +30,12 @@ class TestBfclTools(unittest.TestCase):
     def test_math_api_add(self):
         """Test MathAPI's add method."""
         math_tool = MathAPI()
-        result = math_tool.add(a=5, b=3)
+        result = math_tool.add(a=5.0, b=3.0)  # Changed to float
         self.assertEqual(result.get("result"), 8)
-        result_error = math_tool.add(a="test", b=3)
+        # Pass a type that will cause an error in the method if not handled
+        result_error = math_tool.add(
+            a=cast(float, "test"), b=3.0
+        )  # Cast to float, will error
         self.assertIn("error", result_error)
 
     # Add more tests for MathAPI methods here
@@ -41,10 +45,7 @@ class TestBfclTools(unittest.TestCase):
         try:
             message_tool = MessageAPI()
             self.assertIsNotNone(message_tool)
-            # Basic _load_scenario call with an empty scenario
-            # This ensures the method runs and defaults are applied if necessary
             message_tool._load_scenario({})
-            # Check if default attributes are set (example)
             self.assertIsNotNone(getattr(message_tool, "user_map", None))
         except Exception as e:
             self.fail(f"MessageAPI instantiation or _load_scenario failed: {e}")
@@ -52,11 +53,10 @@ class TestBfclTools(unittest.TestCase):
     def test_message_api_list_users(self):
         """Test MessageAPI's list_users method."""
         message_tool = MessageAPI()
-        message_tool._load_scenario({})  # Load default state
+        message_tool._load_scenario({})
         result = message_tool.list_users()
         self.assertIn("user_list", result)
         self.assertIsInstance(result["user_list"], list)
-        # Based on DEFAULT_STATE in message_api.py
         self.assertEqual(len(result["user_list"]), 4)
 
     def test_ticket_api_instantiation_and_load_scenario(self):
@@ -64,7 +64,6 @@ class TestBfclTools(unittest.TestCase):
         try:
             ticket_tool = TicketAPI()
             self.assertIsNotNone(ticket_tool)
-            # Basic _load_scenario call
             ticket_tool._load_scenario({})
             self.assertIsNotNone(getattr(ticket_tool, "ticket_queue", None))
         except Exception as e:
@@ -73,30 +72,30 @@ class TestBfclTools(unittest.TestCase):
     def test_ticket_api_get_ticket(self):
         """Test TicketAPI's get_ticket method."""
         ticket_tool = TicketAPI()
-        ticket_tool._load_scenario({})  # Load default state
+        ticket_tool._load_scenario({})
 
-        # Test getting a non-existent ticket
         result_error = ticket_tool.get_ticket(ticket_id=999)
         self.assertIn("error", result_error)
 
-        # Test creating and getting a ticket (requires user to be "logged in")
-        ticket_tool.current_user = "test_user"  # Simulate login
+        ticket_tool.current_user = "test_user"
         create_result = ticket_tool.create_ticket(
             title="Test Ticket", description="A test ticket"
         )
-        ticket_id = create_result.get("id")
-        self.assertIsNotNone(ticket_id)
-
-        get_result = ticket_tool.get_ticket(ticket_id=ticket_id)
-        self.assertEqual(get_result.get("id"), ticket_id)
-        self.assertEqual(get_result.get("title"), "Test Ticket")
+        ticket_id_any = create_result.get("id")
+        self.assertIsNotNone(ticket_id_any)
+        if ticket_id_any is not None:  # Type guard
+            ticket_id = int(ticket_id_any)  # Ensure it's an int
+            get_result = ticket_tool.get_ticket(ticket_id=ticket_id)
+            self.assertEqual(get_result.get("id"), ticket_id)
+            self.assertEqual(get_result.get("title"), "Test Ticket")
+        else:
+            self.fail("Ticket ID was None after creation")
 
     def test_trading_bot_instantiation_and_load_scenario(self):
         """Test TradingBot instantiation and _load_scenario."""
         try:
             trading_tool = TradingBot()
             self.assertIsNotNone(trading_tool)
-            # Basic _load_scenario call
             trading_tool._load_scenario({})
             self.assertIsNotNone(getattr(trading_tool, "orders", None))
             self.assertIsNotNone(getattr(trading_tool, "stocks", None))
@@ -106,14 +105,12 @@ class TestBfclTools(unittest.TestCase):
     def test_trading_bot_get_stock_info(self):
         """Test TradingBot's get_stock_info method."""
         trading_tool = TradingBot()
-        trading_tool._load_scenario({})  # Load default state
+        trading_tool._load_scenario({})
 
-        # Test getting info for an existing stock (AAPL is in DEFAULT_STATE)
         result_aapl = trading_tool.get_stock_info(symbol="AAPL")
         self.assertNotIn("error", result_aapl)
         self.assertIn("price", result_aapl)
 
-        # Test getting info for a non-existent stock
         result_error = trading_tool.get_stock_info(symbol="NONEXISTENT")
         self.assertIn("error", result_error)
 
@@ -122,7 +119,6 @@ class TestBfclTools(unittest.TestCase):
         try:
             travel_tool = TravelAPI()
             self.assertIsNotNone(travel_tool)
-            # Basic _load_scenario call
             travel_tool._load_scenario({})
             self.assertIsNotNone(getattr(travel_tool, "credit_card_list", None))
             self.assertIsNotNone(getattr(travel_tool, "booking_record", None))
@@ -132,9 +128,8 @@ class TestBfclTools(unittest.TestCase):
     def test_travel_api_get_flight_cost(self):
         """Test TravelAPI's get_flight_cost method."""
         travel_tool = TravelAPI()
-        travel_tool._load_scenario({})  # Load default state
+        travel_tool._load_scenario({})
 
-        # Test getting flight cost for a known route
         result = travel_tool.get_flight_cost(
             travel_from="SFO",
             travel_to="LAX",
@@ -142,11 +137,13 @@ class TestBfclTools(unittest.TestCase):
             travel_class="economy",
         )
         self.assertIn("travel_cost_list", result)
-        self.assertIsInstance(result["travel_cost_list"], list)
-        self.assertTrue(len(result["travel_cost_list"]) > 0)
-        self.assertIsInstance(result["travel_cost_list"][0], float)
+        travel_cost_list = result["travel_cost_list"]
+        if isinstance(travel_cost_list, list):  # Type guard
+            self.assertTrue(len(travel_cost_list) > 0)
+            self.assertIsInstance(travel_cost_list[0], float)
+        else:
+            self.fail("travel_cost_list is not a list")
 
-        # Test with an invalid class
         with self.assertRaises(ValueError) as context:
             travel_tool.get_flight_cost(
                 travel_from="SFO",
@@ -156,7 +153,6 @@ class TestBfclTools(unittest.TestCase):
             )
         self.assertIn("Invalid travel class", str(context.exception))
 
-        # Test with an unknown route
         with self.assertRaises(ValueError) as context:
             travel_tool.get_flight_cost(
                 travel_from="XXX",
@@ -171,7 +167,6 @@ class TestBfclTools(unittest.TestCase):
         try:
             vehicle_tool = VehicleControlAPI()
             self.assertIsNotNone(vehicle_tool)
-            # Basic _load_scenario call
             vehicle_tool._load_scenario({})
             self.assertIsNotNone(getattr(vehicle_tool, "fuelLevel", None))
         except Exception as e:
@@ -180,14 +175,12 @@ class TestBfclTools(unittest.TestCase):
     def test_vehicle_control_api_display_car_status(self):
         """Test VehicleControlAPI's displayCarStatus method."""
         vehicle_tool = VehicleControlAPI()
-        vehicle_tool._load_scenario({})  # Load default state
+        vehicle_tool._load_scenario({})
 
-        # Test displaying fuel status
         result_fuel = vehicle_tool.displayCarStatus(option="fuel")
         self.assertIn("fuelLevel", result_fuel)
         self.assertIsInstance(result_fuel["fuelLevel"], float)
 
-        # Test displaying an invalid option
         result_error = vehicle_tool.displayCarStatus(option="invalid_option")
         self.assertIn("error", result_error)
 
@@ -196,22 +189,14 @@ class TestBfclTools(unittest.TestCase):
         try:
             fs_tool = GorillaFileSystem()
             self.assertIsNotNone(fs_tool)
-            # Basic _load_scenario call
             fs_tool._load_scenario({})
-            self.assertIsNotNone(
-                getattr(fs_tool, "root", None)  # Check for the root directory attribute
-            )
+            self.assertIsNotNone(getattr(fs_tool, "root", None))
         except Exception as e:
             self.fail(f"GorillaFileSystem instantiation or _load_scenario failed: {e}")
 
     def test_gorilla_file_system_ls_and_cat(self):
         """Test GorillaFileSystem's ls and cat methods."""
         fs_tool = GorillaFileSystem()
-        # Load a scenario with a known file, or adapt to create one if possible
-        # For now, assume _load_scenario with an empty dict creates a root.
-        # The default _load_scenario in GorillaFileSystem creates a 'workspace' root.
-        # If it also created a default file, we could test cat.
-        # Let's test ls on the root.
         fs_tool._load_scenario(
             {
                 "root": {
@@ -225,14 +210,16 @@ class TestBfclTools(unittest.TestCase):
 
         ls_result = fs_tool.ls()
         self.assertIn("contents", ls_result)
-        self.assertIn("example.txt", ls_result["contents"])
-        self.assertEqual(ls_result["contents"]["example.txt"]["type"], "file")
+        ls_contents = ls_result["contents"]
+        if isinstance(ls_contents, dict):  # Type guard
+            self.assertIn("example.txt", ls_contents)
+            self.assertEqual(ls_contents["example.txt"]["type"], "file")
+        else:
+            self.fail("ls_result['contents'] is not a dict")
 
-        # Test cat
         cat_result = fs_tool.cat(file_name="example.txt")
         self.assertEqual(cat_result.get("content"), "test content")
 
-        # Test cat on non-existent file
         cat_error_result = fs_tool.cat(file_name="non_existent_file.txt")
         self.assertIn("error", cat_error_result)
 
@@ -241,12 +228,9 @@ class TestBfclTools(unittest.TestCase):
         try:
             twitter_tool = TwitterAPI()
             self.assertIsNotNone(twitter_tool)
-            # Basic _load_scenario call
             twitter_tool._load_scenario({})
-            self.assertIsNotNone(
-                getattr(twitter_tool, "tweets", None)
-            )  # Check for tweets attribute
-            self.assertFalse(twitter_tool.authenticated)  # Should be false by default
+            self.assertIsNotNone(getattr(twitter_tool, "tweets", None))
+            self.assertFalse(twitter_tool.authenticated)
         except Exception as e:
             self.fail(f"TwitterAPI instantiation or _load_scenario failed: {e}")
 
@@ -256,16 +240,15 @@ class TestBfclTools(unittest.TestCase):
         scenario_data = {
             "username": "testuser",
             "password": "password",
-            "tweets": {},  # Initial tweets
+            "tweets": {},
             "comments": {},
             "retweets": {},
             "following_list": [],
-            "tweet_counter": 0,  # Initial counter
+            "tweet_counter": 0,
             "authenticated": False,
         }
         twitter_tool._load_scenario(scenario_data)
 
-        # Test login
         login_result = twitter_tool.login(username="testuser", password="password")
         self.assertEqual(
             login_result.get("status"),
@@ -274,7 +257,6 @@ class TestBfclTools(unittest.TestCase):
         )
         self.assertTrue(twitter_tool.authenticated)
 
-        # Test post_tweet
         tweet_content = "Hello from Cline the AI!"
         post_result = twitter_tool.post_tweet(content=tweet_content)
         self.assertEqual(
@@ -284,11 +266,8 @@ class TestBfclTools(unittest.TestCase):
         )
         self.assertIn("tweet_id", post_result)
         tweet_id = post_result["tweet_id"]
-        tweet_id_str = str(
-            tweet_id
-        )  # The API stores tweet IDs as strings in the tweets dict
+        tweet_id_str = str(tweet_id)
 
-        # Test get_tweets for the user
         tweets_result = twitter_tool.get_tweets(username="testuser")
         self.assertIsInstance(
             tweets_result, dict, "get_tweets should return a dictionary."
@@ -299,7 +278,6 @@ class TestBfclTools(unittest.TestCase):
         self.assertEqual(tweets_result[tweet_id_str]["content"], tweet_content)
         self.assertEqual(tweets_result[tweet_id_str]["username"], "testuser")
 
-        # Test get_tweets for all (should include the new tweet)
         all_tweets_result = twitter_tool.get_tweets()
         self.assertIsInstance(all_tweets_result, dict)
         self.assertIn(
@@ -310,11 +288,8 @@ class TestBfclTools(unittest.TestCase):
         self.assertEqual(all_tweets_result[tweet_id_str]["content"], tweet_content)
 
     def test_gorilla_file_system_pwd(self):
-        """Test GorillaFileSystem's pwd method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads default /workspace
-
-        # 1. Test pwd at root
+        fs_tool._load_scenario({})
         pwd_result_root = fs_tool.pwd()
         self.assertNotIn(
             "error",
@@ -322,8 +297,6 @@ class TestBfclTools(unittest.TestCase):
             f"pwd failed at root: {pwd_result_root.get('error')}",
         )
         self.assertEqual(pwd_result_root.get("current_working_directory"), "/workspace")
-
-        # 2. Create a dir, cd into it, test pwd
         fs_tool.mkdir(dir_name="testdir")
         fs_tool.cd(folder="testdir")
         pwd_result_subdir = fs_tool.pwd()
@@ -335,8 +308,6 @@ class TestBfclTools(unittest.TestCase):
         self.assertEqual(
             pwd_result_subdir.get("current_working_directory"), "/workspace/testdir"
         )
-
-        # 3. cd back to parent, test pwd
         fs_tool.cd(folder="..")
         pwd_result_back_to_root = fs_tool.pwd()
         self.assertNotIn(
@@ -349,9 +320,7 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_cp(self):
-        """Test GorillaFileSystem's cp method."""
         fs_tool = GorillaFileSystem()
-        # Initial setup: /workspace, /workspace/file1.txt, /workspace/dir1
         fs_tool._load_scenario(
             {
                 "root": {
@@ -372,126 +341,119 @@ class TestBfclTools(unittest.TestCase):
             }
         )
 
-        # 1. Copy file to new name in current directory (/workspace)
         cp_result1 = fs_tool.cp(source="file1.txt", destination="file2.txt")
         self.assertIn("Copied 'file1.txt' to 'file2.txt'", cp_result1.get("result", ""))
         self.assertIn("file2.txt", fs_tool.current_dir.contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["file2.txt"].content, "content of file1"
-        )
+        file2_node = fs_tool.current_dir.contents["file2.txt"]
+        if isinstance(file2_node, File):
+            self.assertEqual(file2_node.content, "content of file1")
+        else:
+            self.fail("file2.txt is not a File")
 
-        # 2. Copy file into an existing subdirectory (/workspace/dir1)
         cp_result2 = fs_tool.cp(source="file1.txt", destination="dir1")
         self.assertIn(
             "Copied 'file1.txt' into directory 'dir1'", cp_result2.get("result", "")
         )
-        self.assertIn("file1.txt", fs_tool.current_dir.contents["dir1"].contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir1"].contents["file1.txt"].content,
-            "content of file1",
-        )
+        dir1_node = fs_tool.current_dir.contents["dir1"]
+        if isinstance(dir1_node, Directory):
+            self.assertIn("file1.txt", dir1_node.contents)
+            copied_file_in_dir1 = dir1_node.contents["file1.txt"]
+            if isinstance(copied_file_in_dir1, File):
+                self.assertEqual(copied_file_in_dir1.content, "content of file1")
+            else:
+                self.fail("Copied file1.txt in dir1 is not a File")
+        else:
+            self.fail("dir1 is not a Directory")
 
-        # 3. Copy directory to new name (deep copy)
         cp_result3 = fs_tool.cp(source="dir1", destination="dir2")
         self.assertIn("Copied 'dir1' to 'dir2'", cp_result3.get("result", ""))
         self.assertIn("dir2", fs_tool.current_dir.contents)
-        self.assertIsInstance(
-            fs_tool.current_dir.contents["dir2"],
-            type(fs_tool.current_dir.contents["dir1"]),
-        )  # Check type
-        self.assertIn("nested_file.txt", fs_tool.current_dir.contents["dir2"].contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir2"].contents["nested_file.txt"].content,
-            "nested content",
-        )
-        # Ensure it's a deep copy (modifying copy shouldn't affect original)
-        fs_tool.current_dir.contents["dir2"].contents[
-            "nested_file.txt"
-        ].content = "modified nested"
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir1"].contents["nested_file.txt"].content,
-            "nested content",
-        )
+        dir1_original_ref = fs_tool.current_dir.contents.get(
+            "dir1"
+        )  # dir1 might be gone if source was 'dir1' and dest was 'dir2' (rename)
+        # If cp is copy, dir1 should still exist.
+        # Assuming cp is copy, not move.
+        dir2_copied = fs_tool.current_dir.contents["dir2"]
 
-        # 4. Copy directory into an existing subdirectory (deep copy)
+        if isinstance(dir2_copied, Directory) and isinstance(
+            dir1_original_ref, Directory
+        ):
+            self.assertIsInstance(dir2_copied, type(dir1_original_ref))
+            self.assertIn("nested_file.txt", dir2_copied.contents)
+            nested_file_in_dir2 = dir2_copied.contents["nested_file.txt"]
+            if isinstance(nested_file_in_dir2, File):
+                self.assertEqual(nested_file_in_dir2.content, "nested content")
+                nested_file_in_dir2.content = "modified nested"  # Modify copy
+            else:
+                self.fail("nested_file.txt in dir2 is not a File")
+
+            original_nested_file_in_dir1 = dir1_original_ref.contents["nested_file.txt"]
+            if isinstance(original_nested_file_in_dir1, File):
+                self.assertEqual(
+                    original_nested_file_in_dir1.content, "nested content"
+                )  # Check original is unchanged
+            else:
+                self.fail("Original nested_file.txt in dir1 is not a File")
+        elif not isinstance(dir1_original_ref, Directory):
+            self.fail(
+                "Original dir1 reference is not a Directory or was removed unexpectedly"
+            )
+        else:
+            self.fail("dir2 is not a Directory")
+
         fs_tool.mkdir("dir3")
         cp_result4 = fs_tool.cp(source="dir1", destination="dir3")
         self.assertIn(
             "Copied 'dir1' into directory 'dir3'", cp_result4.get("result", "")
         )
-        self.assertIn("dir1", fs_tool.current_dir.contents["dir3"].contents)
-        self.assertIn(
-            "nested_file.txt",
-            fs_tool.current_dir.contents["dir3"].contents["dir1"].contents,
-        )
+        dir3_node = fs_tool.current_dir.contents["dir3"]
+        if isinstance(dir3_node, Directory):
+            self.assertIn("dir1", dir3_node.contents)
+            copied_dir1_in_dir3 = dir3_node.contents["dir1"]
+            if isinstance(copied_dir1_in_dir3, Directory):
+                self.assertIn("nested_file.txt", copied_dir1_in_dir3.contents)
+            else:
+                self.fail("Copied dir1 in dir3 is not a Directory")
+        else:
+            self.fail("dir3 is not a Directory")
 
-        # 5. Attempt to copy non-existent source
         cp_result5 = fs_tool.cp(source="nonexistent.txt", destination="newfile.txt")
         self.assertIn(
             "Error: Source 'nonexistent.txt' not found", cp_result5.get("result", "")
         )
 
-        # 6. Attempt to copy file over an existing directory
-        cp_result6 = fs_tool.cp(
-            source="file1.txt", destination="dir1"
-        )  # dir1 already exists
-        # Current implementation overwrites dir1/file1.txt if file1.txt is copied into dir1.
-        # If destination is dir1 (the directory itself), it should copy file1.txt into dir1.
-        # The test for this specific error "Cannot overwrite directory 'destination' with file 'source'"
-        # would require destination to be the name of the directory, not copying *into* it.
-        # Let's re-test copying file1.txt to dir1 (as a name, not as a target directory)
-        # To do this, dir1 must not exist as a directory for this specific error.
-        # So, this test case as written might be testing copy *into* dir, which is allowed.
-        # Let's test the specific error: cp file1.txt dir1_as_file_target (where dir1_as_file_target is actually a dir)
-        # This is tricky because cp logic first checks if dest is a dir to copy into.
-        # The error "Cannot overwrite directory 'destination' with file 'source'"
-        # happens if destination is NOT a directory, but an existing item that IS a directory.
-        # This means the cp logic: `if destination in self.current_dir.contents and isinstance(self.current_dir.contents[destination], Directory):`
-        # handles copying *into* a directory.
-        # The error is for `else` block: `if isinstance(self.current_dir.contents[destination], Directory) and isinstance(source_item, File):`
-        # This means destination is an existing item, it's a directory, and we are trying to overwrite it with a file.
-        # Create a scenario for this:
-        fs_tool.mkdir("dir_to_be_overwritten_by_file")
-        cp_result6b = fs_tool.cp(
-            source="file1.txt", destination="dir_to_be_overwritten_by_file"
-        )
-        # Corrected assertion: cp file into dir should succeed by copying the file into the dir
+        fs_tool.mkdir("dir_target_for_file")
+        cp_result6 = fs_tool.cp(source="file1.txt", destination="dir_target_for_file")
         self.assertIn(
-            "Copied 'file1.txt' into directory 'dir_to_be_overwritten_by_file'",
-            cp_result6b.get("result", ""),
+            "Copied 'file1.txt' into directory 'dir_target_for_file'",
+            cp_result6.get("result", ""),
         )
-        self.assertIn(
-            "file1.txt",
-            fs_tool.current_dir.contents["dir_to_be_overwritten_by_file"].contents,
-        )
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir_to_be_overwritten_by_file"]
-            .contents["file1.txt"]
-            .content,
-            "content of file1",
-        )
+        dir_target_node = fs_tool.current_dir.contents["dir_target_for_file"]
+        if isinstance(dir_target_node, Directory):
+            self.assertIn("file1.txt", dir_target_node.contents)
+            copied_file_in_dir_target = dir_target_node.contents["file1.txt"]
+            if isinstance(copied_file_in_dir_target, File):
+                self.assertEqual(copied_file_in_dir_target.content, "content of file1")
+            else:
+                self.fail("Copied file1.txt in dir_target_for_file is not a File")
+        else:
+            self.fail("dir_target_for_file is not a Directory")
 
-        # 7. Attempt to copy directory over an existing file
-        fs_tool.cat = lambda file_name: {
-            "content": "dummy"
-        }  # mock cat to create a file easily for test
-        fs_tool.current_dir.contents[
-            "file_to_be_overwritten_by_dir"
-        ] = GorillaFileSystem()._deep_copy_item(
-            fs_tool.current_dir.contents["file1.txt"],
-            fs_tool.current_dir,
-            "file_to_be_overwritten_by_dir",
+        fs_tool.current_dir.contents["file_to_be_overwritten_by_dir.txt"] = File(
+            name="file_to_be_overwritten_by_dir.txt",
+            content="original file content",
+            parent=fs_tool.current_dir,
         )
-
+        if "dir1" not in fs_tool.current_dir.contents:  # Ensure dir1 exists
+            fs_tool.mkdir("dir1")
         cp_result7 = fs_tool.cp(
-            source="dir1", destination="file_to_be_overwritten_by_dir"
+            source="dir1", destination="file_to_be_overwritten_by_dir.txt"
         )
         self.assertIn(
-            "Error: Cannot overwrite file 'file_to_be_overwritten_by_dir' with directory 'dir1'",
+            "Error: Cannot overwrite file 'file_to_be_overwritten_by_dir.txt' with directory 'dir1'",
             cp_result7.get("result", ""),
         )
 
-        # 8. Copy file to an existing file name (overwrite)
         fs_tool.current_dir.contents["file_to_overwrite.txt"] = File(
             name="file_to_overwrite.txt",
             content="original content",
@@ -502,27 +464,28 @@ class TestBfclTools(unittest.TestCase):
             "Copied 'file1.txt' to 'file_to_overwrite.txt'",
             cp_result8.get("result", ""),
         )
-        self.assertEqual(
-            fs_tool.current_dir.contents["file_to_overwrite.txt"].content,
-            "content of file1",
-        )
+        file_to_overwrite_node = fs_tool.current_dir.contents["file_to_overwrite.txt"]
+        if isinstance(file_to_overwrite_node, File):
+            self.assertEqual(file_to_overwrite_node.content, "content of file1")
+        else:
+            self.fail("file_to_overwrite.txt is not a File after cp")
 
-        # 9. Copy file into a directory where a file of the same name already exists (overwrite)
         fs_tool.mkdir("dir_for_overwrite_test")
-        fs_tool.current_dir.contents["dir_for_overwrite_test"].contents[
-            "common_name.txt"
-        ] = File(
-            name="common_name.txt",
-            content="content in dir",
-            parent=fs_tool.current_dir.contents["dir_for_overwrite_test"],
-        )
-        # Create a source file with the same name in current_dir to copy from
+        dir_for_overwrite_node = fs_tool.current_dir.contents["dir_for_overwrite_test"]
+        if isinstance(dir_for_overwrite_node, Directory):
+            dir_for_overwrite_node.contents["common_name.txt"] = File(
+                name="common_name.txt",
+                content="content in dir",
+                parent=dir_for_overwrite_node,
+            )
+        else:
+            self.fail("dir_for_overwrite_test is not a Directory")
+
         fs_tool.current_dir.contents["common_name.txt"] = File(
             name="common_name.txt",
             content="new main content",
             parent=fs_tool.current_dir,
         )
-
         cp_result9 = fs_tool.cp(
             source="common_name.txt", destination="dir_for_overwrite_test"
         )
@@ -530,37 +493,40 @@ class TestBfclTools(unittest.TestCase):
             "Copied 'common_name.txt' into directory 'dir_for_overwrite_test'",
             cp_result9.get("result", ""),
         )
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir_for_overwrite_test"]
-            .contents["common_name.txt"]
-            .content,
-            "new main content",
-        )
+
+        target_dir_node_after_cp = fs_tool.current_dir.contents[
+            "dir_for_overwrite_test"
+        ]
+        if isinstance(target_dir_node_after_cp, Directory):
+            overwritten_file_node = target_dir_node_after_cp.contents["common_name.txt"]
+            if isinstance(overwritten_file_node, File):
+                self.assertEqual(overwritten_file_node.content, "new main content")
+            else:
+                self.fail(
+                    "common_name.txt in dir_for_overwrite_test is not a File after cp"
+                )
+        else:
+            self.fail("dir_for_overwrite_test is not a Directory after cp")
 
     def test_gorilla_file_system_diff(self):
-        """Test GorillaFileSystem's diff method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
-        # Setup files for diff
+        fs_tool._load_scenario({})
         fs_tool.current_dir.contents["file_a.txt"] = File(
             name="file_a.txt", content="line1\nline2\nline3", parent=fs_tool.current_dir
         )
         fs_tool.current_dir.contents["file_b.txt"] = File(
             name="file_b.txt", content="line1\nline2\nline3", parent=fs_tool.current_dir
-        )  # Identical
+        )
         fs_tool.current_dir.contents["file_c.txt"] = File(
             name="file_c.txt",
             content="line_one\nline2\nline_three\nline4",
             parent=fs_tool.current_dir,
-        )  # Different
+        )
 
-        # 1. Compare two identical files
         diff_result1 = fs_tool.diff(file_name1="file_a.txt", file_name2="file_b.txt")
         self.assertEqual(diff_result1.get("status"), "success")
         self.assertEqual(diff_result1.get("diff_lines"), "Files are identical")
 
-        # 2. Compare two different files
         diff_result2 = fs_tool.diff(file_name1="file_a.txt", file_name2="file_c.txt")
         self.assertEqual(diff_result2.get("status"), "success")
         expected_diff_lines = [
@@ -570,7 +536,6 @@ class TestBfclTools(unittest.TestCase):
         ]
         self.assertEqual(diff_result2.get("diff_lines"), "\n".join(expected_diff_lines))
 
-        # 2b. Compare files with c first (order might matter for None display)
         diff_result2b = fs_tool.diff(file_name1="file_c.txt", file_name2="file_a.txt")
         self.assertEqual(diff_result2b.get("status"), "success")
         expected_diff_lines_rev = [
@@ -582,14 +547,12 @@ class TestBfclTools(unittest.TestCase):
             diff_result2b.get("diff_lines"), "\n".join(expected_diff_lines_rev)
         )
 
-        # 3. Attempt to diff a non-existent file (file1 missing)
         diff_result3 = fs_tool.diff(
             file_name1="non_existent.txt", file_name2="file_a.txt"
         )
         self.assertIn("error", diff_result3)
         self.assertEqual(diff_result3.get("error"), "File non_existent.txt not found")
 
-        # 4. Attempt to diff a non-existent file (file2 missing)
         diff_result4 = fs_tool.diff(
             file_name1="file_a.txt", file_name2="non_existent.txt"
         )
@@ -597,34 +560,28 @@ class TestBfclTools(unittest.TestCase):
         self.assertEqual(diff_result4.get("error"), "File non_existent.txt not found")
 
     def test_gorilla_file_system_touch(self):
-        """Test GorillaFileSystem's touch method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
-        # 1. Touch a new file
+        fs_tool._load_scenario({})
         touch_result1 = fs_tool.touch(file_name="new_empty_file.txt")
-        self.assertEqual(
-            touch_result1, {}, "Touch new file should return empty dict on success"
-        )
+        self.assertEqual(touch_result1, {})
         self.assertIn("new_empty_file.txt", fs_tool.current_dir.contents)
-        self.assertIsInstance(fs_tool.current_dir.contents["new_empty_file.txt"], File)
-        self.assertEqual(fs_tool.current_dir.contents["new_empty_file.txt"].content, "")
+        new_file_node = fs_tool.current_dir.contents["new_empty_file.txt"]
+        if isinstance(new_file_node, File):
+            self.assertEqual(new_file_node.content, "")
+        else:
+            self.fail("new_empty_file.txt is not a File")
 
-        # 2. Touch an existing file
         fs_tool.current_dir.contents["existing_file.txt"] = File(
             name="existing_file.txt", content="some content", parent=fs_tool.current_dir
         )
         touch_result2 = fs_tool.touch(file_name="existing_file.txt")
-        self.assertEqual(
-            touch_result2, {}, "Touch existing file should return empty dict on success"
-        )
-        self.assertEqual(
-            fs_tool.current_dir.contents["existing_file.txt"].content,
-            "some content",
-            "Touch should not alter content of existing file",
-        )
+        self.assertEqual(touch_result2, {})
+        existing_file_node = fs_tool.current_dir.contents["existing_file.txt"]
+        if isinstance(existing_file_node, File):
+            self.assertEqual(existing_file_node.content, "some content")
+        else:
+            self.fail("existing_file.txt is not a File")
 
-        # 3. Attempt to touch an existing directory
         fs_tool.mkdir("existing_dir")
         touch_result3 = fs_tool.touch(file_name="existing_dir")
         self.assertIn("error", touch_result3)
@@ -634,7 +591,6 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_rm(self):
-        """Test GorillaFileSystem's rm method."""
         fs_tool = GorillaFileSystem()
         fs_tool._load_scenario(
             {
@@ -656,36 +612,27 @@ class TestBfclTools(unittest.TestCase):
                 }
             }
         )
-
-        # 1. Remove an existing file
         rm_result1 = fs_tool.rm(file_name="file_to_remove.txt")
         self.assertEqual(
             rm_result1.get("result"), "Successfully removed 'file_to_remove.txt'."
         )
         self.assertNotIn("file_to_remove.txt", fs_tool.current_dir.contents)
-
-        # 2. Remove an existing empty directory
         rm_result2 = fs_tool.rm(file_name="empty_dir_to_remove")
         self.assertEqual(
             rm_result2.get("result"), "Successfully removed 'empty_dir_to_remove'."
         )
         self.assertNotIn("empty_dir_to_remove", fs_tool.current_dir.contents)
-
-        # 3. Remove an existing non-empty directory
         rm_result3 = fs_tool.rm(file_name="non_empty_dir_to_remove")
         self.assertEqual(
             rm_result3.get("result"), "Successfully removed 'non_empty_dir_to_remove'."
         )
         self.assertNotIn("non_empty_dir_to_remove", fs_tool.current_dir.contents)
-
-        # 4. Attempt to remove a non-existent file/directory
         rm_result4 = fs_tool.rm(file_name="does_not_exist.txt")
         self.assertEqual(
             rm_result4.get("result"), "Error: 'does_not_exist.txt' not found."
         )
 
     def test_gorilla_file_system_rmdir(self):
-        """Test GorillaFileSystem's rmdir method."""
         fs_tool = GorillaFileSystem()
         fs_tool._load_scenario(
             {
@@ -704,86 +651,61 @@ class TestBfclTools(unittest.TestCase):
                 }
             }
         )
-
-        # 1. Remove an existing empty directory
         rmdir_result1 = fs_tool.rmdir(dir_name="empty_dir")
         self.assertEqual(
             rmdir_result1.get("result"), "Successfully removed directory 'empty_dir'."
         )
         self.assertNotIn("empty_dir", fs_tool.current_dir.contents)
-
-        # 2. Attempt to remove a non-empty directory
         rmdir_result2 = fs_tool.rmdir(dir_name="non_empty_dir")
         self.assertEqual(
             rmdir_result2.get("result"),
             "Error: Directory 'non_empty_dir' is not empty.",
         )
-        self.assertIn(
-            "non_empty_dir", fs_tool.current_dir.contents
-        )  # Should still exist
-
-        # 3. Attempt to remove a file using rmdir
+        self.assertIn("non_empty_dir", fs_tool.current_dir.contents)
         rmdir_result3 = fs_tool.rmdir(dir_name="a_file.txt")
         self.assertEqual(
             rmdir_result3.get("result"), "Error: 'a_file.txt' is not a directory."
         )
-        self.assertIn("a_file.txt", fs_tool.current_dir.contents)  # Should still exist
-
-        # 4. Attempt to remove a non-existent directory
+        self.assertIn("a_file.txt", fs_tool.current_dir.contents)
         rmdir_result4 = fs_tool.rmdir(dir_name="ghost_dir")
         self.assertEqual(
             rmdir_result4.get("result"), "Error: Directory 'ghost_dir' not found."
         )
 
     def test_gorilla_file_system_grep(self):
-        """Test GorillaFileSystem's grep method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
+        fs_tool._load_scenario({})
         file_content = "Hello world\nThis is a test line\nAnother Test Line with test pattern\nworld wide web"
         fs_tool.current_dir.contents["grep_test_file.txt"] = File(
             name="grep_test_file.txt", content=file_content, parent=fs_tool.current_dir
         )
-
-        # 1. Grep for a pattern that exists
         grep_result1 = fs_tool.grep(file_name="grep_test_file.txt", pattern="world")
         self.assertNotIn("error", grep_result1)
         self.assertEqual(
             grep_result1.get("matching_lines"), ["Hello world", "world wide web"]
         )
-
-        # 2. Grep for a pattern that does not exist
         grep_result2 = fs_tool.grep(
             file_name="grep_test_file.txt", pattern="nonexistentpattern"
         )
         self.assertNotIn("error", grep_result2)
         self.assertEqual(grep_result2.get("matching_lines"), [])
-
-        # 3. Grep in a non-existent file
         grep_result3 = fs_tool.grep(file_name="no_such_file.txt", pattern="world")
         self.assertIn("error", grep_result3)
         self.assertEqual(
             grep_result3.get("error"),
             "File 'no_such_file.txt' not found or is not a file.",
         )
-
-        # 4. Grep for a pattern that matches multiple lines (case sensitive)
         grep_result4 = fs_tool.grep(file_name="grep_test_file.txt", pattern="test")
         self.assertNotIn("error", grep_result4)
         self.assertEqual(
             grep_result4.get("matching_lines"),
             ["This is a test line", "Another Test Line with test pattern"],
         )
-
-        # 5. Grep for a pattern that is case sensitive (no match for "Test" with lowercase "test" pattern)
-        # (already covered by above, but explicitly checking for "Test" with "Test" pattern)
         grep_result5 = fs_tool.grep(file_name="grep_test_file.txt", pattern="Test")
         self.assertNotIn("error", grep_result5)
         self.assertEqual(
             grep_result5.get("matching_lines"), ["Another Test Line with test pattern"]
         )
-
-        # 6. Grep for pattern in a file that is actually a directory
         fs_tool.mkdir("grep_dir_test")
         grep_result6 = fs_tool.grep(file_name="grep_dir_test", pattern="world")
         self.assertIn("error", grep_result6)
@@ -793,9 +715,7 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_mv(self):
-        """Test GorillaFileSystem's mv method."""
         fs_tool = GorillaFileSystem()
-        # Setup: /workspace contains file1.txt, dir1 (empty), dir2 (with nested_file.txt)
         fs_tool._load_scenario(
             {
                 "root": {
@@ -817,27 +737,24 @@ class TestBfclTools(unittest.TestCase):
                 }
             }
         )
-
-        # 1. Rename a file in current directory
         mv_result1 = fs_tool.mv(source="file1.txt", destination="file_renamed.txt")
         self.assertEqual(
             mv_result1.get("result"), "Moved 'file1.txt' to 'file_renamed.txt'."
         )
         self.assertNotIn("file1.txt", fs_tool.current_dir.contents)
         self.assertIn("file_renamed.txt", fs_tool.current_dir.contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["file_renamed.txt"].content, "content1"
-        )
+        renamed_file_node = fs_tool.current_dir.contents["file_renamed.txt"]
+        if isinstance(renamed_file_node, File):
+            self.assertEqual(renamed_file_node.content, "content1")
+        else:
+            self.fail("file_renamed.txt is not a File")
 
-        # 2. Rename a directory in current directory
         mv_result2 = fs_tool.mv(source="dir1", destination="dir_renamed")
         self.assertEqual(mv_result2.get("result"), "Moved 'dir1' to 'dir_renamed'.")
         self.assertNotIn("dir1", fs_tool.current_dir.contents)
         self.assertIn("dir_renamed", fs_tool.current_dir.contents)
         self.assertIsInstance(fs_tool.current_dir.contents["dir_renamed"], Directory)
 
-        # 3. Move a file into an existing subdirectory (dir2)
-        # Re-create file_renamed.txt as it was moved in test 1
         fs_tool.current_dir.contents["file_renamed.txt"] = File(
             name="file_renamed.txt", content="content1", parent=fs_tool.current_dir
         )
@@ -846,14 +763,16 @@ class TestBfclTools(unittest.TestCase):
             mv_result3.get("result"), "Moved 'file_renamed.txt' into directory 'dir2'."
         )
         self.assertNotIn("file_renamed.txt", fs_tool.current_dir.contents)
-        self.assertIn("file_renamed.txt", fs_tool.current_dir.contents["dir2"].contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir2"].contents["file_renamed.txt"].parent,
-            fs_tool.current_dir.contents["dir2"],
-        )
+        dir2_node_after_mv3 = fs_tool.current_dir.contents["dir2"]
+        if isinstance(dir2_node_after_mv3, Directory):
+            self.assertIn("file_renamed.txt", dir2_node_after_mv3.contents)
+            self.assertEqual(
+                dir2_node_after_mv3.contents["file_renamed.txt"].parent,
+                dir2_node_after_mv3,
+            )
+        else:
+            self.fail("dir2 is not a Directory after mv3")
 
-        # 4. Move a directory into an existing subdirectory (dir2)
-        # Re-create dir_renamed as it was moved in test 2
         fs_tool.current_dir.contents["dir_renamed"] = Directory(
             name="dir_renamed", parent=fs_tool.current_dir, contents={}
         )
@@ -862,19 +781,20 @@ class TestBfclTools(unittest.TestCase):
             mv_result4.get("result"), "Moved 'dir_renamed' into directory 'dir2'."
         )
         self.assertNotIn("dir_renamed", fs_tool.current_dir.contents)
-        self.assertIn("dir_renamed", fs_tool.current_dir.contents["dir2"].contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["dir2"].contents["dir_renamed"].parent,
-            fs_tool.current_dir.contents["dir2"],
-        )
+        dir2_node_after_mv4 = fs_tool.current_dir.contents["dir2"]
+        if isinstance(dir2_node_after_mv4, Directory):
+            self.assertIn("dir_renamed", dir2_node_after_mv4.contents)
+            self.assertEqual(
+                dir2_node_after_mv4.contents["dir_renamed"].parent, dir2_node_after_mv4
+            )
+        else:
+            self.fail("dir2 is not a Directory after mv4")
 
-        # 5. Attempt to move non-existent source
         mv_result5 = fs_tool.mv(source="non_existent.txt", destination="new_name.txt")
         self.assertEqual(
             mv_result5.get("result"), "Error: Source 'non_existent.txt' not found."
         )
 
-        # 6. Overwrite an existing file
         fs_tool.current_dir.contents["another_file.txt"] = File(
             name="another_file.txt",
             content="another content",
@@ -889,14 +809,14 @@ class TestBfclTools(unittest.TestCase):
         )
         self.assertNotIn("another_file.txt", fs_tool.current_dir.contents)
         self.assertIn("file_to_overwrite.txt", fs_tool.current_dir.contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["file_to_overwrite.txt"].content,
-            "another content",
-        )
+        overwritten_file_node = fs_tool.current_dir.contents["file_to_overwrite.txt"]
+        if isinstance(overwritten_file_node, File):
+            self.assertEqual(overwritten_file_node.content, "another content")
+        else:
+            self.fail("file_to_overwrite.txt is not a File after mv6")
 
-        # 7. Attempt to overwrite file with directory
         fs_tool.mkdir("source_dir_for_mv_test7")
-        fs_tool.touch("target_file_for_mv_test7.txt")  # Ensure it's a file
+        fs_tool.touch("target_file_for_mv_test7.txt")
         mv_result7 = fs_tool.mv(
             source="source_dir_for_mv_test7", destination="target_file_for_mv_test7.txt"
         )
@@ -905,7 +825,6 @@ class TestBfclTools(unittest.TestCase):
             "Error: Cannot overwrite file 'target_file_for_mv_test7.txt' with directory 'source_dir_for_mv_test7'.",
         )
 
-        # 8. Attempt to overwrite directory with file (this should move file INTO directory)
         fs_tool.touch("source_file_for_mv_test8.txt")
         fs_tool.mkdir("target_dir_for_mv_test8")
         mv_result8 = fs_tool.mv(
@@ -915,12 +834,16 @@ class TestBfclTools(unittest.TestCase):
             mv_result8.get("result"),
             "Moved 'source_file_for_mv_test8.txt' into directory 'target_dir_for_mv_test8'.",
         )
-        self.assertIn(
-            "source_file_for_mv_test8.txt",
-            fs_tool.current_dir.contents["target_dir_for_mv_test8"].contents,
-        )
+        target_dir_node_after_mv8 = fs_tool.current_dir.contents[
+            "target_dir_for_mv_test8"
+        ]
+        if isinstance(target_dir_node_after_mv8, Directory):
+            self.assertIn(
+                "source_file_for_mv_test8.txt", target_dir_node_after_mv8.contents
+            )
+        else:
+            self.fail("target_dir_for_mv_test8 is not a Directory after mv8")
 
-        # 9. Move file to itself (should be a no-op or specific message)
         fs_tool.touch("self_move_file.txt")
         mv_result9 = fs_tool.mv(
             source="self_move_file.txt", destination="self_move_file.txt"
@@ -928,10 +851,9 @@ class TestBfclTools(unittest.TestCase):
         self.assertEqual(
             mv_result9.get("result"),
             "Moved 'self_move_file.txt' to 'self_move_file.txt'.",
-        )  # Current logic
+        )
         self.assertIn("self_move_file.txt", fs_tool.current_dir.contents)
 
-        # 10. Destination as a path (should fail)
         fs_tool.touch("path_test_file.txt")
         mv_result10 = fs_tool.mv(
             source="path_test_file.txt", destination="dir2/new_file.txt"
@@ -941,7 +863,6 @@ class TestBfclTools(unittest.TestCase):
             "Error: Destination 'dir2/new_file.txt' cannot be a path.",
         )
 
-        # 11. Moving a directory into itself (should fail)
         fs_tool.mkdir("mv_dir_self_test")
         mv_result11 = fs_tool.mv(
             source="mv_dir_self_test", destination="mv_dir_self_test"
@@ -952,14 +873,9 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_sort(self):
-        """Test GorillaFileSystem's sort method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
-        # Setup files for sort
+        fs_tool._load_scenario({})
         unsorted_content = "zebra\napple\nbanana\n"
-        sorted_content_expected = "apple\nbanana\nzebra"  # Note: trailing newline might be handled differently by splitlines/join
-
         fs_tool.current_dir.contents["unsorted.txt"] = File(
             name="unsorted.txt", content=unsorted_content, parent=fs_tool.current_dir
         )
@@ -974,43 +890,32 @@ class TestBfclTools(unittest.TestCase):
         )
         fs_tool.mkdir("a_directory_for_sort_test")
 
-        # 1. Sort an unsorted file
         sort_result1 = fs_tool.sort(file_name="unsorted.txt")
         self.assertNotIn("error", sort_result1)
-        # splitlines() on "text\n" -> ["text"], so "\n".join results in no trailing newline if last line was empty due to \n
-        # If unsorted_content = "zebra\napple\nbanana", then splitlines is ['zebra', 'apple', 'banana'] -> sorted ['apple', 'banana', 'zebra'] -> joined "apple\nbanana\nzebra"
-        # If unsorted_content = "zebra\napple\nbanana\n", then splitlines() is ['zebra', 'apple', 'banana'].
-        # sorted() -> ['apple', 'banana', 'zebra']
-        # "\n".join() -> "apple\nbanana\nzebra"
         self.assertEqual(sort_result1.get("sorted_content"), "apple\nbanana\nzebra")
-        self.assertEqual(
-            fs_tool.current_dir.contents["unsorted.txt"].content,
-            unsorted_content,
-            "Original file should not be modified.",
-        )
+        unsorted_node = fs_tool.current_dir.contents["unsorted.txt"]
+        if isinstance(unsorted_node, File):
+            self.assertEqual(unsorted_node.content, unsorted_content)
+        else:
+            self.fail("unsorted.txt is not a File")
 
-        # 2. Sort an already sorted file
         sort_result2 = fs_tool.sort(file_name="already_sorted.txt")
         self.assertNotIn("error", sort_result2)
         self.assertEqual(sort_result2.get("sorted_content"), "a\nb\nc")
-        self.assertEqual(
-            fs_tool.current_dir.contents["already_sorted.txt"].content,
-            "a\nb\nc",
-            "Original file should not be modified.",
-        )
+        already_sorted_node = fs_tool.current_dir.contents["already_sorted.txt"]
+        if isinstance(already_sorted_node, File):
+            self.assertEqual(already_sorted_node.content, "a\nb\nc")
+        else:
+            self.fail("already_sorted.txt is not a File")
 
-        # 3. Sort a file with empty lines
-        # content: "\nc\n\na\nb" -> splitlines: ['', 'c', '', 'a', 'b'] -> sorted: ['', '', 'a', 'b', 'c'] -> joined: "\n\na\nb\nc"
         sort_result3 = fs_tool.sort(file_name="empty_lines.txt")
         self.assertNotIn("error", sort_result3)
         self.assertEqual(sort_result3.get("sorted_content"), "\n\na\nb\nc")
 
-        # 4. Sort an empty file
         sort_result4 = fs_tool.sort(file_name="empty_file.txt")
         self.assertNotIn("error", sort_result4)
         self.assertEqual(sort_result4.get("sorted_content"), "")
 
-        # 5. Attempt to sort a non-existent file
         sort_result5 = fs_tool.sort(file_name="no_such_file.txt")
         self.assertIn("error", sort_result5)
         self.assertEqual(
@@ -1018,7 +923,6 @@ class TestBfclTools(unittest.TestCase):
             "File 'no_such_file.txt' not found or is not a file.",
         )
 
-        # 6. Attempt to sort a directory
         sort_result6 = fs_tool.sort(file_name="a_directory_for_sort_test")
         self.assertIn("error", sort_result6)
         self.assertEqual(
@@ -1027,37 +931,28 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_echo(self):
-        """Test GorillaFileSystem's echo method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
+        fs_tool._load_scenario({})
         test_content = "Hello from echo!"
-
-        # 1. Echo content to terminal (no file_name)
         echo_result1 = fs_tool.echo(content=test_content)
         self.assertNotIn("error", echo_result1)
         self.assertEqual(echo_result1.get("terminal_output"), test_content)
-
-        # 2. Echo content to terminal (file_name is None explicitly)
         echo_result2 = fs_tool.echo(content=test_content, file_name=None)
         self.assertNotIn("error", echo_result2)
         self.assertEqual(echo_result2.get("terminal_output"), test_content)
-
-        # 2b. Echo content to terminal (file_name is "None" string)
         echo_result2b = fs_tool.echo(content=test_content, file_name="None")
         self.assertNotIn("error", echo_result2b)
         self.assertEqual(echo_result2b.get("terminal_output"), test_content)
-
-        # 3. Echo content to a new file
         echo_result3 = fs_tool.echo(content=test_content, file_name="echo_new_file.txt")
         self.assertNotIn("error", echo_result3)
         self.assertIsNone(echo_result3.get("terminal_output"))
         self.assertIn("echo_new_file.txt", fs_tool.current_dir.contents)
-        self.assertEqual(
-            fs_tool.current_dir.contents["echo_new_file.txt"].content, test_content
-        )
+        new_echo_file_node = fs_tool.current_dir.contents["echo_new_file.txt"]
+        if isinstance(new_echo_file_node, File):
+            self.assertEqual(new_echo_file_node.content, test_content)
+        else:
+            self.fail("echo_new_file.txt is not a File")
 
-        # 4. Echo content to an existing file (overwrite)
         fs_tool.current_dir.contents["echo_existing_file.txt"] = File(
             name="echo_existing_file.txt",
             content="original",
@@ -1069,12 +964,12 @@ class TestBfclTools(unittest.TestCase):
         )
         self.assertNotIn("error", echo_result4)
         self.assertIsNone(echo_result4.get("terminal_output"))
-        self.assertEqual(
-            fs_tool.current_dir.contents["echo_existing_file.txt"].content,
-            new_echo_content,
-        )
+        existing_echo_file_node = fs_tool.current_dir.contents["echo_existing_file.txt"]
+        if isinstance(existing_echo_file_node, File):
+            self.assertEqual(existing_echo_file_node.content, new_echo_content)
+        else:
+            self.fail("echo_existing_file.txt is not a File")
 
-        # 5. Attempt to echo to a file name that is an existing directory
         fs_tool.mkdir("echo_test_dir")
         echo_result5 = fs_tool.echo(content=test_content, file_name="echo_test_dir")
         self.assertIn("error", echo_result5)
@@ -1082,11 +977,7 @@ class TestBfclTools(unittest.TestCase):
             echo_result5.get("error"),
             "Cannot write to 'echo_test_dir': It is a directory.",
         )
-        self.assertIsNone(
-            echo_result5.get("terminal_output")
-        )  # Ensure terminal_output is None on error if writing to file
-
-        # 6. Attempt to echo to a file name that is a path (should fail)
+        self.assertIsNone(echo_result5.get("terminal_output"))
         echo_result6 = fs_tool.echo(
             content=test_content, file_name="some_dir/echo_file.txt"
         )
@@ -1098,16 +989,9 @@ class TestBfclTools(unittest.TestCase):
         self.assertIsNone(echo_result6.get("terminal_output"))
 
     def test_gorilla_file_system_wc(self):
-        """Test GorillaFileSystem's wc method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
+        fs_tool._load_scenario({})
         content_for_wc = "word1 word2\nanother line with three words\n  leading and trailing spaces  \n\nlast line."
-        # Expected:
-        # Lines: 5 (splitlines counts empty lines between other lines, and the last line even if no trailing newline)
-        # Words: 1 (word1) + 1 (word2) + 1 (another) + 1 (line) + 1 (with) + 1 (three) + 1 (words) + 1 (leading) + 1 (and) + 1 (trailing) + 1 (spaces) + 1 (last) + 1 (line.) = 13
-        # Chars: len(content_for_wc)
-
         fs_tool.current_dir.contents["wc_file.txt"] = File(
             name="wc_file.txt", content=content_for_wc, parent=fs_tool.current_dir
         )
@@ -1115,61 +999,41 @@ class TestBfclTools(unittest.TestCase):
             name="wc_empty.txt", content="", parent=fs_tool.current_dir
         )
         fs_tool.mkdir("wc_dir_test")
-
-        # 1. Count lines (default mode)
         wc_res1 = fs_tool.wc(file_name="wc_file.txt")
         self.assertNotIn("error", wc_res1)
-        self.assertEqual(
-            wc_res1.get("count"), 5
-        )  # "word1 word2", "another line with three words", "  leading and trailing spaces  ", "", "last line."
+        self.assertEqual(wc_res1.get("count"), 5)
         self.assertEqual(wc_res1.get("type"), "lines")
-
-        # 2. Count lines (explicit 'l' mode)
         wc_res2 = fs_tool.wc(file_name="wc_file.txt", mode="l")
         self.assertNotIn("error", wc_res2)
         self.assertEqual(wc_res2.get("count"), 5)
         self.assertEqual(wc_res2.get("type"), "lines")
-
-        # 3. Count words ('w' mode)
         wc_res3 = fs_tool.wc(file_name="wc_file.txt", mode="w")
         self.assertNotIn("error", wc_res3)
         self.assertEqual(wc_res3.get("count"), 13)
         self.assertEqual(wc_res3.get("type"), "words")
-
-        # 4. Count characters ('c' mode)
         wc_res4 = fs_tool.wc(file_name="wc_file.txt", mode="c")
         self.assertNotIn("error", wc_res4)
         self.assertEqual(wc_res4.get("count"), len(content_for_wc))
         self.assertEqual(wc_res4.get("type"), "characters")
-
-        # 5. wc on an empty file
         wc_res5_l = fs_tool.wc(file_name="wc_empty.txt", mode="l")
-        self.assertEqual(wc_res5_l.get("count"), 0)  # splitlines on "" is []
+        self.assertEqual(wc_res5_l.get("count"), 0)
         self.assertEqual(wc_res5_l.get("type"), "lines")
-
         wc_res5_w = fs_tool.wc(file_name="wc_empty.txt", mode="w")
         self.assertEqual(wc_res5_w.get("count"), 0)
         self.assertEqual(wc_res5_w.get("type"), "words")
-
         wc_res5_c = fs_tool.wc(file_name="wc_empty.txt", mode="c")
         self.assertEqual(wc_res5_c.get("count"), 0)
         self.assertEqual(wc_res5_c.get("type"), "characters")
-
-        # 6. Attempt wc on a non-existent file
         wc_res6 = fs_tool.wc(file_name="no_wc_file.txt")
         self.assertIn("error", wc_res6)
         self.assertEqual(
             wc_res6.get("error"), "File 'no_wc_file.txt' not found or is not a file."
         )
-
-        # 7. Attempt wc with an invalid mode
-        wc_res7 = fs_tool.wc(file_name="wc_file.txt", mode="x")
+        wc_res7 = fs_tool.wc(file_name="wc_file.txt", mode="x")  # type: ignore
         self.assertIn("error", wc_res7)
         self.assertEqual(
             wc_res7.get("error"), "Invalid mode 'x'. Must be 'l', 'w', or 'c'."
         )
-
-        # 8. Attempt wc on a directory
         wc_res8 = fs_tool.wc(file_name="wc_dir_test")
         self.assertIn("error", wc_res8)
         self.assertEqual(
@@ -1177,13 +1041,10 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_tail(self):
-        """Test GorillaFileSystem's tail method."""
         fs_tool = GorillaFileSystem()
-        fs_tool._load_scenario({})  # Loads /workspace
-
+        fs_tool._load_scenario({})
         lines_15 = "\n".join([f"Line {i+1}" for i in range(15)])
         lines_5 = "\n".join([f"Line {i+1}" for i in range(5)])
-
         fs_tool.current_dir.contents["file_15_lines.txt"] = File(
             name="file_15_lines.txt", content=lines_15, parent=fs_tool.current_dir
         )
@@ -1194,61 +1055,35 @@ class TestBfclTools(unittest.TestCase):
             name="empty_tail_file.txt", content="", parent=fs_tool.current_dir
         )
         fs_tool.mkdir("tail_test_dir")
-
-        # 1. Tail a file with more lines than default (10)
-        tail_result1 = fs_tool.tail(file_name="file_15_lines.txt")  # Default lines=10
+        tail_result1 = fs_tool.tail(file_name="file_15_lines.txt")
         self.assertNotIn("error", tail_result1)
-        expected_lines1 = "\n".join(
-            [f"Line {i+1}" for i in range(5, 15)]
-        )  # Lines 6 to 15
+        expected_lines1 = "\n".join([f"Line {i+1}" for i in range(5, 15)])
         self.assertEqual(tail_result1.get("last_lines"), expected_lines1)
-
-        # 2. Tail a file with fewer lines than default (10)
-        tail_result2 = fs_tool.tail(file_name="file_5_lines.txt")  # Default lines=10
+        tail_result2 = fs_tool.tail(file_name="file_5_lines.txt")
         self.assertNotIn("error", tail_result2)
-        self.assertEqual(
-            tail_result2.get("last_lines"), lines_5
-        )  # Should return all 5 lines
-
-        # 3. Tail a file with specific number of lines (3)
+        self.assertEqual(tail_result2.get("last_lines"), lines_5)
         tail_result3 = fs_tool.tail(file_name="file_15_lines.txt", lines=3)
         self.assertNotIn("error", tail_result3)
-        expected_lines3 = "\n".join(
-            [f"Line {i+1}" for i in range(12, 15)]
-        )  # Lines 13, 14, 15
+        expected_lines3 = "\n".join([f"Line {i+1}" for i in range(12, 15)])
         self.assertEqual(tail_result3.get("last_lines"), expected_lines3)
-
-        # 4. Tail a file with specific number of lines (15), more than available in file_5_lines
         tail_result4 = fs_tool.tail(file_name="file_5_lines.txt", lines=15)
         self.assertNotIn("error", tail_result4)
-        self.assertEqual(
-            tail_result4.get("last_lines"), lines_5
-        )  # Should return all 5 lines
-
-        # 5. Tail an empty file
+        self.assertEqual(tail_result4.get("last_lines"), lines_5)
         tail_result5 = fs_tool.tail(file_name="empty_tail_file.txt")
         self.assertNotIn("error", tail_result5)
         self.assertEqual(tail_result5.get("last_lines"), "")
-
-        # 6. Tail with lines=0
         tail_result6 = fs_tool.tail(file_name="file_15_lines.txt", lines=0)
         self.assertNotIn("error", tail_result6)
         self.assertEqual(tail_result6.get("last_lines"), "")
-
-        # 6b. Tail with lines < 0 (should also be empty)
         tail_result6b = fs_tool.tail(file_name="file_15_lines.txt", lines=-5)
         self.assertNotIn("error", tail_result6b)
         self.assertEqual(tail_result6b.get("last_lines"), "")
-
-        # 7. Attempt to tail a non-existent file
         tail_result7 = fs_tool.tail(file_name="no_such_tail_file.txt")
         self.assertIn("error", tail_result7)
         self.assertEqual(
             tail_result7.get("error"),
             "File 'no_such_tail_file.txt' not found or is not a file.",
         )
-
-        # 8. Attempt to tail a directory
         tail_result8 = fs_tool.tail(file_name="tail_test_dir")
         self.assertIn("error", tail_result8)
         self.assertEqual(
@@ -1257,20 +1092,10 @@ class TestBfclTools(unittest.TestCase):
         )
 
     def test_gorilla_file_system_find(self):
-        """Test GorillaFileSystem's find method."""
         fs_tool = GorillaFileSystem()
-        # Setup: /workspace contains:
-        #   file1.txt
-        #   doc.txt
-        #   dir1/
-        #     file_in_dir1.txt
-        #     sub_dir/
-        #       nested_doc.txt
-        #   dir2/
-        #     another_file.txt
         fs_tool._load_scenario(
             {
-                "root": {  # workspace
+                "root": {
                     "type": "directory",
                     "contents": {
                         "file1.txt": {"type": "file", "content": "content1"},
@@ -1306,8 +1131,6 @@ class TestBfclTools(unittest.TestCase):
                 }
             }
         )
-
-        # 1. Find all in current directory (path=".", name=None)
         find_res1 = fs_tool.find(path=".")
         self.assertNotIn("error", find_res1)
         self.assertIsInstance(find_res1.get("matches"), list)
@@ -1323,103 +1146,72 @@ class TestBfclTools(unittest.TestCase):
                 "dir2/another_file.txt",
             ]
         )
-        self.assertEqual(sorted(find_res1.get("matches")), expected1)
-
-        # 2. Find items by exact name in current directory (path=".")
+        self.assertEqual(
+            sorted(find_res1.get("matches") or []), expected1
+        )  # Added 'or []'
         find_res2 = fs_tool.find(path=".", name="file1.txt")
         self.assertNotIn("error", find_res2)
-        self.assertEqual(sorted(find_res2.get("matches")), sorted(["file1.txt"]))
-
-        find_res2b = fs_tool.find(
-            path=".", name="dir1"
-        )  # dir1 itself and its contents if name matches
+        self.assertEqual(sorted(find_res2.get("matches") or []), sorted(["file1.txt"]))
+        find_res2b = fs_tool.find(path=".", name="dir1")
         self.assertNotIn("error", find_res2b)
-        # Expected: "dir1", and if "dir1" is in "file_in_dir1.txt", that too.
-        # Current find logic: if search_name_pattern in name. So "dir1" matches "dir1" and "file_in_dir1.txt"
         self.assertEqual(
-            sorted(find_res2b.get("matches")), sorted(["dir1", "dir1/file_in_dir1.txt"])
+            sorted(find_res2b.get("matches") or []),
+            sorted(["dir1", "dir1/file_in_dir1.txt"]),
         )
-
-        # 3. Find items by partial name "doc" in current directory (path=".")
         find_res3 = fs_tool.find(path=".", name="doc")
         self.assertNotIn("error", find_res3)
         expected3 = sorted(["doc.txt", "dir1/sub_dir/nested_doc.txt"])
-        self.assertEqual(sorted(find_res3.get("matches")), expected3)
-
-        # 4. Find all items in a subdirectory (path="dir1", name=None)
-        find_res4 = fs_tool.find(path="dir1", name=None)  # Search within dir1
+        self.assertEqual(sorted(find_res3.get("matches") or []), expected3)
+        find_res4 = fs_tool.find(path="dir1", name=None)
         self.assertNotIn("error", find_res4)
-        # Paths should be relative to "dir1"
         expected4 = sorted(["file_in_dir1.txt", "sub_dir", "sub_dir/nested_doc.txt"])
-        self.assertEqual(sorted(find_res4.get("matches")), expected4)
-
-        # 5. Find items by name in a subdirectory (path="dir1", name="file")
+        self.assertEqual(sorted(find_res4.get("matches") or []), expected4)
         find_res5 = fs_tool.find(path="dir1", name="file")
         self.assertNotIn("error", find_res5)
-        self.assertEqual(sorted(find_res5.get("matches")), sorted(["file_in_dir1.txt"]))
-
-        # 6. Find items recursively (name="nested_doc.txt", path=".")
+        self.assertEqual(
+            sorted(find_res5.get("matches") or []), sorted(["file_in_dir1.txt"])
+        )
         find_res6 = fs_tool.find(path=".", name="nested_doc.txt")
         self.assertNotIn("error", find_res6)
         self.assertEqual(
-            sorted(find_res6.get("matches")), sorted(["dir1/sub_dir/nested_doc.txt"])
+            sorted(find_res6.get("matches") or []),
+            sorted(["dir1/sub_dir/nested_doc.txt"]),
         )
-
-        # 7. Finding with a non-existent path
         find_res7 = fs_tool.find(path="non_existent_dir", name="file1.txt")
         self.assertIn("error", find_res7)
         self.assertEqual(
             find_res7.get("error"),
             "Path 'non_existent_dir' not found or is not a directory.",
         )
-
-        # 8. Finding a name that doesn't exist anywhere
         find_res8 = fs_tool.find(path=".", name="ghost_file.boo")
         self.assertNotIn("error", find_res8)
         self.assertEqual(find_res8.get("matches"), [])
-
-        # 9. Finding with path as root (e.g. /workspace) - assuming _find_path handles this
-        # This test depends on how _find_path and pwd() define absolute paths.
-        # If current_dir is /workspace, find(path="/workspace", name="file1.txt")
-        # The _find_path will resolve "/workspace" to self.root if current_dir is self.root.
-        # The paths returned by _find_recursive are relative to the start_dir_obj.
-        # So if start_dir_obj is root, paths are like "file1.txt", "dir1/file_in_dir1.txt"
-        fs_tool.cd(fs_tool.root.name)  # Ensure we are at /workspace
+        fs_tool.cd(fs_tool.root.name)
         find_res9 = fs_tool.find(path=f"/{fs_tool.root.name}", name="file1.txt")
         self.assertNotIn("error", find_res9, f"Error: {find_res9.get('error')}")
-        self.assertEqual(sorted(find_res9.get("matches")), sorted(["file1.txt"]))
-
+        self.assertEqual(sorted(find_res9.get("matches") or []), sorted(["file1.txt"]))
         find_res9b = fs_tool.find(path=f"/{fs_tool.root.name}", name="nested_doc.txt")
         self.assertNotIn("error", find_res9b, f"Error: {find_res9b.get('error')}")
         self.assertEqual(
-            sorted(find_res9b.get("matches")), sorted(["dir1/sub_dir/nested_doc.txt"])
+            sorted(find_res9b.get("matches") or []),
+            sorted(["dir1/sub_dir/nested_doc.txt"]),
         )
 
     def test_gorilla_file_system_du(self):
-        """Test GorillaFileSystem's du method."""
         fs_tool = GorillaFileSystem()
-        # Setup: /workspace contains:
-        #   file1.txt (10 bytes: "0123456789")
-        #   dir1/
-        #     file_in_dir1.txt (5 bytes: "abcde")
-        #     sub_dir/  (empty)
-        #   empty_dir/
         fs_tool._load_scenario(
             {
-                "root": {  # workspace
+                "root": {
                     "type": "directory",
                     "contents": {
-                        "file1.txt": {
-                            "type": "file",
-                            "content": "0123456789",
-                        },  # 10 bytes
+                        "file1.txt": {"type": "file", "content": "0123456789"},
                         "dir1": {
                             "type": "directory",
                             "contents": {
                                 "file_in_dir1.txt": {
                                     "type": "file",
                                     "content": "abcde",
-                                },  # 5 bytes
+                                },
                                 "sub_dir": {"type": "directory", "contents": {}},
                             },
                         },
@@ -1428,47 +1220,32 @@ class TestBfclTools(unittest.TestCase):
                 }
             }
         )
-
-        # 1. du on /workspace (human_readable=False) - Total 10 (file1) + 5 (file_in_dir1) = 15 bytes
-        # current_dir is /workspace by default after _load_scenario
         du_res1 = fs_tool.du()
         self.assertNotIn("error", du_res1)
         self.assertEqual(du_res1.get("disk_usage"), "15")
-
-        # 2. du on /workspace (human_readable=True)
         du_res2 = fs_tool.du(human_readable=True)
         self.assertNotIn("error", du_res2)
         self.assertEqual(du_res2.get("disk_usage"), "15B")
-
-        # 3. du on /workspace/dir1 (human_readable=False) - Total 5 bytes
         fs_tool.cd("dir1")
         du_res3 = fs_tool.du()
         self.assertNotIn("error", du_res3)
         self.assertEqual(du_res3.get("disk_usage"), "5")
-
-        # 3b. du on /workspace/dir1 (human_readable=True)
         du_res3b = fs_tool.du(human_readable=True)
         self.assertNotIn("error", du_res3b)
         self.assertEqual(du_res3b.get("disk_usage"), "5B")
-
-        # 4. du on /workspace/dir1/sub_dir (empty)
         fs_tool.cd("sub_dir")
         du_res4 = fs_tool.du()
         self.assertNotIn("error", du_res4)
         self.assertEqual(du_res4.get("disk_usage"), "0")
         du_res4b = fs_tool.du(human_readable=True)
         self.assertEqual(du_res4b.get("disk_usage"), "0B")
-
-        # 5. du on /workspace/empty_dir
-        fs_tool.cd("..")  # back to dir1
-        fs_tool.cd("..")  # back to workspace
+        fs_tool.cd("..")
+        fs_tool.cd("..")
         fs_tool.cd("empty_dir")
         du_res5 = fs_tool.du()
         self.assertNotIn("error", du_res5)
         self.assertEqual(du_res5.get("disk_usage"), "0")
-
-        # 6. Test human readable for KB
-        fs_tool.cd("..")  # back to workspace
+        fs_tool.cd("..")
         fs_tool.mkdir("large_files_dir")
         fs_tool.cd("large_files_dir")
         fs_tool.current_dir.contents["kb_file.txt"] = File(
@@ -1476,18 +1253,11 @@ class TestBfclTools(unittest.TestCase):
         )
         du_res6 = fs_tool.du(human_readable=True)
         self.assertEqual(du_res6.get("disk_usage"), "1.0KB")
-
         fs_tool.current_dir.contents["mb_file.txt"] = File(
             name="mb_file.txt", content="a" * (1024 * 1024), parent=fs_tool.current_dir
         )
-        # du in current dir (large_files_dir) will sum kb_file and mb_file
-        # Total = 1024 + 1024*1024 = 1024 + 1048576 = 1049600 bytes
-        # 1049600 / 1024 = 1025 KB
-        # 1025 KB / 1024 = 1.0009765625 MB -> "1.0MB"
         du_res7 = fs_tool.du(human_readable=True)
         self.assertEqual(du_res7.get("disk_usage"), "1.0MB")
-
-    # Add test classes or methods for other APIs below
 
 
 if __name__ == "__main__":

@@ -24,7 +24,6 @@ def match_function_call(
     messages: List[
         Dict[str, str]
     ],  # messages is for context if needed, not directly used here for func call parts
-    # original_messages: List[Dict[str, str]], # Removed
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],

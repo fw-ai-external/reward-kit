@@ -187,12 +187,12 @@ class Evaluator:
         self.ts_mode_config = (
             ts_mode_config  # Config for TypeScript-like single code snippet mode
         )
-        self.code_files = {}  # Map of filename -> content
-        self.metric_folders: dict[str, str] = (
+        self.code_files: Dict[str, str] = {}  # Map of filename -> content
+        self.metric_folders: Dict[str, str] = (
             {}
         )  # Map of metric_name -> folder_path (used when not in ts_mode_config and not multi_metrics)
-        self.description = ""
-        self.display_name = ""
+        self.description: str = ""
+        self.display_name: str = ""
         self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
         if self.ts_mode_config:
@@ -350,7 +350,7 @@ class Evaluator:
 
         account_id = get_fireworks_account_id()
         auth_token = get_fireworks_api_key()
-        logger.debug("Show account id", account_id)
+        logger.debug(f"Show account id: {account_id}")
 
         if not account_id or not auth_token:
             logger.error(
@@ -477,14 +477,19 @@ class Evaluator:
                 # We validate sample format but in this simulation we don't use these directly
                 # In a real implementation, these would be passed to the evaluate function
                 _ = sample.get("messages", [])
-                _ = sample.get("original_messages", [])
+                _ = sample.get("ground_truth", [])  # Changed from original_messages
                 _ = sample.get("tools", [])
 
                 # Additional kwargs would be passed to evaluate in a real implementation
                 _ = {
                     k: v
                     for k, v in sample.items()
-                    if k not in ["messages", "original_messages", "tools"]
+                    if k
+                    not in [
+                        "messages",
+                        "ground_truth",
+                        "tools",
+                    ]  # Changed from original_messages
                 }
 
                 # Simple simulation of metric evaluation
@@ -775,23 +780,59 @@ class Evaluator:
 
         # Simple regex to match the old evaluate function signature
         old_pattern = r"def\s+evaluate\s*\(\s*entry\s*(?::\s*dict)?\s*\)"
-        new_signature = (
-            "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
-        )
+        # Regex to match the signature we are changing from (original_messages)
+        current_signature_pattern = r"def\s+evaluate\s*\(\s*messages,\s*original_messages\s*=\s*None,\s*tools\s*=\s*None,\s*\*\*kwargs\s*\)"
+        new_signature = "def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs)"
 
-        # Check if the old pattern exists
+        # Check if the old pattern (entry-based) exists
         if re.search(old_pattern, content):
             # Replace the old signature with the new one
             updated_content = re.sub(old_pattern, new_signature, content, count=1)
 
-            # Also add a compatibility layer at the beginning of the function
+            # Add a compatibility layer for the 'entry' style
             compat_layer = """
-    # Compatibility layer for old format
-    if original_messages is None:
-        original_messages = messages
-    entry = {"messages": messages, "original_messages": original_messages, "tools": tools}
-    entry.update(kwargs)
+    # Compatibility layer for old 'entry' format
+    if ground_truth is None: # Default ground_truth from messages if not provided
+        ground_truth = messages
+    # Assuming 'entry' dict was constructed from messages, original_messages (now ground_truth), tools, kwargs
+    # This part might need more context on how 'entry' was used.
+    # For now, we'll assume ground_truth takes precedence or is derived.
 """
+        # Check if the current signature (with original_messages) exists
+        elif re.search(current_signature_pattern, content):
+            updated_content = re.sub(
+                current_signature_pattern, new_signature, content, count=1
+            )
+            # No specific compatibility layer needed here as it's a direct parameter rename
+            compat_layer = ""  # No additional layer for this direct change
+        else:
+            # If neither known signature is found, return content as is
+            return content
+
+        # Find the function body indent level if a change was made
+        if (
+            "updated_content" in locals() and compat_layer
+        ):  # Only add layer if it's defined
+            func_match = re.search(
+                r"def\s+evaluate.*?:\s*\n(\s+)", updated_content, re.DOTALL
+            )
+            if func_match:
+                indent = func_match.group(1)
+                # Adjust indentation of compatibility layer
+                indented_compat_layer = "\n".join(
+                    indent + line for line in compat_layer.strip().split("\n")
+                )
+
+                # Insert compatibility layer after function definition
+                updated_content = re.sub(
+                    re.escape(new_signature) + r"\s*:",
+                    new_signature + ":" + indented_compat_layer,
+                    updated_content,
+                    count=1,
+                )
+            return updated_content
+        elif "updated_content" in locals():
+            return updated_content
 
             # Find the function body indent level
             func_match = re.search(
@@ -805,15 +846,6 @@ class Evaluator:
                 )
 
                 # Insert compatibility layer after function definition
-                updated_content = re.sub(
-                    re.escape(new_signature) + r"\s*:",
-                    new_signature + ":" + compat_layer,
-                    updated_content,
-                    count=1,
-                )
-
-            return updated_content
-
         return content
 
     def _get_combined_code(self):
@@ -848,10 +880,14 @@ if __name__ == '__main__':
     try:
         input_data = json.loads(sys.stdin.read())
         messages = input_data.get('messages', [])
-        original_messages = input_data.get('original_messages', messages)
+        ground_truth = input_data.get('ground_truth', messages) # Changed from original_messages
         tools = input_data.get('tools', [])
-        result = evaluate(messages, original_messages, tools, **{k: v for k, v in input_data.items()
-                                                            if k not in ['messages', 'original_messages', 'tools']})
+        # Ensure ground_truth is passed to evaluate, and also handle its potential absence in input_data.items()
+        kwargs_for_eval = {k: v for k, v in input_data.items()
+                           if k not in ['messages', 'ground_truth', 'tools']}
+        # If ground_truth was in input_data, it's now in the ground_truth variable.
+        # If it wasn't, it defaults to messages.
+        result = evaluate(messages, ground_truth, tools, **kwargs_for_eval)
         print(json.dumps(result))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
@@ -894,10 +930,11 @@ if __name__ == '__main__':
     try:
         input_data = json.loads(sys.stdin.read())
         messages = input_data.get('messages', [])
-        original_messages = input_data.get('original_messages', messages)
+        ground_truth = input_data.get('ground_truth', messages) # Changed from original_messages
         tools = input_data.get('tools', [])
-        result = evaluate(messages, original_messages, tools, **{k: v for k, v in input_data.items()
-                                                            if k not in ['messages', 'original_messages', 'tools']})
+        kwargs_for_eval = {k: v for k, v in input_data.items()
+                           if k not in ['messages', 'ground_truth', 'tools']}
+        result = evaluate(messages, ground_truth, tools, **kwargs_for_eval)
         print(json.dumps(result))
     except Exception as e:
         print(json.dumps({"error": str(e)}))

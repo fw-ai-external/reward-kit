@@ -70,9 +70,9 @@ This function iterates through each number in the list and adds it to a running 
     print("Running code in E2B sandbox...")
 
     # Evaluate the code using E2B, letting it extract the expected output
+    # ground_truth is None, so the function will attempt auto-extraction from messages.
     result = e2b_code_execution_reward(
         messages=messages,
-        original_messages=messages,  # Pass the original messages for expected output extraction
         language="python",
         api_key=api_key,
         timeout=10,

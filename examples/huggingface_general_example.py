@@ -36,7 +36,7 @@ def main():
 # available for import in this dynamically executed script by preview_evaluation.
 # Instead, we will return a dictionary matching their structure.
 
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs):
     # Extract assistant response
     assistant_messages = [m for m in messages if m.get("role") == "assistant"]
     if not assistant_messages:

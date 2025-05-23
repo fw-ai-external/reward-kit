@@ -37,7 +37,8 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        # Ensure __str__ is a MagicMock with a return_value
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock
         mock_task_manager = MockTaskManager.return_value
@@ -79,7 +80,7 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.json"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.json")
 
         # Setup TaskManager mock
         mock_task_manager = MockTaskManager.return_value
@@ -120,7 +121,7 @@ class TestAgentEvalCommand:
         mock_path_instance.exists.return_value = False
         mock_path_instance.is_file.return_value = False
         mock_path_instance.is_dir.return_value = False
-        mock_path_instance.__str__.return_value = "non_existent_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="non_existent_task.yaml")
 
         args = argparse.Namespace(task_def="non_existent_task.yaml")
         result = agent_eval_command(args)
@@ -136,7 +137,7 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "invalid_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="invalid_task.yaml")
 
         # Setup TaskManager mock to simulate a file load failure
         mock_task_manager = MockTaskManager.return_value
@@ -160,7 +161,7 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "incomplete_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="incomplete_task.yaml")
 
         # Setup TaskManager to have the validation error happen in _load_task_from_file
         mock_task_manager = MockTaskManager.return_value
@@ -182,7 +183,7 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock to make loading the file fail
         mock_task_manager = MockTaskManager.return_value
@@ -204,7 +205,7 @@ class TestAgentEvalCommand:
         MockPath.return_value = mock_path_instance
         mock_path_instance.exists.return_value = True
         mock_path_instance.is_file.return_value = True
-        mock_path_instance.__str__.return_value = "dummy_task.yaml"
+        mock_path_instance.__str__ = MagicMock(return_value="dummy_task.yaml")
 
         # Setup TaskManager mock
         mock_task_manager = MockTaskManager.return_value

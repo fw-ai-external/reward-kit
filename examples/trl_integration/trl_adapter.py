@@ -105,7 +105,9 @@ def create_combined_reward(
 @reward_function
 def grpo_format_reward(
     messages: List[Dict[str, Any]],
-    original_messages: Optional[List[Dict[str, Any]]] = None,
+    ground_truth: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # Changed from original_messages
     think_tag: str = "<think>",
     answer_tag: str = "<answer>",
     **kwargs,
@@ -115,7 +117,7 @@ def grpo_format_reward(
 
     Args:
         messages: List of conversation messages
-        original_messages: Original messages for context
+        ground_truth: Optional ground truth context (not used by this specific function).
         think_tag: Tag to use for reasoning (default: "<think>")
         answer_tag: Tag to use for answers (default: "<answer>")
 

@@ -38,15 +38,15 @@ class BFCLResource:
     Developers should not need to modify this class in most cases.
     """
 
-    def __init__(self, package_name: str = None):
+    def __init__(self, package_name: Optional[str] = None):  # Changed type hint
         """
         Initialize a BFCL resource manager.
 
         Args:
             package_name: Optional package name for imports (defaults to current package)
         """
-        self._env_instances = {}
-        self._initial_config = {}
+        self._env_instances: Dict[str, Any] = {}
+        self._initial_config: Dict[str, Any] = {}
         self._package_name = package_name or ".".join(__name__.split(".")[:-1])
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
 
@@ -281,7 +281,7 @@ class BFCLResource:
                 continue
 
             # Default to string type
-            param_schema: Dict[str, Any] = {"type": "string"}
+            param_schema: Dict[str, Any] = {"type": "string"}  # type: ignore [no-redef]
 
             # Try to infer type from annotation
             if param.annotation != inspect.Parameter.empty:
@@ -300,7 +300,7 @@ class BFCLResource:
                 elif hasattr(param_type, "__origin__"):
                     # Handle generics like List[str]
                     if param_type.__origin__ in (list, List):
-                        param_schema: Dict[str, Any] = {
+                        param_schema = {
                             "type": "array",
                             "items": {"type": "string"},
                         }
@@ -354,14 +354,16 @@ class BFCLOrchestrator:
         self.logger = logging.getLogger(f"BFCLOrchestrator.{self.name}")
 
         # Create resource instance
-        resource_class = resource_class or BFCLResource
-        self.resource = resource_class()
+        resource_class_val = (
+            resource_class or BFCLResource
+        )  # Ensure type for self.resource
+        self.resource: BFCLResource = resource_class_val()
 
         # Initialize state
-        self.conversation_history = []
-        self.tool_calls_history = []
-        self.current_states = []
-        self.model = os.environ.get("MODEL_AGENT", "openai/gpt-4")
+        self.conversation_history: List[Dict[str, Any]] = []
+        self.tool_calls_history: List[Dict[str, Any]] = []
+        self.current_states: List[Dict[str, Any]] = []
+        self.model: str = os.environ.get("MODEL_AGENT", "openai/gpt-4")
 
     async def setup(self) -> bool:
         """

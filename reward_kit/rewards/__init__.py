@@ -2,9 +2,9 @@
 Out-of-the-box reward functions for common use cases.
 """
 
-# Import specific reward functions
-from . import bfcl_reward  # Import bfcl_reward
-from . import deepcoder_reward  # Added import
+# Import reward modules
+from . import bfcl_reward
+from . import deepcoder_reward
 from . import (
     accuracy,
     accuracy_length,
@@ -31,7 +31,7 @@ from .bfcl_reward import bfcl_reward as bfcl_reward_function
 # Directly import specific reward functions for easy access
 from .code_execution import fractional_code_reward
 from .cpp_code import binary_cpp_code_reward, ioi_cpp_code_reward
-from .deepcoder_reward import deepcoder_code_reward  # Added import
+from .deepcoder_reward import deepcoder_code_reward
 
 # To make individual functions directly importable from reward_kit.rewards
 # e.g., from reward_kit.rewards import composite_function_call_reward

@@ -68,7 +68,7 @@ def cosine_scaled_accuracy_length_reward(
             },
         )
 
-    response = messages[-1]  # response is a Message object
+    response = messages[-1]
 
     # Extract response text
     if response.role != "assistant" or not response.content:

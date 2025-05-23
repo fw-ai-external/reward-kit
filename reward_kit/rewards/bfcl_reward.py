@@ -1,7 +1,7 @@
 import ast
 import inspect
 import json
-import logging  # Import logging
+import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from reward_kit.agent.resources.bfcl_sim_api_resource import BFCLSimAPIResource
@@ -206,8 +206,8 @@ def bfcl_reward(
     )
 
     state_match_score = 0.5 if state_match else 0.0
-    # num_state_matches = int(state_match) # Not used
-    # num_state_total = 1 if ground_truth_comparable_state else 0 # Not used
+
+
 
     # --- Function Call Matches Check ---
     # model_successful_func_calls is List[List[Dict[str, Any]]], one inner list per user turn's accumulated calls
@@ -334,7 +334,7 @@ def bfcl_reward(
             reason += f" Function call match failed ({num_func_matches_for_score}/{reason_num_total_gt_turns_with_calls} GT turns with calls matched)."
 
     # Add metrics
-    metrics = {}  # Initialize metrics dictionary
+    metrics = {}
     metrics["state_match"] = MetricResult(
         score=state_match_score,
         is_score_valid=state_match_score == 0.5,

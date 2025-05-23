@@ -808,13 +808,13 @@ def normalize_output(output: str) -> str:
     Returns:
         Normalized output string
     """
-    # Remove leading/trailing whitespace
+
     normalized = output.strip()
 
-    # Standardize line endings
+
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Remove duplicate whitespace
+
     normalized = re.sub(r"\s+", " ", normalized)
 
     return normalized

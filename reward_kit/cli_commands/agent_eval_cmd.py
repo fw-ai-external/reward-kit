@@ -7,7 +7,7 @@ import asyncio
 try:
     import yaml
 except ImportError:
-    import sys
+
     import types
 
     # Create a stub module if yaml is not installed
@@ -52,7 +52,8 @@ def agent_eval_command(args):
     # Handle task definition file or directory
     if not args.task_def:
         logger.error(
-            "Error: --task-def (path to task definition YAML file or directory) is required."
+            "Error: --task-def (path to task definition YAML file or"
+            " directory) is required."
         )
         return 1
 
@@ -80,14 +81,10 @@ def agent_eval_command(args):
             )
             return 1
     else:
-        logger.error(
-            f"Task definition path not found or invalid: {task_def_path}"
-        )
+        logger.error(f"Task definition path not found or invalid: {task_def_path}")
         return 1
 
-    logger.info(
-        f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}"
-    )
+    logger.info(f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}")
 
     # Run tasks with asyncio
     try:
@@ -95,7 +92,7 @@ def agent_eval_command(args):
         async def main_flow():
             # Handle model override
             if getattr(args, "model", None):
-                original_model = os.environ.get("MODEL_AGENT")
+                _original_model = os.environ.get("MODEL_AGENT")
                 os.environ["MODEL_AGENT"] = args.model
                 logger.info(f"Model overridden to: {args.model}")
 
@@ -128,13 +125,9 @@ def agent_eval_command(args):
                 logger.info(f"Execution completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
-                        logger.error(
-                            f"Task '{task_id}' failed: {result['error']}"
-                        )
+                        logger.error(f"Task '{task_id}' failed: {result['error']}")
                     elif isinstance(result, dict) and "score" in result:
-                        logger.info(
-                            f"Task '{task_id}' score: {result['score']}"
-                        )
+                        logger.info(f"Task '{task_id}' score: {result['score']}")
                     else:
                         logger.info(f"Task '{task_id}' completed")
             finally:
@@ -197,9 +190,7 @@ def bfcl_eval_command(args):
                 str(task_dir)
             )
             if not registered_task_ids:
-                logger.error(
-                    f"No valid BFCL tasks found in directory: {task_dir}"
-                )
+                logger.error(f"No valid BFCL tasks found in directory: {task_dir}")
                 return 1
             logger.info(f"Registered {len(registered_task_ids)} BFCL tasks")
 
@@ -207,7 +198,7 @@ def bfcl_eval_command(args):
         async def main_flow():
             # Handle model override
             if args.model:
-                original_model = os.environ.get("MODEL_AGENT")
+                _original_model = os.environ.get("MODEL_AGENT")
                 os.environ["MODEL_AGENT"] = args.model
                 logger.info(f"Model overridden to: {args.model}")
 
@@ -226,32 +217,25 @@ def bfcl_eval_command(args):
                 )
 
                 # Log results summary
-                logger.info(
-                    f"BFCL evaluation completed for {len(results)} tasks"
-                )
+                logger.info(f"BFCL evaluation completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
-                        logger.error(
-                            f"Task '{task_id}' failed: {result['error']}"
-                        )
+                        logger.error(f"Task '{task_id}' failed: {result['error']}")
                     elif isinstance(result, dict) and "score" in result:
-                        logger.info(
-                            f"Task '{task_id}' score: {result['score']}"
-                        )
+                        logger.info(f"Task '{task_id}' score: {result['score']}")
 
                         # More detailed results for BFCL
                         if "format_score" in result:
                             logger.info(
-                                f"Task '{task_id}' format score: {result['format_score']}"
+                                f"Task '{task_id}' format score: "
+                                f"{result['format_score']}"
                             )
                         if "state_match" in result:
                             logger.info(
                                 f"Task '{task_id}' state match: {result['state_match']}"
                             )
                     else:
-                        logger.info(
-                            f"Task '{task_id}' completed with result: {result}"
-                        )
+                        logger.info(f"Task '{task_id}' completed with result: {result}")
 
                 # Save results to output directory if specified
                 if args.output_dir:
@@ -264,7 +248,7 @@ def bfcl_eval_command(args):
                             # Handle Pydantic models
                             serializable_results[task_id] = result.dict()
                         elif isinstance(result, dict):
-                            # Handle dictionaries with potentially non-serializable values
+                            # Handle dicts with potentially non-serializable values
                             serializable_dict = {}
                             for k, v in result.items():
                                 if hasattr(v, "dict"):

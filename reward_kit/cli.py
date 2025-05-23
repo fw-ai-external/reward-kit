@@ -106,9 +106,7 @@ def parse_args(args=None):
         "deploy",
         help="Create and deploy an evaluator, or register a remote one",
     )
-    deploy_parser.add_argument(
-        "--id", required=True, help="ID for the evaluator"
-    )
+    deploy_parser.add_argument("--id", required=True, help="ID for the evaluator")
     deploy_parser.add_argument(
         "--metrics-folders",
         "-m",
@@ -120,9 +118,7 @@ def parse_args(args=None):
         "--display-name",
         help="Display name for the evaluator (defaults to ID if not provided)",
     )
-    deploy_parser.add_argument(
-        "--description", help="Description for the evaluator"
-    )
+    deploy_parser.add_argument("--description", help="Description for the evaluator")
     deploy_parser.add_argument(
         "--force",
         "-f",
@@ -131,9 +127,7 @@ def parse_args(args=None):
     )
 
     # Add HuggingFace dataset options to deploy command
-    hf_deploy_group = deploy_parser.add_argument_group(
-        "HuggingFace Dataset Options"
-    )
+    hf_deploy_group = deploy_parser.add_argument_group("HuggingFace Dataset Options")
     hf_deploy_group.add_argument(
         "--huggingface-dataset",
         "--hf",

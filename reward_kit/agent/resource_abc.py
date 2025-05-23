@@ -54,9 +54,7 @@ class ForkableResource(ABC):
         pass
 
     @abstractmethod
-    async def step(
-        self, action_name: str, action_params: Dict[str, Any]
-    ) -> Any:
+    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
         Executes a named action with given parameters on the resource.
         This typically modifies the resource's state.

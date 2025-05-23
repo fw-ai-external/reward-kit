@@ -38,9 +38,7 @@ async def evaluate_endpoint(request: EvaluationRequest):
     Endpoint to evaluate a given set of messages using the loaded reward function.
     """
     if _LOADED_REWARD_FUNCTION is None:
-        raise HTTPException(
-            status_code=500, detail="Reward function not loaded."
-        )
+        raise HTTPException(status_code=500, detail="Reward function not loaded.")
 
     try:
         # Prepare arguments for the reward function
@@ -164,6 +162,4 @@ if __name__ == "__main__":
     print(
         f"Starting server for reward function: {args.import_string} on http://{args.host}:{args.port}"
     )
-    uvicorn.run(
-        app, host=args.host, port=args.port
-    )  # reload=args.reload for dev
+    uvicorn.run(app, host=args.host, port=args.port)  # reload=args.reload for dev

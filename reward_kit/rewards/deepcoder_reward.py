@@ -24,9 +24,7 @@ from .code_execution import (
 
 @reward_function
 def deepcoder_code_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, model's response is messages[-1]
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
     ground_truth: List[Dict[str, Any]],  # This is the test_cases
     language: str,
     timeout: int = 10,  # DeepCoder paper mentions 6-12s, default to 10s
@@ -78,9 +76,7 @@ def deepcoder_code_reward(
         )
 
     assistant_content = messages[-1].content
-    test_cases = (
-        ground_truth  # The new ground_truth parameter is the test_cases
-    )
+    test_cases = ground_truth  # The new ground_truth parameter is the test_cases
 
     code_blocks = extract_code_blocks(assistant_content, language)
     if not code_blocks:
@@ -149,9 +145,7 @@ def deepcoder_code_reward(
     }
 
     # Filter out None values from kwargs
-    filtered_kwargs = {
-        k: v for k, v in run_test_cases_kwargs.items() if v is not None
-    }
+    filtered_kwargs = {k: v for k, v in run_test_cases_kwargs.items() if v is not None}
 
     # _run_test_cases already returns EvaluateResult
     eval_result_from_tests: EvaluateResult = _run_test_cases(**filtered_kwargs)  # type: ignore

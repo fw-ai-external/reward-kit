@@ -71,9 +71,7 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     all_potential_matches: List[MatchInfo] = []
     for p_idx, p_str in enumerate(patterns):
         for match in re.finditer(p_str, text, re.IGNORECASE):
-            option_text = match.group(
-                1
-            )  # The full matched option, e.g. (A), A.
+            option_text = match.group(1)  # The full matched option, e.g. (A), A.
             letter = match.group(2)  # The letter itself
             # Ensure match.span(1) returns a tuple of two integers
             span_tuple = match.span(1)
@@ -107,12 +105,8 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     # Filter out overlapping matches, keeping the highest priority/longest one
     last_covered_end = -1
     for match_info in all_potential_matches:
-        start, end = match_info[
-            "span"
-        ]  # Now correctly typed as Tuple[int, int]
-        if (
-            start >= last_covered_end
-        ):  # Non-overlapping or starts after last one ended
+        start, end = match_info["span"]  # Now correctly typed as Tuple[int, int]
+        if start >= last_covered_end:  # Non-overlapping or starts after last one ended
             letter_upper = match_info["letter"]  # Now correctly typed as str
             if letter_upper not in found_mcq_letters:
                 final_mcq_answers.append(
@@ -175,12 +169,8 @@ def multiple_choice_math_reward(
 
     gen_content = ""
     if messages and len(messages) > 0:
-        gen_response_message = messages[
-            -1
-        ]  # Assistant's response is the last message
-        if (
-            gen_response_message.role == "assistant"
-        ):  # Assumes Pydantic Message object
+        gen_response_message = messages[-1]  # Assistant's response is the last message
+        if gen_response_message.role == "assistant":  # Assumes Pydantic Message object
             gen_content = gen_response_message.content or ""
 
     if not gen_content:
@@ -199,9 +189,7 @@ def multiple_choice_math_reward(
     # ground_truth is expected to be a list containing the single assistant ground truth message
     if ground_truth and len(ground_truth) > 0:
         orig_response_message = ground_truth[0]
-        if (
-            orig_response_message.role == "assistant"
-        ):  # Assumes Pydantic Message object
+        if orig_response_message.role == "assistant":  # Assumes Pydantic Message object
             orig_content = orig_response_message.content or ""
 
     if not orig_content:

@@ -382,9 +382,7 @@ class GorillaFileSystem:
             found_item = current_node.contents.get(part_name)
 
             if i == len(parts) - 1:  # This is the last part of the path
-                return (
-                    found_item  # Return File, Directory, or None if not found
-                )
+                return found_item  # Return File, Directory, or None if not found
 
             if isinstance(found_item, Directory):
                 current_node = found_item  # Navigate into subdirectory

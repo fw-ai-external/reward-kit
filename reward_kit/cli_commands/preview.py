@@ -34,14 +34,10 @@ def preview_command(args):
 
     # Validate --remote-url and --metrics-folders usage
     if args.remote_url and args.metrics_folders:
-        print(
-            "Info: --metrics-folders are ignored when --remote-url is specified."
-        )
+        print("Info: --metrics-folders are ignored when --remote-url is specified.")
 
     if not args.remote_url and not args.metrics_folders:
-        print(
-            "Error: Either --remote-url or --metrics-folders must be specified."
-        )
+        print("Error: Either --remote-url or --metrics-folders must be specified.")
         return 1
 
     # Ensure either samples or huggingface_dataset is provided (still needed for remote_url)
@@ -121,12 +117,8 @@ def preview_command(args):
 
             processed_messages = []
             for msg_item in messages_payload:
-                if isinstance(
-                    msg_item, Message
-                ):  # If helpers return Message objects
-                    processed_messages.append(
-                        msg_item.model_dump(exclude_none=True)
-                    )
+                if isinstance(msg_item, Message):  # If helpers return Message objects
+                    processed_messages.append(msg_item.model_dump(exclude_none=True))
                 elif isinstance(msg_item, dict):  # If helpers return dicts
                     processed_messages.append(msg_item)
                 else:

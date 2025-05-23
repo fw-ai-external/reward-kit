@@ -33,9 +33,7 @@ def get_fireworks_api_key() -> Optional[str]:
             config = configparser.ConfigParser()
             config.read(AUTH_INI_FILE)
             # Try [fireworks] section first
-            if "fireworks" in config and config.has_option(
-                "fireworks", "api_key"
-            ):
+            if "fireworks" in config and config.has_option("fireworks", "api_key"):
                 api_key_from_file = config.get("fireworks", "api_key")
                 if api_key_from_file:
                     logger.debug(
@@ -46,9 +44,7 @@ def get_fireworks_api_key() -> Optional[str]:
             # config.defaults() returns a dictionary of default values.
             # config[config.default_section] is another way to access them.
             if config.has_option(config.default_section, "api_key"):
-                api_key_from_default = config.get(
-                    config.default_section, "api_key"
-                )
+                api_key_from_default = config.get(config.default_section, "api_key")
                 if api_key_from_default:
                     logger.debug(
                         f"Using api_key from default section [{config.default_section}] in {AUTH_INI_FILE}."
@@ -77,17 +73,11 @@ def get_fireworks_api_key() -> Optional[str]:
                     f"Error during simple key-value parsing of {AUTH_INI_FILE}: {e_simple}"
                 )
         except configparser.Error as e_config:
-            logger.warning(
-                f"Configparser error reading {AUTH_INI_FILE}: {e_config}"
-            )
+            logger.warning(f"Configparser error reading {AUTH_INI_FILE}: {e_config}")
         except Exception as e_general:
-            logger.warning(
-                f"Unexpected error reading {AUTH_INI_FILE}: {e_general}"
-            )
+            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e_general}")
 
-    logger.debug(
-        "Fireworks API key not found in environment variables or auth.ini."
-    )
+    logger.debug("Fireworks API key not found in environment variables or auth.ini.")
     return None
 
 
@@ -114,9 +104,7 @@ def get_fireworks_account_id() -> Optional[str]:
             config = configparser.ConfigParser()
             config.read(AUTH_INI_FILE)
             # Try [fireworks] section first
-            if "fireworks" in config and config.has_option(
-                "fireworks", "account_id"
-            ):
+            if "fireworks" in config and config.has_option("fireworks", "account_id"):
                 account_id_from_file = config.get("fireworks", "account_id")
                 if account_id_from_file:
                     logger.debug(
@@ -155,13 +143,9 @@ def get_fireworks_account_id() -> Optional[str]:
                     f"Error during simple key-value parsing of {AUTH_INI_FILE}: {e_simple}"
                 )
         except configparser.Error as e_config:
-            logger.warning(
-                f"Configparser error reading {AUTH_INI_FILE}: {e_config}"
-            )
+            logger.warning(f"Configparser error reading {AUTH_INI_FILE}: {e_config}")
         except Exception as e_general:
-            logger.warning(
-                f"Unexpected error reading {AUTH_INI_FILE}: {e_general}"
-            )
+            logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e_general}")
 
     # Handle Dev API special case for account ID if FIREWORKS_API_BASE is set
     # This logic was present in the original file and might be relevant
@@ -176,7 +160,5 @@ def get_fireworks_account_id() -> Optional[str]:
     # logger.info("Using development API base, defaulting to pyroworks-dev account")
     # account_id = "pyroworks-dev" # Default dev account
 
-    logger.debug(
-        "Fireworks Account ID not found in environment variables or auth.ini."
-    )
+    logger.debug("Fireworks Account ID not found in environment variables or auth.ini.")
     return None

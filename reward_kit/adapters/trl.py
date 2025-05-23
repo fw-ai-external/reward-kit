@@ -113,10 +113,7 @@ def create_trl_adapter(
             else:
                 # Ensure data from TRL kwargs is a list of correct length
                 data_list = kwargs[dataset_col_name]
-                if (
-                    not isinstance(data_list, list)
-                    or len(data_list) != num_samples
-                ):
+                if not isinstance(data_list, list) or len(data_list) != num_samples:
                     logger.error(
                         f"Data for dataset column '{dataset_col_name}' "
                         f"is not a list of "
@@ -125,9 +122,7 @@ def create_trl_adapter(
                         f"Reward function will receive None for this parameter "
                         f"for all samples."
                     )
-                    mapped_kwargs_data[reward_fn_param_name] = [
-                        None
-                    ] * num_samples
+                    mapped_kwargs_data[reward_fn_param_name] = [None] * num_samples
                 else:
                     mapped_kwargs_data[reward_fn_param_name] = data_list
 
@@ -148,9 +143,7 @@ def create_trl_adapter(
             # Default extraction for assistant_content if not simple string
             final_assistant_str_content = ""
             if assistant_message_fn:
-                final_assistant_str_content = assistant_message_fn(
-                    current_completion
-                )
+                final_assistant_str_content = assistant_message_fn(current_completion)
             elif isinstance(current_completion, str):
                 final_assistant_str_content = current_completion
             elif (
@@ -184,9 +177,7 @@ def create_trl_adapter(
                 data_list_for_param,
             ) in mapped_kwargs_data.items():
                 # data_list_for_param is list of Nones or actual data
-                current_dynamic_kwargs[reward_fn_param_name] = (
-                    data_list_for_param[i]
-                )
+                current_dynamic_kwargs[reward_fn_param_name] = data_list_for_param[i]
 
             # Combine static and dynamic kwargs
             final_reward_fn_kwargs = {

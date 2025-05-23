@@ -27,10 +27,7 @@ def prepare_deepcoder_sample_for_trl(
     """
     # Extract prompt (user content)
     prompt_content = ""
-    if (
-        isinstance(raw_sample.get("prompt"), list)
-        and len(raw_sample["prompt"]) > 0
-    ):
+    if isinstance(raw_sample.get("prompt"), list) and len(raw_sample["prompt"]) > 0:
         for msg in raw_sample["prompt"]:
             if msg.get("role") == "user" and msg.get("content"):
                 prompt_content = msg["content"]
@@ -64,9 +61,7 @@ def prepare_deepcoder_sample_for_trl(
     final_prompt = prompt_content + instruction
 
     # Parse test cases from ground_truth JSON string
-    test_cases_str = raw_sample.get("reward_model", {}).get(
-        "ground_truth", "[]"
-    )
+    test_cases_str = raw_sample.get("reward_model", {}).get("ground_truth", "[]")
     try:
         test_cases = json.loads(test_cases_str)
     except json.JSONDecodeError:

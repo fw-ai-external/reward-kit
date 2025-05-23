@@ -25,9 +25,7 @@ def _parse_function_call(func_call_str: str):
         tree = ast.parse(func_call_str, mode="eval")
         if not isinstance(tree.body, ast.Call):
             raise ValueError("Input is not a valid function call.")
-        func_name = (
-            tree.body.func.id if isinstance(tree.body.func, ast.Name) else None
-        )
+        func_name = tree.body.func.id if isinstance(tree.body.func, ast.Name) else None
         if not func_name:
             raise ValueError("Could not determine function name.")
         args_dict = {}
@@ -161,15 +159,9 @@ def compare_comparable_states(
 
 @reward_function
 def bfcl_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, assistant responses are at the end
-    ground_truth: Dict[
-        str, Any
-    ],  # Contains 'function_calls' and 'comparable_state'
-    state: Dict[
-        str, Any
-    ],  # Runtime state (BFCLSimAPIResource, successful_func_calls)
+    messages: List[Message],  # Full conversation, assistant responses are at the end
+    ground_truth: Dict[str, Any],  # Contains 'function_calls' and 'comparable_state'
+    state: Dict[str, Any],  # Runtime state (BFCLSimAPIResource, successful_func_calls)
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -190,10 +182,7 @@ def bfcl_reward(
         f"Ground truth comparable state from input: {ground_truth_comparable_state}"
     )
 
-    if (
-        ground_truth_function_calls is None
-        or ground_truth_comparable_state is None
-    ):
+    if ground_truth_function_calls is None or ground_truth_comparable_state is None:
         return EvaluateResult(
             score=0.0,
             reason="Ground truth 'function_calls' or 'comparable_state' not found in ground_truth dict.",
@@ -222,33 +211,27 @@ def bfcl_reward(
 
     # --- Function Call Matches Check ---
     # model_successful_func_calls is List[List[Dict[str, Any]]], one inner list per user turn's accumulated calls
-    model_successful_func_calls_per_turn = state.get(
-        "successful_func_calls", []
-    )
+    model_successful_func_calls_per_turn = state.get("successful_func_calls", [])
 
-    num_func_matches_for_score = 0  # Number of user turns where model's calls matched GT's calls for that turn
+    num_func_matches_for_score = (
+        0  # Number of user turns where model's calls matched GT's calls for that turn
+    )
     func_match_score = 0.0
 
     num_gt_turns_with_calls = (
         len(ground_truth_function_calls) if ground_truth_function_calls else 0
     )
-    num_model_turns_with_actual_calls = len(
-        model_successful_func_calls_per_turn
-    )
+    num_model_turns_with_actual_calls = len(model_successful_func_calls_per_turn)
 
     # Iterate over GT turns to see if the model matched them
     # This handles cases where model makes fewer turns with calls than GT expects.
     if num_gt_turns_with_calls > 0:
         for i in range(num_gt_turns_with_calls):
-            gt_calls_str_for_this_turn = ground_truth_function_calls[
-                i
-            ]  # List[str]
+            gt_calls_str_for_this_turn = ground_truth_function_calls[i]  # List[str]
 
             model_calls_for_this_turn = []  # List[Dict]
             if i < num_model_turns_with_actual_calls:
-                model_calls_for_this_turn = (
-                    model_successful_func_calls_per_turn[i]
-                )
+                model_calls_for_this_turn = model_successful_func_calls_per_turn[i]
 
             try:
                 gt_calls_for_this_turn = [

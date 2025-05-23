@@ -97,12 +97,8 @@ def extract_code_blocks(
         re.compile(
             r"Thinking:\s*.*?(?=\n\S)", re.DOTALL
         ),  # Matches "Thinking: ..." until a new non-whitespace line
-        re.compile(
-            r"^\s*Here's the Python code.*?\n", re.MULTILINE | re.IGNORECASE
-        ),
-        re.compile(
-            r"^\s*Okay, here is the code:.*?\n", re.MULTILINE | re.IGNORECASE
-        ),
+        re.compile(r"^\s*Here's the Python code.*?\n", re.MULTILINE | re.IGNORECASE),
+        re.compile(r"^\s*Okay, here is the code:.*?\n", re.MULTILINE | re.IGNORECASE),
     ]
 
     for lang, code_content in matches:
@@ -135,9 +131,7 @@ def extract_code_blocks(
         if (
             verbose_patterns_removed
         ):  # Add only if something was actually removed for this block
-            block_info["verbosity_cleaned_reason"] = "; ".join(
-                verbose_patterns_removed
-            )
+            block_info["verbosity_cleaned_reason"] = "; ".join(verbose_patterns_removed)
             verbose_patterns_removed = []  # Reset for next block
 
         code_blocks.append(block_info)
@@ -151,9 +145,7 @@ def extract_code_blocks(
 
 @reward_function
 def local_code_execution_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, last message is model's response
+    messages: List[Message],  # Full conversation, last message is model's response
     ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 5,
@@ -201,7 +193,9 @@ def local_code_execution_reward(
         )
 
     response_content = messages[-1].content
-    expected_output_str = ground_truth  # Use the new ground_truth parameter as expected_output_str
+    expected_output_str = (
+        ground_truth  # Use the new ground_truth parameter as expected_output_str
+    )
 
     # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
@@ -275,9 +269,7 @@ def local_code_execution_reward(
                 reason=match_reason,
                 is_score_valid=similarity == 1.0,
             )
-            final_reason = (
-                f"Execution successful. Output similarity: {similarity:.2f}."
-            )
+            final_reason = f"Execution successful. Output similarity: {similarity:.2f}."
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metrics
             )
@@ -378,9 +370,7 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     try:
         # Create temporary file for the code
-        with tempfile.NamedTemporaryFile(
-            suffix=".py", delete=False
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp_file:
             temp_file_path = temp_file.name
 
             # Add imports and reliability guard
@@ -494,9 +484,7 @@ def execute_python_code(code: str, timeout: int = 5) -> Dict[str, Any]:
     )
 
 
-def _execute_javascript_in_subprocess(
-    code: str, timeout: int
-) -> Dict[str, Any]:
+def _execute_javascript_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
     """
     Inner function to execute JavaScript code in a subprocess.
 
@@ -510,9 +498,7 @@ def _execute_javascript_in_subprocess(
     try:
         # Check if Node.js is installed
         try:
-            subprocess.run(
-                ["node", "--version"], capture_output=True, check=True
-            )
+            subprocess.run(["node", "--version"], capture_output=True, check=True)
         except (subprocess.SubprocessError, FileNotFoundError):
             return {
                 "success": False,
@@ -521,9 +507,7 @@ def _execute_javascript_in_subprocess(
             }
 
         # Create temporary file for the code
-        with tempfile.NamedTemporaryFile(
-            suffix=".js", delete=False
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".js", delete=False) as temp_file:
             temp_file_path = temp_file.name
 
             # Add safety wrapper around the code to prevent dangerous operations
@@ -708,9 +692,7 @@ def compare_outputs(actual: str, expected: str) -> float:
             if not actual_list and not expected_list:
                 return 1.0
 
-            if not isinstance(actual_list, list) or not isinstance(
-                expected_list, list
-            ):
+            if not isinstance(actual_list, list) or not isinstance(expected_list, list):
                 raise ValueError("Not a list")
 
             # Check length similarity
@@ -729,9 +711,7 @@ def compare_outputs(actual: str, expected: str) -> float:
                     best_match = 0.0
                     for act_item in actual_list:
                         # Recursively compare items
-                        item_similarity = compare_outputs(
-                            str(act_item), str(exp_item)
-                        )
+                        item_similarity = compare_outputs(str(act_item), str(exp_item))
                         best_match = max(best_match, item_similarity)
                     total_similarity += best_match
 
@@ -765,9 +745,7 @@ def compare_outputs(actual: str, expected: str) -> float:
             total_similarity = 0.0
             for i in range(common_len):
                 # Use string similarity for each line
-                line_similarity = string_similarity(
-                    actual_lines[i], expected_lines[i]
-                )
+                line_similarity = string_similarity(actual_lines[i], expected_lines[i])
                 total_similarity += line_similarity
 
             lines_similarity = total_similarity / common_len
@@ -1025,9 +1003,7 @@ def execute_code_with_e2b(
 
 @reward_function
 def e2b_code_execution_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, last message is model's response
+    messages: List[Message],  # Full conversation, last message is model's response
     ground_truth: Optional[str] = None,  # This is the new expected_output_str
     language: str = "python",
     timeout: int = 30,
@@ -1101,7 +1077,9 @@ def e2b_code_execution_reward(
         )
 
     response_content = messages[-1].content
-    expected_output_str = ground_truth  # Use the new ground_truth parameter as expected_output_str
+    expected_output_str = (
+        ground_truth  # Use the new ground_truth parameter as expected_output_str
+    )
 
     # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
@@ -1161,15 +1139,15 @@ def e2b_code_execution_reward(
                 reason=match_reason,
                 is_score_valid=similarity == 1.0,
             )
-            final_reason = f"E2B execution successful. Output similarity: {similarity:.2f}."
+            final_reason = (
+                f"E2B execution successful. Output similarity: {similarity:.2f}."
+            )
             return EvaluateResult(
                 score=similarity, reason=final_reason, metrics=metrics
             )
 
         # No expected output provided, score based on successful execution
-        final_reason = (
-            "E2B execution successful. No expected output to compare."
-        )
+        final_reason = "E2B execution successful. No expected output to compare."
         return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
     else:
         # Execution failed
@@ -1186,9 +1164,7 @@ def e2b_code_execution_reward(
 
 @reward_function
 def fractional_code_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, last message is model's response
+    messages: List[Message],  # Full conversation, last message is model's response
     ground_truth: Union[
         Optional[str], Optional[List[Dict[str, Any]]]
     ],  # Expected output string OR list of test_cases
@@ -1299,9 +1275,7 @@ def fractional_code_reward(
     # Use the first code block for execution
     code = code_blocks[0]["code"]
 
-    metrics_strings["extracted_code"] = (
-        f"Extracted code:\n```{language}\n{code}\n```"
-    )
+    metrics_strings["extracted_code"] = f"Extracted code:\n```{language}\n{code}\n```"
 
     # Add expected output to metrics if available and not using test cases
     if expected_output_str_from_gt and not test_cases_from_gt:
@@ -1372,10 +1346,7 @@ def fractional_code_reward(
             reason=v,
             is_score_valid=(
                 k == "extracted_code"
-                or (
-                    k == "expected_output"
-                    and expected_output_str_from_gt is not None
-                )
+                or (k == "expected_output" and expected_output_str_from_gt is not None)
             ),
         )
         for k, v in metrics_strings.items()
@@ -1417,9 +1388,7 @@ def fractional_code_reward(
             is_score_valid=False,
         )
         final_reason = f"Fractional code execution failed: {error}"
-        return EvaluateResult(
-            score=0.0, reason=final_reason, metrics=metric_results
-        )
+        return EvaluateResult(score=0.0, reason=final_reason, metrics=metric_results)
 
 
 def _run_test_cases(
@@ -1484,9 +1453,7 @@ def _run_test_cases(
                     # If val is a string, try to parse it further if it looks like list/dict or number
                     if isinstance(val, str):
                         stripped_val = val.strip()
-                        if stripped_val.startswith(
-                            ("[", "{")
-                        ):  # Looks like list/dict
+                        if stripped_val.startswith(("[", "{")):  # Looks like list/dict
                             try:
                                 return json.loads(stripped_val)
                             except json.JSONDecodeError:
@@ -1502,9 +1469,7 @@ def _run_test_cases(
                                 else:
                                     return int(stripped_val)
                             except ValueError:
-                                return (
-                                    val  # Keep original string if not a number
-                                )
+                                return val  # Keep original string if not a number
                     return val  # Not a string, or already refined (e.g. actual list/int from initial parse)
 
                 # Argument parsing logic:
@@ -1528,18 +1493,14 @@ def _run_test_cases(
                     # Handles valid JSON values like "[1,2,3]", "5", "\"a string\"", "true".
                     try:
                         val_from_json = json.loads(args_str_stripped)
-                        parsed_args.append(
-                            refine_evaluated_value(val_from_json)
-                        )
+                        parsed_args.append(refine_evaluated_value(val_from_json))
                         parsed_as_single_arg = True
                     except json.JSONDecodeError:
                         # Attempt 2: If JSON parsing fails, try parsing as a single Python literal.
                         # Handles Python literals like "['a','b']", "{'k':'v'}", "None".
                         try:
                             val_from_ast = ast.literal_eval(args_str_stripped)
-                            parsed_args.append(
-                                refine_evaluated_value(val_from_ast)
-                            )
+                            parsed_args.append(refine_evaluated_value(val_from_ast))
                             parsed_as_single_arg = True
                         except (ValueError, SyntaxError):
                             # Both single-argument parse attempts failed.
@@ -1552,9 +1513,7 @@ def _run_test_cases(
                         # Handles inputs like "1 'foo' \"[1, 2]\"" or "item1 item2".
                         try:
                             arg_parts = shlex.split(args_str_stripped)
-                        except (
-                            ValueError
-                        ):  # Handle shlex errors e.g. unmatched quotes
+                        except ValueError:  # Handle shlex errors e.g. unmatched quotes
                             arg_parts = [
                                 args_str_stripped
                             ]  # Fallback to treating as a single, possibly problematic, part
@@ -1570,9 +1529,7 @@ def _run_test_cases(
                                 # If ast.literal_eval fails on a part, it's likely an unquoted string
                                 # or a malformed literal. Treat it as a string, but still refine.
                                 # (e.g. "item" or even "[1,2,3" if it ended up here due to earlier parse failures)
-                                parsed_args.append(
-                                    refine_evaluated_value(part_str)
-                                )
+                                parsed_args.append(refine_evaluated_value(part_str))
 
                 # Create the final argument string for the function call template.
                 args_repr = ", ".join(map(repr, parsed_args))
@@ -1636,9 +1593,7 @@ print(captured_stdout.getvalue(), end='')
                 parsed_args_js = []
                 if args_str:
                     for arg in args_str.split():
-                        if arg.isdigit() or (
-                            arg.startswith("-") and arg[1:].isdigit()
-                        ):
+                        if arg.isdigit() or (arg.startswith("-") and arg[1:].isdigit()):
                             parsed_args_js.append(arg)  # Keep as string number
                         elif "." in arg and all(
                             c.isdigit() or c == "." or (i == 0 and c == "-")
@@ -1646,17 +1601,11 @@ print(captured_stdout.getvalue(), end='')
                         ):
                             try:
                                 float(arg)  # Check if it's a float
-                                parsed_args_js.append(
-                                    arg
-                                )  # Keep as string number
+                                parsed_args_js.append(arg)  # Keep as string number
                             except ValueError:
-                                parsed_args_js.append(
-                                    json.dumps(arg)
-                                )  # String literal
+                                parsed_args_js.append(json.dumps(arg))  # String literal
                         else:
-                            parsed_args_js.append(
-                                json.dumps(arg)
-                            )  # String literal
+                            parsed_args_js.append(json.dumps(arg))  # String literal
 
                 args_js_repr = ", ".join(parsed_args_js)
                 # Use triple quotes for JS harness string
@@ -1680,9 +1629,7 @@ try {{
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
                 input_lines = test_input_str.strip().split("\n")
-                input_setup = (
-                    "const inputs = " + json.dumps(input_lines) + ";\n"
-                )
+                input_setup = "const inputs = " + json.dumps(input_lines) + ";\n"
                 input_setup += "let inputIndex = 0;\n"
                 input_setup += "const readline = () => inputs[inputIndex++];\n"
                 # Use triple quotes for JS harness string
@@ -1729,9 +1676,7 @@ process.stdout.write(output); // Write directly to avoid extra newline
         expected = test_case.get("expected_output", "")
 
         # Prepare code with test input using the appropriate harness
-        test_code_prepared = prepare_test_code(
-            code, test_input, function_to_call
-        )
+        test_code_prepared = prepare_test_code(code, test_input, function_to_call)
 
         # Execute code in the specified environment
         if environment.lower() == "e2b":
@@ -1757,13 +1702,9 @@ process.stdout.write(output); // Write directly to avoid extra newline
             )
         else:  # local execution
             if language.lower() in ["python", "py"]:
-                execution_result = execute_python_code(
-                    test_code_prepared, timeout
-                )
+                execution_result = execute_python_code(test_code_prepared, timeout)
             elif language.lower() in ["javascript", "js"]:
-                execution_result = execute_javascript_code(
-                    test_code_prepared, timeout
-                )
+                execution_result = execute_javascript_code(test_code_prepared, timeout)
             # Need to handle the case where language is not supported here too
             else:
                 return EvaluateResult(
@@ -1829,9 +1770,7 @@ process.stdout.write(output); // Write directly to avoid extra newline
 
     # Ensure results is treated as a list of dicts
     if isinstance(results, list):
-        metrics["test_results"] = (
-            results  # results is List[Dict], not MetricResult
-        )
+        metrics["test_results"] = results  # results is List[Dict], not MetricResult
     else:
         # If somehow results is a string, convert it to a list with one dict
         metrics["test_results"] = [{"error": "Invalid results format"}]

@@ -24,9 +24,7 @@ except ImportError:
 
 def load_jsonl_to_hf_dataset(
     dataset_path: str,
-    transform_fn: Optional[
-        Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]
-    ] = None,
+    transform_fn: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
     prompt_column: str = "prompt",
     required_columns: Optional[List[str]] = None,
     dataset_filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
@@ -76,9 +74,7 @@ def load_jsonl_to_hf_dataset(
                     ):  # transform_fn might return None to skip
                         continue
 
-                    if dataset_filter_fn and not dataset_filter_fn(
-                        transformed_sample
-                    ):
+                    if dataset_filter_fn and not dataset_filter_fn(transformed_sample):
                         continue
 
                     processed_samples.append(transformed_sample)
@@ -123,7 +119,5 @@ def load_jsonl_to_hf_dataset(
         print(f"Error: {ve}")
         return None
     except Exception as e:
-        print(
-            f"An unexpected error occurred while loading dataset {dataset_path}: {e}"
-        )
+        print(f"An unexpected error occurred while loading dataset {dataset_path}: {e}")
         return None

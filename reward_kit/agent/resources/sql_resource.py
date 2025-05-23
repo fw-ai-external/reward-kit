@@ -32,9 +32,7 @@ class SQLResource(ForkableResource):
         self._db_path: Optional[Path] = None
         self._base_db_path: Optional[Path] = None
         # Consider making temp_dir configurable or using a more robust temp solution
-        self._temp_dir = Path(
-            "./.rk_temp_dbs"
-        ).resolve()  # Ensure absolute path
+        self._temp_dir = Path("./.rk_temp_dbs").resolve()  # Ensure absolute path
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_db_connection(self) -> sqlite3.Connection:
@@ -65,9 +63,7 @@ class SQLResource(ForkableResource):
 
         db_name = self._config.get("db_name", f"db_{uuid.uuid4().hex}.sqlite")
         self._base_db_path = self._temp_dir / db_name
-        self._db_path = (
-            self._base_db_path
-        )  # Initially, the current DB is the base DB
+        self._db_path = self._base_db_path  # Initially, the current DB is the base DB
 
         # Ensure a fresh start if the base DB file already exists from a previous run
         if self._base_db_path is not None and self._base_db_path.exists():
@@ -112,9 +108,7 @@ class SQLResource(ForkableResource):
 
         forked_resource = SQLResource()
         forked_resource._config = self._config.copy()
-        forked_resource._temp_dir = (
-            self._temp_dir
-        )  # Share the same temp dir base
+        forked_resource._temp_dir = self._temp_dir  # Share the same temp dir base
 
         # The new fork's base is the current state of this resource
         forked_resource._base_db_path = self._db_path
@@ -136,9 +130,7 @@ class SQLResource(ForkableResource):
         if not self._db_path or not self._db_path.exists():
             raise RuntimeError("Cannot checkpoint: database does not exist.")
 
-        checkpoint_name = (
-            f"checkpoint_{self._db_path.stem}_{uuid.uuid4().hex}.sqlite"
-        )
+        checkpoint_name = f"checkpoint_{self._db_path.stem}_{uuid.uuid4().hex}.sqlite"
         checkpoint_path = self._temp_dir / checkpoint_name
         shutil.copyfile(str(self._db_path), str(checkpoint_path))
         # print(f"SQLResource checkpointed. DB at: {self._db_path} to {checkpoint_path}")
@@ -157,15 +149,11 @@ class SQLResource(ForkableResource):
 
         checkpoint_path = Path(checkpoint_path_str)
         if not checkpoint_path.exists():
-            raise FileNotFoundError(
-                f"Checkpoint file not found: {checkpoint_path}"
-            )
+            raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
 
         # If current db_path is not set (e.g. fresh resource), assign one
         if not self._db_path:
-            self._db_path = (
-                self._temp_dir / f"restored_{uuid.uuid4().hex}.sqlite"
-            )
+            self._db_path = self._temp_dir / f"restored_{uuid.uuid4().hex}.sqlite"
 
         shutil.copyfile(str(checkpoint_path), str(self._db_path))
         self._base_db_path = (
@@ -173,9 +161,7 @@ class SQLResource(ForkableResource):
         )  # The restored state becomes the new base for future forks
         # print(f"SQLResource restored. DB at: {self._db_path} from {checkpoint_path}")
 
-    async def step(
-        self, action_name: str, action_params: Dict[str, Any]
-    ) -> Any:
+    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
         Executes a SQL query on the database.
 
@@ -196,9 +182,7 @@ class SQLResource(ForkableResource):
 
         query = action_params.get("query")
         if not query:
-            raise ValueError(
-                "Missing 'query' in action_params for 'execute_sql'."
-            )
+            raise ValueError("Missing 'query' in action_params for 'execute_sql'.")
 
         params = action_params.get("parameters", [])
         fetch_mode = action_params.get("fetch_mode")  # 'one', 'all', 'val'
@@ -234,9 +218,7 @@ class SQLResource(ForkableResource):
             "db_type": "sqlite",
             "db_path": str(self._db_path) if self._db_path else None,
             "status": (
-                "ready"
-                if self._db_path and self._db_path.exists()
-                else "uninitialized"
+                "ready" if self._db_path and self._db_path.exists() else "uninitialized"
             ),
         }
 

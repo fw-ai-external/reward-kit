@@ -22,9 +22,7 @@ from .reward_function import RewardFunction
 from .typed_interface import reward_function
 
 # Show deprecation warnings
-warnings.filterwarnings(
-    "default", category=DeprecationWarning, module="reward_kit"
-)
+warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 
 __all__ = [
     # Core interfaces

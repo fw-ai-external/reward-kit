@@ -42,9 +42,7 @@ class TaskManager:
         """
         task_id = task_definition.name
         if task_id in self.tasks:
-            self.logger.warning(
-                f"Task '{task_id}' is already registered. Overwriting."
-            )
+            self.logger.warning(f"Task '{task_id}' is already registered. Overwriting.")
 
         self.tasks[task_id] = task_definition
         self.logger.info(f"Registered task: {task_id}")
@@ -87,14 +85,10 @@ class TaskManager:
             except Exception as e:
                 self.logger.error(f"Error loading task from {file_path}: {e}")
 
-        self.logger.info(
-            f"Registered {len(task_ids)} tasks from {directory_path}"
-        )
+        self.logger.info(f"Registered {len(task_ids)} tasks from {directory_path}")
         return task_ids
 
-    def _load_task_from_file(
-        self, file_path: str
-    ) -> Optional[TaskDefinitionModel]:
+    def _load_task_from_file(self, file_path: str) -> Optional[TaskDefinitionModel]:
         """
         Load and validate a task definition from a file.
 
@@ -129,9 +123,7 @@ class TaskManager:
             task_def = TaskDefinitionModel.model_validate(task_data)
             return task_def
         except Exception as e:
-            self.logger.error(
-                f"Error loading task definition from {file_path}: {e}"
-            )
+            self.logger.error(f"Error loading task definition from {file_path}: {e}")
             return None
 
     async def prepare_task(self, task_id: str) -> bool:
@@ -160,9 +152,7 @@ class TaskManager:
             await orchestrator.setup_base_resource()
             return True
         except Exception as e:
-            self.logger.error(
-                f"Error preparing resources for task '{task_id}': {e}"
-            )
+            self.logger.error(f"Error preparing resources for task '{task_id}': {e}")
             return False
 
     async def execute_task(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -196,9 +186,7 @@ class TaskManager:
             self.logger.info(f"Task '{task_id}' execution completed.")
             return result
         except Exception as e:
-            self.logger.error(
-                f"Error executing task '{task_id}': {e}", exc_info=True
-            )
+            self.logger.error(f"Error executing task '{task_id}': {e}", exc_info=True)
             return {"error": str(e)}
 
     async def execute_tasks(
@@ -224,14 +212,10 @@ class TaskManager:
         )
 
         # Validate task IDs
-        valid_task_ids = [
-            tid for tid in task_ids_to_execute if tid in self.tasks
-        ]
+        valid_task_ids = [tid for tid in task_ids_to_execute if tid in self.tasks]
         if len(valid_task_ids) != len(task_ids_to_execute):
             invalid_task_ids = set(task_ids_to_execute) - set(valid_task_ids)
-            self.logger.warning(
-                f"Some task IDs are not registered: {invalid_task_ids}"
-            )
+            self.logger.warning(f"Some task IDs are not registered: {invalid_task_ids}")
 
         if not valid_task_ids:
             self.logger.error("No valid tasks to execute.")
@@ -246,16 +230,12 @@ class TaskManager:
             )
 
             # Prepare all tasks first
-            prepare_tasks = [
-                self.prepare_task(task_id) for task_id in valid_task_ids
-            ]
+            prepare_tasks = [self.prepare_task(task_id) for task_id in valid_task_ids]
             prepare_results = await asyncio.gather(*prepare_tasks)
 
             # Filter out tasks that failed preparation
             prepared_task_ids = [
-                tid
-                for tid, success in zip(valid_task_ids, prepare_results)
-                if success
+                tid for tid, success in zip(valid_task_ids, prepare_results) if success
             ]
 
             if not prepared_task_ids:
@@ -269,18 +249,14 @@ class TaskManager:
                 async with semaphore:
                     return tid, await self.execute_task(tid)
 
-            execution_tasks = [
-                execute_with_semaphore(tid) for tid in prepared_task_ids
-            ]
+            execution_tasks = [execute_with_semaphore(tid) for tid in prepared_task_ids]
             execution_results = await asyncio.gather(*execution_tasks)
 
             # Collect results
             results = {tid: result for tid, result in execution_results}
         else:
             # Execute tasks sequentially
-            self.logger.info(
-                f"Executing {len(valid_task_ids)} tasks sequentially."
-            )
+            self.logger.info(f"Executing {len(valid_task_ids)} tasks sequentially.")
             for task_id in valid_task_ids:
                 if await self.prepare_task(task_id):
                     results[task_id] = await self.execute_task(task_id)
@@ -297,9 +273,7 @@ class TaskManager:
             task_ids: List of task IDs to clean up. If None, clean up all tasks.
         """
         task_ids_to_cleanup = (
-            task_ids
-            if task_ids is not None
-            else list(self.orchestrators.keys())
+            task_ids if task_ids is not None else list(self.orchestrators.keys())
         )
 
         for task_id in task_ids_to_cleanup:
@@ -308,9 +282,7 @@ class TaskManager:
                 if orchestrator.base_resource:
                     try:
                         await orchestrator.base_resource.close()
-                        self.logger.info(
-                            f"Cleaned up resources for task '{task_id}'."
-                        )
+                        self.logger.info(f"Cleaned up resources for task '{task_id}'.")
                     except Exception as e:
                         self.logger.error(
                             f"Error cleaning up resources for task '{task_id}': {e}"

@@ -198,9 +198,7 @@ def repetition_penalty_reward(
     reason = f"Repetition ratio: {repetition_ratio:.2f}, Unique {ngram_size}-grams: {unique_ngrams}/{total}"
 
     metrics = {
-        "repetition": MetricResult(
-            score=score, is_score_valid=success, reason=reason
-        ),
+        "repetition": MetricResult(score=score, is_score_valid=success, reason=reason),
         "unique_ngram_ratio": MetricResult(
             score=1.0 - repetition_ratio,  # Higher is better
             is_score_valid=success,
@@ -331,9 +329,7 @@ def diversity_reward(
             weights = weights[: len(ngram_sizes)]
         else:
             # Fill with equal weights for missing values
-            missing_weight = (1.0 - sum(weights)) / (
-                len(ngram_sizes) - len(weights)
-            )
+            missing_weight = (1.0 - sum(weights)) / (len(ngram_sizes) - len(weights))
             weights.extend([missing_weight] * (len(ngram_sizes) - len(weights)))
 
     # Normalize weights to sum to 1

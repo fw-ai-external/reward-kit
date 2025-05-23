@@ -79,9 +79,7 @@ class PistonClient:
 
     async def get_runtimes(self) -> List[Dict[str, Any]]:
         """Get list of supported runtimes."""
-        async with self.session.get(
-            f"{self.base_endpoint}/runtimes"
-        ) as response:
+        async with self.session.get(f"{self.base_endpoint}/runtimes") as response:
             if response.status != 200:
                 raise PistonError(f"Error getting runtimes: {response.status}")
             return await response.json()
@@ -164,9 +162,7 @@ def get_piston_client(endpoint: Optional[str] = None) -> PistonClient:
     return PistonClient(base_endpoint=piston_endpoint)
 
 
-def extract_code_blocks(
-    text: str, language: str = "cpp"
-) -> List[Dict[str, str]]:
+def extract_code_blocks(text: str, language: str = "cpp") -> List[Dict[str, str]]:
     """
     Extract code blocks from text.
 
@@ -344,9 +340,7 @@ async def execute_cpp_code(
                 return {
                     "success": False,
                     "output": (
-                        result["run"]["stdout"]
-                        if result["run"]["stdout"]
-                        else None
+                        result["run"]["stdout"] if result["run"]["stdout"] else None
                     ),
                     "error": f"Runtime error (exit code {result['run']['code']}): {result['run']['stderr']}",
                 }
@@ -552,9 +546,7 @@ async def run_cpp_test_cases(
         )
 
         # Process the result
-        test_result = TestResult(
-            test_name=test_name, expected_output=expected_output
-        )
+        test_result = TestResult(test_name=test_name, expected_output=expected_output)
 
         if execution_result["success"]:
             actual_output = execution_result["output"]
@@ -575,9 +567,7 @@ async def run_cpp_test_cases(
             test_result.feedback = f"Similarity: {similarity:.2f}"
         else:
             test_result.status = (
-                "CE"
-                if "Compilation error" in execution_result["error"]
-                else "RE"
+                "CE" if "Compilation error" in execution_result["error"] else "RE"
             )
             test_result.feedback = execution_result["error"]
             test_result.score = 0.0
@@ -632,9 +622,7 @@ def ioi_cpp_code_reward(
 
 
 def _ioi_cpp_code_reward_impl(
-    messages: List[
-        Message
-    ],  # Full conversation, model's response is messages[-1]
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
     ground_truth: Union[
         Optional[str], Optional[List[Dict[str, Any]]]
     ],  # New ground_truth
@@ -807,9 +795,7 @@ def _ioi_cpp_code_reward_impl(
             reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
 
-        return EvaluateResult(
-            score=overall_score, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=overall_score, reason=final_reason, metrics=metrics)
 
     # Single test case with expected_output_str_from_gt
     elif expected_output_str_from_gt:
@@ -860,9 +846,7 @@ def _ioi_cpp_code_reward_impl(
                 reason=f"Code execution failed with error:\n{error}",
             )
 
-            return EvaluateResult(
-                score=0.0, reason=final_reason, metrics=metrics
-            )
+            return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
     # No expected output or test cases
     else:
@@ -880,7 +864,9 @@ def _ioi_cpp_code_reward_impl(
 
         if execution_result["success"]:
             output = execution_result["output"]
-            final_reason = "Code executed successfully (no expected output for comparison)."
+            final_reason = (
+                "Code executed successfully (no expected output for comparison)."
+            )
 
             metrics["execution_result"] = MetricResult(
                 score=1.0,
@@ -888,9 +874,7 @@ def _ioi_cpp_code_reward_impl(
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
-            return EvaluateResult(
-                score=1.0, reason=final_reason, metrics=metrics
-            )
+            return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
         else:
             # Execution failed
             error = execution_result["error"]
@@ -901,9 +885,7 @@ def _ioi_cpp_code_reward_impl(
                 reason=f"Code execution failed with error:\n{error}",
             )
 
-            return EvaluateResult(
-                score=0.0, reason=final_reason, metrics=metrics
-            )
+            return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
 
 @reward_function
@@ -977,8 +959,6 @@ def binary_cpp_code_reward(
             reason=f"{'Passed' if binary_score > 0 else 'Failed'} (threshold: {pass_threshold:.2f}, actual: {score:.2f})",
         )
 
-        return EvaluateResult(
-            score=binary_score, reason=final_reason, metrics=metrics
-        )
+        return EvaluateResult(score=binary_score, reason=final_reason, metrics=metrics)
     finally:
         loop.close()

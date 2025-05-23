@@ -94,9 +94,7 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": self.parameters.get(tool_name, {}),
-                        "required": list(
-                            self.parameters.get(tool_name, {}).keys()
-                        ),
+                        "required": list(self.parameters.get(tool_name, {}).keys()),
                     },
                 }
             )

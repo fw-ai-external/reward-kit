@@ -132,9 +132,7 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
                             typed_ground_truth_list.append(gt_item_data)
                         elif isinstance(gt_item_data, dict):
                             # Simplified conversion
-                            typed_ground_truth_list.append(
-                                Message(**gt_item_data)
-                            )
+                            typed_ground_truth_list.append(Message(**gt_item_data))
                         else:
                             raise TypeError(
                                 f"Unexpected type in ground_truth list: {type(gt_item_data)}"
@@ -158,9 +156,7 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
                 # Otherwise validate it
                 result_model = _res_adapter.validate_python(result)
         except ValidationError as err:
-            raise ValueError(
-                f"Return value failed validation:\n{err}"
-            ) from None
+            raise ValueError(f"Return value failed validation:\n{err}") from None
 
         # 3. Return the EvaluateResult object directly
         # The result_model is an instance of our hybrid EvaluateResult

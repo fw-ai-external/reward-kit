@@ -107,9 +107,7 @@ def cosine_scaled_accuracy_length_reward(
         ),
     )
     accuracy_success = answer_accuracy_metric.is_score_valid
-    accuracy_reason = (
-        accuracy_eval_result.reason or "No reason from accuracy_reward"
-    )
+    accuracy_reason = accuracy_eval_result.reason or "No reason from accuracy_reward"
 
     # Step 2: Calculate length-based score
     token_count = count_tokens(text, method=token_method)

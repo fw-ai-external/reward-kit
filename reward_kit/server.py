@@ -28,9 +28,7 @@ class Message(BaseModel):
 class RewardRequest(BaseModel):
     """Request model for reward endpoints."""
 
-    messages: List[Message] = Field(
-        ..., description="List of conversation messages"
-    )
+    messages: List[Message] = Field(..., description="List of conversation messages")
     original_messages: Optional[List[Message]] = Field(
         None, description="Original messages for context"
     )
@@ -80,9 +78,7 @@ class RewardServer:
             module = importlib.import_module(module_path)
             func = getattr(module, func_name)
 
-            logger.info(
-                f"Loaded reward function {func_name} from {module_path}"
-            )
+            logger.info(f"Loaded reward function {func_name} from {module_path}")
             return func
         except (ImportError, AttributeError) as e:
             raise ImportError(
@@ -142,9 +138,7 @@ class RewardServer:
                         "Reward function returned EvaluateResult object directly to server; expected dict."
                     )
                     return result.model_dump()
-                elif (
-                    isinstance(result, tuple) and len(result) == 2
-                ):  # Legacy tuple
+                elif isinstance(result, tuple) and len(result) == 2:  # Legacy tuple
                     logger.warning(
                         "Reward function returned legacy tuple format to server."
                     )

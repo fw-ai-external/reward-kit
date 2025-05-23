@@ -104,10 +104,7 @@ def huggingface_dataset_to_jsonl(
 
             if not prompt_text or not response_text:
                 logger.debug(
-                    (
-                        f"Skipping sample {i} due to missing prompt or "
-                        "response text."
-                    )
+                    (f"Skipping sample {i} due to missing prompt or " "response text.")
                 )
                 continue
 
@@ -127,10 +124,7 @@ def huggingface_dataset_to_jsonl(
 
             # Add all remaining keys as kwargs
             for key, value in item.items():
-                if (
-                    key not in [prompt_key, response_key]
-                    and key not in message_key_map
-                ):
+                if key not in [prompt_key, response_key] and key not in message_key_map:
                     entry[key] = value
 
             # Write the entry
@@ -210,16 +204,16 @@ class Evaluator:
         self.multi_metrics = (
             multi_metrics  # Original multi_metrics flag for folder-based setup
         )
-        self.ts_mode_config = ts_mode_config  # Config for TypeScript-like single code snippet mode
+        self.ts_mode_config = (
+            ts_mode_config  # Config for TypeScript-like single code snippet mode
+        )
         self.code_files = {}  # Map of filename -> content
         self.metric_folders: dict[str, str] = (
             {}
-        )  # Map of metric_name -> folder_path (used when not in ts_mode_config and not multi_metrics)
+        )  # Map: metric_name -> folder_path (not ts_mode_config/multi_metrics)
         self.description = ""
         self.display_name = ""
-        self.api_base = os.environ.get(
-            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
-        )
+        self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
         if self.ts_mode_config:
             # If in ts_mode, populate code_files directly and set multi_metrics to True
@@ -231,7 +225,9 @@ class Evaluator:
             if not python_code:
                 raise ValueError("python_code is required in ts_mode_config")
             self.code_files[file_name] = python_code
-            self.multi_metrics = True  # ts_mode implies multiMetrics: true and specific rollup settings
+            self.multi_metrics = (
+                True  # ts_mode implies multiMetrics: true and specific rollup settings
+            )
 
     def load_metric_folder(self, metric_name, folder_path):
         """
@@ -262,7 +258,8 @@ class Evaluator:
                     # Check for main.py with evaluate function
                     if filename == "main.py" and "evaluate" not in content:
                         raise ValueError(
-                            f"main.py in {folder_path} must contain an evaluate function"
+                            f"main.py in {folder_path} must contain an "
+                            f"evaluate function"
                         )
 
         if "main.py" not in files:
@@ -273,7 +270,8 @@ class Evaluator:
             self.code_files[f"{metric_name}/{filename}"] = content
 
         logger.info(
-            f"Loaded {len(files)} Python files for metric '{metric_name}' from {folder_path}"
+            f"Loaded {len(files)} Python files for metric '{metric_name}'"
+            f" from {folder_path}"
         )
         return files
 
@@ -305,7 +303,8 @@ class Evaluator:
                     # Check for main.py with evaluate function
                     if filename == "main.py" and "evaluate" not in content:
                         raise ValueError(
-                            f"main.py in {folder_path} must contain an evaluate function"
+                            f"main.py in {folder_path} must contain an "
+                            f"evaluate function"
                         )
 
         if "main.py" not in files:
@@ -363,9 +362,7 @@ class Evaluator:
             EvaluatorPreviewResult containing the preview results
         """
         if not self.code_files:
-            raise ValueError(
-                "No code files loaded. Load metric folder(s) first."
-            )
+            raise ValueError("No code files loaded. Load metric folder(s) first.")
 
         if "main.py" not in self.code_files and not any(
             k.endswith("/main.py") for k in self.code_files
@@ -385,7 +382,8 @@ class Evaluator:
         if not account_id or not auth_token:
             logger.error(
                 "Authentication error: Missing Fireworks Account ID or API Key. "
-                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY environment variables, "
+                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY "
+                "environment variables, "
                 "or configure them in ~/.fireworks/auth.ini."
             )
             raise ValueError(
@@ -398,7 +396,7 @@ class Evaluator:
             pass  # Now handled above
         except (
             ValueError
-        ) as e:  # This specific except block might be less relevant if direct checks are made
+        ) as e:  # This except block might be less relevant if direct checks are made
             logger.error(f"Authentication error: {str(e)}")
             raise
 
@@ -427,9 +425,7 @@ class Evaluator:
         }
 
         # Make API request to preview evaluator
-        api_base = os.environ.get(
-            "FIREWORKS_API_BASE", "https://api.fireworks.ai"
-        )
+        api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
         # For dev environment, special handling for account_id
         if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
@@ -447,12 +443,8 @@ class Evaluator:
 
         # Log the request details for debugging
         logger.debug(f"Preview API Request URL: {url}")
-        logger.debug(
-            f"Preview API Request Headers: {json.dumps(headers, indent=2)}"
-        )
-        logger.debug(
-            f"Preview API Request Payload: {json.dumps(payload, indent=2)}"
-        )
+        logger.debug(f"Preview API Request Headers: {json.dumps(headers, indent=2)}")
+        logger.debug(f"Preview API Request Payload: {json.dumps(payload, indent=2)}")
 
         global used_preview_api
         try:
@@ -466,12 +458,8 @@ class Evaluator:
 
             # Convert API response to EvaluatorPreviewResult
             preview_result = EvaluatorPreviewResult()
-            preview_result.total_samples = result.get(
-                "totalSamples", len(samples)
-            )
-            preview_result.total_runtime_ms = int(
-                result.get("totalRuntimeMs", 0)
-            )
+            preview_result.total_samples = result.get("totalSamples", len(samples))
+            preview_result.total_runtime_ms = int(result.get("totalRuntimeMs", 0))
 
             # Process individual sample results
             sample_results = result.get("results", [])
@@ -487,9 +475,7 @@ class Evaluator:
 
         except Exception as e:
             logger.error(f"Error previewing evaluator: {str(e)}")
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(
-                e, "response"
-            ):
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
                 logger.error(f"Response: {e.response.text}")
 
             # Set flag to indicate fallback mode was used
@@ -518,9 +504,7 @@ class Evaluator:
             try:
                 # Sample validation
                 if "messages" not in sample:
-                    raise ValueError(
-                        f"Sample {i + 1} is missing 'messages' field"
-                    )
+                    raise ValueError(f"Sample {i + 1} is missing 'messages' field")
 
                 # We validate sample format but in this simulation we don't use these directly
                 # In a real implementation, these would be passed to the evaluate function
@@ -568,15 +552,11 @@ class Evaluator:
 
         end_time = time.time()
         # Calculate runtime in milliseconds
-        preview_result.total_runtime_ms = max(
-            1, int((end_time - start_time) * 1000)
-        )
+        preview_result.total_runtime_ms = max(1, int((end_time - start_time) * 1000))
 
         return preview_result
 
-    def create(
-        self, evaluator_id, display_name=None, description=None, force=False
-    ):
+    def create(self, evaluator_id, display_name=None, description=None, force=False):
         """
         Create the evaluation on the Fireworks platform
 
@@ -590,9 +570,7 @@ class Evaluator:
             The created evaluator object
         """
         if not self.code_files:
-            raise ValueError(
-                "No code files loaded. Load metric folder(s) first."
-            )
+            raise ValueError("No code files loaded. Load metric folder(s) first.")
 
         # Authentication
         account_id = get_fireworks_account_id()
@@ -603,7 +581,8 @@ class Evaluator:
         ):  # Simplified check, length check can be added if necessary
             logger.error(
                 "Authentication error: API credentials appear to be invalid or incomplete. "
-                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY environment variables, "
+                "Please set FIREWORKS_ACCOUNT_ID and FIREWORKS_API_KEY "
+                "environment variables, "
                 "or configure them in ~/.fireworks/auth.ini."
             )
             raise ValueError(
@@ -626,9 +605,7 @@ class Evaluator:
 
         # Set display name and description
         self.display_name = display_name or evaluator_id
-        self.description = (
-            description or f"Evaluator created from {evaluator_id}"
-        )
+        self.description = description or f"Evaluator created from {evaluator_id}"
 
         # Always use the new API payload format
 
@@ -648,10 +625,7 @@ class Evaluator:
 
         # Make API request to create evaluator
         # For dev environment, special handling for account_id
-        if (
-            "dev.api.fireworks.ai" in self.api_base
-            and account_id == "fireworks"
-        ):
+        if "dev.api.fireworks.ai" in self.api_base and account_id == "fireworks":
             account_id = "pyroworks-dev"  # Default dev account
 
         base_url = f"{self.api_base}/v1/accounts/{account_id}/evaluators"
@@ -696,9 +670,7 @@ class Evaluator:
                                     f"Unable to delete evaluator '{evaluator_id}', status: {delete_response.status_code}"
                                 )
                         except Exception as e:
-                            logger.warning(
-                                f"Error deleting evaluator: {str(e)}"
-                            )
+                            logger.warning(f"Error deleting evaluator: {str(e)}")
 
                         # Now create it
                         response = requests.post(
@@ -711,14 +683,10 @@ class Evaluator:
                         )
                 except requests.exceptions.RequestException:
                     # If checking fails, try to create it
-                    response = requests.post(
-                        base_url, json=payload, headers=headers
-                    )
+                    response = requests.post(base_url, json=payload, headers=headers)
             else:
                 # Just try to create it
-                response = requests.post(
-                    base_url, json=payload, headers=headers
-                )
+                response = requests.post(base_url, json=payload, headers=headers)
 
             response.raise_for_status()
             result = response.json()
@@ -727,9 +695,7 @@ class Evaluator:
             return result
         except Exception as e:
             logger.error(f"Error creating evaluator: {str(e)}")
-            if isinstance(e, requests.exceptions.HTTPError) and hasattr(
-                e, "response"
-            ):
+            if isinstance(e, requests.exceptions.HTTPError) and hasattr(e, "response"):
                 logger.error(f"Response: {e.response.text}")
             raise
 
@@ -773,9 +739,7 @@ class Evaluator:
                 # Skip files that aren't Python
                 if not filename.endswith(".py"):
                     continue
-                file_contents[filename] = self._update_evaluate_signature(
-                    content
-                )
+                file_contents[filename] = self._update_evaluate_signature(content)
 
             assertions.append(
                 {
@@ -785,8 +749,7 @@ class Evaluator:
                     },
                     "name": "eval",  # Default name for multi-metric criterion
                     "type": "CODE_SNIPPETS",
-                    "description": self.description
-                    or "Multi-metric evaluation",
+                    "description": self.description or "Multi-metric evaluation",
                 }
             )
         else:
@@ -800,9 +763,7 @@ class Evaluator:
                             simple_name = k.split("/", 1)[1]
                         else:
                             simple_name = k  # Fallback if no slash
-                        file_contents[simple_name] = (
-                            self._update_evaluate_signature(v)
-                        )
+                        file_contents[simple_name] = self._update_evaluate_signature(v)
 
                 if not file_contents:  # Skip if no files found for this metric
                     logger.warning(
@@ -847,14 +808,14 @@ class Evaluator:
 
         # Simple regex to match the old evaluate function signature
         old_pattern = r"def\s+evaluate\s*\(\s*entry\s*(?::\s*dict)?\s*\)"
-        new_signature = "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        new_signature = (
+            "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        )
 
         # Check if the old pattern exists
         if re.search(old_pattern, content):
             # Replace the old signature with the new one
-            updated_content = re.sub(
-                old_pattern, new_signature, content, count=1
-            )
+            updated_content = re.sub(old_pattern, new_signature, content, count=1)
 
             # Also add a compatibility layer at the beginning of the function
             compat_layer = """
@@ -907,9 +868,7 @@ class Evaluator:
                 continue
 
             # Add file as a section
-            simple_name = (
-                filename.split("/")[-1] if "/" in filename else filename
-            )
+            simple_name = filename.split("/")[-1] if "/" in filename else filename
             updated_content = self._update_evaluate_signature(content)
             code_parts.append(f"# From {simple_name}\n{updated_content}\n\n")
 
@@ -1107,9 +1066,7 @@ def preview_evaluation(
                 f"Using HuggingFace dataset: {huggingface_dataset}"
             )
 
-        logger.info(
-            f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}"
-        )
+        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
         sample_file = huggingface_dataset_to_jsonl(
             dataset_name=huggingface_dataset,
             split=huggingface_split,
@@ -1121,9 +1078,7 @@ def preview_evaluation(
         logger.info(f"Converted dataset saved to: {sample_file}")
 
     if not sample_file:
-        raise ValueError(
-            "Either sample_file or huggingface_dataset must be specified"
-        )
+        raise ValueError("Either sample_file or huggingface_dataset must be specified")
 
     return evaluator.preview(sample_file, max_samples)
 
@@ -1178,9 +1133,7 @@ def preview_folder_evaluation(
         # Look for a structure that suggests multi-metrics
         py_files = list(Path(evaluator_folder).glob("*.py"))
         if len(py_files) > 1:
-            logger.info(
-                "Auto-detecting multi-metrics mode based on folder structure"
-            )
+            logger.info("Auto-detecting multi-metrics mode based on folder structure")
             multi_metrics = True
 
     # Create and load evaluator
@@ -1221,9 +1174,7 @@ def preview_folder_evaluation(
                 f"Using HuggingFace dataset: {huggingface_dataset}"
             )
 
-        logger.info(
-            f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}"
-        )
+        logger.info(f"Converting HuggingFace dataset to JSONL: {huggingface_dataset}")
         sample_file = huggingface_dataset_to_jsonl(
             dataset_name=huggingface_dataset,
             split=huggingface_split,
@@ -1235,9 +1186,7 @@ def preview_folder_evaluation(
         logger.info(f"Converted dataset saved to: {sample_file}")
 
     if not sample_file:
-        raise ValueError(
-            "Either sample_file or huggingface_dataset must be specified"
-        )
+        raise ValueError("Either sample_file or huggingface_dataset must be specified")
 
     # Run the preview
     return evaluator.preview(sample_file, max_samples)
@@ -1401,9 +1350,7 @@ def deploy_folder_evaluation(
         # Look for a structure that suggests multi-metrics
         py_files = list(Path(evaluator_folder).glob("*.py"))
         if len(py_files) > 1:
-            logger.info(
-                "Auto-detecting multi-metrics mode based on folder structure"
-            )
+            logger.info("Auto-detecting multi-metrics mode based on folder structure")
             multi_metrics = True
 
     # Default display name if not provided

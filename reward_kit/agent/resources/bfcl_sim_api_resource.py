@@ -1,6 +1,6 @@
 import copy
 import importlib
-import sys
+
 from pathlib import Path
 
 # Import BFCL File and Directory for isinstance checks from local implementation
@@ -38,17 +38,13 @@ class BFCLSimAPIResource(ForkableResource):
             "content": file_obj.content,
         }
 
-    def _serialize_bfcl_directory(
-        self, dir_obj: BFCLDirectory
-    ) -> Dict[str, Any]:
+    def _serialize_bfcl_directory(self, dir_obj: BFCLDirectory) -> Dict[str, Any]:
         """Serializes a BFCL Directory object into a canonical dictionary."""
         serialized_contents: Dict[str, Any] = {}
         # Sort keys for canonical representation, crucial for reliable comparison
         for item_name, item_value in sorted(dir_obj.contents.items()):
             if BFCL_TYPES_AVAILABLE and isinstance(item_value, BFCLFile):
-                serialized_contents[item_name] = self._serialize_bfcl_file(
-                    item_value
-                )
+                serialized_contents[item_name] = self._serialize_bfcl_file(item_value)
             elif BFCL_TYPES_AVAILABLE and isinstance(item_value, BFCLDirectory):
                 serialized_contents[item_name] = self._serialize_bfcl_directory(
                     item_value
@@ -87,9 +83,7 @@ class BFCLSimAPIResource(ForkableResource):
                 instance = class_()
 
                 if class_name not in self.STATELESS_CLASSES:
-                    class_initial_config = initial_config_data.get(
-                        class_name, {}
-                    )
+                    class_initial_config = initial_config_data.get(class_name, {})
                     instance._load_scenario(copy.deepcopy(class_initial_config))
 
                 self._env_instances[class_name] = instance
@@ -119,9 +113,7 @@ class BFCLSimAPIResource(ForkableResource):
         # Restore state from the provided state_data using _set_comparable_state
         self._set_comparable_state(state_data)
 
-    async def step(
-        self, action_name: str, action_params: Dict[str, Any]
-    ) -> Any:
+    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """Executes a named action with given parameters on the resource."""
         # Find the correct environment instance and call the method
         for instance in self._env_instances.values():
@@ -144,9 +136,7 @@ class BFCLSimAPIResource(ForkableResource):
                     return result
                 except Exception as e:
                     return {"error": f"Error executing tool {action_name}: {e}"}
-        return {
-            "error": f"Tool {action_name} not found in available resources."
-        }
+        return {"error": f"Tool {action_name} not found in available resources."}
 
     async def get_observation(self) -> Dict[str, Any]:
         """Returns the current observable state of the resource for the agent."""
@@ -205,18 +195,12 @@ class BFCLSimAPIResource(ForkableResource):
                 # Serialize other public attributes normally
                 for attr_name, value in vars(instance).items():
                     if not attr_name.startswith("_") and attr_name != "root":
-                        if BFCL_TYPES_AVAILABLE and isinstance(
-                            value, BFCLDirectory
-                        ):
-                            instance_state[attr_name] = (
-                                self._serialize_bfcl_directory(value)
+                        if BFCL_TYPES_AVAILABLE and isinstance(value, BFCLDirectory):
+                            instance_state[attr_name] = self._serialize_bfcl_directory(
+                                value
                             )
-                        elif BFCL_TYPES_AVAILABLE and isinstance(
-                            value, BFCLFile
-                        ):
-                            instance_state[attr_name] = (
-                                self._serialize_bfcl_file(value)
-                            )
+                        elif BFCL_TYPES_AVAILABLE and isinstance(value, BFCLFile):
+                            instance_state[attr_name] = self._serialize_bfcl_file(value)
                         else:
                             try:
                                 json.dumps(value)
@@ -229,18 +213,12 @@ class BFCLSimAPIResource(ForkableResource):
                 for attr_name, value in vars(instance).items():
                     if not attr_name.startswith("_"):
                         # Check if value is an instance of BFCLDirectory or BFCLFile first
-                        if BFCL_TYPES_AVAILABLE and isinstance(
-                            value, BFCLDirectory
-                        ):
-                            instance_state[attr_name] = (
-                                self._serialize_bfcl_directory(value)
+                        if BFCL_TYPES_AVAILABLE and isinstance(value, BFCLDirectory):
+                            instance_state[attr_name] = self._serialize_bfcl_directory(
+                                value
                             )
-                        elif BFCL_TYPES_AVAILABLE and isinstance(
-                            value, BFCLFile
-                        ):
-                            instance_state[attr_name] = (
-                                self._serialize_bfcl_file(value)
-                            )
+                        elif BFCL_TYPES_AVAILABLE and isinstance(value, BFCLFile):
+                            instance_state[attr_name] = self._serialize_bfcl_file(value)
                         else:
                             try:
                                 json.dumps(value)
@@ -363,9 +341,7 @@ class BFCLSimAPIResource(ForkableResource):
                         schema["parameters"]["required"].append(name)
                     continue  # Skip default property assignment
                 else:
-                    json_type = type_mapping.get(
-                        param_type_annotation, "string"
-                    )
+                    json_type = type_mapping.get(param_type_annotation, "string")
 
             schema["parameters"]["properties"][name] = {"type": json_type}
             if param.default == inspect.Parameter.empty:

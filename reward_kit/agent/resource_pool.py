@@ -86,9 +86,7 @@ class ResourcePool:
         """
         return self.resources.get(resource_id)
 
-    def _associate_task_with_resource(
-        self, task_id: str, resource_id: str
-    ) -> None:
+    def _associate_task_with_resource(self, task_id: str, resource_id: str) -> None:
         """
         Associate a task with a resource for tracking purposes.
 
@@ -112,9 +110,7 @@ class ResourcePool:
             self.task_resources[task_id] = set()
         self.task_resources[task_id].add(resource_id)
 
-        self.logger.debug(
-            f"Associated task '{task_id}' with resource '{resource_id}'."
-        )
+        self.logger.debug(f"Associated task '{task_id}' with resource '{resource_id}'.")
 
     async def fork_resource_for_task(
         self, resource_id: str, task_id: str
@@ -131,18 +127,14 @@ class ResourcePool:
         """
         base_resource = self.get_resource(resource_id)
         if not base_resource:
-            self.logger.error(
-                f"Cannot fork non-existent resource '{resource_id}'."
-            )
+            self.logger.error(f"Cannot fork non-existent resource '{resource_id}'.")
             return None
 
         try:
             forked_resource = await base_resource.fork()
             # We don't track forked resources in the pool, as they are typically
             # short-lived and managed by the Orchestrator
-            self.logger.debug(
-                f"Forked resource '{resource_id}' for task '{task_id}'."
-            )
+            self.logger.debug(f"Forked resource '{resource_id}' for task '{task_id}'.")
             return forked_resource
         except Exception as e:
             self.logger.error(
@@ -183,9 +175,7 @@ class ResourcePool:
             resource_id: The identifier of the resource to close
         """
         if resource_id not in self.resources:
-            self.logger.debug(
-                f"Cannot close non-existent resource '{resource_id}'."
-            )
+            self.logger.debug(f"Cannot close non-existent resource '{resource_id}'.")
             return
 
         resource = self.resources[resource_id]
@@ -193,9 +183,7 @@ class ResourcePool:
             await resource.close()
             self.resources.pop(resource_id)
             self.resource_tasks.pop(resource_id, None)
-            self.logger.info(
-                f"Closed and removed resource '{resource_id}' from pool."
-            )
+            self.logger.info(f"Closed and removed resource '{resource_id}' from pool.")
         except Exception as e:
             self.logger.error(f"Error closing resource '{resource_id}': {e}")
 

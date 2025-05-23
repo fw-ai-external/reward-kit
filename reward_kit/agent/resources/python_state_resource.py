@@ -64,9 +64,7 @@ class PythonStateResource(ForkableResource):
         """
         self._state = pickle.loads(state_data)
 
-    async def step(
-        self, action_name: str, action_params: Dict[str, Any]
-    ) -> Any:
+    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
         Executes a named action with given parameters on the resource.
 
@@ -93,9 +91,7 @@ class PythonStateResource(ForkableResource):
         elif action_name == "get_value":
             key = action_params.get("key")
             if key is None:
-                raise ValueError(
-                    "Missing 'key' in action_params for 'get_value'"
-                )
+                raise ValueError("Missing 'key' in action_params for 'get_value'")
             return self._state.get(key)
         else:
             raise NotImplementedError(

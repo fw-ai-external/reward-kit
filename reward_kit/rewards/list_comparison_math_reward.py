@@ -29,9 +29,7 @@ def parse_number_list_from_string(s: str) -> Optional[List[float]]:
 
     for part in parts:
         part = part.strip()
-        if (
-            not part
-        ):  # Skip empty strings resulting from multiple commas, e.g. "1,,2"
+        if not part:  # Skip empty strings resulting from multiple commas, e.g. "1,,2"
             continue
         try:
             # Attempt to convert to float. Handles integers and decimals.
@@ -66,9 +64,7 @@ def extract_number_list(text: str) -> List[List[float]]:
             parsed_list = parse_number_list_from_string(content)
             if parsed_list:
                 extracted_lists.append(parsed_list)
-        if (
-            extracted_lists
-        ):  # If any list found in boxed expressions, return them
+        if extracted_lists:  # If any list found in boxed expressions, return them
             return extracted_lists
 
     # Priority 2: Content within $...$ or $$...$$
@@ -83,9 +79,7 @@ def extract_number_list(text: str) -> List[List[float]]:
                 parsed_list = parse_number_list_from_string(content.strip())
                 if parsed_list:
                     extracted_lists.append(parsed_list)
-        if (
-            extracted_lists
-        ):  # If any list found in dollar expressions, return them
+        if extracted_lists:  # If any list found in dollar expressions, return them
             return extracted_lists
 
     # Priority 3: Try parsing the whole text as a list if no delimiters found
@@ -100,9 +94,7 @@ def extract_number_list(text: str) -> List[List[float]]:
 
 @reward_function  # type: ignore[arg-type]
 def list_comparison_math_reward(
-    messages: List[
-        Message
-    ],  # Full conversation, model's response is messages[-1]
+    messages: List[Message],  # Full conversation, model's response is messages[-1]
     *,  # Make subsequent parameters keyword-only
     ground_truth: str,  # String representation of the expected list of numbers
     order_matters: bool = False,
@@ -147,7 +139,9 @@ def list_comparison_math_reward(
         )
 
     gen_content = messages[-1].content
-    orig_content = ground_truth  # The new ground_truth parameter is the expected list string
+    orig_content = (
+        ground_truth  # The new ground_truth parameter is the expected list string
+    )
 
     if not gen_content:  # Model's response content is empty
         return EvaluateResult(

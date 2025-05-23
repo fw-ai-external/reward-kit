@@ -66,10 +66,7 @@ def json_schema_reward(
         content_text = ""  # Initialize to handle cases where content might be None or role isn't assistant
 
         if isinstance(last_message, Message):
-            if (
-                last_message.role == "assistant"
-                and last_message.content is not None
-            ):
+            if last_message.role == "assistant" and last_message.content is not None:
                 content_text = last_message.content
             else:  # Not an assistant message or no content
                 return EvaluateResult(
@@ -140,7 +137,9 @@ def json_schema_reward(
                 pass
 
         if extracted_json_str:
-            json_content = extracted_json_str  # Update json_content if successfully extracted
+            json_content = (
+                extracted_json_str  # Update json_content if successfully extracted
+            )
 
         if (
             not json_content
@@ -239,9 +238,7 @@ def json_schema_reward(
     comparison_details = []
 
     if matching_props:
-        comparison_details.append(
-            f"Matching properties ({len(matching_props)}):"
-        )
+        comparison_details.append(f"Matching properties ({len(matching_props)}):")
         for prop, prop_type in sorted(matching_props):
             comparison_details.append(f"  - {prop}: {prop_type}")
 
@@ -267,16 +264,12 @@ def json_schema_reward(
     final_score = schema_similarity
     final_reason = f"Final score based on schema similarity: {final_score:.2f}."
 
-    return EvaluateResult(
-        score=final_score, reason=final_reason, metrics=metrics
-    )
+    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
 
 
 def json_schema_reward_with_llm_judge(
     messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[
-        Union[List[Message], List[Dict[str, Any]]]
-    ] = None,  # Added
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -515,9 +508,7 @@ EXPLANATION: [your detailed explanation]
     schema_weight = normalized_weights.get("schema", 0.7)
     llm_weight = normalized_weights.get("llm", 0.3)
 
-    final_score = (schema_result.score * schema_weight) + (
-        llm_score * llm_weight
-    )
+    final_score = (schema_result.score * schema_weight) + (llm_score * llm_weight)
     final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_score:.2f} * {llm_weight:.2f})."
 
     # Add weight information

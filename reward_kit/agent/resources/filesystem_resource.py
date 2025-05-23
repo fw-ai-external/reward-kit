@@ -81,7 +81,7 @@ class FileSystemResource(ForkableResource):
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             with open(abs_path, "w", encoding="utf-8") as f:
                 f.write(content)
-        # print(f"FileSystemResource setup. Base dir: {self._base_managed_dir_path}")
+
 
     async def fork(self) -> "FileSystemResource":
         """
@@ -111,7 +111,7 @@ class FileSystemResource(ForkableResource):
             None  # Or perhaps self._managed_dir_path?
         )
 
-        # print(f"FileSystemResource forked. New dir: {forked_resource._managed_dir_path} from {self._managed_dir_path}")
+
         return forked_resource
 
     async def checkpoint(self) -> Dict[str, Any]:
@@ -130,7 +130,7 @@ class FileSystemResource(ForkableResource):
             # Add files relative to the managed_dir_path so they extract correctly
             tar.add(str(self._managed_dir_path), arcname=".")
 
-        # print(f"FileSystemResource checkpointed. Dir: {self._managed_dir_path} to {checkpoint_path}")
+
         return {"type": "filesystem_tar_gz", "checkpoint_path": str(checkpoint_path)}
 
     async def restore(self, state_data: Dict[str, Any]) -> None:
@@ -160,7 +160,7 @@ class FileSystemResource(ForkableResource):
 
         # The restored state becomes the new "base" for subsequent forks from this instance
         # self._base_managed_dir_path = self._managed_dir_path
-        # print(f"FileSystemResource restored. Dir: {self._managed_dir_path} from {checkpoint_path}")
+
 
     # _resolve_path is a synchronous helper, no need to make it async unless it performs async I/O
     def _resolve_path(self, rel_path: Union[str, Path]) -> Path:
@@ -401,7 +401,6 @@ class FileSystemResource(ForkableResource):
         if self._managed_dir_path and self._managed_dir_path.exists():
             try:
                 shutil.rmtree(self._managed_dir_path)
-                # print(f"FileSystemResource closed. Deleted dir: {self._managed_dir_path}")
             except OSError as e:
                 print(f"Error deleting managed directory {self._managed_dir_path}: {e}")
 

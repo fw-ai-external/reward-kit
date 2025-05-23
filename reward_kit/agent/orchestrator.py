@@ -7,11 +7,11 @@ Manages the lifecycle of a task using ForkableResources.
 import asyncio
 import importlib
 import inspect
-import json  # Add json import
+import json
 import logging
-import os  # Add os import
+import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, cast
-from unittest.mock import AsyncMock  # Add this import
+from unittest.mock import AsyncMock
 
 # Attempt to import OpenAI client
 try:
@@ -50,11 +50,11 @@ except ImportError:
 # Max steps for the inner loop within a single user turn
 MAX_STEPS_PER_USER_TURN = 10
 
-from ..models import Message, TaskDefinitionModel  # Import Message model
+from ..models import Message, TaskDefinitionModel
 from .resource_abc import ForkableResource
 
 # Import specific resource types for type checking if needed, or handle dynamically
-from .resources import (  # Import BFCLSimAPIResource
+from .resources import (
     BFCLSimAPIResource,
     DockerResource,
     FileSystemResource,
@@ -241,7 +241,7 @@ class Orchestrator:
             "SQLResource": SQLResource,
             "FileSystemResource": FileSystemResource,
             "DockerResource": DockerResource,
-            "BFCLSimAPIResource": BFCLSimAPIResource,  # Add BFCLSimAPIResource to mapping
+            "BFCLSimAPIResource": BFCLSimAPIResource,
         }
         resource_class = mapping.get(resource_type_name)
 
@@ -284,7 +284,7 @@ class Orchestrator:
             resource_tool_specs = await episode_resource.get_tools_spec()
             self.logger.debug(
                 f"Raw tool specs from resource.get_tools_spec(): {resource_tool_specs}"
-            )  # <-- ADDED DEBUG LOG
+            )
             for tool_spec in resource_tool_specs:
                 # Corrected logic based on BFCLSimAPIResource._infer_schema_from_method output
                 tool_name = tool_spec.get("name")  # Get name directly from spec root
@@ -580,7 +580,7 @@ class Orchestrator:
                                         )  # Fallback to original if parsing fails partially
                                         break  # Stop processing sub-messages for this turn
                                 else:  # If loop completed without break
-                                    pass  # Successfully processed all sub-messages
+                                    pass
                             else:  # Content is a JSON string but not a list
                                 conversation_messages.append(current_user_turn_message)
                         else:  # Content is not a string or already a complex object
@@ -868,17 +868,6 @@ class Orchestrator:
 
             # TODO: Re-evaluate how task_achieved should be determined without PoC logic
             # Maybe based on final observation, specific tool calls, or reward function logic itself?
-
-            # Log evaluation_criteria and its relevant fields before calling reward function
-            self.logger.debug(f"Evaluation criteria object: {eval_criteria}")
-            if eval_criteria:
-                self.logger.debug(
-                    f"Evaluation criteria ground_truth_function_calls: {getattr(eval_criteria, 'ground_truth_function_calls', 'AttributeError or None')}"
-                )
-                self.logger.debug(
-                    f"Evaluation criteria ground_truth_comparable_state: {getattr(eval_criteria, 'ground_truth_comparable_state', 'AttributeError or None')}"
-                )
-
             # Prepare ground_truth dictionary for the reward function
             ground_truth_for_reward = None
             if eval_criteria:

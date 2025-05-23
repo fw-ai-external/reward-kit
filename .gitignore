@@ -199,7 +199,8 @@ examples/math_example/math_grpo_trainer_output_qwen/
 # You can add other patterns here as needed, for example:
 # __pycache__/
 # *.pyc
-# .env
+.env.dev
+.env
 # /venv/
 # /build/
 # /dist/

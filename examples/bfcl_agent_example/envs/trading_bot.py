@@ -1,7 +1,7 @@
 import random
 from copy import deepcopy
 from datetime import datetime, time, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from .long_context import (
     AUTOMOBILE_EXTENSION,
@@ -622,7 +622,7 @@ class TradingBot:
         current_watch_list = list(self.watch_list)  # Create a copy
         if self.long_context:
             # WATCH_LIST_EXTENSION is List[str]
-            current_watch_list.extend(WATCH_LIST_EXTENSION)
+            current_watch_list.extend(cast(List[str], WATCH_LIST_EXTENSION))
         return {"watchlist": current_watch_list}
 
     def get_order_history(
@@ -690,7 +690,12 @@ class TradingBot:
 
         if self.long_context:
             # Assuming TRANSACTION_HISTORY_EXTENSION items are correctly typed
-            final_history.extend(TRANSACTION_HISTORY_EXTENSION)
+            final_history.extend(
+                cast(
+                    List[Dict[str, Union[str, float, int]]],
+                    TRANSACTION_HISTORY_EXTENSION,
+                )
+            )
 
         return {"transaction_history": final_history}
 
@@ -716,9 +721,10 @@ class TradingBot:
 
         old_price = self.stocks[symbol]["price"]
         self.stocks[symbol]["price"] = new_price
-        self.stocks[symbol]["percent_change"] = (
-            (new_price - old_price) / old_price
-        ) * 100
+        old_price = self._ensure_numeric(old_price)
+        new_price = self._ensure_numeric(new_price)
+        percent_change = ((new_price / old_price) - 1) * 100
+        self.stocks[symbol]["percent_change"] = percent_change
 
         return {"symbol": symbol, "old_price": old_price, "new_price": new_price}
 
@@ -739,8 +745,8 @@ class TradingBot:
         }
 
         if self.long_context:
-            sector_map["Technology"].extend(TECHNOLOGY_EXTENSION)
-            sector_map["Automobile"].extend(AUTOMOBILE_EXTENSION)
+            sector_map["Technology"].extend(cast(List[str], TECHNOLOGY_EXTENSION))
+            sector_map["Automobile"].extend(cast(List[str], AUTOMOBILE_EXTENSION))
         return {"stock_list": sector_map.get(sector, [])}
 
     def filter_stocks_by_price(
@@ -760,8 +766,10 @@ class TradingBot:
         filtered_stocks = [
             symbol
             for symbol in stocks
-            if self.stocks.get(symbol, {}).get("price", 0) >= min_price
-            and self.stocks.get(symbol, {}).get("price", 0) <= max_price
+            if self._ensure_numeric(self.stocks.get(symbol, {}).get("price", 0))
+            >= min_price
+            and self._ensure_numeric(self.stocks.get(symbol, {}).get("price", 0))
+            <= max_price
         ]
         return {"filtered_stocks": filtered_stocks}
 
@@ -803,7 +811,8 @@ class TradingBot:
             symbol
             for symbol in stocks
             if symbol in self.stocks
-            and abs(self.stocks[symbol]["percent_change"]) >= threshold
+            and abs(self._ensure_numeric(self.stocks[symbol]["percent_change"]))
+            >= self._ensure_numeric(threshold)
         ]
 
         if changed_stocks:
@@ -814,3 +823,8 @@ class TradingBot:
             return {
                 "notification": "No significant price changes in the selected stocks."
             }
+
+    def _ensure_numeric(self, value: Union[float, int, str]) -> float:
+        if isinstance(value, str):
+            return float(value)
+        return float(value)

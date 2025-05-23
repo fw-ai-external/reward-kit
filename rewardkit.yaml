@@ -1,0 +1,11 @@
+default_deployment_target: fireworks
+gcp_cloud_run:
+  service_name_template: rewardeval-{evaluator_id}
+  default_auth_mode: api-key
+  secrets: {}
+aws_lambda:
+  function_name_template: rewardeval-{evaluator_id}
+  default_auth_mode: api-key
+  secrets: {}
+evaluator_endpoint_keys:
+  gcp-dummy-eval-01: H6PClBuy2f1dKiA656wxPlA5ENee7IuySINPMl19UpI

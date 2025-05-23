@@ -285,7 +285,7 @@ def test_standalone_reward():
 
     # Verify result
     assert result.score == 1.0
-    assert "good" in result.reason
+    assert result.reason is not None and "good" in result.reason
 
 
 if __name__ == "__main__":

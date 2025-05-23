@@ -162,3 +162,23 @@ def get_fireworks_account_id() -> Optional[str]:
 
     logger.debug("Fireworks Account ID not found in environment variables or auth.ini.")
     return None
+
+
+def get_fireworks_api_base() -> str:
+    """
+    Retrieves the Fireworks API base URL.
+
+    The base URL is sourced from the FIREWORKS_API_BASE environment variable.
+    If not set, it defaults to "https://api.fireworks.ai".
+
+    Returns:
+        The API base URL.
+    """
+    api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+    if os.environ.get("FIREWORKS_API_BASE"):
+        logger.debug("Using FIREWORKS_API_BASE from environment variable.")
+    else:
+        logger.debug(
+            f"FIREWORKS_API_BASE not set in environment, defaulting to {api_base}."
+        )
+    return api_base

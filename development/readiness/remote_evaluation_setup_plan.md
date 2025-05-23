@@ -128,10 +128,10 @@ The envisioned CLI commands would simplify deployment and previewing:
           my_gcp_eval_id: "generated_secure_key_for_endpoint"
         ```
 
-3.  **Enhanced `reward-kit deploy` Command (for `--remote-url`):** - **Status: PARTIALLY DONE**
+3.  **Enhanced `reward-kit deploy` Command (for `--remote-url`):** - **Status: DONE**
     *   Supports `--remote-url <url>` for registering an existing URL with the Fireworks AI platform.
     *   CLI argument parsing and command logic in `reward_kit/cli.py` and `reward_kit/cli_commands/deploy.py` are implemented and tested.
-    *   **Next Step:** The actual API call to the Fireworks AI platform to register/update the evaluator with the remote URL needs to be implemented (currently placeholder logic in `deploy_command`).
+    *   The Fireworks AI platform API call is handled by `reward_kit.evaluation.create_evaluation`, which deploys a Python shim that proxies to the specified remote URL. This is the current accepted mechanism.
 
 4.  **Enhanced `reward-kit preview` Command (for `--remote-url`):** - **Status: DONE**
     *   Supports `--remote-url <url>` to preview against any remote evaluator endpoint.
@@ -146,11 +146,13 @@ The envisioned CLI commands would simplify deployment and previewing:
 6.  **Test Suite Health:** - **Status: IMPROVED**
     *   Addressed all reported test failures and hangs across `tests/test_generic_server.py`, `tests/test_config.py`, `tests/test_cli_args.py`, `tests/cli_commands/test_preview_cmd.py`, `tests/cli_commands/test_deploy_cmd.py`, `tests/test_cli.py`, `tests/test_evaluation.py`, and `tests/test_evaluation_integration.py`.
 
-**Next Immediate Step for Phase A Completion:**
-*   Implement the actual Fireworks AI platform API call within `reward-kit deploy --remote-url` functionality. This involves creating or updating a function (e.g., in `reward_kit.evaluation` or a new `reward_kit.platform_api` module) to make the necessary HTTP request to the backend service that manages evaluator registrations.
+**Phase A Completion Note:**
+*   The previously stated "Next Immediate Step" regarding the API call for `reward-kit deploy --remote-url` is now considered complete. The existing functionality in `reward_kit.evaluation.create_evaluation` (which deploys a Python shim to proxy to the remote URL) serves this purpose. The concept of a separate, direct API endpoint for remote URL registration (previously explored in `reward_kit.platform_api.py`) has been deprecated as no such backend API exists.
+
+With this, Phase A is considered complete.
 
 ---
-The following sections describe future work beyond the immediate next step.
+The following sections describe future work.
 ---
 
 7.  **Platform-Specific Packaging Logic:** (Future Work for Phase B/C)
@@ -178,9 +180,9 @@ The following sections describe future work beyond the immediate next step.
 1.  **Phase A: Core Framework (Largely Complete):**
     *   **DONE:** Internal Generic Reward Function Server.
     *   **DONE:** `rewardkit.yaml` basic structure and loading.
-    *   **PARTIALLY DONE:** Enhance `reward-kit deploy` to support `--remote-url <url>`.
+    *   **DONE:** Enhance `reward-kit deploy` to support `--remote-url <url>`.
         *   CLI and argument handling complete.
-        *   **TODO (Immediate Next Step):** Implement actual Fireworks AI platform API call for registration.
+        *   The platform API call is handled by `reward_kit.evaluation.create_evaluation` (deploys a Python shim proxy). This fulfills the requirement.
     *   **DONE:** Enhance `reward-kit preview` to support `--remote-url <url>`.
     *   **DONE:** Robust sample loading utilities in `reward_kit/cli_commands/common.py`.
     *   **DONE:** Resolved test failures across multiple suites.

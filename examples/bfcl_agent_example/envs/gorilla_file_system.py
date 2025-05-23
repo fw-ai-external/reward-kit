@@ -214,7 +214,7 @@ class GorillaFileSystem:
         """Helper to recursively copy a file or directory."""
         name_to_use = new_name if new_name is not None else item.name
         if isinstance(item, File):
-            return File(name=name_to_use, content=item.content, parent=new_parent)
+            return File(name=name_to_use, content=item.content, parent=new_parent)  # type: ignore[arg-type]
         elif isinstance(item, Directory):
             new_dir = Directory(name=name_to_use, parent=new_parent)
             new_contents: Dict[str, Union[File, "Directory"]] = {}

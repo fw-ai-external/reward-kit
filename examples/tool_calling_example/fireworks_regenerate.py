@@ -11,9 +11,6 @@ import time  # For potential rate limiting
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from reward_kit.evaluation import (  # Assuming this is the entry point for single evaluations
-    evaluate_chat_messages,
-)
 from reward_kit.rewards.function_calling import (  # Our updated reward function
     composite_function_call_reward,
 )

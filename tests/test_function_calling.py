@@ -32,10 +32,13 @@ class TestFunctionCalling:
         parsed_args = {"location": "New York", "unit": "celsius"}
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -69,10 +72,13 @@ class TestFunctionCalling:
         parsed_args = {"location": "New York", "unit": "celsius"}
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -116,10 +122,13 @@ class TestFunctionCalling:
         }
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -162,10 +171,13 @@ class TestFunctionCalling:
         }
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -208,10 +220,13 @@ class TestFunctionCalling:
         }
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -249,10 +264,13 @@ class TestFunctionCalling:
         }
 
         result = match_function_call(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                {"role": "assistant", "content": "Let me check the weather."},
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    {"role": "assistant", "content": "Let me check the weather."},
+                ],
+            ),
             # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
@@ -368,16 +386,20 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
             # expected_schema is no longer used by the delegated function
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 1.0" in result.reason
 
     def test_schema_jaccard_reward_mismatch(self):
@@ -411,14 +433,18 @@ class TestFunctionCalling:
         }
 
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 0.0" in result.reason
 
     def test_schema_jaccard_reward_wrong_function_name(self):
@@ -451,14 +477,18 @@ class TestFunctionCalling:
             ]
         }
         result = schema_jaccard_reward(
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 0.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 0.0" in result.reason
 
     def test_nested_schema_exact_match(self):  # Renamed for clarity
@@ -503,14 +533,18 @@ class TestFunctionCalling:
             ]
         }
         result = schema_jaccard_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "Create a user for John Doe"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "Create a user for John Doe"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
         )
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 1.0" in result.reason
 
     # Remove @patch for OpenAI as llm_judge_reward now delegates
@@ -545,17 +579,20 @@ class TestFunctionCalling:
         }
 
         result = llm_judge_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
             # Other params like expected_schema, expected_behavior, openai_api_key are no longer used by the core logic
-
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 1.0" in result.reason
         # Ensure no LLM-specific metrics are present if the delegation is clean
         assert "llm_judge" not in result.metrics
@@ -592,17 +629,20 @@ class TestFunctionCalling:
         }
 
         result = composite_function_call_reward(  # This now calls exact_tool_match_reward
-            messages=[
-                {"role": "user", "content": "What's the weather?"},
-                assistant_message_content_with_tool_call,
-            ],
+            messages=cast(
+                List[Dict[str, Any]],
+                [
+                    {"role": "user", "content": "What's the weather?"},
+                    assistant_message_content_with_tool_call,
+                ],
+            ),
             ground_truth=ground_truth_data,
             # Other params like expected_schema, expected_behavior, weights are no longer used by the core logic
-
         )
 
         assert isinstance(result, EvaluateResult)
         assert result.score == 1.0
+        assert isinstance(result.reason, str)
         assert "Exact tool match evaluation score: 1.0" in result.reason
         # Ensure no composite-specific metrics (like schema_score, llm_score, weights) are present
         assert "schema_score" not in result.metrics

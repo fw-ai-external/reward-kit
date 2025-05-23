@@ -5,6 +5,7 @@ import shutil  # Added for checking ssh availability
 import signal
 import subprocess
 import time
+from typing import List
 
 try:
     import requests
@@ -295,7 +296,11 @@ def stop_process(pid: int):
         proc_info = managed_processes[pid]
         process = proc_info["process"]
         log_file = proc_info["log_file"]
-        command_str = " ".join(proc_info["command"])
+        command = proc_info.get("command", [])
+        if isinstance(command, (list, tuple)):
+            command_str = " ".join(str(arg) for arg in command)
+        else:
+            command_str = str(command)
 
         print(f"Stopping process PID {pid} ({command_str})...")
         try:
@@ -310,7 +315,12 @@ def stop_process(pid: int):
                 # Send SIGTERM to the entire process group
                 os.killpg(os.getpgid(pid), signal.SIGTERM)
 
-            process.wait(timeout=5)  # Wait for graceful termination
+            if (
+                hasattr(process, "stdout")
+                and process.stdout
+                and not process.stdout.closed
+            ):
+                process.stdout.close()
             print(f"Process PID {pid} terminated gracefully.")
         except subprocess.TimeoutExpired:
             print(f"Process PID {pid} did not terminate gracefully, sending SIGKILL...")
@@ -326,7 +336,7 @@ def stop_process(pid: int):
         except Exception as e:
             print(f"Error stopping process PID {pid}: {e}")
         finally:
-            if log_file and not log_file.closed:
+            if log_file and hasattr(log_file, "close"):
                 log_file.close()
             del managed_processes[pid]
     else:

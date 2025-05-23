@@ -19,15 +19,12 @@ from typing import (  # Any, Type removed
 import requests
 
 from .models import EvaluateResult, MetricResult
-from .typed_interface import (
-    reward_function,
-)
+from .typed_interface import reward_function
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Callable[..., EvaluateResult])
-
 
 
 class RewardFunction:
@@ -349,9 +346,7 @@ class RewardFunction:
                                 f"is not the expected assistant message dict or is malformed: {first_element}. "
                                 f"Using str(first_element) as content."
                             )
-                            actual_completion_str = str(
-                                first_element
-                            )
+                            actual_completion_str = str(first_element)
                     else:
                         logger.warning(
                             f"Adapter: completions[{i}] is an empty list. Using empty string for content."

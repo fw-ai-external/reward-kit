@@ -1,8 +1,9 @@
 import importlib
+import os  # Added for environment variable access
 from typing import Any, Dict, List, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request  # Added Request, Depends
 from pydantic import BaseModel, ValidationError
 
 # Assuming these models are correctly defined in reward_kit.models
@@ -24,6 +25,29 @@ class EvaluationRequest(BaseModel):
 _LOADED_REWARD_FUNCTION = None
 _REWARD_FUNCTION_NAME = "N/A"
 
+# --- API Key Authentication Dependency ---
+EXPECTED_API_KEY = os.environ.get("RK_ENDPOINT_API_KEY")
+
+
+async def verify_api_key(request: Request):
+    if EXPECTED_API_KEY:
+        # Check for X-Api-Key header first
+        client_api_key = request.headers.get("X-Api-Key")
+        # If not found, check for Authorization: Bearer <key>
+        if not client_api_key:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                client_api_key = auth_header.split(" ", 1)[1]
+
+        if not client_api_key:
+            raise HTTPException(
+                status_code=401, detail="API key required but not provided."
+            )
+        if client_api_key != EXPECTED_API_KEY:
+            raise HTTPException(status_code=403, detail="Invalid API key.")
+    return True  # Allow request if no key expected or if key is valid
+
+
 # --- FastAPI App ---
 app = FastAPI(
     title="Reward Kit Generic Reward Function Server",
@@ -32,10 +56,13 @@ app = FastAPI(
 )
 
 
-@app.post("/evaluate", response_model=EvaluateResult)
+@app.post(
+    "/evaluate", response_model=EvaluateResult, dependencies=[Depends(verify_api_key)]
+)
 async def evaluate_endpoint(request: EvaluationRequest):
     """
     Endpoint to evaluate a given set of messages using the loaded reward function.
+    Requires API key if RK_ENDPOINT_API_KEY environment variable is set.
     """
     if _LOADED_REWARD_FUNCTION is None:
         raise HTTPException(status_code=500, detail="Reward function not loaded.")

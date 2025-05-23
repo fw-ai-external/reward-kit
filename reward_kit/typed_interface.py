@@ -7,7 +7,6 @@ from pydantic import TypeAdapter, ValidationError
 from .models import EvaluateResult, Message  # EvaluateResult is now the hybrid model
 
 _res_adapter = TypeAdapter(EvaluateResult)
-# _msg_adapter is not used. T is not used.
 
 
 class EvaluateFunction(Protocol):
@@ -52,7 +51,7 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
     @wraps(func)
     def wrapper(
         messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
-    ) -> EvaluateResult:  # Changed return type
+    ) -> EvaluateResult:
 
         sig = inspect.signature(func)
         params = sig.parameters
@@ -130,7 +129,7 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
         # 3. Call the author's function with processed inputs
         result = func(processed_messages, **kwargs)
 
-        # 4. Author might return EvaluateResult *or* a bare dict → coerce either way
+        # 4. Coerce the result to EvaluateResult if necessary
         try:
             # If it's already an EvaluateResult, use it directly
             if isinstance(result, EvaluateResult):
@@ -141,7 +140,7 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
         except ValidationError as err:
             raise ValueError(f"Return value failed validation:\n{err}") from None
 
-        # 3. Return the EvaluateResult object directly
+        # 5. Return the EvaluateResult object
         # The result_model is an instance of our hybrid EvaluateResult
         return result_model
 

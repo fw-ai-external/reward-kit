@@ -19,24 +19,15 @@ from typing import (  # Any, Type removed
 import requests
 
 from .models import EvaluateResult, MetricResult
-from .typed_interface import (  # Note: This is the new decorator, not the legacy one below
+from .typed_interface import (
     reward_function,
 )
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Type for reward function
 T = TypeVar("T", bound=Callable[..., EvaluateResult])
 
-# Show deprecation warning
-# warnings.warn(
-#     "RewardOutput and legacy_reward_function are deprecated and will be removed in a future version. "
-#     "Use EvaluateResult and the reward_function decorator instead.",
-#     DeprecationWarning,
-#     stacklevel=2,
-# )
 
 
 class RewardFunction:
@@ -98,18 +89,13 @@ class RewardFunction:
                 raise ValueError(
                     "'model_id' must be provided for fireworks_hosted mode"
                 )
-            # Construct endpoint for the Fireworks-hosted model
             self.endpoint = f"https://api.fireworks.ai/v1/models/{model_id}/reward"
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
     def _load_function_from_path(self, func_path: str) -> Callable:
         """
-        Load a function from a path string.
-
-        Handles two formats:
-        - 'module.path:function_name' - Module with colon separator
-        - 'module.path.function_name' - Module with function as last component
+        Load a function from a path string (e.g., 'module.path:func_name' or 'module.path.func_name').
         """
         # Check for the colon format first (preferred)
         if ":" in func_path:
@@ -164,14 +150,12 @@ class RewardFunction:
         if original_messages is None:
             original_messages = messages[:-1] if messages else []
 
-        # Combine instance kwargs with call kwargs
         combined_kwargs = {**self.kwargs, **kwargs}
 
         if self.mode == "local":
             if self.func is None:
                 raise ValueError("No function provided for local mode")
 
-            # Call the local function
             try:
                 result = self.func(
                     messages=messages,
@@ -179,9 +163,7 @@ class RewardFunction:
                     **combined_kwargs,
                 )
 
-                # Handle different result types
                 if isinstance(result, EvaluateResult):
-                    # Preferred return type
                     return result
                 elif isinstance(result, tuple) and len(result) == 2:
                     # Handle legacy (score, components) tuple format
@@ -191,7 +173,6 @@ class RewardFunction:
                         stacklevel=2,
                     )
                     score, components = result
-                    # Convert to EvaluateResult
                     metrics = {
                         k: MetricResult(
                             score=v, reason=f"{k} score", is_score_valid=True
@@ -206,7 +187,6 @@ class RewardFunction:
                         DeprecationWarning,
                         stacklevel=2,
                     )
-                    # Convert to EvaluateResult
                     metrics = {}
                     if "metrics" in result:
                         for k, v in result["metrics"].items():
@@ -241,14 +221,12 @@ class RewardFunction:
             if self.endpoint is None:
                 raise ValueError(f"No endpoint provided for {self.mode} mode")
 
-            # Prepare the payload
             payload = {
                 "messages": messages,
                 "original_messages": original_messages,
                 **combined_kwargs,
             }
 
-            # Get API key
             api_key = os.environ.get("FIREWORKS_API_KEY")
             headers = {
                 "Content-Type": "application/json",
@@ -260,9 +238,7 @@ class RewardFunction:
                 response.raise_for_status()
                 result = response.json()
 
-                # Convert the result to EvaluateResult
                 if isinstance(result, dict) and "score" in result:
-                    # Create metrics dictionary
                     metrics = {}
                     if "metrics" in result:
                         for k, v in result["metrics"].items():
@@ -347,15 +323,14 @@ class RewardFunction:
                 logger.warning(
                     f"Expected 'solution' kwarg to be a list of size {batch_size}, but got {type(solutions)}. Ground truth might not be passed correctly."
                 )
-                solutions = [None] * batch_size  # Fallback
+                solutions = [None] * batch_size
 
             for i in range(batch_size):
-                # Construct the full message list for this sample
                 completion_input = completions[i]
                 actual_completion_str = ""
 
                 if isinstance(completion_input, list):
-                    if completion_input:  # If the list is not empty
+                    if completion_input:
                         first_element = completion_input[0]
                         if (
                             isinstance(first_element, dict)
@@ -376,14 +351,14 @@ class RewardFunction:
                             )
                             actual_completion_str = str(
                                 first_element
-                            )  # Fallback: stringify the element
+                            )
                     else:
                         logger.warning(
                             f"Adapter: completions[{i}] is an empty list. Using empty string for content."
                         )
                         actual_completion_str = ""
                 elif isinstance(completion_input, str):
-                    actual_completion_str = completion_input  # It's already a string
+                    actual_completion_str = completion_input
                 else:
                     # Fallback for other types (e.g. a direct dict, though less likely given warnings)
                     logger.warning(

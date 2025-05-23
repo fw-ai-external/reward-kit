@@ -41,7 +41,6 @@ async def evaluate_endpoint(request: EvaluationRequest):
         raise HTTPException(status_code=500, detail="Reward function not loaded.")
 
     try:
-        # Prepare arguments for the reward function
         # The user's reward function is expected to match the @reward_function signature
         func_args = {
             "messages": request.messages,

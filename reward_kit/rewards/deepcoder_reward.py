@@ -4,7 +4,7 @@ DeepCoder-style reward function for evaluating code correctness based on test ca
 
 import json
 import os
-import re  # For function name extraction
+
 from typing import Any, Dict, List, Optional, Union
 
 from ..models import EvaluateResult, Message, MetricResult

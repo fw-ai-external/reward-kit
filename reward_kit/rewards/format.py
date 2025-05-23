@@ -7,7 +7,7 @@ in the correct order.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Union  # Added Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ..models import EvaluateResult, Message, MetricResult
 from ..typed_interface import reward_function

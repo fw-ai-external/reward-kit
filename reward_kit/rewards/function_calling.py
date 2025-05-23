@@ -1,6 +1,6 @@
 import json
 
-# from collections import defaultdict # Unused import
+
 import os
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -16,15 +16,15 @@ except ImportError:
 import copy
 from collections import Counter
 
-from ..models import EvaluateResult, Message, MetricResult  # Added Message
-from ..typed_interface import reward_function  # Added reward_function
+from ..models import EvaluateResult, Message, MetricResult
+from ..typed_interface import reward_function
 
 
 def match_function_call(
     messages: List[
         Dict[str, str]
     ],  # messages is for context if needed, not directly used here for func call parts
-    # original_messages: List[Dict[str, str]], # Removed
+
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
@@ -312,7 +312,7 @@ def parse_tool_calls(completion: str) -> list:
             tool_call_str = match.strip()
             row_tool_calls.append(json.loads(tool_call_str))
         except Exception:  # pylint: disable=bare-except
-            # print("tool call parsing error")
+
             continue
     return row_tool_calls
 
@@ -428,7 +428,7 @@ def exact_tool_match_reward(
 # End of New Exact Tool Match Reward Function and Helpers
 
 
-@reward_function  # Added decorator
+@reward_function
 def schema_jaccard_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[
@@ -460,7 +460,7 @@ def schema_jaccard_reward(
     )
 
 
-@reward_function  # Added decorator
+@reward_function
 def llm_judge_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[Dict[str, Any]] = None,  # Ensure ground_truth type is Dict

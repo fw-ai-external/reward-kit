@@ -2,8 +2,8 @@ import json
 import re
 from typing import Any, Dict, List, Optional, Union
 
-from ..models import EvaluateResult, Message, MetricResult  # Added Message import
-from ..typed_interface import reward_function  # Added import
+from ..models import EvaluateResult, Message, MetricResult
+from ..typed_interface import reward_function
 from .function_calling import (
     calculate_jaccard_similarity,
     extract_schema_properties,
@@ -11,9 +11,9 @@ from .function_calling import (
 )
 
 
-@reward_function  # Added decorator
+@reward_function
 def json_schema_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[
         Union[List[Message], List[Dict[str, Any]]]
     ] = None,  # Added, not used by core logic
@@ -262,8 +262,8 @@ def json_schema_reward(
 
 
 def json_schema_reward_with_llm_judge(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -469,7 +469,7 @@ EXPLANATION: [your detailed explanation]
     combined_metrics = {}
 
     # Add schema metrics with "schema_" prefix
-    for key, metric_val in schema_result.metrics.items():  # Renamed to metric_val
+    for key, metric_val in schema_result.metrics.items():
         if key != "schema_similarity":
             combined_metrics[f"schema_{key}"] = metric_val
         else:

@@ -258,10 +258,7 @@ def load_samples_from_huggingface(
                         f"HuggingFace record {processed_records}: Key '{source_key_in_record}' from key_map not found. It will be omitted."
                     )
 
-        # Optionally, copy all other non-conflicting keys from record to sample_output
-        # for k, v in record.items():
-        #     if k not in [prompt_key, response_key] and k not in (key_map or {}).keys() and k not in sample_output:
-        #         sample_output[k] = v
+
 
         yield sample_output
         count += 1

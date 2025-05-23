@@ -41,8 +41,6 @@ def get_fireworks_api_key() -> Optional[str]:
                     )
                     return api_key_from_file
             # If not found in [fireworks] section, try the default section
-            # config.defaults() returns a dictionary of default values.
-            # config[config.default_section] is another way to access them.
             if config.has_option(config.default_section, "api_key"):
                 api_key_from_default = config.get(config.default_section, "api_key")
                 if api_key_from_default:

@@ -52,9 +52,6 @@ def huggingface_dataset_to_jsonl(
             "Please install it with 'pip install \"reward-kit[deepseek]\"'"
         )
 
-    if False:
-        import datasets
-
     import tempfile
 
     logger.info(f"Loading dataset {dataset_name} (split: {split})")
@@ -123,8 +120,6 @@ def huggingface_dataset_to_jsonl(
             )
     return output_file
 
-
-import types
 
 
 class EvaluatorPreviewResult:

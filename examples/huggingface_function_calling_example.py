@@ -18,13 +18,18 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/huggingface_function_calling_example.py"
     )
 
+import json  # Added import
+from typing import Any, Dict, List, cast  # Moved imports to top
+
 # Import the evaluation functions
-# Unused evaluation functions were removed
-from reward_kit.rewards.function_calling import composite_function_call_reward
+from reward_kit.rewards.function_calling import (  # Changed import
+    exact_tool_match_reward,
+)
 
 
 def main():
     # Example 1: Convert a HuggingFace dataset to JSONL for manual inspection
+    # This part remains commented out as it's beyond the scope of this update
     print("Converting Glaive-FC dataset to JSONL...")
     # Note: Replace with the actual dataset name, split, prompt_key, and response_key
     # jsonl_file = huggingface_dataset_to_jsonl(
@@ -36,28 +41,24 @@ def main():
     # )
     # print(f"Dataset converted to JSONL file: {jsonl_file}")
 
-    # Example 2: Evaluate a custom response against the Glaive-FC dataset using composite_function_call_reward
-    print(
-        "\nEvaluating a custom response against Glaive-FC example using composite_function_call_reward..."
-    )
+    # Example 2: Evaluate a custom response using exact_tool_match_reward
+    print("\nEvaluating a custom response using exact_tool_match_reward...")
 
-    # Replace with actual dataset loading and function call extraction logic
-    # For demonstration purposes, we'll use a dummy function call and schema
-    function_call = {
+    # For demonstration purposes, we'll use a dummy tool call
+    # and construct the messages and ground_truth accordingly.
+
+    # Define the tool call the assistant is supposed to make
+    assistant_tool_call_function = {
         "name": "get_weather",
-        "arguments": '{"location": "San Francisco", "unit": "celsius"}',
+        "arguments": json.dumps({"location": "San Francisco", "unit": "celsius"}),
     }
-    expected_schema = {
-        "name": "get_weather",
-        "description": "Get the current weather in a given location",
-        "arguments": {
-            "location": {
-                "type": "string",
-                "description": "The city and state, e.g. San Francisco, CA",
-            },
-            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
-        },
+
+    assistant_tool_call = {
+        "id": "call_sfo_weather_123",  # Example ID
+        "type": "function",
+        "function": assistant_tool_call_function,
     }
+
     messages = [
         {
             "role": "user",
@@ -65,19 +66,35 @@ def main():
         },
         {
             "role": "assistant",
-            "content": "I can help with that.",
-            "function_call": function_call,
+            "content": None,  # Content can be None if only tool_calls are present
+            "tool_calls": [assistant_tool_call],  # Use tool_calls list
         },
     ]
 
-    from typing import Any, Dict, List, cast  # Add imports
+    # Define the ground truth for the expected tool call
+    ground_truth_data = {
+        "tool_calls": [
+            {
+                # Note: The 'id' field in tool_calls is not compared by exact_tool_match_reward,
+                # so it doesn't strictly need to match the one in the assistant's message.
+                # However, 'type' and 'function' (including name and arguments) must match.
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": json.dumps(
+                        {"location": "San Francisco", "unit": "celsius"}
+                    ),
+                },
+            }
+        ]
+    }
 
-    # Evaluate the function call using composite_function_call_reward
-    result = composite_function_call_reward(
-        messages=cast(List[Dict[str, Any]], messages), expected_schema=expected_schema
+    # Evaluate the tool call using exact_tool_match_reward
+    result = exact_tool_match_reward(
+        messages=cast(List[Dict[str, Any]], messages), ground_truth=ground_truth_data
     )
 
-    print(f"Function call score: {result.score}")
+    print(f"Tool call evaluation score: {result.score}")
     if result.metrics:
         print("Detailed metrics:")
         for metric_name, metric_value in result.metrics.items():

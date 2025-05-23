@@ -49,7 +49,9 @@ def format_reward(
             reason="No messages provided",
             metrics={
                 "format_check": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
             is_score_valid=False,

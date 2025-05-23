@@ -4,7 +4,7 @@ Fireworks Reward Kit - Simplify reward modeling for LLM RL fine-tuning.
 A Python library for defining, testing, deploying, and using reward functions
 for LLM fine-tuning, including launching full RL jobs on the Fireworks platform.
 
-The library also provides an agent evaluation framework for testing and evaluating
+The library also provides an agent evaluation framework for testing & evaluating
 tool-augmented models using self-contained task bundles.
 """
 
@@ -22,7 +22,9 @@ from .reward_function import RewardFunction
 from .typed_interface import reward_function
 
 # Show deprecation warnings
-warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
+warnings.filterwarnings(
+    "default", category=DeprecationWarning, module="reward_kit"
+)
 
 __all__ = [
     # Core interfaces

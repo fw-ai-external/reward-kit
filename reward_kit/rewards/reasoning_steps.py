@@ -46,7 +46,9 @@ def reasoning_steps_reward(
             reason="No messages provided",
             metrics={
                 "reasoning_steps": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )
@@ -210,7 +212,9 @@ def sequence_reward(
             reason="No messages provided",
             metrics={
                 "sequence_reasoning": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )

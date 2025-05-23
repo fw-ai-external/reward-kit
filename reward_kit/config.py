@@ -19,10 +19,12 @@ class GCPCloudRunConfig(BaseModel):
     project_id: Optional[str] = None
     region: Optional[str] = None
     service_name_template: Optional[str] = "rewardeval-{evaluator_id}"
-    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = (
-        "api-key"
-    )
-    secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to GCP Secret Manager ID
+    default_auth_mode: Optional[
+        Literal["api-key", "iam", "mtls-client-auth"]
+    ] = "api-key"
+    secrets: Optional[Dict[str, str]] = (
+        {}
+    )  # Maps ENV_VAR_NAME to GCP Secret Manager ID
 
 
 # Unused models, can be removed.
@@ -35,10 +37,12 @@ class GCPCloudRunConfig(BaseModel):
 class AWSLambdaConfig(BaseModel):
     region: Optional[str] = None
     function_name_template: Optional[str] = "rewardeval-{evaluator_id}"
-    default_auth_mode: Optional[Literal["api-key", "iam", "mtls-client-auth"]] = (
-        "api-key"
-    )
-    secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to AWS Secret ARN
+    default_auth_mode: Optional[
+        Literal["api-key", "iam", "mtls-client-auth"]
+    ] = "api-key"
+    secrets: Optional[Dict[str, str]] = (
+        {}
+    )  # Maps ENV_VAR_NAME to AWS Secret ARN
 
 
 class RewardKitConfig(BaseModel):
@@ -95,7 +99,9 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
 
     if not config_path:
         # print(f"Info: No {CONFIG_FILE_NAME} found. Using default configuration.")
-        _loaded_config = RewardKitConfig()  # Return default config if no file found
+        _loaded_config = (
+            RewardKitConfig()
+        )  # Return default config if no file found
         _config_file_path = None
         return _loaded_config
 
@@ -203,5 +209,7 @@ evaluator_endpoint_keys:
     _config_file_path = None
     print("\nTesting get_config() with no file present:")
     config_no_file = get_config()
-    print(f"  Default Target (no file): {config_no_file.default_deployment_target}")
+    print(
+        f"  Default Target (no file): {config_no_file.default_deployment_target}"
+    )
     print(f"  GCP Config (no file): {config_no_file.gcp_cloud_run}")

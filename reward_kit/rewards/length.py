@@ -80,7 +80,9 @@ def length_reward(
             reason="No messages provided",
             metrics={
                 "length": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )
@@ -154,7 +156,9 @@ def length_reward(
             progress = min(1.0, normalized_diff)
             score = (
                 min_reward
-                + (max_reward - min_reward) * (1.0 + math.cos(progress * math.pi)) / 2.0
+                + (max_reward - min_reward)
+                * (1.0 + math.cos(progress * math.pi))
+                / 2.0
             )
         else:
             # Linear scaling (straight line falloff from target)
@@ -200,9 +204,7 @@ def length_reward(
                 # Linear scaling
                 score = max_reward - (max_reward - min_reward) * progress
 
-            reason = (
-                f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
-            )
+            reason = f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
             success = False
 
         else:
@@ -249,9 +251,7 @@ def length_reward(
                 # Linear scaling
                 score = max_reward - (max_reward - min_reward) * progress
 
-            reason = (
-                f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
-            )
+            reason = f"Response length ({token_count} tokens) exceeds maximum ({max_length})"
             success = False
         else:
             # At or below maximum
@@ -273,7 +273,9 @@ def length_reward(
             progress = min(1.0, normalized_length)
             score = (
                 min_reward
-                + (max_reward - min_reward) * (1.0 + math.cos(progress * math.pi)) / 2.0
+                + (max_reward - min_reward)
+                * (1.0 + math.cos(progress * math.pi))
+                / 2.0
             )
         else:
             # Linear scaling
@@ -285,11 +287,14 @@ def length_reward(
 
     # Prepare metrics
     metrics = {
-        "length": MetricResult(score=score, is_score_valid=success, reason=reason),
+        "length": MetricResult(
+            score=score, is_score_valid=success, reason=reason
+        ),
         "token_count": MetricResult(
             score=min(
                 1.0,
-                float(token_count) / (target_length or max_length or min_length or 100),
+                float(token_count)
+                / (target_length or max_length or min_length or 100),
             ),
             is_score_valid=success,
             reason=f"Token count: {token_count}",
@@ -349,7 +354,9 @@ def cosine_length_reward(
             reason="No messages provided",
             metrics={
                 "cosine_length": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )

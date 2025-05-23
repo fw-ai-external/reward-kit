@@ -2,12 +2,9 @@
 DockerResource: A ForkableResource for managing Docker container states.
 """
 
-import io
 import uuid
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from ..resource_abc import ForkableResource
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 # Attempt to import Docker SDK with error handling
 try:
@@ -21,8 +18,8 @@ try:
         from docker.models.containers import Container
 
     DOCKER_SDK_AVAILABLE = True
-    # Ensure these are available for type checking even if the runtime import fails
-    # The `else` block for DOCKER_SDK_AVAILABLE = False will define runtime dummies.
+    # Ensure available for type checking even if runtime import fails
+    # The `else` block for DOCKER_SDK_AVAILABLE=False defines runtime dummies.
     DockerException = DockerException
     NotFound = NotFound
     APIError = APIError
@@ -68,22 +65,26 @@ except ImportError:
             return b""
 
 
+from ..resource_abc import ForkableResource
+
+
 class DockerResource(ForkableResource):
     """
     A ForkableResource for managing Docker container states.
 
     Allows initializing a container from an image, forking (by committing the
     current container and starting a new one from the committed image),
-    checkpointing (committing to an image), and restoring from a checkpoint image.
+    checkpointing (committing to image), and restoring from checkpoint image.
     Commands can be executed within the container.
 
-    Requires the Docker SDK (`docker` pip package) to be installed and Docker daemon running.
+    Requires Docker SDK (pip install docker) and Docker daemon running.
     """
 
     def __init__(self) -> None:
         if not DOCKER_SDK_AVAILABLE:
             raise ImportError(
-                "Docker SDK not found. Please install 'docker' package to use DockerResource."
+                "Docker SDK not found. Please install 'docker' package "
+                "to use DockerResource."
             )
         self._client = docker.from_env()
         self._config: Dict[str, Any] = {}
@@ -105,7 +106,10 @@ class DockerResource(ForkableResource):
                 pass  # Already removed
             except APIError as e:
                 print(
-                    f"DockerResource: Error removing container {(container.id or '')[:12]}: {e}"
+                    (
+                        f"DockerResource: Error removing container "
+                        f"{(container.id or '')[:12]}: {e}"
+                    )
                 )
 
     def _cleanup_image(self, image_id: Optional[str]) -> None:
@@ -117,7 +121,9 @@ class DockerResource(ForkableResource):
                 pass  # Already removed
             except APIError as e:
                 # Often "image is being used by stopped container" if cleanup order is tricky
-                print(f"DockerResource: Error removing image {image_id[:12]}: {e}")
+                print(
+                    f"DockerResource: Error removing image {image_id[:12]}: {e}"
+                )
 
     async def setup(self, config: Dict[str, Any]) -> None:
         """
@@ -143,7 +149,9 @@ class DockerResource(ForkableResource):
         try:
             self._client.images.get(image_name)
         except NotFound:
-            print(f"DockerResource: Image '{image_name}' not found locally. Pulling...")
+            print(
+                f"DockerResource: Image '{image_name}' not found locally. Pulling..."
+            )
             try:
                 self._client.images.pull(image_name)
             except APIError as e:
@@ -170,7 +178,9 @@ class DockerResource(ForkableResource):
             pass
 
         try:
-            self._container = self._client.containers.run(image_name, **run_options)
+            self._container = self._client.containers.run(
+                image_name, **run_options
+            )
             if self._container:
                 self._container.reload()  # Ensure state is up-to-date
             # print(f"DockerResource setup: Started container {self._container.id[:12]} ({self._container.name}) from image {image_name}")
@@ -235,11 +245,15 @@ class DockerResource(ForkableResource):
         Returns the ID of the committed image.
         """
         if self._is_closed or not self._container:
-            raise RuntimeError("Cannot checkpoint: resource is closed or not set up.")
+            raise RuntimeError(
+                "Cannot checkpoint: resource is closed or not set up."
+            )
 
         checkpoint_image_tag = self._generate_name("checkpoint_img")
         try:
-            committed_image = self._container.commit(repository=checkpoint_image_tag)
+            committed_image = self._container.commit(
+                repository=checkpoint_image_tag
+            )
             # print(f"DockerResource checkpoint: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({checkpoint_image_tag})")
             return {"type": "docker_image_id", "image_id": committed_image.id}
         except APIError as e:
@@ -290,7 +304,9 @@ class DockerResource(ForkableResource):
         run_options["name"] = restored_container_name
 
         try:
-            self._container = self._client.containers.run(image_id, **run_options)
+            self._container = self._client.containers.run(
+                image_id, **run_options
+            )
             if self._container:
                 self._container.reload()
             # print(f"DockerResource restore: Started container {self._container.id[:12]} from checkpoint image {image_id[:12]}")
@@ -299,7 +315,9 @@ class DockerResource(ForkableResource):
                 f"Failed to start container from checkpoint image {image_id[:12]}: {e}"
             ) from e
 
-    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
+    async def step(
+        self, action_name: str, action_params: Dict[str, Any]
+    ) -> Any:
         """
         Executes a command inside the Docker container or performs other Docker actions.
 
@@ -312,7 +330,9 @@ class DockerResource(ForkableResource):
             Returns: str (logs)
         """
         if self._is_closed or not self._container:
-            raise RuntimeError("Cannot execute step: resource is closed or not set up.")
+            raise RuntimeError(
+                "Cannot execute step: resource is closed or not set up."
+            )
 
         self._container.reload()
         if self._container.status != "running":
@@ -344,10 +364,14 @@ class DockerResource(ForkableResource):
                 "demux": False,  # Get stdout and stderr interleaved as a single stream
             }
             # Filter out None values for docker SDK
-            exec_options = {k: v for k, v in exec_options.items() if v is not None}
+            exec_options = {
+                k: v for k, v in exec_options.items() if v is not None
+            }
 
             try:
-                exit_code, output_stream = self._container.exec_run(**exec_options)
+                exit_code, output_stream = self._container.exec_run(
+                    **exec_options
+                )
                 output_bytes = output_stream if output_stream else b""
                 return {
                     "exit_code": exit_code,
@@ -414,7 +438,10 @@ class DockerResource(ForkableResource):
                             "command": {
                                 "oneOf": [
                                     {"type": "string"},
-                                    {"type": "array", "items": {"type": "string"}},
+                                    {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                 ],
                                 "description": "The command to execute (string or list of strings).",
                             },
@@ -485,7 +512,8 @@ class DockerResource(ForkableResource):
         original_base_image_name = self._config.get("image_name")
         if (
             self._image_id_for_fork_or_checkpoint
-            and self._image_id_for_fork_or_checkpoint != original_base_image_name
+            and self._image_id_for_fork_or_checkpoint
+            != original_base_image_name
         ):
             # Check if the image ID is a full ID or a tag like the original.
             # This check might need refinement if original_base_image_name is an ID itself.
@@ -493,12 +521,14 @@ class DockerResource(ForkableResource):
                 try:
                     img_obj = self._client.images.get(original_base_image_name)
                     if img_obj.id != self._image_id_for_fork_or_checkpoint:
-                        self._cleanup_image(self._image_id_for_fork_or_checkpoint)
+                        self._cleanup_image(
+                            self._image_id_for_fork_or_checkpoint
+                        )
                 except (
                     NotFound
                 ):  # Original image name might not be an ID, or might have been removed.
                     self._cleanup_image(self._image_id_for_fork_or_checkpoint)
-            else: # original_base_image_name IS None
+            else:  # original_base_image_name IS None
                 # If original_base_image_name is None, but _image_id_for_fork_or_checkpoint is set
                 # (and different from None, due to the outer if), then it's an image to clean up.
                 if self._image_id_for_fork_or_checkpoint:

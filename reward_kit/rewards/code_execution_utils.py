@@ -2,7 +2,9 @@ import json
 from typing import Any, Dict, List, Optional
 
 
-def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, Any]:
+def prepare_deepcoder_sample_for_trl(
+    raw_sample: Dict[str, Any],
+) -> Dict[str, Any]:
     """
     Transforms a raw DeepCoder-style sample into a format suitable for TRL training
     with the deepcoder_code_reward function.
@@ -25,7 +27,10 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
     """
     # Extract prompt (user content)
     prompt_content = ""
-    if isinstance(raw_sample.get("prompt"), list) and len(raw_sample["prompt"]) > 0:
+    if (
+        isinstance(raw_sample.get("prompt"), list)
+        and len(raw_sample["prompt"]) > 0
+    ):
         for msg in raw_sample["prompt"]:
             if msg.get("role") == "user" and msg.get("content"):
                 prompt_content = msg["content"]
@@ -59,7 +64,9 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
     final_prompt = prompt_content + instruction
 
     # Parse test cases from ground_truth JSON string
-    test_cases_str = raw_sample.get("reward_model", {}).get("ground_truth", "[]")
+    test_cases_str = raw_sample.get("reward_model", {}).get(
+        "ground_truth", "[]"
+    )
     try:
         test_cases = json.loads(test_cases_str)
     except json.JSONDecodeError:

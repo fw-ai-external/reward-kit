@@ -1,10 +1,23 @@
 import inspect  # Added for signature inspection
 from functools import wraps
-from typing import Any, Dict, List, Protocol, TypeVar, Union, cast, get_args, get_origin
+from typing import (
+    Any,
+    Dict,
+    List,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from pydantic import TypeAdapter, ValidationError
 
-from .models import EvaluateResult, Message  # EvaluateResult is now the hybrid model
+from .models import (
+    EvaluateResult,
+    Message,
+)  # EvaluateResult is now the hybrid model
 
 _res_adapter = TypeAdapter(EvaluateResult)
 # _msg_adapter is not used. T is not used.
@@ -27,7 +40,9 @@ class HybridEvaluateFunction(Protocol):
     """
 
     def __call__(
-        self, messages: Union[List[Dict[str, Any]], List[Message]], **kwargs: Any
+        self,
+        messages: Union[List[Dict[str, Any]], List[Message]],
+        **kwargs: Any,
     ) -> EvaluateResult: ...
 
 
@@ -117,7 +132,9 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
                             typed_ground_truth_list.append(gt_item_data)
                         elif isinstance(gt_item_data, dict):
                             # Simplified conversion
-                            typed_ground_truth_list.append(Message(**gt_item_data))
+                            typed_ground_truth_list.append(
+                                Message(**gt_item_data)
+                            )
                         else:
                             raise TypeError(
                                 f"Unexpected type in ground_truth list: {type(gt_item_data)}"
@@ -141,7 +158,9 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
                 # Otherwise validate it
                 result_model = _res_adapter.validate_python(result)
         except ValidationError as err:
-            raise ValueError(f"Return value failed validation:\n{err}") from None
+            raise ValueError(
+                f"Return value failed validation:\n{err}"
+            ) from None
 
         # 3. Return the EvaluateResult object directly
         # The result_model is an instance of our hybrid EvaluateResult

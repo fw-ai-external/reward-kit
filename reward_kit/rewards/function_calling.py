@@ -86,7 +86,9 @@ def match_function_call(
                     f"Type mismatch for {arg_name}: expected string, got {type(arg_value).__name__}"
                 )
                 type_matched = False
-            elif expected_type == "number" and not isinstance(arg_value, (int, float)):
+            elif expected_type == "number" and not isinstance(
+                arg_value, (int, float)
+            ):
                 type_mismatches.append(arg_name)
                 arg_details.append(
                     f"Type mismatch for {arg_name}: expected number, got {type(arg_value).__name__}"
@@ -168,7 +170,9 @@ def match_function_call(
     final_score = (name_score + arg_score) / 2.0
     final_reason = f"Overall score based on name match ({name_score:.2f}) and argument match ({arg_score:.2f})."
 
-    return EvaluateResult(score=final_score, reason=final_reason, metrics=metrics)
+    return EvaluateResult(
+        score=final_score, reason=final_reason, metrics=metrics
+    )
 
 
 def calculate_jaccard_similarity(set1: Set, set2: Set) -> float:
@@ -275,7 +279,7 @@ def normalize_schema(schema: Union[Dict[str, Any], str]) -> Dict[str, Any]:
 
 
 def maybe_deserialize_tool_call_arguments(
-    tool_calls: list[dict[str, Any]]
+    tool_calls: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     result = copy.deepcopy(tool_calls)
     for tool_call in result:
@@ -328,7 +332,9 @@ def compare_tool_calls(generated_tool_calls: list, gt_tool_calls: list) -> bool:
         json.dumps(item, sort_keys=True) for item in gt_tool_calls
     ]
 
-    return Counter(generated_tool_calls_serialized) == Counter(gt_tool_calls_serialized)
+    return Counter(generated_tool_calls_serialized) == Counter(
+        gt_tool_calls_serialized
+    )
 
 
 def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
@@ -340,7 +346,9 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
     ground_truth_tool_calls = maybe_deserialize_tool_call_arguments(
         expected_gt_tool_calls
     )
-    ground_truth_functions = [item["function"] for item in ground_truth_tool_calls]
+    ground_truth_functions = [
+        item["function"] for item in ground_truth_tool_calls
+    ]
 
     generated_functions = []
     # Check if 'tool_calls' key exists and is not None or empty
@@ -355,7 +363,9 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
         deserialized_tool_calls = maybe_deserialize_tool_call_arguments(
             processed_tool_calls
         )
-        generated_functions = [item["function"] for item in deserialized_tool_calls]
+        generated_functions = [
+            item["function"] for item in deserialized_tool_calls
+        ]
     # Check 'content' only if 'tool_calls' is not present or is empty
     elif "<tool_call>" in generation.get("content", ""):
         parsed_from_content = parse_tool_calls(generation["content"])
@@ -463,7 +473,9 @@ def schema_jaccard_reward(
 @reward_function  # Added decorator
 def llm_judge_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Dict[str, Any]] = None,  # Ensure ground_truth type is Dict
+    ground_truth: Optional[
+        Dict[str, Any]
+    ] = None,  # Ensure ground_truth type is Dict
     function_call: Optional[Dict[str, Any]] = None,  # Param becomes unused
     expected_schema: Optional[
         Union[Dict[str, Any], str]

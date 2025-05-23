@@ -31,7 +31,9 @@ from pydantic import ValidationError
 
 from reward_kit.agent import Orchestrator
 from reward_kit.agent.task_manager import TaskManager
-from reward_kit.models import TaskDefinitionModel  # Import the new Pydantic model
+from reward_kit.models import (
+    TaskDefinitionModel,
+)  # Import the new Pydantic model
 
 # setup_logging is already called in cli.py's main, but good for standalone use if any
 # from .common import setup_logging
@@ -78,10 +80,14 @@ def agent_eval_command(args):
             )
             return 1
     else:
-        logger.error(f"Task definition path not found or invalid: {task_def_path}")
+        logger.error(
+            f"Task definition path not found or invalid: {task_def_path}"
+        )
         return 1
 
-    logger.info(f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}")
+    logger.info(
+        f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}"
+    )
 
     # Run tasks with asyncio
     try:
@@ -122,9 +128,13 @@ def agent_eval_command(args):
                 logger.info(f"Execution completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
-                        logger.error(f"Task '{task_id}' failed: {result['error']}")
+                        logger.error(
+                            f"Task '{task_id}' failed: {result['error']}"
+                        )
                     elif isinstance(result, dict) and "score" in result:
-                        logger.info(f"Task '{task_id}' score: {result['score']}")
+                        logger.info(
+                            f"Task '{task_id}' score: {result['score']}"
+                        )
                     else:
                         logger.info(f"Task '{task_id}' completed")
             finally:
@@ -187,7 +197,9 @@ def bfcl_eval_command(args):
                 str(task_dir)
             )
             if not registered_task_ids:
-                logger.error(f"No valid BFCL tasks found in directory: {task_dir}")
+                logger.error(
+                    f"No valid BFCL tasks found in directory: {task_dir}"
+                )
                 return 1
             logger.info(f"Registered {len(registered_task_ids)} BFCL tasks")
 
@@ -214,12 +226,18 @@ def bfcl_eval_command(args):
                 )
 
                 # Log results summary
-                logger.info(f"BFCL evaluation completed for {len(results)} tasks")
+                logger.info(
+                    f"BFCL evaluation completed for {len(results)} tasks"
+                )
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
-                        logger.error(f"Task '{task_id}' failed: {result['error']}")
+                        logger.error(
+                            f"Task '{task_id}' failed: {result['error']}"
+                        )
                     elif isinstance(result, dict) and "score" in result:
-                        logger.info(f"Task '{task_id}' score: {result['score']}")
+                        logger.info(
+                            f"Task '{task_id}' score: {result['score']}"
+                        )
 
                         # More detailed results for BFCL
                         if "format_score" in result:
@@ -231,7 +249,9 @@ def bfcl_eval_command(args):
                                 f"Task '{task_id}' state match: {result['state_match']}"
                             )
                     else:
-                        logger.info(f"Task '{task_id}' completed with result: {result}")
+                        logger.info(
+                            f"Task '{task_id}' completed with result: {result}"
+                        )
 
                 # Save results to output directory if specified
                 if args.output_dir:

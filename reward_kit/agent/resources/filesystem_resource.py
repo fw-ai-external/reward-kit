@@ -58,7 +58,9 @@ class FileSystemResource(ForkableResource):
         """
         self._config = config.copy()
 
-        base_dir_name = self._config.get("base_dir_name", f"fs_base_{uuid.uuid4().hex}")
+        base_dir_name = self._config.get(
+            "base_dir_name", f"fs_base_{uuid.uuid4().hex}"
+        )
         self._base_managed_dir_path = self._temp_base_dir / base_dir_name
         self._managed_dir_path = (
             self._base_managed_dir_path
@@ -119,11 +121,11 @@ class FileSystemResource(ForkableResource):
         Creates a tar.gz archive of the current managed directory and returns its path.
         """
         if not self._managed_dir_path or not self._managed_dir_path.exists():
-            raise RuntimeError("Cannot checkpoint: managed directory does not exist.")
+            raise RuntimeError(
+                "Cannot checkpoint: managed directory does not exist."
+            )
 
-        checkpoint_filename = (
-            f"checkpoint_fs_{self._managed_dir_path.name}_{uuid.uuid4().hex}.tar.gz"
-        )
+        checkpoint_filename = f"checkpoint_fs_{self._managed_dir_path.name}_{uuid.uuid4().hex}.tar.gz"
         checkpoint_path = self._temp_base_dir / checkpoint_filename
 
         with tarfile.open(checkpoint_path, "w:gz") as tar:
@@ -131,7 +133,10 @@ class FileSystemResource(ForkableResource):
             tar.add(str(self._managed_dir_path), arcname=".")
 
         # print(f"FileSystemResource checkpointed. Dir: {self._managed_dir_path} to {checkpoint_path}")
-        return {"type": "filesystem_tar_gz", "checkpoint_path": str(checkpoint_path)}
+        return {
+            "type": "filesystem_tar_gz",
+            "checkpoint_path": str(checkpoint_path),
+        }
 
     async def restore(self, state_data: Dict[str, Any]) -> None:
         """
@@ -142,14 +147,20 @@ class FileSystemResource(ForkableResource):
         checkpoint_path_str = state_data.get("checkpoint_path")
 
         if archive_type != "filesystem_tar_gz" or not checkpoint_path_str:
-            raise ValueError("Invalid state_data for FileSystemResource restore.")
+            raise ValueError(
+                "Invalid state_data for FileSystemResource restore."
+            )
 
         checkpoint_path = Path(checkpoint_path_str)
         if not checkpoint_path.exists():
-            raise FileNotFoundError(f"Checkpoint archive not found: {checkpoint_path}")
+            raise FileNotFoundError(
+                f"Checkpoint archive not found: {checkpoint_path}"
+            )
 
         if not self._managed_dir_path:
-            self._managed_dir_path = self._get_new_managed_path(prefix="fs_restored_")
+            self._managed_dir_path = self._get_new_managed_path(
+                prefix="fs_restored_"
+            )
 
         if self._managed_dir_path.exists():
             shutil.rmtree(self._managed_dir_path)  # Clean before restore
@@ -180,7 +191,9 @@ class FileSystemResource(ForkableResource):
             )
         return abs_path
 
-    async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
+    async def step(
+        self, action_name: str, action_params: Dict[str, Any]
+    ) -> Any:
         """
         Performs a file system operation within the managed directory.
 
@@ -202,7 +215,9 @@ class FileSystemResource(ForkableResource):
         if (
             path_str is None and action_name not in []
         ):  # Some actions might not need a path
-            raise ValueError(f"Missing 'path' in action_params for '{action_name}'.")
+            raise ValueError(
+                f"Missing 'path' in action_params for '{action_name}'."
+            )
 
         abs_path = self._resolve_path(path_str) if path_str else None
 
@@ -403,7 +418,9 @@ class FileSystemResource(ForkableResource):
                 shutil.rmtree(self._managed_dir_path)
                 # print(f"FileSystemResource closed. Deleted dir: {self._managed_dir_path}")
             except OSError as e:
-                print(f"Error deleting managed directory {self._managed_dir_path}: {e}")
+                print(
+                    f"Error deleting managed directory {self._managed_dir_path}: {e}"
+                )
 
         # self._base_managed_dir_path might also need cleanup if it's different and temporary.
         self._managed_dir_path = None

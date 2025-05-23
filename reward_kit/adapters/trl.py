@@ -1,11 +1,11 @@
 """
-Adapters for integrating reward-kit reward functions with TRL (Transformer Reinforcement Learning) trainers.
+Adapters for integrating reward-kit with TRL trainers.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 
-from reward_kit.models import (  # Assuming Message is accessible via reward_kit.models
+from reward_kit.models import (  # Assuming Message accessible
     Message,
 )
 from reward_kit.typed_interface import (  # For type hinting the reward_fn
@@ -27,7 +27,7 @@ def create_trl_adapter(
     ] = None,  # Function to construct assistant message content
 ) -> Callable[[List[Any], List[str]], List[float]]:
     """
-    Creates an adapter function compatible with TRL trainers (e.g., GRPOTrainer, PPOTrainer)
+    Creates an adapter function compatible with TRL trainers (e.g., GRPOTrainer)
     from a reward-kit reward function.
 
     The TRL trainer expects a reward function with the signature:
@@ -40,20 +40,25 @@ def create_trl_adapter(
                    input/output conventions (takes List[Message] or List[Dict],
                    returns Dict with a 'score' key).
         dataset_to_reward_kwargs_map: A dictionary mapping dataset column names
-                                      (which appear as keys in **kwargs passed by TRL)
-                                      to the parameter names of the `reward_fn`.
-                                      Example: {"test_cases_column": "test_cases_param"}
-                                      This tells the adapter to take the data from
-                                      kwargs['test_cases_column'] and pass it as
-                                      the `test_cases_param` argument to `reward_fn`.
-        static_reward_kwargs: A dictionary of static keyword arguments that will be
-                              passed to `reward_fn` for every sample.
-                              Example: {"language": "python", "timeout": 10}
-        user_message_fn: An optional function that takes a prompt string and returns
-                         the content for the user message. If None, the prompt itself
+                                      (which appear as keys in **kwargs from TRL
+                                      ) to `reward_fn` parameter names.
+                                      Example: {
+                                          "test_cases_col": "test_cases_param"
+                                      }
+                                      This tells the adapter to take data from
+                                      kwargs['test_cases_column'] and pass as
+                                      the `test_cases_param` arg to `reward_fn`.
+        static_reward_kwargs: Dict of static keyword args that will be
+                              passed to `reward_fn` for each sample.
+                              Example: {
+                                  "language": "python",
+                                  "timeout": 10
+                              }
+        user_message_fn: Optional function that takes prompt string and returns
+                         the content for user message. If None, prompt is used
                          is used as content.
-        assistant_message_fn: An optional function that takes a completion string and
-                              returns the content for the assistant message. If None,
+        assistant_message_fn: Optional function that takes completion string and
+                              returns content for assistant message. If None,
                               the completion itself is used as content.
 
 
@@ -66,12 +71,12 @@ def create_trl_adapter(
     def trl_reward_pipeline(
         prompts: List[Any],  # Changed from List[str] to List[Any]
         completions: Optional[List[str]] = None,
-        **kwargs: Any,  # Contains other dataset columns, e.g., kwargs['test_cases']
+        **kwargs: Any,  # Contains other dataset columns, e.g., test_cases
     ) -> List[float]:
         """
         This is the actual function TRL will call.
 
-        Note: completions parameter is optional to handle cases where prompts already
+        Note: completions param is optional if prompts already
         contain complete conversations.
         """
         scores: List[float] = []
@@ -97,22 +102,32 @@ def create_trl_adapter(
         ) in dataset_to_reward_kwargs_map.items():
             if dataset_col_name not in kwargs:
                 logger.warning(
-                    f"Dataset column '{dataset_col_name}' (mapped to reward_fn param "
+                    f"Dataset column '{dataset_col_name}' "
+                    f"(mapped to reward_fn param "
                     f"'{reward_fn_param_name}') not found in TRL kwargs. "
-                    f"Reward function will receive None for this parameter for all samples."
+                    f"Reward function will receive None for this parameter "
+                    f"for all samples."
                 )
-                # Ensure the key exists in mapped_kwargs_data with a list of Nones
+                # Ensure key exists in mapped_kwargs_data with list of Nones
                 mapped_kwargs_data[reward_fn_param_name] = [None] * num_samples
             else:
-                # Ensure the data from TRL kwargs is a list of the correct length
+                # Ensure data from TRL kwargs is a list of correct length
                 data_list = kwargs[dataset_col_name]
-                if not isinstance(data_list, list) or len(data_list) != num_samples:
+                if (
+                    not isinstance(data_list, list)
+                    or len(data_list) != num_samples
+                ):
                     logger.error(
-                        f"Data for dataset column '{dataset_col_name}' is not a list of "
-                        f"length {num_samples}. Received: {data_list}. "
-                        f"Reward function will receive None for this parameter for all samples."
+                        f"Data for dataset column '{dataset_col_name}' "
+                        f"is not a list of "
+                        f"length {num_samples}. "
+                        f"Received: {data_list}. "
+                        f"Reward function will receive None for this parameter "
+                        f"for all samples."
                     )
-                    mapped_kwargs_data[reward_fn_param_name] = [None] * num_samples
+                    mapped_kwargs_data[reward_fn_param_name] = [
+                        None
+                    ] * num_samples
                 else:
                     mapped_kwargs_data[reward_fn_param_name] = data_list
 
@@ -121,19 +136,21 @@ def create_trl_adapter(
             current_completion: str = completions[i]
 
             # Construct messages
-            # If user_message_fn is provided, it's responsible for converting current_prompt_item to string content.
-            # If not, and current_prompt_item is not a string, this might error or behave unexpectedly.
-            # Default behavior: assume current_prompt_item is a string if user_message_fn is None.
+            # If user_message_fn, it converts current_prompt_item to string.
+            # If not, and current_prompt_item is not string, may error.
+            # Default: current_prompt_item is string if user_message_fn is None.
             user_content = (
                 user_message_fn(current_prompt_item)
                 if user_message_fn
                 else str(current_prompt_item)
             )
 
-            # Default extraction for assistant_content if current_completion is not a simple string
+            # Default extraction for assistant_content if not simple string
             final_assistant_str_content = ""
             if assistant_message_fn:
-                final_assistant_str_content = assistant_message_fn(current_completion)
+                final_assistant_str_content = assistant_message_fn(
+                    current_completion
+                )
             elif isinstance(current_completion, str):
                 final_assistant_str_content = current_completion
             elif (
@@ -143,16 +160,18 @@ def create_trl_adapter(
                 and "content" in current_completion[0]
                 and isinstance(current_completion[0].get("content"), str)
             ):
-                # Handles cases like [{'role':'assistant', 'content':'actual_text'}]
+                # Handles cases like [{'role':'assistant', 'content':'text'}]
                 final_assistant_str_content = current_completion[0]["content"]
             else:
                 # Fallback if current_completion is an unexpected type
                 logger.warning(
-                    f"Completion for assistant message was not a string or expected list/dict structure: {current_completion}. Using str()."
+                    f"Completion for assistant message was not a string or "
+                    f"expected list/dict structure: {current_completion}. "
+                    f"Using str()."
                 )
                 final_assistant_str_content = str(current_completion)
 
-            # Ensure messages_for_reward is typed as List[Message] as per EvaluateFunction protocol
+            # Ensure messages_for_reward is List[Message] per EvaluateFunction
             messages_for_reward: List[Message] = [
                 Message(role="user", content=user_content),
                 Message(role="assistant", content=final_assistant_str_content),
@@ -160,16 +179,24 @@ def create_trl_adapter(
 
             # Prepare kwargs for the specific reward_fn call for this sample
             current_dynamic_kwargs: Dict[str, Any] = {}
-            for reward_fn_param_name, data_list_for_param in mapped_kwargs_data.items():
-                # data_list_for_param is already ensured to be a list of Nones or actual data
-                current_dynamic_kwargs[reward_fn_param_name] = data_list_for_param[i]
+            for (
+                reward_fn_param_name,
+                data_list_for_param,
+            ) in mapped_kwargs_data.items():
+                # data_list_for_param is list of Nones or actual data
+                current_dynamic_kwargs[reward_fn_param_name] = (
+                    data_list_for_param[i]
+                )
 
             # Combine static and dynamic kwargs
-            final_reward_fn_kwargs = {**static_reward_kwargs, **current_dynamic_kwargs}
+            final_reward_fn_kwargs = {
+                **static_reward_kwargs,
+                **current_dynamic_kwargs,
+            }
 
             try:
-                # reward_fn is expected to be decorated with @reward_function,
-                # so it handles Message object creation internally if dicts are passed,
+                # reward_fn is expected to be decorated with @reward_function
+                # so it handles Message object creation if dicts are passed,
                 # and returns a dict.
                 reward_output_dict: Dict[str, Any] = reward_fn(
                     messages=messages_for_reward, **final_reward_fn_kwargs
@@ -178,7 +205,8 @@ def create_trl_adapter(
                 score = reward_output_dict.get("score")
                 if score is None:
                     logger.warning(
-                        f"Sample {i}: 'score' key not found in reward_output_dict or is None. "
+                        f"Sample {i}: 'score' key not found in "
+                        f"reward_output_dict or is None. "
                         f"Output: {reward_output_dict}. Assigning 0.0."
                     )
                     scores.append(0.0)
@@ -187,15 +215,17 @@ def create_trl_adapter(
 
             except Exception as e:
                 logger.error(
-                    f"Error calling reward_fn for sample {i} (prompt: '{str(current_prompt_item)[:50]}...'): {e}",
+                    f"Error calling reward_fn for sample {i} "
+                    f"(prompt: '{str(current_prompt_item)[:50]}...'): {e}",
                     exc_info=True,
                 )
-                scores.append(0.0)  # Assign 0 score on error
+                scores.append(0.0)  # Assign 0 on error
 
         if scores:
             logger.debug(
-                f"Batch rewards calculated by TRL adapter. Count: {len(scores)}, "
-                f"Min: {min(scores)}, Max: {max(scores)}, Avg: {sum(scores)/len(scores):.2f}"
+                f"Batch rewards calculated by TRL adapter. "
+                f"Count: {len(scores)}, Min: {min(scores)}, "
+                f"Max: {max(scores)}, Avg: {sum(scores) / len(scores):.2f}"
             )
         return scores
 

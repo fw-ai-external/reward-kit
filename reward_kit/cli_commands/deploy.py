@@ -29,7 +29,9 @@ def deploy_command(args):
 
     if args.remote_url:
         # Deploying by registering a remote URL
-        print(f"Registering remote evaluator '{args.id}' with URL: {args.remote_url}")
+        print(
+            f"Registering remote evaluator '{args.id}' with URL: {args.remote_url}"
+        )
         if args.metrics_folders:
             print(
                 "Info: --metrics-folders are ignored when deploying with --remote-url."
@@ -89,7 +91,9 @@ def deploy_command(args):
     else:
         # Original behavior: Deploying by packaging local metrics_folders
         if not args.metrics_folders:
-            print("Error: --metrics-folders are required if not using --remote-url.")
+            print(
+                "Error: --metrics-folders are required if not using --remote-url."
+            )
             return 1
 
         # Validate paths for metrics_folders (though create_evaluation might also do this)
@@ -104,7 +108,9 @@ def deploy_command(args):
         huggingface_message_key_map = None
         if args.huggingface_key_map:
             try:
-                huggingface_message_key_map = json.loads(args.huggingface_key_map)
+                huggingface_message_key_map = json.loads(
+                    args.huggingface_key_map
+                )
             except json.JSONDecodeError:
                 print("Error: Invalid JSON format for --huggingface-key-map")
                 return 1
@@ -124,7 +130,9 @@ def deploy_command(args):
                 huggingface_response_key=args.huggingface_response_key,
             )
 
-            print(f"Successfully created/updated evaluator: {evaluator['name']}")
+            print(
+                f"Successfully created/updated evaluator: {evaluator['name']}"
+            )
             return 0
         except Exception as e:
             print(f"Error creating/updating evaluator: {str(e)}")

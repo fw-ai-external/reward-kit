@@ -25,7 +25,10 @@ class TwitterAPI:
             self.authenticated = True
             return {"status": "success", "message": f"Logged in as {username}"}
         else:
-            return {"status": "error", "message": "Invalid username or password"}
+            return {
+                "status": "error",
+                "message": "Invalid username or password",
+            }
 
     def logout(self):
         """Log out from Twitter."""
@@ -41,7 +44,10 @@ class TwitterAPI:
             return {"status": "error", "message": "Not authenticated"}
 
         if not content:
-            return {"status": "error", "message": "Tweet content cannot be empty"}
+            return {
+                "status": "error",
+                "message": "Tweet content cannot be empty",
+            }
 
         tweet_id = self.tweet_counter
         self.tweet_counter += 1
@@ -89,7 +95,10 @@ class TwitterAPI:
             return {"status": "error", "message": "Cannot follow yourself"}
 
         if username in self.following_list:
-            return {"status": "error", "message": f"Already following {username}"}
+            return {
+                "status": "error",
+                "message": f"Already following {username}",
+            }
 
         self.following_list.append(username)
 
@@ -127,7 +136,11 @@ class TwitterAPI:
             self.comments[tweet_id_str] = []
 
         comment_id = len(self.comments[tweet_id_str])
-        comment = {"id": comment_id, "content": content, "username": self.username}
+        comment = {
+            "id": comment_id,
+            "content": content,
+            "username": self.username,
+        }
 
         self.comments[tweet_id_str].append(comment)
 
@@ -150,7 +163,10 @@ class TwitterAPI:
             self.retweets[self.username] = []
 
         if tweet_id_str in self.retweets[self.username]:
-            return {"status": "error", "message": f"Already retweeted tweet {tweet_id}"}
+            return {
+                "status": "error",
+                "message": f"Already retweeted tweet {tweet_id}",
+            }
 
         self.retweets[self.username].append(tweet_id_str)
 

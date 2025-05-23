@@ -38,7 +38,9 @@ async def evaluate_endpoint(request: EvaluationRequest):
     Endpoint to evaluate a given set of messages using the loaded reward function.
     """
     if _LOADED_REWARD_FUNCTION is None:
-        raise HTTPException(status_code=500, detail="Reward function not loaded.")
+        raise HTTPException(
+            status_code=500, detail="Reward function not loaded."
+        )
 
     try:
         # Prepare arguments for the reward function
@@ -84,7 +86,8 @@ async def evaluate_endpoint(request: EvaluationRequest):
         )
         # Consider logging the full traceback here
         raise HTTPException(
-            status_code=500, detail=f"Internal server error during evaluation: {str(e)}"
+            status_code=500,
+            detail=f"Internal server error during evaluation: {str(e)}",
         )
 
 
@@ -129,7 +132,10 @@ if __name__ == "__main__":
         help="Import string for the reward function (e.g., 'my_package.my_module.my_reward_function')",
     )
     parser.add_argument(
-        "--host", type=str, default="127.0.0.1", help="Host to bind the server to."
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to bind the server to.",
     )
     parser.add_argument(
         "--port",
@@ -158,4 +164,6 @@ if __name__ == "__main__":
     print(
         f"Starting server for reward function: {args.import_string} on http://{args.host}:{args.port}"
     )
-    uvicorn.run(app, host=args.host, port=args.port)  # reload=args.reload for dev
+    uvicorn.run(
+        app, host=args.host, port=args.port
+    )  # reload=args.reload for dev

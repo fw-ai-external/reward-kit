@@ -15,7 +15,9 @@ class Message(BaseModel):
     """Chat message model compatible with OpenAI's interface."""
 
     role: str
-    content: Optional[str] = ""  # Content can be None for tool calls in OpenAI API
+    content: Optional[str] = (
+        ""  # Content can be None for tool calls in OpenAI API
+    )
     name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_calls: Optional[List[ChatCompletionMessageToolCall]] = None
@@ -150,10 +152,12 @@ class EvaluationCriteriaModel(BaseModel):
 
     # Explicit fields for ground truth data for BFCL evaluation
     ground_truth_function_calls: Optional[List[List[str]]] = Field(
-        default=None, description="Ground truth function calls for BFCL evaluation."
+        default=None,
+        description="Ground truth function calls for BFCL evaluation.",
     )
     ground_truth_comparable_state: Optional[Dict[str, Any]] = Field(
-        default=None, description="Ground truth comparable state for BFCL evaluation."
+        default=None,
+        description="Ground truth comparable state for BFCL evaluation.",
     )
 
     # Future: Could include other complex evaluation logic or references

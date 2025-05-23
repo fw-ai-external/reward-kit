@@ -104,7 +104,9 @@ def _validate_sample_messages(
     return True
 
 
-def load_samples_from_file(filepath: str, max_samples: int) -> Iterator[Dict[str, Any]]:
+def load_samples_from_file(
+    filepath: str, max_samples: int
+) -> Iterator[Dict[str, Any]]:
     """
     Loads samples from a JSONL file.
     Each line should be a JSON object.
@@ -143,7 +145,9 @@ def load_samples_from_file(filepath: str, max_samples: int) -> Iterator[Dict[str
                         f"Sample (line {line_number}): 'messages' field is missing. Skipping sample."
                     )
                     continue
-                if not _validate_sample_messages(messages, count + 1, line_number):
+                if not _validate_sample_messages(
+                    messages, count + 1, line_number
+                ):
                     continue
                 yield sample
                 count += 1
@@ -244,7 +248,9 @@ def load_samples_from_huggingface(
             {"role": "assistant", "content": response_content},
         ]
 
-        if not _validate_sample_messages(messages, count + 1, processed_records):
+        if not _validate_sample_messages(
+            messages, count + 1, processed_records
+        ):
             continue
 
         sample_output: Dict[str, Any] = {"messages": messages}
@@ -252,7 +258,9 @@ def load_samples_from_huggingface(
         if key_map:
             for source_key_in_record, target_key_in_sample in key_map.items():
                 if source_key_in_record in record:
-                    sample_output[target_key_in_sample] = record[source_key_in_record]
+                    sample_output[target_key_in_sample] = record[
+                        source_key_in_record
+                    ]
                 else:
                     logger.warning(
                         f"HuggingFace record {processed_records}: Key '{source_key_in_record}' from key_map not found. It will be omitted."

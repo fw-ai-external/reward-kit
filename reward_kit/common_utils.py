@@ -33,6 +33,8 @@ def load_jsonl(file_path: str) -> List[Dict[str, Any]]:
         logger.error(f"File not found: {file_path}")
         return []  # Or raise
     except Exception as e:
-        logger.error(f"An unexpected error occurred while reading {file_path}: {e}")
+        logger.error(
+            f"An unexpected error occurred while reading {file_path}: {e}"
+        )
         return []  # Or raise
     return data

@@ -86,7 +86,9 @@ def repetition_penalty_reward(
             reason="No messages provided",
             metrics={
                 "repetition": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )
@@ -196,7 +198,9 @@ def repetition_penalty_reward(
     reason = f"Repetition ratio: {repetition_ratio:.2f}, Unique {ngram_size}-grams: {unique_ngrams}/{total}"
 
     metrics = {
-        "repetition": MetricResult(score=score, is_score_valid=success, reason=reason),
+        "repetition": MetricResult(
+            score=score, is_score_valid=success, reason=reason
+        ),
         "unique_ngram_ratio": MetricResult(
             score=1.0 - repetition_ratio,  # Higher is better
             is_score_valid=success,
@@ -250,7 +254,9 @@ def diversity_reward(
             reason="No messages provided",
             metrics={
                 "diversity": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )
@@ -325,7 +331,9 @@ def diversity_reward(
             weights = weights[: len(ngram_sizes)]
         else:
             # Fill with equal weights for missing values
-            missing_weight = (1.0 - sum(weights)) / (len(ngram_sizes) - len(weights))
+            missing_weight = (1.0 - sum(weights)) / (
+                len(ngram_sizes) - len(weights)
+            )
             weights.extend([missing_weight] * (len(ngram_sizes) - len(weights)))
 
     # Normalize weights to sum to 1
@@ -360,7 +368,10 @@ def diversity_reward(
 
     # Prepare metrics for each n-gram size
     size_metric_items: List[Tuple[str, MetricResult]] = []
-    for size_key, ratio_val in ratios.items():  # size_key is str, e.g., "ngram_1"
+    for (
+        size_key,
+        ratio_val,
+    ) in ratios.items():  # size_key is str, e.g., "ngram_1"
         metric_for_size = MetricResult(
             score=ratio_val,
             is_score_valid=ratio_val

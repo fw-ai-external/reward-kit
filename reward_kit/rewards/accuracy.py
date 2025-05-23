@@ -100,7 +100,9 @@ def extract_math_expression(text: str) -> str:
                     # Handle pi symbols in the answer
                     if "π" in result or "pi" in result.lower():
                         result = (
-                            result.replace("π", "").replace("Pi", "").replace("pi", "")
+                            result.replace("π", "")
+                            .replace("Pi", "")
+                            .replace("pi", "")
                         )
                         try:
                             # If it's just a coefficient of pi, convert to decimal
@@ -134,15 +136,21 @@ def extract_math_expression(text: str) -> str:
     # Only use as a fallback for short responses with few numbers
     if len(text) < 200:  # Only for short answers
         # Count decimal numbers in text
-        numbers = re.findall(r"(?:^|\s|[^\w])([-+]?\d+(?:\.\d+)?)(?:\s|$|[^\w])", text)
-        if len(numbers) == 1:  # If there's only one number, it's likely the answer
+        numbers = re.findall(
+            r"(?:^|\s|[^\w])([-+]?\d+(?:\.\d+)?)(?:\s|$|[^\w])", text
+        )
+        if (
+            len(numbers) == 1
+        ):  # If there's only one number, it's likely the answer
             return numbers[0]
         elif numbers and len(text.split()) < 30:  # Very short text with numbers
             # Take the last number in a short response
             return numbers[-1]
 
     # Look for capitalized city names or other proper nouns as answers
-    if re.search(r"capital|city|country|president|largest|smallest", text.lower()):
+    if re.search(
+        r"capital|city|country|president|largest|smallest", text.lower()
+    ):
         noun_pattern = r"is\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)"
         match = re.search(noun_pattern, text)
         if match:
@@ -352,7 +360,9 @@ def accuracy_reward(
             reason="No messages provided.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided.",
                 )
             },
         )
@@ -400,13 +410,19 @@ def accuracy_reward(
             reason=f"Unexpected type for last message: {type(model_last_message)}.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid message type."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid message type.",
                 )
             },
         )
 
     ground_truth_comparison_text = ""
-    if not ground_truth or not isinstance(ground_truth, list) or len(ground_truth) == 0:
+    if (
+        not ground_truth
+        or not isinstance(ground_truth, list)
+        or len(ground_truth) == 0
+    ):
         return EvaluateResult(
             score=0.0,
             reason="Ground truth not provided/invalid.",
@@ -456,7 +472,9 @@ def accuracy_reward(
             reason=f"Unexpected type for first GT message: {type(first_gt_message)}.",
             metrics={
                 "accuracy": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Invalid GT message type."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Invalid GT message type.",
                 )
             },
         )
@@ -478,7 +496,9 @@ def accuracy_reward(
     similarity_score = (
         compare_fn(extracted_answer, ground_truth_comparison_text)
         if compare_fn
-        else compare_math_expressions(extracted_answer, ground_truth_comparison_text)
+        else compare_math_expressions(
+            extracted_answer, ground_truth_comparison_text
+        )
     )
     success = similarity_score >= 0.9
     reason = f"Expected: '{ground_truth_comparison_text}', Extracted: '{extracted_answer}', Similarity: {similarity_score:.2f}"
@@ -499,4 +519,6 @@ def accuracy_reward(
             reason=f"Answer similarity: {similarity_score:.2f}",
         ),
     }
-    return EvaluateResult(score=similarity_score, reason=reason, metrics=metrics)
+    return EvaluateResult(
+        score=similarity_score, reason=reason, metrics=metrics
+    )

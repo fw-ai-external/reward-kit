@@ -44,7 +44,9 @@ def tag_count_reward(
             reason="No messages provided",
             metrics={
                 "tag_count": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No messages provided"
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No messages provided",
                 )
             },
         )
@@ -111,7 +113,9 @@ def tag_count_reward(
                 if (opening_count > 0 and closing_count > 0 and is_balanced)
                 else 0.0
             )
-            tag_success = opening_count > 0 and closing_count > 0 and is_balanced
+            tag_success = (
+                opening_count > 0 and closing_count > 0 and is_balanced
+            )
         else:
             has_tags = opening_count > 0 or closing_count > 0
             tag_score = 1.0 if has_tags else 0.0
@@ -120,7 +124,9 @@ def tag_count_reward(
         tag_metrics[f"tag_{tag}"] = MetricResult(
             score=tag_score,
             is_score_valid=tag_success,
-            reason=_get_tag_reason(tag, opening_count, closing_count, require_balanced),
+            reason=_get_tag_reason(
+                tag, opening_count, closing_count, require_balanced
+            ),
         )
 
     # Calculate overall score
@@ -145,7 +151,10 @@ def tag_count_reward(
     )
 
     return EvaluateResult(
-        score=total_score, reason=reason, metrics=tag_metrics, is_score_valid=success
+        score=total_score,
+        reason=reason,
+        metrics=tag_metrics,
+        is_score_valid=success,
     )
 
 

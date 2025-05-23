@@ -9,7 +9,10 @@ class File:
     """A file in the Gorilla File System."""
 
     def __init__(
-        self, name: str = "", content: str = "", parent: Optional["Directory"] = None
+        self,
+        name: str = "",
+        content: str = "",
+        parent: Optional["Directory"] = None,
     ):  # 'Directory' as string literal
         self.name: str = name
         self.content: str = content
@@ -185,7 +188,10 @@ class GorillaFileSystem:
                     "message": f"Changed to {self.current_dir.name}",
                 }
             else:  # Parent is None, so we are at root
-                return {"status": "error", "message": "Already at root directory"}
+                return {
+                    "status": "error",
+                    "message": "Already at root directory",
+                }
 
         # self.current_dir is always a Directory. Accessing .contents is safe.
         target_item = self.current_dir.contents.get(folder)
@@ -253,7 +259,10 @@ class GorillaFileSystem:
         source_item.parent = final_target_dir
         final_target_dir.contents[dest_name] = source_item
 
-        return {"status": "success", "message": f"Moved {source} to {destination}"}
+        return {
+            "status": "success",
+            "message": f"Moved {source} to {destination}",
+        }
 
     def grep(self, file_name: str, pattern: str) -> Dict:
         """Search for a pattern in a file."""
@@ -289,9 +298,15 @@ class GorillaFileSystem:
         item2 = self.current_dir.contents.get(file_name2)
 
         if not isinstance(item1, File):
-            return {"status": "error", "message": f"File {file_name1} not found"}
+            return {
+                "status": "error",
+                "message": f"File {file_name1} not found",
+            }
         if not isinstance(item2, File):
-            return {"status": "error", "message": f"File {file_name2} not found"}
+            return {
+                "status": "error",
+                "message": f"File {file_name2} not found",
+            }
 
         content1 = item1.content  # item1 is File
         content2 = item2.content  # item2 is File
@@ -367,7 +382,9 @@ class GorillaFileSystem:
             found_item = current_node.contents.get(part_name)
 
             if i == len(parts) - 1:  # This is the last part of the path
-                return found_item  # Return File, Directory, or None if not found
+                return (
+                    found_item  # Return File, Directory, or None if not found
+                )
 
             if isinstance(found_item, Directory):
                 current_node = found_item  # Navigate into subdirectory

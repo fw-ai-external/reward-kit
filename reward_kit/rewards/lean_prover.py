@@ -9,7 +9,9 @@ from reward_kit.reward_function import reward_function
 
 @reward_function
 def lean_prover_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    messages: List[
+        Message
+    ],  # Full conversation, model's response is messages[-1]
     ground_truth: Optional[str],  # This is the expected_answer (proof string)
     # statement is still expected via kwargs as per original logic
     **kwargs: Any,
@@ -41,7 +43,9 @@ def lean_prover_reward(
             reason="Statement not provided in kwargs.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Statement not provided."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Statement not provided.",
                 )
             },
         )
@@ -154,7 +158,9 @@ def lean_prover_reward(
         # Add up to 0.4 more based on tactics complexity
         if tactics_count >= 5:
             score += 0.4
-            reason = f"Complete proof with good complexity ({tactics_count} tactics)"
+            reason = (
+                f"Complete proof with good complexity ({tactics_count} tactics)"
+            )
         else:
             score += (tactics_count / 5) * 0.4
             reason = f"Complete proof with {tactics_count} tactics"
@@ -187,7 +193,8 @@ def lean_prover_reward(
             ),
             "tactics": MetricResult(
                 score=min(1.0, tactics_count / 10),
-                is_score_valid=tactics_count > 0,  # Basic success if any tactics used
+                is_score_valid=tactics_count
+                > 0,  # Basic success if any tactics used
                 reason=f"Used {tactics_count} tactics",
             ),
         }
@@ -214,7 +221,9 @@ def lean_prover_reward(
 
 @reward_function
 def deepseek_prover_v2_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    messages: List[
+        Message
+    ],  # Full conversation, model's response is messages[-1]
     ground_truth: Optional[str],  # This is the expected_proof
     # statement is still expected via kwargs
     **kwargs: Any,
@@ -243,7 +252,9 @@ def deepseek_prover_v2_reward(
             reason="Statement not provided in kwargs for deepseek_prover_v2_reward.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="Statement not provided."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="Statement not provided.",
                 )
             },
         )
@@ -266,7 +277,9 @@ def deepseek_prover_v2_reward(
     # messages (full convo) is passed as messages.
     # expected_proof (this function's ground_truth) is passed as ground_truth to lean_prover_reward.
     base_evaluate_result: EvaluateResult = lean_prover_reward(
-        messages=messages, ground_truth=expected_proof, **lean_prover_kwargs_for_call
+        messages=messages,
+        ground_truth=expected_proof,
+        **lean_prover_kwargs_for_call,
     )
 
     base_score = base_evaluate_result.score
@@ -332,7 +345,9 @@ def deepseek_prover_v2_reward(
             final_score = min(1.0, base_score + subgoal_score + hierarchy_score)
             # Update top_level_reason, as 'reason' might not be defined in this scope
             # if base_reason was used for top_level_reason.
-            top_level_reason = f"{top_level_reason} with good subgoal decomposition"
+            top_level_reason = (
+                f"{top_level_reason} with good subgoal decomposition"
+            )
         else:
             final_score = base_score
 
@@ -366,7 +381,9 @@ def deepseek_prover_v2_reward(
 
 @reward_function
 def deepseek_huggingface_prover_benchmark(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    messages: List[
+        Message
+    ],  # Full conversation, model's response is messages[-1]
     ground_truth: Dict[
         str, Any
     ],  # Expected to contain 'statement', and optionally 'dataset_item' or its components
@@ -396,7 +413,9 @@ def deepseek_huggingface_prover_benchmark(
     expected_proof_from_gt: Optional[str] = ground_truth.get("expected_proof")
     answer_from_gt: Optional[str] = ground_truth.get("answer")
 
-    dataset_name: str = kwargs.get("dataset_name", "deepseek-ai/DeepSeek-ProverBench")
+    dataset_name: str = kwargs.get(
+        "dataset_name", "deepseek-ai/DeepSeek-ProverBench"
+    )
     check_for_answer: bool = kwargs.get("check_for_answer", True)
     verbose: bool = kwargs.get("verbose", False)
 
@@ -483,7 +502,9 @@ def deepseek_huggingface_prover_benchmark(
                     ratio = SequenceMatcher(
                         None, statement.strip(), item.get("statement", "")
                     ).ratio()
-                    if ratio > best_ratio and ratio > 0.7:  # 70% similarity threshold
+                    if (
+                        ratio > best_ratio and ratio > 0.7
+                    ):  # 70% similarity threshold
                         best_ratio = ratio
                         matched_item = item
                         matched_ratio = ratio
@@ -511,16 +532,22 @@ def deepseek_huggingface_prover_benchmark(
         else:
             # Add exact match info to metrics
             metrics["dataset_match"] = MetricResult(
-                score=1.0, is_score_valid=True, reason="Found exact match in dataset"
+                score=1.0,
+                is_score_valid=True,
+                reason="Found exact match in dataset",
             )
 
         dataset_item = matched_item
 
     # Extract expected proof if available from dataset_item or directly from ground_truth
-    expected_proof = expected_proof_from_gt  # Prioritize direct key from ground_truth
+    expected_proof = (
+        expected_proof_from_gt  # Prioritize direct key from ground_truth
+    )
     reference_solution = None
     if dataset_item:
-        if not expected_proof:  # If not in ground_truth directly, try from dataset_item
+        if (
+            not expected_proof
+        ):  # If not in ground_truth directly, try from dataset_item
             expected_proof = dataset_item.get("expected_proof", None)
         reference_solution = dataset_item.get("reference_solution", None)
 
@@ -528,7 +555,9 @@ def deepseek_huggingface_prover_benchmark(
     proof_reference = expected_proof or reference_solution
 
     # Check for the answer/solution if required
-    current_top_level_reason = "Evaluation against DeepSeek ProverBench dataset."
+    current_top_level_reason = (
+        "Evaluation against DeepSeek ProverBench dataset."
+    )
     # Use answer_from_gt if available, otherwise try from dataset_item
     answer_to_check = answer_from_gt
     if not answer_to_check and dataset_item:
@@ -568,7 +597,9 @@ def deepseek_huggingface_prover_benchmark(
         "verbose": verbose,
     }
     eval_result_from_deepseek: EvaluateResult = deepseek_prover_v2_reward(
-        messages=messages, ground_truth=proof_reference, **deepseek_kwargs_for_call
+        messages=messages,
+        ground_truth=proof_reference,
+        **deepseek_kwargs_for_call,
     )
 
     result_score = eval_result_from_deepseek.score
@@ -598,5 +629,7 @@ def deepseek_huggingface_prover_benchmark(
 
     # Create and return final result
     return EvaluateResult(
-        score=result_score, reason=current_top_level_reason, metrics=combined_metrics
+        score=result_score,
+        reason=current_top_level_reason,
+        metrics=combined_metrics,
     )

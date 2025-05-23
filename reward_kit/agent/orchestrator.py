@@ -10,7 +10,16 @@ import inspect
 import json  # Add json import
 import logging
 import os  # Add os import
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    cast,
+)
 from unittest.mock import AsyncMock  # Add this import
 
 # Attempt to import OpenAI client
@@ -69,7 +78,9 @@ class Orchestrator:
         self.base_resource: Optional[ForkableResource] = None
         self.tools_module: Optional[Any] = None
         self.reward_function: Optional[Callable[..., Any]] = None
-        self.logger = logging.getLogger(f"Orchestrator.{self.task_definition.name}")
+        self.logger = logging.getLogger(
+            f"Orchestrator.{self.task_definition.name}"
+        )
         self.logger.setLevel(logging.DEBUG)  # Ensure debug logs are processed
         self.logger.info(
             f"Orchestrator initialized for task: {self.task_definition.name}"
@@ -91,10 +102,14 @@ class Orchestrator:
                 )
                 self.logger.info("AsyncOpenAI client initialized.")
             except Exception as e:
-                self.logger.error(f"Failed to initialize AsyncOpenAI client: {e}")
+                self.logger.error(
+                    f"Failed to initialize AsyncOpenAI client: {e}"
+                )
                 self._openai_client = None  # Ensure it's None if init fails
 
-    def _load_module_and_function(self, full_path: str) -> Optional[Callable[..., Any]]:
+    def _load_module_and_function(
+        self, full_path: str
+    ) -> Optional[Callable[..., Any]]:
         try:
             module_path, function_name = full_path.rsplit(".", 1)
             module = importlib.import_module(module_path)
@@ -126,7 +141,9 @@ class Orchestrator:
                 )
             return None
         except (ImportError, AttributeError, ValueError) as e:
-            self.logger.error(f"Failed to load function from '{full_path}': {e}")
+            self.logger.error(
+                f"Failed to load function from '{full_path}': {e}"
+            )
             return None
 
     async def _load_task_components(self) -> bool:
@@ -175,9 +192,11 @@ class Orchestrator:
                         in self.task_definition.reward_function_path
                     ):
                         # Extract the function name from the path
-                        func_name = self.task_definition.reward_function_path.split(
-                            "."
-                        )[-1]
+                        func_name = (
+                            self.task_definition.reward_function_path.split(
+                                "."
+                            )[-1]
+                        )
                         self.logger.debug(
                             f"Attempting to get function by name: {func_name}"
                         )
@@ -220,14 +239,18 @@ class Orchestrator:
                     )
                     return False
             except Exception as e:
-                self.logger.error(f"Error loading reward function: {e}", exc_info=True)
+                self.logger.error(
+                    f"Error loading reward function: {e}", exc_info=True
+                )
                 return False
         else:
             self.logger.error("Reward function path is mandatory but missing.")
             return False
         return True
 
-    def _get_resource_class(self, resource_type_name: str) -> Type[ForkableResource]:
+    def _get_resource_class(
+        self, resource_type_name: str
+    ) -> Type[ForkableResource]:
         # This method will now need to look into reward_kit.agent_v2.resources
         # For example: from .resources import SQLResource, PythonStateResource etc.
         # And then map resource_type_name string to the class.
@@ -287,7 +310,9 @@ class Orchestrator:
             )  # <-- ADDED DEBUG LOG
             for tool_spec in resource_tool_specs:
                 # Corrected logic based on BFCLSimAPIResource._infer_schema_from_method output
-                tool_name = tool_spec.get("name")  # Get name directly from spec root
+                tool_name = tool_spec.get(
+                    "name"
+                )  # Get name directly from spec root
                 if tool_name:
                     # Create an async adapter function that calls episode_resource.step
                     async def resource_tool_adapter(
@@ -301,7 +326,9 @@ class Orchestrator:
                         )
 
                     available_tools[tool_name] = resource_tool_adapter
-                    self.logger.debug(f"Added tool '{tool_name}' from resource spec.")
+                    self.logger.debug(
+                        f"Added tool '{tool_name}' from resource spec."
+                    )
                 else:
                     self.logger.warning(
                         f"Skipping resource tool spec due to missing 'name': {tool_spec}"
@@ -327,7 +354,9 @@ class Orchestrator:
             if registry_instances:
                 # Use the first registry instance found
                 registry_name, registry = registry_instances[0]
-                self.logger.info(f"Using ToolRegistry '{registry_name}' from module")
+                self.logger.info(
+                    f"Using ToolRegistry '{registry_name}' from module"
+                )
 
                 # Get all tools from the registry
                 registry_tools = registry.get_tools()
@@ -335,7 +364,8 @@ class Orchestrator:
                     # Create an adapter that will pass the resource to the tool
                     def create_tool_adapter(tool_func):
                         async def adapter(
-                            params: Dict[str, Any], bound_resource=episode_resource
+                            params: Dict[str, Any],
+                            bound_resource=episode_resource,
                         ):
                             # Handle both sync and async functions
                             if asyncio.iscoroutinefunction(tool_func):
@@ -343,7 +373,9 @@ class Orchestrator:
                                     resource=bound_resource, **params
                                 )
                             else:
-                                result = tool_func(resource=bound_resource, **params)
+                                result = tool_func(
+                                    resource=bound_resource, **params
+                                )
                             return result
 
                         return adapter
@@ -358,7 +390,9 @@ class Orchestrator:
                     self.logger.info(
                         f"Found {len(available_tools)} tools from ToolRegistry"
                     )
-                    self.logger.debug(f"Tool names: {list(available_tools.keys())}")
+                    self.logger.debug(
+                        f"Tool names: {list(available_tools.keys())}"
+                    )
 
             # If no registry tools were found, fall back to module inspection
             if not available_tools:
@@ -417,7 +451,10 @@ class Orchestrator:
                                 res_param_name=resource_param_name,
                                 is_async=is_async,
                             ):
-                                tool_kwargs = {res_param_name: bound_resource, **params}
+                                tool_kwargs = {
+                                    res_param_name: bound_resource,
+                                    **params,
+                                }
                                 if is_async:
                                     return await bound_tool_func(**tool_kwargs)
                                 else:
@@ -435,7 +472,9 @@ class Orchestrator:
                         self.logger.debug(
                             f"Skipping module tool '{name}': could not get signature. Error: {e_sig}"
                         )
-        self.logger.info(f"Combined available tools: {list(available_tools.keys())}")
+        self.logger.info(
+            f"Combined available tools: {list(available_tools.keys())}"
+        )
         return available_tools
 
     async def execute_task_poc(self) -> Optional[Dict[str, Any]]:
@@ -472,7 +511,9 @@ class Orchestrator:
         if agent_model_name.startswith("openai/"):
             self._initialize_openai_client()
             if not self._openai_client:
-                self.logger.error("OpenAI client failed to initialize. Cannot proceed.")
+                self.logger.error(
+                    "OpenAI client failed to initialize. Cannot proceed."
+                )
                 return None
             agent_model_name = agent_model_name.split("openai/", 1)[
                 1
@@ -493,7 +534,9 @@ class Orchestrator:
             if not self.base_resource:
                 await self.setup_base_resource()
             if not self.base_resource:
-                self.logger.error("Base resource setup failed or not performed.")
+                self.logger.error(
+                    "Base resource setup failed or not performed."
+                )
                 return None
             if not self.reward_function:
                 self.logger.error("Reward function not loaded.")
@@ -511,10 +554,16 @@ class Orchestrator:
             user_turns_from_task: List[Dict[str, Any]] = []
             if self.task_definition.messages:
                 for msg_data in self.task_definition.messages:
-                    if isinstance(msg_data, dict) and msg_data.get("role") == "user":
+                    if (
+                        isinstance(msg_data, dict)
+                        and msg_data.get("role") == "user"
+                    ):
                         # Ensure it's a dict and has a role, content can be complex
                         user_turns_from_task.append(msg_data)
-                    elif isinstance(msg_data, Message) and msg_data.role == "user":
+                    elif (
+                        isinstance(msg_data, Message)
+                        and msg_data.role == "user"
+                    ):
                         user_turns_from_task.append(
                             msg_data.model_dump(exclude_none=True)
                         )
@@ -545,9 +594,9 @@ class Orchestrator:
                     f"--- User Turn {turn_num}/{max_interaction_turns} (Overall Index {current_user_turn_index + 1}/{num_defined_user_turns}) ---"
                 )
 
-                current_user_turn_accumulated_successful_calls: List[Dict[str, Any]] = (
-                    []
-                )
+                current_user_turn_accumulated_successful_calls: List[
+                    Dict[str, Any]
+                ] = []
 
                 # Add the current user turn's message(s) to the conversation history
                 if current_user_turn_index < num_defined_user_turns:
@@ -559,7 +608,9 @@ class Orchestrator:
                     # We need to parse it if it's a JSON string representing a list of messages.
                     try:
                         # Attempt to parse content if it's a string that looks like a JSON list
-                        if isinstance(current_user_turn_message.get("content"), str):
+                        if isinstance(
+                            current_user_turn_message.get("content"), str
+                        ):
                             parsed_content = json.loads(
                                 current_user_turn_message["content"]
                             )
@@ -570,7 +621,9 @@ class Orchestrator:
                                         and "role" in sub_msg_dict
                                         and "content" in sub_msg_dict
                                     ):
-                                        conversation_messages.append(sub_msg_dict)
+                                        conversation_messages.append(
+                                            sub_msg_dict
+                                        )
                                     else:
                                         self.logger.warning(
                                             f"Skipping sub-message in user turn due to invalid format: {sub_msg_dict}"
@@ -582,9 +635,13 @@ class Orchestrator:
                                 else:  # If loop completed without break
                                     pass  # Successfully processed all sub-messages
                             else:  # Content is a JSON string but not a list
-                                conversation_messages.append(current_user_turn_message)
+                                conversation_messages.append(
+                                    current_user_turn_message
+                                )
                         else:  # Content is not a string or already a complex object
-                            conversation_messages.append(current_user_turn_message)
+                            conversation_messages.append(
+                                current_user_turn_message
+                            )
                     except (
                         json.JSONDecodeError
                     ):  # Content is a string but not valid JSON
@@ -616,7 +673,9 @@ class Orchestrator:
                                     type="function",
                                     function={
                                         "name": spec["name"],
-                                        "description": spec.get("description", ""),
+                                        "description": spec.get(
+                                            "description", ""
+                                        ),
                                         "parameters": spec[
                                             "parameters"
                                         ],  # Assuming this matches OpenAI schema
@@ -641,7 +700,9 @@ class Orchestrator:
                                     type="function",
                                     function={
                                         "name": tool_spec["name"],
-                                        "description": tool_spec.get("description", ""),
+                                        "description": tool_spec.get(
+                                            "description", ""
+                                        ),
                                         "parameters": tool_spec["parameters"],
                                     },
                                 )
@@ -675,11 +736,13 @@ class Orchestrator:
                         if not self._openai_client:
                             raise Exception("OpenAI client not initialized")
 
-                        response = await self._openai_client.chat.completions.create(
-                            model=agent_model_name,
-                            messages=conversation_messages,  # type: ignore
-                            tools=openai_tools if openai_tools else None,
-                            tool_choice="auto" if openai_tools else None,
+                        response = (
+                            await self._openai_client.chat.completions.create(
+                                model=agent_model_name,
+                                messages=conversation_messages,  # type: ignore
+                                tools=openai_tools if openai_tools else None,
+                                tool_choice="auto" if openai_tools else None,
+                            )
                         )
                         response_message = response.choices[0].message
                         self.logger.debug(
@@ -688,12 +751,15 @@ class Orchestrator:
 
                     except Exception as e_openai:
                         self.logger.error(
-                            f"Error calling OpenAI API: {e_openai}", exc_info=True
+                            f"Error calling OpenAI API: {e_openai}",
+                            exc_info=True,
                         )
                         # Break inner loop on API error, then outer loop will decide to continue or break.
                         # For now, let's break the outer loop as well to prevent cascading errors.
                         # TODO: Consider more nuanced error handling for outer loop.
-                        evaluation_result = {"error": f"OpenAI API error: {e_openai}"}
+                        evaluation_result = {
+                            "error": f"OpenAI API error: {e_openai}"
+                        }
                         # Clean up and return
                         if episode_resource:
                             await episode_resource.close()
@@ -713,7 +779,9 @@ class Orchestrator:
                         self.logger.info(
                             f"Assistant requested {len(tool_calls)} tool calls in this step."
                         )
-                        current_llm_response_successful_calls: List[Dict[str, Any]] = []
+                        current_llm_response_successful_calls: List[
+                            Dict[str, Any]
+                        ] = []
                         for tool_call in tool_calls:
                             function_name = tool_call.function.name
                             function_args_str = tool_call.function.arguments
@@ -721,10 +789,14 @@ class Orchestrator:
                                 f"Attempting tool call: {function_name}({function_args_str})"
                             )
 
-                            tool_adapter = available_tools_adapters.get(function_name)
+                            tool_adapter = available_tools_adapters.get(
+                                function_name
+                            )
                             if tool_adapter:
                                 try:
-                                    function_args = json.loads(function_args_str)
+                                    function_args = json.loads(
+                                        function_args_str
+                                    )
                                     function_response = await tool_adapter(
                                         function_args
                                     )
@@ -736,7 +808,9 @@ class Orchestrator:
                                             "tool_call_id": tool_call.id,
                                             "role": "tool",
                                             "name": function_name,
-                                            "content": json.dumps(function_response),
+                                            "content": json.dumps(
+                                                function_response
+                                            ),
                                         }
                                     )
                                     current_llm_response_successful_calls.append(
@@ -755,7 +829,9 @@ class Orchestrator:
                                             "role": "tool",
                                             "name": function_name,
                                             "content": json.dumps(
-                                                {"error": "Invalid JSON arguments"}
+                                                {
+                                                    "error": "Invalid JSON arguments"
+                                                }
                                             ),
                                         }
                                     )
@@ -844,7 +920,8 @@ class Orchestrator:
             ):  # and isinstance(episode_resource, SQLResource):
                 if hasattr(episode_resource, "step"):  # Generic check
                     query_res_step = await episode_resource.step(
-                        "fetch_val_sql", {"query": eval_criteria.final_state_query}
+                        "fetch_val_sql",
+                        {"query": eval_criteria.final_state_query},
                     )
                     if query_res_step.get("status") == "success":
                         outcome = query_res_step.get("result")
@@ -855,7 +932,9 @@ class Orchestrator:
                                 )
                                 task_achieved = bool(transform_func(outcome))
                             except Exception as e_tf:
-                                self.logger.error(f"Error applying transform: {e_tf}")
+                                self.logger.error(
+                                    f"Error applying transform: {e_tf}"
+                                )
                         else:
                             task_achieved = bool(outcome)
                         self.logger.info(
@@ -927,5 +1006,7 @@ class Orchestrator:
                 await self.base_resource.close()
                 self.base_resource = None
                 self.logger.info("Base resource closed.")
-        self.logger.info(f"Execution for task '{self.task_definition.name}' finished.")
+        self.logger.info(
+            f"Execution for task '{self.task_definition.name}' finished."
+        )
         return evaluation_result

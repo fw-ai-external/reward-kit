@@ -166,7 +166,9 @@ def _extract_boxed_latex_answers(
     """
     boxed_answers: List[Tuple[str, Union[float, str]]] = []
     found_any_boxed_expr = False
-    for m_boxed in re.finditer(r"\\boxed\s*\{\s*((?:[^{}]|\{[^{}]*\})*?)\s*\}", text):
+    for m_boxed in re.finditer(
+        r"\\boxed\s*\{\s*((?:[^{}]|\{[^{}]*\})*?)\s*\}", text
+    ):
         found_any_boxed_expr = True
         original_boxed_expr = m_boxed.group(0)
         content = m_boxed.group(1).strip()
@@ -177,7 +179,9 @@ def _extract_boxed_latex_answers(
         if " or " in content.lower():  # Handle "A or B" type answers
             boxed_answers.append((original_boxed_expr, content))
             continue
-        if re.fullmatch(r"[A-Ea-e]", content):  # Handle MCQ options like "A", "B"
+        if re.fullmatch(
+            r"[A-Ea-e]", content
+        ):  # Handle MCQ options like "A", "B"
             boxed_answers.append((original_boxed_expr, content.upper()))
             continue
 
@@ -228,10 +232,15 @@ def _extract_boxed_latex_answers(
                 if isinstance(first_val_candidate, (float, int)):
                     first_numeric_value = float(first_val_candidate)
                     all_other_values_identical = True  # Assume true initially
-                    if len(boxed_answers) > 1:  # Only check if there are other elements
+                    if (
+                        len(boxed_answers) > 1
+                    ):  # Only check if there are other elements
                         all_other_values_identical = all(
                             math.isclose(
-                                val, first_numeric_value, rel_tol=1e-9, abs_tol=1e-9
+                                val,
+                                first_numeric_value,
+                                rel_tol=1e-9,
+                                abs_tol=1e-9,
                             )
                             for _, val in boxed_answers[
                                 1:
@@ -295,24 +304,32 @@ def _extract_gsm8k_answers(text: str) -> List[Tuple[str, Union[float, str]]]:
     """Extracts answers from GSM8K-style final answer markers (#### ...)."""
     final_marker_answers: List[Tuple[str, Union[float, str]]] = []
     # Pattern for numbers in GSM8K, allowing for commas and decimals
-    GSM8K_NUM_CONTENT_PATTERN = r"-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?"
+    GSM8K_NUM_CONTENT_PATTERN = (
+        r"-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?"
+    )
     for m_final in re.finditer(rf"####\s*({GSM8K_NUM_CONTENT_PATTERN})", text):
         original_marker_expr = m_final.group(0)
         num_str_from_regex = m_final.group(1)
         cleaned_num_str = num_str_from_regex.replace(",", "")
         try:
-            final_marker_answers.append((original_marker_expr, float(cleaned_num_str)))
+            final_marker_answers.append(
+                (original_marker_expr, float(cleaned_num_str))
+            )
         except ValueError:
             pass  # Should not happen if regex matches, but good practice
     return final_marker_answers
 
 
-def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, str]]]:
+def _extract_general_numeric_answers(
+    text: str,
+) -> List[Tuple[str, Union[float, str]]]:
     """Extracts general numeric or LaTeX-formatted numbers as a fallback."""
     potential_general_matches: List[Dict[str, Any]] = []
 
     # --- Part 1: Numbers within LaTeX blocks ($...$ or $$...$$) ---
-    for latex_block_match in re.finditer(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL):
+    for latex_block_match in re.finditer(
+        r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL
+    ):
         content = (
             latex_block_match.group(1)
             if latex_block_match.group(1) is not None
@@ -326,7 +343,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         if not content:
             continue
         # Avoid re-processing if it's a boxed expression already handled
-        if content.strip().startswith("\\boxed{") and content.strip().endswith("}"):
+        if content.strip().startswith("\\boxed{") and content.strip().endswith(
+            "}"
+        ):
             continue
 
         # LaTeX fraction: \frac{a}{b}
@@ -334,7 +353,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
             r"\\frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}", content
         ):
             try:
-                num, den = float(m_frac_latex.group(1)), float(m_frac_latex.group(2))
+                num, den = float(m_frac_latex.group(1)), float(
+                    m_frac_latex.group(2)
+                )
                 if den != 0:
                     potential_general_matches.append(
                         {
@@ -355,7 +376,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
             r"(-?\d+(?:\.\d+)?)\s*\\times\s*10\^\{(.*?)\}", content
         ):
             try:
-                base, exp = float(m_sci_latex.group(1)), float(m_sci_latex.group(2))
+                base, exp = float(m_sci_latex.group(1)), float(
+                    m_sci_latex.group(2)
+                )
                 potential_general_matches.append(
                     {
                         "text": m_sci_latex.group(0),
@@ -397,7 +420,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
     # These patterns are applied to the original `text`, not just LaTeX blocks.
     # The _is_coefficient check here will use the full `text`.
 
-    sci_pattern = r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
+    sci_pattern = (
+        r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
+    )
     for m in re.finditer(sci_pattern, text):
         if _is_coefficient(  # Use module-level helper
             text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
@@ -464,9 +489,7 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         except ValueError:
             pass
 
-    decimal_pattern = (
-        r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?:\s*([a-zA-Z%]+))?"
-    )
+    decimal_pattern = r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?:\s*([a-zA-Z%]+))?"
     for m in re.finditer(decimal_pattern, text):
         if _is_coefficient(  # Corrected call
             text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
@@ -503,7 +526,11 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
             pass
 
     potential_general_matches.sort(
-        key=lambda x: (x["span"][0], -(x["span"][1] - x["span"][0]), x["type_priority"])
+        key=lambda x: (
+            x["span"][0],
+            -(x["span"][1] - x["span"][0]),
+            x["type_priority"],
+        )
     )
     filtered_general_answers: List[Tuple[str, Union[float, str]]] = []
     last_covered_end = -1
@@ -512,7 +539,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         if start >= last_covered_end:
             value_to_append = item["value"]
             if isinstance(value_to_append, (int, float)):
-                filtered_general_answers.append((item["text"], float(value_to_append)))
+                filtered_general_answers.append(
+                    (item["text"], float(value_to_append))
+                )
             last_covered_end = end
 
     if filtered_general_answers:
@@ -538,7 +567,9 @@ def compare_numbers(
             similarity = max(0.0, 1.0 - min(1.0, error / absolute_tolerance))
         else:
             rel_error = abs((expected - actual) / expected)
-            similarity = max(0.0, 1.0 - min(1.0, rel_error / relative_tolerance))
+            similarity = max(
+                0.0, 1.0 - min(1.0, rel_error / relative_tolerance)
+            )
     except (ZeroDivisionError, OverflowError):
         similarity = 0.0
     return False, similarity
@@ -547,7 +578,9 @@ def compare_numbers(
 def _has_unit_text(full_extracted_text: str, numeric_value: float) -> bool:
     """Checks if the extracted text for a number likely contains a unit."""
     content_to_check = full_extracted_text
-    if content_to_check.startswith("\\boxed{") and content_to_check.endswith("}"):
+    if content_to_check.startswith("\\boxed{") and content_to_check.endswith(
+        "}"
+    ):
         content_to_check = content_to_check[7:-1].strip()
 
     num_str_float = str(numeric_value)
@@ -603,9 +636,7 @@ def _check_unboxed_or_strictness(
         )
     ):
         specific_reason_detail = "Generated answer offers multiple numeric alternatives with an unboxed 'or' in the raw response."
-        full_reason = (
-            f"Strictness fail (Issue #1 - Unboxed 'or'): {specific_reason_detail}"
-        )
+        full_reason = f"Strictness fail (Issue #1 - Unboxed 'or'): {specific_reason_detail}"
         metrics["strictness_penalty_unboxed_or"] = MetricResult(
             score=0.0, is_score_valid=False, reason=specific_reason_detail
         )
@@ -776,9 +807,9 @@ def math_reward(
     # --- DEMO Leniency Modification START ---
     is_single_orig_boxed_truth = False
     orig_boxed_value = None
-    if len(orig_answers_extracted) == 1 and orig_answers_extracted[0][0].startswith(
-        "\\boxed{"
-    ):
+    if len(orig_answers_extracted) == 1 and orig_answers_extracted[0][
+        0
+    ].startswith("\\boxed{"):
         if isinstance(orig_answers_extracted[0][1], (float, int)):
             is_single_orig_boxed_truth = True
             orig_boxed_value = orig_answers_extracted[0][1]
@@ -789,7 +820,9 @@ def math_reward(
             gen_text,
             gen_val,
         ) in gen_answers_extracted_initial:  # Iterate initial extraction
-            if gen_text.startswith("\\boxed{") and isinstance(gen_val, (float, int)):
+            if gen_text.startswith("\\boxed{") and isinstance(
+                gen_val, (float, int)
+            ):
                 if math.isclose(
                     gen_val,
                     orig_boxed_value,
@@ -917,7 +950,8 @@ def math_reward(
     metrics["answer_comparison"] = MetricResult(
         score=best_match_score,
         is_score_valid=match_found_flag
-        and best_match_score > 0,  # is_score_valid if a match was found and score > 0
+        and best_match_score
+        > 0,  # is_score_valid if a match was found and score > 0
         reason=best_match_reason,
     )
     return EvaluateResult(

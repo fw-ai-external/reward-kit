@@ -9,7 +9,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from ..models import EvaluateResult, Message, MetricResult
 from ..reward_function import reward_function
-from .code_execution import _HAS_E2B  # Import _HAS_E2B to check E2B availability
+from .code_execution import (
+    _HAS_E2B,
+)  # Import _HAS_E2B to check E2B availability
 from .code_execution import _run_test_cases  # Import the main test case runner
 from .code_execution import (
     compare_outputs,
@@ -22,7 +24,9 @@ from .code_execution import (
 
 @reward_function
 def deepcoder_code_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    messages: List[
+        Message
+    ],  # Full conversation, model's response is messages[-1]
     ground_truth: List[Dict[str, Any]],  # This is the test_cases
     language: str,
     timeout: int = 10,  # DeepCoder paper mentions 6-12s, default to 10s
@@ -74,7 +78,9 @@ def deepcoder_code_reward(
         )
 
     assistant_content = messages[-1].content
-    test_cases = ground_truth  # The new ground_truth parameter is the test_cases
+    test_cases = (
+        ground_truth  # The new ground_truth parameter is the test_cases
+    )
 
     code_blocks = extract_code_blocks(assistant_content, language)
     if not code_blocks:
@@ -106,7 +112,9 @@ def deepcoder_code_reward(
             reason="No test cases provided.",
             metrics={
                 "error": MetricResult(
-                    score=0.0, is_score_valid=False, reason="No test cases provided."
+                    score=0.0,
+                    is_score_valid=False,
+                    reason="No test cases provided.",
                 ),
                 **metrics_dict,  # Include already gathered metrics like extracted_code
             },
@@ -141,7 +149,9 @@ def deepcoder_code_reward(
     }
 
     # Filter out None values from kwargs
-    filtered_kwargs = {k: v for k, v in run_test_cases_kwargs.items() if v is not None}
+    filtered_kwargs = {
+        k: v for k, v in run_test_cases_kwargs.items() if v is not None
+    }
 
     # _run_test_cases already returns EvaluateResult
     eval_result_from_tests: EvaluateResult = _run_test_cases(**filtered_kwargs)  # type: ignore
@@ -170,7 +180,9 @@ def deepcoder_code_reward(
         # overall_reason is already set based on final_score
         pass
     metrics_dict["overall_status"] = MetricResult(
-        score=final_score, is_score_valid=(final_score == 1.0), reason=overall_reason
+        score=final_score,
+        is_score_valid=(final_score == 1.0),
+        reason=overall_reason,
     )
 
     # The main reason for EvaluateResult should reflect the overall outcome.

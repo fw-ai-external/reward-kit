@@ -99,7 +99,9 @@ class RewardFunction:
                     "'model_id' must be provided for fireworks_hosted mode"
                 )
             # Construct endpoint for the Fireworks-hosted model
-            self.endpoint = f"https://api.fireworks.ai/v1/models/{model_id}/reward"
+            self.endpoint = (
+                f"https://api.fireworks.ai/v1/models/{model_id}/reward"
+            )
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
@@ -214,7 +216,9 @@ class RewardFunction:
                                 metrics[k] = MetricResult(
                                     score=v.get("score", 0.0),
                                     reason=v.get("reason", f"{k} score"),
-                                    is_score_valid=v.get("is_score_valid", True),
+                                    is_score_valid=v.get(
+                                        "is_score_valid", True
+                                    ),
                                 )
                             else:
                                 metrics[k] = MetricResult(
@@ -256,7 +260,9 @@ class RewardFunction:
             }
 
             try:
-                response = requests.post(self.endpoint, json=payload, headers=headers)
+                response = requests.post(
+                    self.endpoint, json=payload, headers=headers
+                )
                 response.raise_for_status()
                 result = response.json()
 
@@ -285,7 +291,9 @@ class RewardFunction:
                         metrics=metrics,
                     )
                 else:
-                    raise ValueError(f"Invalid response from remote endpoint: {result}")
+                    raise ValueError(
+                        f"Invalid response from remote endpoint: {result}"
+                    )
 
             except Exception as e:
                 logger.error(f"Error calling remote endpoint: {str(e)}")
@@ -307,7 +315,9 @@ class RewardFunction:
         """
 
         def adapter(
-            prompts: List[List[Dict]], completions: Optional[List[str]] = None, **kwargs
+            prompts: List[List[Dict]],
+            completions: Optional[List[str]] = None,
+            **kwargs,
         ) -> List[float]:
             """
             Adapter function compatible with TRL's reward function signature.
@@ -364,7 +374,9 @@ class RewardFunction:
                             and first_element.get("role") == "assistant"
                         ):
                             # Expected structure: completions[i] = [{'role': 'assistant', 'content': 'str_content'}]
-                            actual_completion_str = str(first_element["content"])
+                            actual_completion_str = str(
+                                first_element["content"]
+                            )
                             logger.debug(
                                 f"Adapter: completions[{i}] is a list with an assistant message dict. Extracted content."
                             )
@@ -383,7 +395,9 @@ class RewardFunction:
                         )
                         actual_completion_str = ""
                 elif isinstance(completion_input, str):
-                    actual_completion_str = completion_input  # It's already a string
+                    actual_completion_str = (
+                        completion_input  # It's already a string
+                    )
                 else:
                     # Fallback for other types (e.g. a direct dict, though less likely given warnings)
                     logger.warning(
@@ -397,14 +411,18 @@ class RewardFunction:
                 ]
 
                 # Prepare kwargs for the underlying reward function call for this specific sample
-                call_kwargs: Dict[str, Any] = {}  # Initialize with Any type for values
+                call_kwargs: Dict[str, Any] = (
+                    {}
+                )  # Initialize with Any type for values
                 current_solution = solutions[
                     i
                 ]  # Get the solution for the current sample
 
                 # --- DEBUG PRINT ---
                 debug_solution_val_str = (
-                    str(current_solution) if current_solution is not None else "None"
+                    str(current_solution)
+                    if current_solution is not None
+                    else "None"
                 )
                 logger.debug(
                     f"Adapter loop i={i}, type(current_solution)={type(current_solution)}, value='{debug_solution_val_str[:100]}...'"

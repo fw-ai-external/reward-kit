@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .models import EvaluateResult  # Changed
+from .models import EvaluateResult
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -208,7 +208,7 @@ def serve_tunnel(func_path: str, port: int = 8000):
     serve(func_path=func_path, host="0.0.0.0", port=port)
 
 
-def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:  # Changed
+def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:
     """
     Create a FastAPI app for the given reward function.
 

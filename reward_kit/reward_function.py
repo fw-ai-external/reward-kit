@@ -5,7 +5,7 @@ import logging
 import os
 import warnings
 from functools import wraps
-from typing import (  # Any, Type removed
+from typing import (
     Any,
     Callable,
     Dict,
@@ -78,8 +78,6 @@ class RewardFunction:
                     "Either 'endpoint' or 'name' must be provided for remote mode"
                 )
             if name and endpoint is None:
-                # Construct endpoint URL from name (in a real implementation,
-                # this would fetch from the Fireworks API)
                 self.endpoint = f"https://api.fireworks.ai/v1/reward/{name}"
         elif mode == "fireworks_hosted":
             if model_id is None:
@@ -92,7 +90,8 @@ class RewardFunction:
 
     def _load_function_from_path(self, func_path: str) -> Callable:
         """
-        Load a function from a path string (e.g., 'module.path:func_name' or 'module.path.func_name').
+        Load a function from a path string.
+        The path string should be in the format 'module.submodule:function_name' or 'module.submodule.function_name'.
         """
         # Check for the colon format first (preferred)
         if ":" in func_path:
@@ -377,7 +376,6 @@ class RewardFunction:
                     i
                 ]  # Get the solution for the current sample
 
-                # --- DEBUG PRINT ---
                 debug_solution_val_str = (
                     str(current_solution) if current_solution is not None else "None"
                 )

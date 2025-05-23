@@ -8,12 +8,6 @@ CONFIG_FILE_NAME = "rewardkit.yaml"
 
 # --- Pydantic Models for Configuration Structure ---
 
-# Unused model, can be removed. The Dict[str, str] in GCPCloudRunConfig handles this.
-# class GCPCloudRunSecretsConfig(BaseModel):
-#     # Maps ENV_VAR_NAME_IN_FUNCTION_CONTAINER: gcp_secret_manager_id
-#     # Example: "OPENAI_API_KEY": "projects/my-gcp-project/secrets/openai-api-key/versions/latest"
-#     pass
-
 
 class GCPCloudRunConfig(BaseModel):
     project_id: Optional[str] = (
@@ -29,12 +23,6 @@ class GCPCloudRunConfig(BaseModel):
     )
     secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to GCP Secret Manager ID
 
-
-# Unused models, can be removed.
-# class AWSLambdaSecretsConfig(BaseModel):
-#     # Maps ENV_VAR_NAME_IN_FUNCTION_CONTAINER: aws_secrets_manager_arn
-#     # Example: "OPENAI_API_KEY": "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-openai-key-xxxxxx"
-#     pass
 
 
 class AWSLambdaConfig(BaseModel):
@@ -99,7 +87,6 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
         config_path = find_config_file()
 
     if not config_path:
-        # print(f"Info: No {CONFIG_FILE_NAME} found. Using default configuration.")
         _loaded_config = RewardKitConfig()  # Return default config if no file found
         _config_file_path = None
         return _loaded_config
@@ -119,10 +106,8 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
             _loaded_config = RewardKitConfig(**raw_config)
 
         _config_file_path = config_path
-        # print(f"Successfully loaded configuration from: {config_path}")
         return _loaded_config
     except FileNotFoundError:
-        # print(f"Warning: Configuration file not found at {config_path}. Using default configuration.")
         _loaded_config = RewardKitConfig()
         _config_file_path = None
         return _loaded_config

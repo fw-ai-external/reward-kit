@@ -75,6 +75,18 @@ def main():
         sys.exit(1)
 
     dataset_path = "examples/tool_calling_example/dataset.jsonl"
+    if not os.path.exists(dataset_path):
+        # Try path relative to script if direct path fails (e.g. when run from root)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        dataset_path_rel = os.path.join(script_dir, "dataset.jsonl")
+        if os.path.exists(dataset_path_rel):
+            dataset_path = dataset_path_rel
+        else:
+            print(
+                f"Error: Dataset file not found at {dataset_path} or {dataset_path_rel}"
+            )
+            sys.exit(1)
+
     dataset = load_dataset(dataset_path)
 
     total_evaluated = 0

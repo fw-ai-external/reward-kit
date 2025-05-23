@@ -47,7 +47,9 @@ except ImportError:
 @reward_function
 def helpfulness_reward(
     messages: List[Dict[str, Any]],
-    original_messages: Optional[List[Dict[str, Any]]] = None,
+    ground_truth: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # Changed from original_messages
     **kwargs,
 ) -> EvaluateResult:
     """
@@ -57,7 +59,7 @@ def helpfulness_reward(
 
     Args:
         messages: List of conversation messages
-        original_messages: Original messages for context
+        ground_truth: Optional ground truth context (not used by this specific function).
 
     Returns:
         EvaluateResult with score based on helpfulness

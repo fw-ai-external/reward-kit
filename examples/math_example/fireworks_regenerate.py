@@ -402,7 +402,6 @@ async def main(args):
             try:
                 result = math_reward(
                     messages=messages_for_eval,
-                    original_messages=messages_for_eval,
                     ground_truth=original_assistant_content,
                 )
 

@@ -129,7 +129,6 @@ def adapted_math_reward(
         try:
             eval_result = math_reward(
                 messages=messages_for_eval,
-                original_messages=messages_for_eval,  # For math_reward, this can be same as messages
                 ground_truth=ground_truth_answer_str,  # This is the crucial ground truth
             )
             rewards.append(torch.tensor(eval_result.score, dtype=torch.float32))

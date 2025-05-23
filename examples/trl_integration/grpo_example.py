@@ -52,7 +52,9 @@ except ImportError:
 @reward_function
 def format_reward(
     messages: List[Dict[str, Any]],
-    original_messages: Optional[List[Dict[str, Any]]] = None,
+    ground_truth: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # Changed from original_messages
     think_tag: str = "<think>",
     answer_tag: str = "<answer>",
     **kwargs,
@@ -532,8 +534,9 @@ def train_with_grpo_example():
     ground_truth_full_solution_text = first_dataset_sample["solution"]
 
     # Extract the actual final answer from the ground_truth_full_solution_text for math_verify
-    # This was for the old local math_accuracy_reward. rk_math_reward will parse the full text.
-    # We still need ground_truth_full_solution_text for constructing original_messages.
+    # rk_math_reward will parse the full text of the assistant's response and compare
+    # its extracted answer against the `ground_truth` parameter (which is ground_truth_full_solution_text here).
+    # Context, if needed by rk_math_reward, is derived from the `messages` parameter.
 
     # The warning about no \boxed in GT is still relevant if the dataset often lacks it.
     boxed_gt_match_in_solution = re.search(
@@ -557,10 +560,8 @@ def train_with_grpo_example():
         f"<answer>\\boxed{{{mock_model_boxed_answer_val}}}</answer>"  # Missing think
     )
 
-    # Original messages for rk_math_reward
-    original_messages_for_test = actual_sample_prompt_messages + [
-        {"role": "assistant", "content": ground_truth_full_solution_text}
-    ]
+    # The `original_messages_for_test` variable is no longer needed as rk_math_reward
+    # does not take an `original_messages` parameter.
 
     # Test case 1: "Perfect" format
     print("\n--- Test Case 1: Mock 'Perfect' Format ---")
@@ -574,7 +575,6 @@ def train_with_grpo_example():
     accuracy_result_1 = rk_math_reward(
         messages=messages_test_case_1,
         ground_truth=ground_truth_full_solution_text,
-        original_messages=original_messages_for_test,
     )
     print(
         f"Format reward (perfect mock): {format_result_1.score} - {format_result_1.get('reason', 'N/A')}"
@@ -596,7 +596,6 @@ def train_with_grpo_example():
     accuracy_result_2 = rk_math_reward(
         messages=messages_test_case_2,
         ground_truth=ground_truth_full_solution_text,
-        original_messages=original_messages_for_test,
     )
     print(
         f"Format reward (no box): {format_result_2.score} - {format_result_2.get('reason', 'N/A')}"
@@ -618,7 +617,6 @@ def train_with_grpo_example():
     accuracy_result_3 = rk_math_reward(
         messages=messages_test_case_3,
         ground_truth=ground_truth_full_solution_text,
-        original_messages=original_messages_for_test,
     )
     print(
         f"Format reward (no think): {format_result_3.score} - {format_result_3.get('reason', 'N/A')}"

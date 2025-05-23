@@ -65,7 +65,6 @@ def main():
         try:
             result = math_reward(
                 messages=messages,
-                original_messages=messages,
                 ground_truth=assistant_response_content,
             )
 

@@ -204,7 +204,7 @@ class Evaluator:
             ts_mode_config  # Config for TypeScript-like single code snippet mode
         )
         self.code_files = {}  # Map of filename -> content
-        self.metric_folders = (
+        self.metric_folders: dict[str, str] = (
             {}
         )  # Map of metric_name -> folder_path (used when not in ts_mode_config and not multi_metrics)
         self.description = ""

@@ -287,19 +287,24 @@ class RewardFunction:
             prompts: List[List[Dict]], completions: Optional[List[str]] = None, **kwargs
         ) -> List[float]:
             """
-            Adapter function compatible with TRL's reward function signature.
+            Adapter function compatible with TRL's expected reward function signature.
+            TRL typically expects: (prompts: List[str], completions: List[str], **kwargs: Any) -> List[float]
+            This adapter handles the conversion from reward-kit's Message format.
 
             Args:
-                prompts: A batch of prompt message lists.
-                         e.g., [[{'role':'system',...}, {'role':'user',...}], ...]
+                prompts: A batch of prompt message lists as expected by this RewardFunction instance.
+                         Typically List[List[Dict[str, str]]], e.g.,
+                         [[{'role':'system',...}, {'role':'user',...}], ...]
                 completions: A batch of generated completion strings by the model.
-                             Optional - if None, assumes prompts already contain complete conversations.
-                **kwargs: Additional keyword arguments passed by TRL, potentially including
-                          ground truth data like 'solution'. TRL typically passes these
-                          as lists matching the batch size.
+                             Optional. If None, it's assumed that the `prompts` argument
+                             already contains the full conversation history including the assistant's response.
+                **kwargs: Additional keyword arguments passed by TRL. These often include
+                          other columns from the HuggingFace dataset being used for training
+                          (e.g., 'solution', 'reference_answer'). These are expected to be
+                          lists of the same length as `prompts`.
 
             Returns:
-                A list of float reward scores for the batch.
+                A list of float reward scores for the batch, one score per sample.
             """
             results = []
             batch_size = len(prompts)

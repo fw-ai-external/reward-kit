@@ -1,8 +1,6 @@
 import json
 from typing import Any, Dict, List, Optional
 
-# Import OpenAI message types
-# from openai.types.chat import ChatCompletionMessageParam # Unused import
 from openai.types.chat.chat_completion_message import (
     ChatCompletionMessageToolCall,
     FunctionCall,
@@ -10,7 +8,6 @@ from openai.types.chat.chat_completion_message import (
 from pydantic import BaseModel, Field
 
 
-# Create a Message class compatible with OpenAI's interface
 class Message(BaseModel):
     """Chat message model compatible with OpenAI's interface."""
 
@@ -21,7 +18,6 @@ class Message(BaseModel):
     tool_calls: Optional[List[ChatCompletionMessageToolCall]] = None
     function_call: Optional[FunctionCall] = None
 
-    # Model validators
     @classmethod
     def model_validate(cls, obj, *args, **kwargs):
         if isinstance(obj, dict) and "role" not in obj:

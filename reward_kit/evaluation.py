@@ -4,6 +4,7 @@ import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+import types # Moved from below
 
 if TYPE_CHECKING:
     # For type checking only
@@ -58,11 +59,9 @@ def huggingface_dataset_to_jsonl(
 
     import tempfile
 
-    # Load dataset from Hugging Face
     logger.info(f"Loading dataset {dataset_name} (split: {split})")
     dataset = load_dataset(dataset_name, split=split)
 
-    # Generate output file if not provided
     if not output_file:
         temp_dir = tempfile.gettempdir()
         dataset_basename = dataset_name.split("/")[-1]
@@ -70,30 +69,23 @@ def huggingface_dataset_to_jsonl(
             temp_dir, f"{dataset_basename}_{split}_{int(time.time())}.jsonl"
         )
 
-    # Create the output directory if it doesn't exist
     os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
 
-    # Default key mapping if not provided
     if message_key_map is None:
         message_key_map = {}
 
-    # Process dataset items
-    # count = 0 # F841: Unused local variable
     with open(output_file, "w") as f:
-        # Limit to max_samples
         processed_samples = 0
         for i, item in enumerate(dataset):
             if processed_samples >= max_samples:
                 break
 
-            # Skip items without required keys
             if prompt_key not in item and "statement" not in item:
                 logger.debug(
                     f"Skipping sample {i} due to missing prompt/statement key."
                 )
                 continue
 
-            # Convert dataset item to reward-kit format
             prompt_text = item.get(prompt_key, item.get("statement", ""))
             response_text = item.get(
                 response_key,
@@ -106,41 +98,33 @@ def huggingface_dataset_to_jsonl(
                 )
                 continue
 
-            # Create messages array
             messages = [
                 {"role": "user", "content": prompt_text},
                 {"role": "assistant", "content": response_text},
             ]
 
-            # Create the entry with messages
             entry = {"messages": messages}
 
-            # Add additional fields based on key mapping
             for ds_key, rk_key in message_key_map.items():
                 if ds_key in item:
                     entry[rk_key] = item[ds_key]
 
-            # Add all remaining keys as kwargs
             for key, value in item.items():
                 if key not in [prompt_key, response_key] and key not in message_key_map:
                     entry[key] = value
 
-            # Write the entry
             f.write(json.dumps(entry) + "\n")
             processed_samples += 1
 
         # Use 'processed_samples' to report the count
         # If loop didn't run, i might not be defined.
-        if processed_samples == 0 and i == -1:  # if dataset was empty
+        if processed_samples == 0 and i == -1:
             logger.info(f"No samples converted to JSONL format: {output_file}")
         else:
             logger.info(
                 f"Converted {processed_samples} samples to JSONL format: {output_file}"
             )
     return output_file
-
-
-import types  # Ensure this is at the top with other imports
 
 
 class EvaluatorPreviewResult:
@@ -174,9 +158,9 @@ class EvaluatorPreviewResult:
         for i, result_obj in enumerate(
             self.results
         ):  # Renamed result to result_obj for clarity
-            print(f"Sample {result_obj.index + 1}:")  # Use attribute access
-            print(f"  Success: {result_obj.success}")  # Use attribute access
-            print(f"  Score: {result_obj.score}")  # Use attribute access
+            print(f"Sample {result_obj.index + 1}:")
+            print(f"  Success: {result_obj.success}")
+            print(f"  Score: {result_obj.score}")
             # per_metric_evals is likely a dict stored in the SimpleNamespace
             if hasattr(result_obj, "per_metric_evals") and isinstance(
                 result_obj.per_metric_evals, dict
@@ -251,7 +235,6 @@ class Evaluator:
                     content = f.read()
                     files[filename] = content
 
-                    # Check for main.py with evaluate function
                     if filename == "main.py" and "evaluate" not in content:
                         raise ValueError(
                             f"main.py in {folder_path} must contain an evaluate function"
@@ -294,7 +277,6 @@ class Evaluator:
                     content = f.read()
                     files[filename] = content
 
-                    # Check for main.py with evaluate function
                     if filename == "main.py" and "evaluate" not in content:
                         raise ValueError(
                             f"main.py in {folder_path} must contain an evaluate function"
@@ -366,8 +348,6 @@ class Evaluator:
         if not samples:
             raise ValueError(f"No valid samples found in {sample_file}")
 
-        # Get authentication information
-        # Get authentication information
         account_id = get_fireworks_account_id()
         auth_token = get_fireworks_api_key()
         logger.debug("Show account id", account_id)
@@ -384,16 +364,13 @@ class Evaluator:
                 "or configured in ~/.fireworks/auth.ini."
             )
         try:
-            # account_id, auth_token = self._get_authentication() # Original call
-            pass  # Now handled above
+            pass
         except (
             ValueError
         ) as e:  # This specific except block might be less relevant if direct checks are made
             logger.error(f"Authentication error: {str(e)}")
             raise
 
-        # Construct the evaluator payload
-        # Construct the preview evaluation payload
 
         # Per user feedback, always set multiMetrics: true and skipRollup: true in the payload
         # to match the behavior observed as "correct" from the TypeScript client.
@@ -416,7 +393,6 @@ class Evaluator:
             "maxSamples": max_samples,
         }
 
-        # Make API request to preview evaluator
         api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
 
         # For dev environment, special handling for account_id

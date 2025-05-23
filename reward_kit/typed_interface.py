@@ -10,7 +10,6 @@ _res_adapter = TypeAdapter(EvaluateResult)
 # _msg_adapter is not used. T is not used.
 
 
-# Define protocol for more precise typing
 class EvaluateFunction(Protocol):
     """Protocol for evaluate functions that take typed messages."""
 
@@ -19,7 +18,6 @@ class EvaluateFunction(Protocol):
     ) -> Union[EvaluateResult, Dict[str, Any]]: ...
 
 
-# Define return type protocol for the wrapped function
 class HybridEvaluateFunction(Protocol):
     """
     Protocol for functions that take a list of dictionaries (JSON-like messages)

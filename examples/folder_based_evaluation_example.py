@@ -33,7 +33,7 @@ def setup_sample_evaluator():
     # Create main.py in the quality folder
     quality_main = quality_folder / "main.py"
     quality_code = '''
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs):
     """
     Evaluate the quality of a response.
     """
@@ -68,7 +68,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
     # Create main.py in the relevance folder
     relevance_main = relevance_folder / "main.py"
     relevance_code = '''
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs):
     """
     Evaluate the relevance of a response to the original query.
     """
@@ -79,9 +79,11 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
             "reason": "No messages found"
         }
 
-    # Get the query and the response
+    # Get the query andお疲れ様です。 the response
     query = ""
-    for msg in original_messages or messages[:-1]:
+    # If ground_truth is a list of messages (context), use it. Otherwise, use messages[:-1].
+    context_messages = ground_truth if isinstance(ground_truth, list) else messages[:-1]
+    for msg in context_messages:
         if msg.get("role") == "user":
             query = msg.get("content", "")
             break
@@ -147,7 +149,7 @@ def evaluate(messages, original_messages=None, tools=None, **kwargs):
                     "content": "Deep learning is a subset of machine learning that uses neural networks with many layers.",
                 },
             ],
-            "original_messages": [
+            "ground_truth": [  # Changed from original_messages
                 {"role": "user", "content": "What is deep learning?"}
             ],
         },

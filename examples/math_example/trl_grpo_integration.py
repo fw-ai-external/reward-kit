@@ -143,12 +143,10 @@ def adapted_math_reward(
         ]
 
         try:
-            # The original_messages for math_reward is for context if needed by the reward logic,
-            # but math_reward primarily uses the 'ground_truth' string for comparison.
-            # For simplicity, we can pass messages_for_eval as original_messages.
+            # math_reward primarily uses the 'ground_truth' string for comparison.
+            # Context, if needed by math_reward when ground_truth is a string, will be derived from messages_for_eval[:-1].
             eval_result = math_reward(  # Use the imported name 'math_reward'
                 messages=messages_for_eval,
-                original_messages=messages_for_eval,
                 ground_truth=ground_truth_answer_str,
             )
             rewards.append(torch.tensor(eval_result.score, dtype=torch.float32))

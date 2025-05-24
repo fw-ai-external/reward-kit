@@ -64,7 +64,7 @@ def format_reward(
 
     Args:
         messages: List of conversation messages
-        original_messages: Original messages for context
+        ground_truth: Optional ground truth context (not used by this specific function).
         think_tag: Tag to use for reasoning (default: "<think>")
         answer_tag: Tag to use for answers (default: "<answer>")
 
@@ -409,7 +409,7 @@ def train_with_grpo_example():
     }
 
     # Configuration for rk_math_reward
-    # rk_math_reward needs 'original_messages' (ground truth) from the 'solution' column
+    # rk_math_reward's 'ground_truth' parameter will be mapped from the 'solution' column of the dataset.
     math_reward_config = {
         "func": rk_math_reward,
         "map": {

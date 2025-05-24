@@ -47,8 +47,6 @@ def main():
 
         # The math_reward expects the full conversation history.
         # The last message is the assistant's response to be evaluated.
-        # The original_messages can be the same as messages if no modification is needed
-        # for the reward function's internal processing.
         # The ground_truth for math_reward should be the expected answer string.
         # For this example, the dataset's assistant message is the ground truth.
         assistant_response_content = next(

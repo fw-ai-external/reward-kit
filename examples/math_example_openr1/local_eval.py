@@ -1,4 +1,4 @@
-import logging  # Added for new utility
+import logging
 import os
 import sys
 
@@ -6,7 +6,7 @@ import sys
 # This assumes the script is run from the 'examples/math_example_openr1/' directory or reward-kit is installed
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from reward_kit.common_utils import load_jsonl  # Import the new utility
+from reward_kit.common_utils import load_jsonl
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
 

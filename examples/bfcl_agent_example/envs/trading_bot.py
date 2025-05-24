@@ -728,7 +728,6 @@ class TradingBot:
 
         return {"symbol": symbol, "old_price": old_price, "new_price": new_price}
 
-    # below contains a list of functions to be nested
     def get_available_stocks(self, sector: str) -> Dict[str, List[str]]:
         """
         Get a list of stock symbols in the given sector.

@@ -36,7 +36,7 @@ class MetricResult(BaseModel):
 
     is_score_valid: bool = True
     score: float = Field(..., ge=0.0, le=1.0)
-    reason: str
+    reason: str = None
 
     def __getitem__(self, key: str) -> Any:
         if (

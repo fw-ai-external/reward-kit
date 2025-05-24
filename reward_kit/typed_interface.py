@@ -141,8 +141,8 @@ def reward_function(func: EvaluateFunction) -> HybridEvaluateFunction:
         except ValidationError as err:
             raise ValueError(f"Return value failed validation:\n{err}") from None
 
-        # 3. Return the EvaluateResult object directly
-        # The result_model is an instance of our hybrid EvaluateResult
-        return result_model
+        # 3. Return a dict converted from a hybrid EvaluateResult
+        # The result_model is a dict converted from a hybrid EvaluateResult
+        return result_model.model_dump()
 
     return cast(HybridEvaluateFunction, wrapper)

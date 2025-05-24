@@ -34,9 +34,11 @@ def sample_messages():
 
 
 @pytest.fixture
-def sample_original_messages(sample_messages):
-    """Sample original (user only) messages."""
-    return [sample_messages[0]]
+def sample_ground_truth_messages(sample_messages):  # Renamed fixture
+    """Sample ground truth messages (e.g., user context or expected full conversation)."""
+    return [
+        sample_messages[0]
+    ]  # Keeping the same logic for now, assuming it represents context
 
 
 @pytest.fixture

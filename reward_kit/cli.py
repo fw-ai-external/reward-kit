@@ -253,12 +253,10 @@ def main():
         from dotenv import load_dotenv
 
         load_dotenv(override=True)  # Load .env file, overriding existing shell env vars
-        # print("INFO: .env file loaded if present.") # Optional: for debugging .env loading
     except ImportError:
         # python-dotenv not installed, proceed without it.
         # Consider logging a warning if .env support is considered core.
         pass
-        # print("INFO: python-dotenv not found, .env file will not be loaded.")
 
     args = parse_args()
     # Setup logging based on global verbose/debug flags if they exist on args,

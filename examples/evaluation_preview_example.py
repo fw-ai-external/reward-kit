@@ -18,7 +18,6 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/evaluation_preview_example.py"
     )
 
-# No example mode - will use real authentication
 
 from reward_kit.evaluation import create_evaluation, preview_evaluation
 
@@ -34,16 +33,14 @@ def main():
 
     preview_result.display()
 
-    # Modified approach - add a flag to reward_kit.evaluation that we'll check
-    # to determine if the preview API was successfully used
+    # The preview_evaluation function might use a local fallback if the API is unavailable.
+    # This example checks if fallback mode was used and skips evaluator creation in that case
+    # to avoid unintended behavior in a non-interactive script.
     import reward_kit.evaluation as evaluation_module
 
-    # Check if 'used_preview_api' attribute exists and is True
-    # This attribute would be set to True when the preview API is used
-    # and False when fallback mode is used
     if (
-        hasattr(evaluation_module, "used_preview_api")
-        and not evaluation_module.used_preview_api
+        hasattr(evaluation_module, "used_preview_api")  # Check if the fallback detection flag is present
+        and not evaluation_module.used_preview_api  # Check if fallback mode was used
     ):
         print("Note: The preview used fallback mode due to server issues.")
         # Default to not creating the evaluator in non-interactive mode if fallback was used.

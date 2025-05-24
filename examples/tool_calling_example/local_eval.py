@@ -18,7 +18,7 @@ def load_dataset(file_path: str) -> List[Dict[str, Any]]:
 
 
 def main():
-    # Path relative to the root of the reward-kit-2 directory
+    # Path relative to the root of the reward-kit directory
     dataset_path = "examples/tool_calling_example/dataset.jsonl"
     dataset = load_dataset(dataset_path)
 

@@ -112,7 +112,7 @@ class MessageAPI:
         """
         new_id = self._random.randint(
             10000, 99999
-        )  # first 5 mapped by initial configuration.
+        )
         while new_id in self.generated_ids:
             new_id = self._random.randint(10000, 99999)
         self.generated_ids.add(new_id)
@@ -286,7 +286,6 @@ class MessageAPI:
         keyword_lower = keyword.lower()
         results = []
         # Iterate through the inbox to search for the keyword in messages
-        # for message_id, message_data in self.inbox.items():
         for message_data in self.inbox:
             receiver_id, message_content = list(message_data.items())[0]
             if keyword_lower in message_content.lower():

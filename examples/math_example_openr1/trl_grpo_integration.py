@@ -1,4 +1,4 @@
-import logging  # Added for new utility
+import logging
 import os
 import sys
 from typing import Any, Dict, List
@@ -12,7 +12,7 @@ from trl import GRPOConfig, GRPOTrainer
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from reward_kit.common_utils import load_jsonl  # Import the new utility
+from reward_kit.common_utils import load_jsonl
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
 

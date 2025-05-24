@@ -16,7 +16,7 @@ def evaluate(messages: List[Message], **kwargs) -> EvaluateResult:
     Returns:
         EvaluateResult with score and metrics information
     """
-    # If this is the first message, there's nothing to evaluate
+    # If there are no messages, there's nothing to evaluate
     if not messages:
         return EvaluateResult(
             score=0.0, reason="No messages found", is_score_valid=False

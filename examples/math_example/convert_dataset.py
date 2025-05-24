@@ -30,7 +30,7 @@ try:
     from reward_kit.rewards.list_comparison_math_reward import (
         list_comparison_math_reward,
     )
-    from reward_kit.rewards.math import extract_numbers  # Added direct import
+    from reward_kit.rewards.math import extract_numbers
     from reward_kit.rewards.math import math_reward as numeric_math_reward
     from reward_kit.rewards.multiple_choice_math_reward import (
         multiple_choice_math_reward,
@@ -94,7 +94,22 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     If cfg.processing.math_type is 'numeric', an additional check ensures 'cfg.dataset.ground_truth_answer_column' is strictly numeric.
     Converts kept rows into an OpenAI-style messages JSONL format.
 
-    Output format is written to cfg.output.file_path.
+    Output format:
+    {
+      "messages": [
+        {"role": "user", "content": "<content_from_query_column>"},
+        {"role": "assistant", "content": "<content_from_solution_column_for_assistant>"}
+      ],
+      "ground_truth_answer_from_column": "<content_from_ground_truth_answer_column>",
+      "match_details": { # Only if filter_by_match is True
+          "filter_passed": true/false,
+          "reward_score": score_from_math_reward_or_strict_check,
+          "match_comparison_reason": "Reason for pass/fail",
+          "math_type_used_for_filter": "numeric/mcq/list",
+          "extracted_from_solution_column": "Extraction details from solution",
+          "extracted_from_gt_answer_column": "Extraction details from ground truth"
+      }
+    }
     """
     # Extract parameters from Hydra config
     dataset_name = cfg.dataset.name
@@ -237,7 +252,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                 if (
                     HAS_REWARD_KIT_MATH_FUNCTIONS
                 ):  # extract_numbers is from reward_kit.rewards.math
-                    orig_gt_extracts = extract_numbers(  # Use direct import
+                    orig_gt_extracts = extract_numbers(
                         gt_answer_content
                     )
 
@@ -257,7 +272,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                         )
 
                         # Check if solution_content already has the correct boxed answer
-                        sol_extracts = extract_numbers(  # Use direct import
+                        sol_extracts = extract_numbers(
                             solution_content
                         )
                         already_correctly_boxed = False

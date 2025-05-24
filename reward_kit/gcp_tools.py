@@ -8,8 +8,6 @@ from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Placeholder for actual gcloud command execution
-# In a real implementation, this would use subprocess.run with error handling
 
 
 def _run_gcloud_command(
@@ -34,7 +32,6 @@ def _run_gcloud_command(
             check=False,  # Handle non-zero exit codes manually
         )
         if process.returncode == 0:
-            # logger.debug(f"Command successful. Stdout:\n{process.stdout}")
             if (
                 process.stderr
             ):  # gcloud sometimes prints informational messages to stderr on success

@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from typing import Any, Dict, List, Optional
 
-from reward_kit.common_utils import load_jsonl  # Import the new utility
+from reward_kit.common_utils import load_jsonl
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
 

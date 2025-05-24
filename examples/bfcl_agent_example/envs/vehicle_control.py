@@ -588,7 +588,6 @@ class VehicleControlAPI:
             intermediaryCities (List[str]): [Optional] The list of intermediary cities between the two cities.
         """
         result: Dict[str, Any] = {}  # Use Dict[str, Any] for flexibility
-        # ... (rest of the distance logic)
         if (cityA == "83214" and cityB == "74532") or (
             cityA == "74532" and cityB == "83214"
         ):

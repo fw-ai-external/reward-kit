@@ -8,7 +8,7 @@ that evaluates the informativeness of an assistant's response.
 
 import os
 import sys
-from typing import List  # Kept from our changes for Message type hint
+from typing import List
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

@@ -15,7 +15,7 @@ def create_test_folder():
     with open(os.path.join(tmp_dir, "main.py"), "w") as f:
         f.write(
             """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth=None, tools=None, **kwargs): # Changed original_messages to ground_truth
     if not messages:
         return {'score': 0.0, 'reason': 'No messages found'}
     last_message = messages[-1]

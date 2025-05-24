@@ -1,5 +1,5 @@
 import sys  # Import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +14,9 @@ from reward_kit.models import EvaluateResult, MetricResult  # Changed
 
 
 def simple_reward_func(
-    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+    messages: List[Dict[str, str]],
+    ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,
+    **kwargs
 ) -> EvaluateResult:  # Changed
     """Example reward function for testing."""
     metrics = {
@@ -27,7 +29,9 @@ def simple_reward_func(
 
 @reward_function
 def decorated_reward_func(
-    messages: List[Dict[str, str]], original_messages: List[Dict[str, str]], **kwargs
+    messages: List[Dict[str, str]],
+    ground_truth: Optional[Union[str, List[Dict[str, str]]]] = None,
+    **kwargs
 ) -> EvaluateResult:  # Changed
     """Example decorated reward function."""
     metrics = {
@@ -60,7 +64,7 @@ class TestRewardFunction:
             ]
             orig_msgs = [test_msgs[0]]
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.5
             assert "length" in result.metrics
             assert result.metrics["length"].score == 0.5
@@ -75,7 +79,7 @@ class TestRewardFunction:
         ]
         orig_msgs = [test_msgs[0]]
 
-        result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+        result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
         assert result.score == 0.5
         assert "length" in result.metrics
         assert result.metrics["length"].score == 0.5
@@ -110,7 +114,7 @@ class TestRewardFunction:
             ]
             orig_msgs = [test_msgs[0]]
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.8
             assert "remote" in result.metrics
             assert result.metrics["remote"].score == 0.8
@@ -138,7 +142,7 @@ class TestRewardFunction:
             ]
             orig_msgs = [test_msgs[0]]
 
-            result = reward_fn(messages=test_msgs, original_messages=orig_msgs)
+            result = reward_fn(messages=test_msgs, ground_truth=orig_msgs)
             assert result.score == 0.9
             assert "hosted" in result.metrics
             assert result.metrics["hosted"].score == 0.9
@@ -151,18 +155,28 @@ class TestRewardFunction:
         assert callable(trl_adapter)
 
         # Test the adapter with a batch input
-        test_msgs = [
+        full_conversations_batch = [
             [
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hi there"},
-            ]
+            ],
+            [  # Add another sample for more robust testing
+                {"role": "user", "content": "Test query"},
+                {"role": "assistant", "content": "Test response"},
+            ],
         ]
-        orig_msgs = [[test_msgs[0][0]]]
 
-        result = trl_adapter(test_msgs, orig_msgs)
+        # Prepare prompts and completions correctly for the adapter
+        # Prompts are lists of messages up to (but not including) the assistant's turn
+        prompts_batch = [conv[:-1] for conv in full_conversations_batch]
+        # Completions are strings of the assistant's responses
+        completions_batch = [conv[-1]["content"] for conv in full_conversations_batch]
+
+        result = trl_adapter(prompts=prompts_batch, completions=completions_batch)
         assert isinstance(result, list)
-        assert len(result) == 1
-        assert result[0] == 0.5  # Just the score
+        assert len(result) == 2  # We have two samples now
+        assert result[0] == 0.5  # simple_reward_func always returns 0.5
+        assert result[1] == 0.5  # simple_reward_func always returns 0.5
 
 
 class TestRewardFunctionDecorator:
@@ -177,7 +191,7 @@ class TestRewardFunctionDecorator:
         orig_msgs = [test_msgs[0]]
 
         # Call the decorated function directly
-        result = decorated_reward_func(messages=test_msgs, original_messages=orig_msgs)
+        result = decorated_reward_func(messages=test_msgs, ground_truth=orig_msgs)
         # The legacy_reward_function (imported as reward_function here)
         # should return an EvaluateResult object.
         assert isinstance(result, EvaluateResult)

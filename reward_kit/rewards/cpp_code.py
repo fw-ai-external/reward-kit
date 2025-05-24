@@ -642,9 +642,7 @@ def _ioi_cpp_code_reward_impl(
 
     Args:
         messages: Generated conversation messages
-        original_messages: Original conversation context (optional)
-        expected_output: Expected output from code execution (for single-case testing)
-        test_cases: List of test cases for batch testing
+        ground_truth: Expected output string or list of test case dictionaries.
         language: Programming language ("c" or "cpp")
         version: Version of the compiler to use
         timeout: Maximum execution time in milliseconds
@@ -910,9 +908,7 @@ def binary_cpp_code_reward(
 
     Args:
         messages: Generated conversation messages
-        original_messages: Original conversation context (optional)
-        expected_output: Expected output from code execution (for single-case testing)
-        test_cases: List of test cases for batch testing
+        ground_truth: Expected output string or list of test case dictionaries.
         language: Programming language ("c" or "cpp")
         version: Version of the compiler to use
         timeout: Maximum execution time in milliseconds

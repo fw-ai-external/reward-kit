@@ -115,13 +115,17 @@ def evaluate(entry):
     """
     updated_code = evaluator._update_evaluate_signature(old_code)
     assert (
-        "def evaluate(messages, original_messages=None, tools=None, **kwargs)"
+        "def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs)"
         in updated_code
     )
-    assert "entry = {" in updated_code
-    assert "original_messages = messages" in updated_code
+    # The "entry = {" line is no longer part of the compatibility layer for the old_pattern.
+    # The compatibility layer now focuses on handling ground_truth.
+    assert (
+        "if ground_truth is None: # Default ground_truth from messages if not provided"
+        in updated_code
+    )  # Check for new compat layer logic
     new_code = """
-def evaluate(messages, original_messages=None, tools=None, **kwargs):
+def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs):
     if not messages: return {'score': 0.0, 'reason': 'No messages found'}
     last_message = messages[-1]
     content = last_message.get('content', '')

@@ -20,9 +20,9 @@ class TestEdgeCases:
     def test_empty_messages(self):
         """Test handling of empty messages arrays."""
 
-        def reward_func(messages, original_messages, **kwargs):
+        def reward_func(messages, ground_truth, **kwargs):  # Changed
             """Function that expects non-empty messages."""
-            if not messages or not original_messages:
+            if not messages or not ground_truth:  # Changed
                 raise ValueError("Messages cannot be empty")
             return EvaluateResult(
                 score=0.5, reason="Test reason", metrics={}
@@ -34,22 +34,22 @@ class TestEdgeCases:
         with pytest.raises(ValueError):
             reward_fn(
                 messages=[],
-                original_messages=[{"role": "user", "content": "Hello"}],
+                ground_truth=[{"role": "user", "content": "Hello"}],  # Changed
             )
 
-        # Test with empty original_messages
+        # Test with empty ground_truth
         with pytest.raises(ValueError):
             reward_fn(
                 messages=[{"role": "user", "content": "Hello"}],
-                original_messages=[],
+                ground_truth=[],  # Changed
             )
 
     def test_invalid_message_structure(self):
         """Test handling of invalid message structure."""
 
-        def reward_func(messages, original_messages, **kwargs):
+        def reward_func(messages, ground_truth, **kwargs):  # Changed
             """Function that validates message structure."""
-            for msg in messages + original_messages:
+            for msg in messages + ground_truth:  # Changed
                 if "role" not in msg or "content" not in msg:
                     raise ValueError("Invalid message structure")
             return EvaluateResult(
@@ -62,14 +62,14 @@ class TestEdgeCases:
         with pytest.raises(ValueError):
             reward_fn(
                 messages=[{"content": "Hello"}],
-                original_messages=[{"role": "user", "content": "Hello"}],
+                ground_truth=[{"role": "user", "content": "Hello"}],  # Changed
             )
 
         # Test with missing content
         with pytest.raises(ValueError):
             reward_fn(
                 messages=[{"role": "user"}],
-                original_messages=[{"role": "user", "content": "Hello"}],
+                ground_truth=[{"role": "user", "content": "Hello"}],  # Changed
             )
 
     def test_remote_error_handling(self):
@@ -91,13 +91,13 @@ class TestEdgeCases:
             with pytest.raises(Exception):
                 reward_fn(
                     messages=[{"role": "user", "content": "Hello"}],
-                    original_messages=[{"role": "user", "content": "Hello"}],
+                    ground_truth=[{"role": "user", "content": "Hello"}],  # Changed
                 )
 
     def test_large_message_handling(self):
         """Test handling of very large messages."""
 
-        def reward_func(messages, original_messages, **kwargs):
+        def reward_func(messages, ground_truth, **kwargs):  # Changed
             """Function that processes large messages."""
             # Just calculate based on message length
             content_length = len(messages[-1]["content"])
@@ -124,7 +124,7 @@ class TestEdgeCases:
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": large_content},
             ],
-            original_messages=[{"role": "user", "content": "Hello"}],
+            ground_truth=[{"role": "user", "content": "Hello"}],  # Changed
         )
 
         assert result.score == 0.5
@@ -134,7 +134,7 @@ class TestEdgeCases:
     def test_unicode_handling(self):
         """Test handling of unicode characters in messages."""
 
-        def reward_func(messages, original_messages, **kwargs):
+        def reward_func(messages, ground_truth, **kwargs):  # Changed
             """Function that handles Unicode."""
             # Just return a simple score and the message
             content = messages[-1]["content"]
@@ -159,7 +159,7 @@ class TestEdgeCases:
                 {"role": "user", "content": "Greet me in different languages"},
                 {"role": "assistant", "content": unicode_message},
             ],
-            original_messages=[
+            ground_truth=[  # Changed
                 {"role": "user", "content": "Greet me in different languages"}
             ],
         )

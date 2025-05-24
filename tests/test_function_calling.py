@@ -41,7 +41,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -81,7 +80,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -96,7 +94,7 @@ class TestFunctionCalling:
         assert (
             result.metrics["function_name_match"].reason is not None
             and "Function name does not match"
-            in result.metrics["function_name_match"].reason
+            in result.metrics["function_name_match"].reason  # type: ignore[operator]
         )
         # Dictionary access
         assert result["score"] < 1.0
@@ -104,7 +102,7 @@ class TestFunctionCalling:
         assert (
             result["metrics"]["function_name_match"]["reason"] is not None
             and "Function name does not match"
-            in result["metrics"]["function_name_match"]["reason"]
+            in result["metrics"]["function_name_match"]["reason"]  # type: ignore[operator]
         )
 
     def test_missing_required_argument(self):
@@ -131,7 +129,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -145,14 +142,14 @@ class TestFunctionCalling:
         assert result.metrics["arguments_match"].score < 1.0
         assert (
             result.metrics["arguments_match"].reason is not None
-            and "Missing argument" in result.metrics["arguments_match"].reason
+            and "Missing argument" in result.metrics["arguments_match"].reason  # type: ignore[operator]
         )
         # Dictionary access
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
         assert (
             result["metrics"]["arguments_match"]["reason"] is not None
-            and "Missing argument" in result["metrics"]["arguments_match"]["reason"]
+            and "Missing argument" in result.metrics["arguments_match"]["reason"]  # type: ignore[operator]
         )
 
     def test_extra_argument(self):
@@ -180,7 +177,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -194,14 +190,14 @@ class TestFunctionCalling:
         assert result.metrics["arguments_match"].score < 1.0
         assert (
             result.metrics["arguments_match"].reason is not None
-            and "Unexpected argument" in result.metrics["arguments_match"].reason
+            and "Unexpected argument" in result.metrics["arguments_match"].reason  # type: ignore[operator]
         )
         # Dictionary access
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
         assert (
             result["metrics"]["arguments_match"]["reason"] is not None
-            and "Unexpected argument" in result["metrics"]["arguments_match"]["reason"]
+            and "Unexpected argument" in result.metrics["arguments_match"]["reason"]  # type: ignore[operator]
         )
 
     def test_permissive_mode(self):
@@ -229,7 +225,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -273,7 +268,6 @@ class TestFunctionCalling:
                     {"role": "assistant", "content": "Let me check the weather."},
                 ],
             ),
-            # original_messages removed
             function_name=parsed_name,
             parsed_arguments=parsed_args,
             expected_call_schema=expected_schema,
@@ -287,14 +281,14 @@ class TestFunctionCalling:
         assert result.metrics["arguments_match"].score < 1.0
         assert (
             result.metrics["arguments_match"].reason is not None
-            and "Type mismatch" in result.metrics["arguments_match"].reason
+            and "Type mismatch" in result.metrics["arguments_match"].reason  # type: ignore[operator]
         )
         # Dictionary access
         assert result["score"] < 1.0
         assert result["metrics"]["arguments_match"]["score"] < 1.0
         assert (
             result["metrics"]["arguments_match"]["reason"] is not None
-            and "Type mismatch" in result["metrics"]["arguments_match"]["reason"]
+            and "Type mismatch" in result.metrics["arguments_match"]["reason"]  # type: ignore[operator]
         )
 
     def test_calculate_jaccard_similarity(self):

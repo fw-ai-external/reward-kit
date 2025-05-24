@@ -110,7 +110,7 @@ def run_example(example_path, env=None):
             return True
         else:
             msg = f"❌ {example_name} failed with code {result.returncode}"
-            logger.error(msg)  # No need to truncate now
+            logger.error(msg)
             if result.stdout.strip():
                 logger.error(f"Output: {result.stdout.strip()}")
             if result.stderr.strip():

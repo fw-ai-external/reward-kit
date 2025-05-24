@@ -21,7 +21,6 @@ if not os.environ.get("FIREWORKS_API_KEY"):
 # Import the evaluation functions
 from reward_kit.evaluation import huggingface_dataset_to_jsonl
 
-# Unused reward functions were removed
 
 
 def main():

@@ -7,7 +7,7 @@ without having to deal with threading or servers.
 from typing import Any, Dict, List, Optional
 
 from reward_kit import reward_function
-from reward_kit.models import (  # Added MetricResult
+from reward_kit.models import (
     EvaluateResult,
     Message,
     MetricResult,

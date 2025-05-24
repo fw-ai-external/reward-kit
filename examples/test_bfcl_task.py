@@ -14,7 +14,6 @@ project_root = Path(__file__).parents[1]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# No longer need to add mock paths as BFCL environments are now part of the main package
 
 from reward_kit.agent.task_manager import TaskManager
 from reward_kit.models import TaskDefinitionModel

@@ -62,7 +62,6 @@ def main():
         length_result = length_reward(messages=messages)
 
         print(f"Problem: {problem}")
-        print(f"Problem: {problem}")
         print(f"Custom solution math score: {math_result['score']}")
         print(f"Custom solution length score: {length_result['score']}")
         if math_result.get("metrics"):

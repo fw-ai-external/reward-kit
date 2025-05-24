@@ -18,11 +18,11 @@ if not os.environ.get("FIREWORKS_API_KEY"):
         "Example: FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY python examples/huggingface_function_calling_example.py"
     )
 
-import json  # Added import
-from typing import Any, Dict, List, cast  # Moved imports to top
+import json
+from typing import Any, Dict, List, cast
 
 # Import the evaluation functions
-from reward_kit.rewards.function_calling import (  # Changed import
+from reward_kit.rewards.function_calling import (
     exact_tool_match_reward,
 )
 

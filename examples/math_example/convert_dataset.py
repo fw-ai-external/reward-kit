@@ -1,11 +1,15 @@
 # mypy: ignore-errors
 # pylint: disable=all
-import argparse
 import json
 import logging
 import math  # Added import
+import os  # Added for Hydra path management
 import re  # Added import
+import sys  # Added to fix flake8 error
 from typing import Optional  # Added Optional
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 try:
     from datasets import Dataset, load_dataset
@@ -38,6 +42,7 @@ except ImportError as e:
         f"Failed to import one or more math reward functions or MetricResult from reward_kit: {e}. Make sure reward-kit is installed and accessible."
     )
     HAS_REWARD_KIT_MATH_FUNCTIONS = False
+
 
 # Regex for is_strictly_numeric function
 _NUM_REGEX_STR = r"-?\d+(\.\d+)?"
@@ -79,41 +84,37 @@ def is_strictly_numeric(text: str) -> bool:
     return bool(_STRICTLY_NUMERIC_COMPILED_REGEX.fullmatch(text))
 
 
-def convert_math_dataset_to_openai_jsonl(
-    dataset_name: str,
-    output_file_path: str,
-    query_column: str = "query",
-    solution_column_for_assistant: str = "solution",  # Column for assistant message
-    ground_truth_answer_column: str = "answer",  # Column for the verifiable answer
-    split: str = "train",
-    filter_by_match: bool = False,
-    math_type: str = "numeric",
-    config_name: Optional[str] = None,
-):
+def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     """
-    Loads a HuggingFace math dataset.
-    Optionally filters rows by comparing an answer extracted from 'solution_column_for_assistant'
-    against 'ground_truth_answer_column' using a specified reward_kit math_reward function.
-    If math_type is 'numeric', an additional check ensures 'ground_truth_answer_column' is strictly numeric.
+    Loads a HuggingFace math dataset based on Hydra configuration.
+    This script is intended to be run using Hydra. Example:
+    `python examples/math_example/convert_dataset.py dataset.name=gsm8k output.file_path=gsm8k_converted.jsonl`
+    Optionally filters rows by comparing an answer extracted from 'cfg.dataset.solution_column_for_assistant'
+    against 'cfg.dataset.ground_truth_answer_column' using a specified reward_kit math_reward function.
+    If cfg.processing.math_type is 'numeric', an additional check ensures 'cfg.dataset.ground_truth_answer_column' is strictly numeric.
     Converts kept rows into an OpenAI-style messages JSONL format.
 
-    Output format:
-    {
-      "messages": [
-        {"role": "user", "content": "<content_from_query_column>"},
-        {"role": "assistant", "content": "<content_from_solution_column_for_assistant>"}
-      ],
-      "ground_truth_answer_from_column": "<content_from_ground_truth_answer_column>",
-      "match_details": { // Only if filter_by_match is True
-          "filter_passed": true/false,
-          "reward_score": score_from_math_reward_or_strict_check,
-          "match_comparison_reason": "Reason for pass/fail",
-          "math_type_used_for_filter": "numeric/mcq/list",
-          "extracted_from_solution_column": "Extraction details from solution",
-          "extracted_from_gt_answer_column": "Extraction details from ground truth"
-      }
-    }
+    Output format is written to cfg.output.file_path.
     """
+    # Extract parameters from Hydra config
+    dataset_name = cfg.dataset.name
+    output_file_path = (
+        cfg.output.file_path
+    )  # This will be relative to Hydra's run dir if not absolute
+    query_column = cfg.dataset.query_column
+    solution_column_for_assistant = cfg.dataset.solution_column_for_assistant
+    ground_truth_answer_column = cfg.dataset.ground_truth_answer_column
+    split = cfg.dataset.split
+    filter_by_match = cfg.processing.filter_by_match
+    math_type = cfg.processing.math_type
+    config_name = cfg.dataset.config_name
+
+    # If output_file_path is relative, it's relative to the Hydra output directory.
+    # If it needs to be relative to the original CWD or an absolute path is preferred,
+    # one might use: output_file_path = hydra.utils.to_absolute_path(cfg.output.file_path)
+    # For simplicity, we'll assume cfg.output.file_path is handled as needed (e.g., absolute or relative to hydra's dir).
+    # Hydra changes CWD to its output dir, so relative paths in cfg.output.file_path will be created there.
+
     if not HAS_DATASETS_LIB:
         logger.error(
             "The 'datasets' library is not installed. Please install it with 'pip install datasets'."
@@ -129,7 +130,7 @@ def convert_math_dataset_to_openai_jsonl(
         f"Loading dataset '{dataset_name}' (config: {config_name}), split '{split}'..."
     )
     try:
-        dataset = load_dataset(
+        dataset_hf = load_dataset(  # Renamed to avoid conflict with cfg.dataset
             dataset_name, name=config_name, split=split, trust_remote_code=True
         )
     except Exception as e:
@@ -138,7 +139,7 @@ def convert_math_dataset_to_openai_jsonl(
         )
         return
 
-    logger.info(f"Dataset loaded. Features: {dataset.features}")
+    logger.info(f"Dataset loaded. Features: {dataset_hf.features}")
 
     required_cols = {
         query_column,
@@ -146,14 +147,15 @@ def convert_math_dataset_to_openai_jsonl(
         ground_truth_answer_column,
     }
     for col_name in required_cols:
-        if col_name not in dataset.column_names:
+        if col_name not in dataset_hf.column_names:
             logger.error(
-                f"Required column '{col_name}' not found in dataset. Available columns: {dataset.column_names}"
+                f"Required column '{col_name}' not found in dataset. Available columns: {dataset_hf.column_names}"
             )
             return
 
     logger.info(
-        f"Processing {len(dataset)} examples. Output to: {output_file_path}. Filtering by match: {filter_by_match}, Math Type: {math_type}"
+        f"Processing {len(dataset_hf)} examples. Output to: {output_file_path}. "
+        f"Filtering by match: {filter_by_match}, Math Type: {math_type}"
     )
 
     kept_count = 0
@@ -184,8 +186,15 @@ def convert_math_dataset_to_openai_jsonl(
             )
             return
 
+    # Ensure output directory exists if path is relative (Hydra usually handles this for its own dir)
+    # If output_file_path is absolute, the directory must exist or be creatable.
+    if not os.path.isabs(output_file_path):
+        # output_file_path is relative to hydra.run.dir, which is the CWD.
+        # os.makedirs(os.path.dirname(output_file_path), exist_ok=True) # Not strictly needed if file is in CWD
+        pass  # Hydra manages its output directory.
+
     with open(output_file_path, "w", encoding="utf-8") as outfile:
-        for example in dataset:
+        for example in dataset_hf:  # Iterate over dataset_hf
             processed_count += 1
             try:
                 query_content = str(example.get(query_column, ""))
@@ -316,7 +325,7 @@ def convert_math_dataset_to_openai_jsonl(
 
                 output_data = {
                     "messages": messages,
-                    "ground_truth_answer_from_column": final_ground_truth_for_jsonl,
+                    "ground_truth": final_ground_truth_for_jsonl,
                 }
 
                 should_keep_row = True  # Default if not filtering
@@ -439,79 +448,34 @@ def convert_math_dataset_to_openai_jsonl(
                 )
 
     logger.info(
-        f"Successfully processed {processed_count} examples. Kept and converted {kept_count} examples from '{dataset_name}' to '{output_file_path}'."
+        f"Successfully processed {processed_count} examples. Kept and converted {kept_count} examples from '{cfg.dataset.name}' to '{output_file_path}'."
     )
+    logger.info(f"Output written to: {os.path.abspath(output_file_path)}")
+
+
+@hydra.main(config_path="conf", config_name="config", version_base=None)
+def run_conversion(cfg: DictConfig) -> None:
+    """
+    Main entry point for the script, configured by Hydra.
+    """
+    logger.info("Starting dataset conversion process with Hydra configuration...")
+    logger.info(f"Full configuration:\n{OmegaConf.to_yaml(cfg)}")
+
+    # Call the main conversion function with the Hydra config
+    # The convert_math_dataset_to_openai_jsonl function now directly accepts the cfg object.
+    convert_math_dataset_to_openai_jsonl(cfg)
+
+    logger.info("Dataset conversion process finished.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Convert HuggingFace math dataset to OpenAI-style messages JSONL, with optional filtering."
-    )
-    parser.add_argument(
-        "dataset_name",
-        type=str,
-        help="HF dataset name (e.g., 'open-r1/OpenR1-Math-220k').",
-    )
-    parser.add_argument(
-        "output_file_path", type=str, help="Path for the output JSONL file."
-    )
-
-    parser.add_argument(
-        "--query_column",
-        type=str,
-        default="problem",
-        help="Dataset column for user query (default: 'problem').",
-    )
-    parser.add_argument(
-        "--solution_column_for_assistant",
-        type=str,
-        default="solution",
-        help="Dataset column for assistant's detailed solution (default: 'solution').",
-    )
-    parser.add_argument(
-        "--ground_truth_answer_column",
-        type=str,
-        default="answer",
-        help="Dataset column for concise ground truth answer (default: 'answer').",
-    )
-
-    parser.add_argument(
-        "--split", type=str, default="train", help="Dataset split (default: 'train')."
-    )
-    parser.add_argument(
-        "--config_name",
-        type=str,
-        default=None,
-        help="Dataset config name (e.g., 'main' for gsm8k).",
-    )
-    parser.add_argument(
-        "--filter_by_match",
-        action="store_true",
-        help="Enable filtering: only keep rows where answer extracted from solution matches ground_truth_answer. For 'numeric' math_type, ground_truth_answer must also be strictly numeric.",
-    )
-    parser.add_argument(
-        "--math_type",
-        type=str,
-        default="numeric",
-        choices=["numeric", "mcq", "list"],
-        help="Type of math reward to use for filtering (default: 'numeric').",
-    )
-
-    args = parser.parse_args()
-
-    if not HAS_REWARD_KIT_MATH_FUNCTIONS and args.filter_by_match:
+    # Ensure Hydra is installed
+    try:
+        import hydra
+    except ImportError:
         logger.error(
-            "Cannot perform filtering because 'math reward functions' or 'MetricResult' from reward_kit could not be imported. Exiting."
+            "Hydra is not installed. Please install it with 'pip install hydra-core'."
         )
-    else:
-        convert_math_dataset_to_openai_jsonl(
-            dataset_name=str(args.dataset_name),  # type: ignore
-            output_file_path=args.output_file_path,
-            query_column=args.query_column,
-            solution_column_for_assistant=args.solution_column_for_assistant,
-            ground_truth_answer_column=args.ground_truth_answer_column,
-            split=args.split,
-            filter_by_match=args.filter_by_match,
-            math_type=args.math_type,
-            config_name=args.config_name,
-        )
+        sys.exit(1)
+
+    run_conversion()

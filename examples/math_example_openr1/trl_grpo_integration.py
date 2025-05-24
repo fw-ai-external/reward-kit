@@ -48,7 +48,7 @@ grpo_config = GRPOConfig(
 
 # --- Helper Functions ---
 def load_jsonl_dataset(file_path: str):
-    """Loads data from a JSONL file, expecting 'messages' and 'ground_truth_answer_from_column', and processes it for TRL."""
+    """Loads data from a JSONL file, expecting 'messages' and 'ground_truth', and processes it for TRL."""
     raw_data = load_jsonl(file_path)  # Use the new utility
     if not raw_data:
         return []  # Return empty list if loading failed or file was empty
@@ -65,7 +65,7 @@ def load_jsonl_dataset(file_path: str):
         )
 
         # For this OpenR1 example, the ground truth is specifically in this field
-        ground_truth_response = item.get("ground_truth_answer_from_column")
+        ground_truth_response = item.get("ground_truth")
 
         if user_msg_content and ground_truth_response is not None:
             processed_trl_data.append(
@@ -76,7 +76,7 @@ def load_jsonl_dataset(file_path: str):
                 }
             )
         elif user_msg_content:  # Handle cases where ground_truth might be missing
-            # logging.warning(f"Missing 'ground_truth_answer_from_column' for prompt: {user_msg_content[:50]}...") # Optional logging
+            # logging.warning(f"Missing 'ground_truth' for prompt: {user_msg_content[:50]}...") # Optional logging
             processed_trl_data.append(
                 {
                     "prompt": user_msg_content,

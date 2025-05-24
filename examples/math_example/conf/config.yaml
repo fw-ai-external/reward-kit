@@ -1,0 +1,37 @@
+# Hydra Configuration for convert_dataset.py
+
+hydra:
+  run:
+    # Hydra's output directory, can be overridden.
+    # Default is outputs/YYYY-MM-DD/HH-MM-SS
+    dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job_logging:
+    root:
+      level: INFO
+  sweep: # Default sweeper config
+    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+
+# Parameters for the dataset source
+dataset:
+  name: "open-r1/OpenR1-Math-220k"    # Default HF dataset name
+  config_name: null                   # Optional: e.g., "main" for gsm8k, "default" for openbookqa
+  split: "train"                      # Default dataset split
+
+  # Column names in the source dataset
+  query_column: "problem"
+  solution_column_for_assistant: "solution"
+  ground_truth_answer_column: "answer"
+
+# Parameters for processing the dataset
+processing:
+  filter_by_match: false              # Enable filtering by matching solution to ground truth
+  math_type: "numeric"                # Type of math reward for filtering: "numeric", "mcq", "list"
+
+# Parameters for the output
+output:
+  # Path for the output JSONL file.
+  # If relative, it will be inside Hydra's output directory (hydra.run.dir).
+  # If absolute, it will be used as is.
+  file_path: "converted_dataset.jsonl"

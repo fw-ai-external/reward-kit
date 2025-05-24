@@ -1,8 +1,7 @@
 import json
-
-# from collections import defaultdict # Unused import
 import os
 import re
+import warnings
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Import OpenAI at module level for mocking in tests
@@ -21,10 +20,7 @@ from ..typed_interface import reward_function  # Added reward_function
 
 
 def match_function_call(
-    messages: List[
-        Dict[str, str]
-    ],  # messages is for context if needed, not directly used here for func call parts
-    # original_messages: List[Dict[str, str]], # Removed
+    messages: List[Dict[str, Any]],  # messages is for context if needed
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
@@ -328,7 +324,8 @@ def compare_tool_calls(generated_tool_calls: list, gt_tool_calls: list) -> bool:
         json.dumps(item, sort_keys=True) for item in gt_tool_calls
     ]
 
-    return Counter(generated_tool_calls_serialized) == Counter(gt_tool_calls_serialized)
+    # Direct list comparison for order sensitivity
+    return generated_tool_calls_serialized == gt_tool_calls_serialized
 
 
 def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
@@ -357,9 +354,16 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
         )
         generated_functions = [item["function"] for item in deserialized_tool_calls]
     # Check 'content' only if 'tool_calls' is not present or is empty
-    elif "<tool_call>" in generation.get("content", ""):
-        parsed_from_content = parse_tool_calls(generation["content"])
-        generated_functions = parsed_from_content
+    elif generation.get("content") and "<tool_call>" in generation["content"]:
+        parsed_tool_calls_from_content = parse_tool_calls(generation["content"])
+        if parsed_tool_calls_from_content:  # Check if parsing yielded any results
+            deserialized_tool_calls_from_content = (
+                maybe_deserialize_tool_call_arguments(parsed_tool_calls_from_content)
+            )
+            generated_functions = [
+                item["function"] for item in deserialized_tool_calls_from_content
+            ]
+        # If parsing yields nothing, generated_functions remains empty, which is correct.
 
     return compare_tool_calls(generated_functions, ground_truth_functions)
 
@@ -441,6 +445,9 @@ def schema_jaccard_reward(
     **kwargs,
 ) -> EvaluateResult:
     """
+    DEPRECATED: This function is deprecated and will be removed in a future version.
+    Please use `exact_tool_match_reward` for evaluating tool calls.
+
     NOTE: This function now delegates to exact_tool_match_reward.
     Original Jaccard similarity logic for function call schemas is bypassed.
     The helper functions for Jaccard similarity are kept in this file as they
@@ -449,12 +456,19 @@ def schema_jaccard_reward(
     Args:
         messages: List of conversation messages.
         ground_truth: Expected assistant response as a dictionary.
+        function_call: (Unused) Kept for signature compatibility.
+        expected_schema: (Unused) Kept for signature compatibility.
         **kwargs: Additional keyword arguments.
 
     Returns:
         EvaluateResult from exact_tool_match_reward.
     """
-    # Delegate to exact_tool_match_reward
+    warnings.warn(
+        "`schema_jaccard_reward` is deprecated and will be removed in a future version. "
+        "Please use `exact_tool_match_reward`.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )
@@ -475,20 +489,32 @@ def llm_judge_reward(
     **kwargs,
 ) -> EvaluateResult:
     """
+    DEPRECATED: This function is deprecated and will be removed in a future version.
+    Please use `exact_tool_match_reward` for evaluating tool calls.
+
     NOTE: This function now delegates to exact_tool_match_reward.
     Original LLM judge logic is bypassed.
 
     Args:
         messages: List of conversation messages.
         ground_truth: Expected assistant response as a dictionary.
+        function_call: (Unused) Kept for signature compatibility.
+        expected_schema: (Unused) Kept for signature compatibility.
+        expected_behavior: (Unused) Kept for signature compatibility.
+        openai_api_key: (Unused) Kept for signature compatibility.
+        model: (Unused) Kept for signature compatibility.
+        temperature: (Unused) Kept for signature compatibility.
         **kwargs: Additional keyword arguments.
 
     Returns:
         EvaluateResult from exact_tool_match_reward.
     """
-    # Delegate to exact_tool_match_reward
-    # Parameters function_call, expected_schema, expected_behavior, openai_api_key, model, temperature
-    # are not used by exact_tool_match_reward.
+    warnings.warn(
+        "`llm_judge_reward` is deprecated and will be removed in a future version. "
+        "Please use `exact_tool_match_reward`.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )
@@ -509,6 +535,9 @@ def composite_function_call_reward(
     **kwargs,
 ) -> EvaluateResult:
     """
+    DEPRECATED: This function is deprecated and will be removed in a future version.
+    Please use `exact_tool_match_reward` for evaluating tool calls.
+
     This reward function now delegates to exact_tool_match_reward
     for an exact match evaluation of tool calls.
     The model's response (containing the function call) is assumed to be `messages[-1]`.
@@ -517,16 +546,23 @@ def composite_function_call_reward(
         messages: List of conversation messages, where `messages[-1]` is the model's response.
         ground_truth: Expected assistant response as a dictionary, typically containing 'tool_calls'.
                       This is passed directly to exact_tool_match_reward.
+        function_call: (Unused) Kept for signature compatibility.
+        expected_schema: (Unused) Kept for signature compatibility.
+        expected_behavior: (Unused) Kept for signature compatibility.
+        openai_api_key: (Unused) Kept for signature compatibility.
+        llm_model: (Unused) Kept for signature compatibility.
+        weights: (Unused) Kept for signature compatibility.
         **kwargs: Additional keyword arguments passed to exact_tool_match_reward.
 
     Returns:
         EvaluateResult with score and metrics from exact_tool_match_reward.
     """
-    # Directly delegate to exact_tool_match_reward.
-    # The original parameters like function_call, expected_schema, expected_behavior,
-    # openai_api_key, llm_model, weights are not explicitly passed here as
-    # exact_tool_match_reward does not use them.
-    # kwargs will pass through any other relevant arguments.
+    warnings.warn(
+        "`composite_function_call_reward` is deprecated and will be removed in a future version. "
+        "Please use `exact_tool_match_reward`.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )

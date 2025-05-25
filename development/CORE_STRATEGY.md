@@ -43,9 +43,6 @@ This roadmap outlines the development priorities. Tasks within each phase can be
     *   [ ] **Example Scripts:** Update all existing example scripts in `examples/` to use the new API and data formats.
     *   [ ] **TRL Adapter:** Update `RewardFunction.get_trl_adapter` in `reward_kit/reward_function.py`.
     *   [ ] **`RewardFunction` Class:** Review and align `reward_kit/reward_function.py` (especially `__call__` and `func_path` handling).
-*   **P1.3: [CRITICAL] Documentation - Data Models & API Refactor:**
-    *   [ ] Urgently update `docs/api_reference/data_models.mdx` and `docs/developer_guide/core_data_types.mdx` to correctly reflect the unified `EvaluateResult`/`MetricResult` structure (use `success: bool` in `MetricResult`, remove `is_score_valid`).
-    *   [ ] Update all other project documentation (`docs/`, `README.md`, `CONTRIBUTING.md`) to reflect the API, data format, and type hinting changes from the refactor.
 *   **P1.4: Code Quality & Tooling Setup:**
     *   [ ] **Configuration Standardization:** Standardize `flake8`, `black`, `mypy` configurations across `.pre-commit-config.yaml`, `.flake8`, `mypy.ini`, `Makefile`, `pyproject.toml` (if adopted).
     *   [ ] **MyPy Strictness:** Systematically review and reduce globally disabled MyPy error codes.

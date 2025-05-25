@@ -6,27 +6,27 @@ clean:
 	rm -rf build/ dist/ *.egg-info/
 
 pre-commit:
-	.venv/bin/pre-commit run --all-files
+	pre-commit run --all-files
 
 build: clean
-	.venv/bin/python -m build
+	python -m build
 
 dist: build
 
 upload:
-	.venv/bin/twine upload dist/*
+	twine upload dist/*
 
 test:
-	.venv/bin/pytest
+	pytest
 
 lint:
-	.venv/bin/flake8 $(PYTHON_DIRS)
+	flake8 $(PYTHON_DIRS)
 
 typecheck:
-	.venv/bin/mypy $(PYTHON_DIRS)
+	mypy $(PYTHON_DIRS)
 
 format:
-	.venv/bin/black $(PYTHON_DIRS)
+	black $(PYTHON_DIRS)
 
 # Sync docs to ~/home/docs with links under 'evaluators'
 sync-docs:
@@ -84,7 +84,7 @@ demo-remote-eval:
 	@echo "---------------------------------------------------------------------"
 	@echo "Log files for the demo will be created in ./logs/remote_eval_demo/"
 	@echo "Starting demo script..."
-	.venv/bin/python examples/remote_eval_demo/run_demo.py
+	python examples/remote_eval_demo/run_demo.py
 	@echo "---------------------------------------------------------------------"
 	@echo "Remote Evaluation Demo finished."
 	@echo "---------------------------------------------------------------------"

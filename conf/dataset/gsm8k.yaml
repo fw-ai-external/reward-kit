@@ -1,0 +1,5 @@
+# Schema for gsm8k dataset
+_target_: reward_kit.datasets.loader.load_gsm8k # Example target, adjust as needed
+name: gsm8k
+path: /path/to/gsm8k/dataset # To be configured by user or via defaults
+# Add gsm8k specific parameters if any

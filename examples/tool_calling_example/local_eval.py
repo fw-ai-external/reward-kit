@@ -1,32 +1,56 @@
 import json
+import logging
+import os
 
 # from reward_kit.models import Message
 from typing import Any, Dict, List, Union
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 from reward_kit.rewards.function_calling import (  # Changed to direct import
     exact_tool_match_reward,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def load_dataset(file_path: str) -> List[Dict[str, Any]]:
     """Loads the dataset from a .jsonl file."""
     dataset = []
+    if not os.path.exists(file_path):
+        # Use print here as logger might not be configured if script is run directly without Hydra context
+        print(f"Error: Dataset file not found at {file_path}")
+        return []
     with open(file_path, "r") as f:
         for line in f:
             dataset.append(json.loads(line))
     return dataset
 
 
-def main():
-    # Path relative to the root of the reward-kit directory
-    dataset_path = "examples/tool_calling_example/dataset.jsonl"
+@hydra.main(config_path="conf", config_name="local_eval_config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    dataset_path = hydra.utils.to_absolute_path(cfg.dataset_file_path)
+
+    # Using print for initial messages as Hydra logger might not be fully set up or for emphasis
+    print(f"Hydra configuration:\n{OmegaConf.to_yaml(cfg)}")
+    print(f"Resolved dataset path: {dataset_path}")
+
     dataset = load_dataset(dataset_path)
+    if (
+        not dataset
+    ):  # Check if dataset loading failed (e.g. file not found by load_dataset)
+        print(
+            f"Failed to load dataset from {dataset_path} or dataset is empty. Exiting."
+        )
+        return
 
     total_evaluated = 0
     total_passed = 0
     cumulative_score = 0.0
 
     print(f"Evaluating dataset: {dataset_path} using exact_tool_match_reward\n")
+    # logger.info(f"Evaluating dataset: {dataset_path} using exact_tool_match_reward")
 
     for i, item in enumerate(dataset):
         messages_data = item.get("messages", [])

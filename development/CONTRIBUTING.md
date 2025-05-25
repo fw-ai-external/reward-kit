@@ -367,6 +367,65 @@ FIREWORKS_API_BASE=https://dev.api.fireworks.ai \
 .venv/bin/python examples/deploy_example.py
 ```
 
+
+### Running Hydra-based Examples
+
+Several example scripts, particularly those involving local evaluations (`local_eval.py`) and TRL integration (`trl_grpo_integration.py`) within directories like `examples/math_example/`, `examples/math_example_openr1/`, and `examples/tool_calling_example/`, have been refactored to use [Hydra](https://hydra.cc/) for configuration management.
+
+**How to Run:**
+
+1.  **Activate your virtual environment:**
+    ```bash
+    source .venv/bin/activate
+    ```
+
+2.  **Navigate to the repository root** if you aren't already there.
+
+3.  **Run the script directly using python:**
+    Hydra will automatically pick up the configuration from the `conf` subdirectory relative to the script's location.
+    ```bash
+    # Example for math_example local_eval.py
+    .venv/bin/python examples/math_example/local_eval.py
+
+    # Example for math_example trl_grpo_integration.py
+    .venv/bin/python examples/math_example/trl_grpo_integration.py
+    ```
+
+**Configuration:**
+
+*   Configuration files are typically found in a `conf` subdirectory alongside the script (e.g., `examples/math_example/conf/local_eval_config.yaml`).
+*   These YAML files define various parameters, including dataset paths, model names, and training arguments.
+
+**Overriding Configuration:**
+
+You can easily override any configuration parameter from the command line:
+
+*   **Dataset Path:**
+    ```bash
+    .venv/bin/python examples/math_example/local_eval.py dataset_file_path=path/to/your/specific_dataset.jsonl
+    ```
+*   **Model Name (for TRL scripts):**
+    ```bash
+    .venv/bin/python examples/math_example/trl_grpo_integration.py model_name=mistralai/Mistral-7B-Instruct-v0.2
+    ```
+*   **GRPO Training Arguments (for TRL scripts):**
+    Access nested parameters using dot notation.
+    ```bash
+    .venv/bin/python examples/math_example/trl_grpo_integration.py grpo.learning_rate=5e-5 grpo.num_train_epochs=3
+    ```
+*   **Multiple Overrides:**
+    ```bash
+    .venv/bin/python examples/tool_calling_example/trl_grpo_integration.py dataset_file_path=my_tools_data.jsonl model_name=google/gemma-7b grpo.per_device_train_batch_size=4
+    ```
+
+**Output Directory:**
+
+Hydra manages output directories for each run. By default, outputs (logs, saved models, etc.) are saved to a timestamped directory structure like:
+`outputs/YYYY-MM-DD/HH-MM-SS/` (relative to where the command is run, typically the repo root).
+The exact base output path can also be configured within the YAML files (e.g., `hydra.run.dir`).
+
+Refer to the specific `conf/*.yaml` file for each example to see all available configuration options.
+
 ## Command Line Interface
 
 Use the Reward Kit CLI for common operations during development. Ensure your virtual environment is activated (`source .venv/bin/activate`), then use the `reward-kit` command (which should be available from `.venv/bin/`):

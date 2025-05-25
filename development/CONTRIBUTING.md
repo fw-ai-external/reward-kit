@@ -14,16 +14,16 @@ cd reward-kit
 # Set up environment
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"  # Includes development dependencies
+.venv/bin/pip install -e ".[dev]"  # Includes development dependencies
 
 # Run tests
-pytest
+.venv/bin/pytest
 
 # Type check
-mypy reward_kit
+.venv/bin/mypy reward_kit
 
 # Lint code
-flake8 reward_kit
+.venv/bin/flake8 reward_kit
 ```
 
 ## Development Environment
@@ -43,12 +43,14 @@ cd reward-kit
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
+   **Important for LLMs and automated scripts:** After activating the virtual environment, always explicitly use executables from the `.venv/bin/` directory (e.g., `.venv/bin/pip`, `.venv/bin/pytest`, `.venv/bin/python`). This ensures commands run within the isolated environment, even if the shell's `PATH` isn't immediately updated or if context is lost between commands.
 
 3. **Install the package in development mode:**
 
+   Use `pip` from the virtual environment:
 ```bash
-pip install -e .            # Basic installation
-pip install -e ".[dev]"     # With development dependencies
+.venv/bin/pip install -e .            # Basic installation
+.venv/bin/pip install -e ".[dev]"     # With development dependencies
 ```
 
 ### Authentication Setup for Development
@@ -239,9 +241,9 @@ To help enforce coding standards and catch issues early, we use pre-commit hooks
 **Installation and Setup:**
 
 1.  **Install pre-commit**:
-    If you installed development dependencies with `pip install -e ".[dev]"`, `pre-commit` should already be installed. If not, you can install it via pip:
+    If you installed development dependencies with `.venv/bin/pip install -e ".[dev]"`, `pre-commit` should already be installed. If not, you can install it via the virtual environment's pip:
     ```bash
-    pip install pre-commit
+    .venv/bin/pip install pre-commit
     ```
 
 2.  **Install the git hooks**:
@@ -267,18 +269,19 @@ By using pre-commit hooks, we can ensure a consistent code style and catch many 
 
 ### Running Tests
 
+   Ensure your virtual environment is activated (`source .venv/bin/activate`). Then run tests using `pytest` from the virtual environment:
 ```bash
 # Run all tests
-pytest tests/
+.venv/bin/pytest tests/
 
 # Run specific test file
-pytest tests/test_evaluation.py
+.venv/bin/pytest tests/test_evaluation.py
 
 # Run specific test function
-pytest tests/test_file.py::test_function
+.venv/bin/pytest tests/test_file.py::test_function
 
 # Run with coverage report
-pytest --cov=reward_kit
+.venv/bin/pytest --cov=reward_kit
 ```
 
 We can focus on tests/ and examples/ folder for now since there are a lot of other repos
@@ -314,15 +317,16 @@ class TestYourFunction(unittest.TestCase):
 
 ### Code Quality Tools
 
+   Ensure your virtual environment is activated (`source .venv/bin/activate`). Then run these tools from the virtual environment:
 ```bash
 # Type checking
-mypy reward_kit
+.venv/bin/mypy reward_kit
 
 # Linting
-flake8 reward_kit
+.venv/bin/flake8 reward_kit
 
 # Format code
-black reward_kit
+.venv/bin/black reward_kit
 ```
 
 ## Available Reward Functions
@@ -351,27 +355,29 @@ The examples folder contains sample code for using the Reward Kit:
 
 ```bash
 # Run evaluation preview example
-source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY \
+# Ensure venv is active: source .venv/bin/activate
+FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY \
 FIREWORKS_API_BASE=https://dev.api.fireworks.ai \
-python examples/evaluation_preview_example.py
+.venv/bin/python examples/evaluation_preview_example.py
 
 # Run deployment example
-source .venv/bin/activate && FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY \
+# Ensure venv is active: source .venv/bin/activate
+FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY \
 FIREWORKS_API_BASE=https://dev.api.fireworks.ai \
-python examples/deploy_example.py
+.venv/bin/python examples/deploy_example.py
 ```
 
 ## Command Line Interface
 
-Use the Reward Kit CLI for common operations during development:
+Use the Reward Kit CLI for common operations during development. Ensure your virtual environment is activated (`source .venv/bin/activate`), then use the `reward-kit` command (which should be available from `.venv/bin/`):
 
 ```bash
 # Preview an evaluator
-reward-kit preview --metrics-folders "word_count=./examples/metrics/word_count" \
+.venv/bin/reward-kit preview --metrics-folders "word_count=./examples/metrics/word_count" \
 --samples ./examples/samples/samples.jsonl
 
 # Deploy an evaluator
-reward-kit deploy --id my-test-evaluator \
+.venv/bin/reward-kit deploy --id my-test-evaluator \
 --metrics-folders "word_count=./examples/metrics/word_count" --force
 ```
 
@@ -416,10 +422,10 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-Or use the `--verbose` flag with CLI commands:
+Or use the `--verbose` flag with CLI commands (from the venv):
 
 ```bash
-reward-kit --verbose preview --metrics-folders "word_count=./examples/metrics/word_count" \
+.venv/bin/reward-kit --verbose preview --metrics-folders "word_count=./examples/metrics/word_count" \
 --samples ./examples/samples/samples.jsonl
 ```
 
@@ -459,13 +465,14 @@ We welcome contributions to Reward Kit! Please follow these steps to contribute:
 
 5.  **Add Tests**:
     *   Write new tests for any new functionality.
-    *   Ensure all tests pass by running `pytest`.
+    *   Ensure all tests pass by running `.venv/bin/pytest` (after activating the virtual environment).
 
 6.  **Run Code Quality Checks**:
-    *   Format your code: `black reward_kit tests`
-    *   Check linting: `flake8 reward_kit tests`
-    *   Check types: `mypy reward_kit`
-    *   (Once configured) Run pre-commit hooks: `pre-commit run --all-files`
+    *   Ensure your virtual environment is activated (`source .venv/bin/activate`).
+    *   Format your code: `.venv/bin/black reward_kit tests`
+    *   Check linting: `.venv/bin/flake8 reward_kit tests`
+    *   Check types: `.venv/bin/mypy reward_kit`
+    *   Run pre-commit hooks (which should use the venv's tools if configured correctly): `pre-commit run --all-files`
 
 7.  **Update Documentation**:
     *   If your changes affect user-facing features or APIs, update the relevant documentation in the `docs/` directory.

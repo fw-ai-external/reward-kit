@@ -156,104 +156,121 @@ def deploy_to_cloud_run(
     Returns:
         The URL of the deployed service if successful, else None.
     """
-    logger.info(
-        f"Deploying image {image_name_tag} to Cloud Run service {service_name} in {gcp_region} (Project: {gcp_project_id})"
-    )
 
-    deploy_cmd_list = [
-        "run",
-        "deploy",
-        service_name,
-        "--image",
-        image_name_tag,
-        "--region",
-        gcp_region,
-        "--project",
-        gcp_project_id,
-        "--port",
-        str(service_port),
-        # "--platform", "managed", # Default for Cloud Run
-    ]
+    if not gcp_project_id:
+        logger.error("GCP Project ID is required for deploying to Cloud Run.")
+        return None
+    if not gcp_region:
+        logger.error("GCP Region is required for deploying to Cloud Run.")
+        return None
 
-    if allow_unauthenticated:
-        deploy_cmd_list.append("--allow-unauthenticated")
-    else:
-        # For IAM based auth, would be --no-allow-unauthenticated and then set IAM policy
-        deploy_cmd_list.append("--no-allow-unauthenticated")
+    try:
         logger.info(
-            "Note: --no-allow-unauthenticated set. Further IAM configuration might be needed."
+            f"Deploying image {image_name_tag} to Cloud Run service {service_name} in {gcp_region} (Project: {gcp_project_id})"
         )
 
-    if env_vars:
-        env_vars_str = ",".join([f"{k}={v}" for k, v in env_vars.items()])
-        deploy_cmd_list.extend(["--set-env-vars", env_vars_str])
-
-    if secrets_to_mount:
-        # Format: ENV_VAR_NAME=secret_name:version,...
-        # Secret name here is just the short ID, not the full path.
-        # gcloud will resolve it within the project.
-        # Example: MY_API_KEY=my-api-key-secret:latest
-        secrets_str_list = []
-        for env_var_name, secret_manager_full_id in secrets_to_mount.items():
-            # Parse projects/PROJECT_ID/secrets/SECRET_ID/versions/VERSION
-            parts = secret_manager_full_id.split("/")
-            if (
-                len(parts) == 6
-                and parts[0] == "projects"
-                and parts[2] == "secrets"
-                and parts[4] == "versions"
-            ):
-                secret_id = parts[3]
-                secret_version = parts[5]
-                secrets_str_list.append(f"{env_var_name}={secret_id}:{secret_version}")
-            else:
-                logger.warning(
-                    f"Invalid secret manager full ID format: {secret_manager_full_id}. Skipping secret mount for {env_var_name}."
-                )
-
-        if secrets_str_list:
-            deploy_cmd_list.extend(["--update-secrets", ",".join(secrets_str_list)])
-
-    success, stdout, stderr = _run_gcloud_command(deploy_cmd_list, dry_run=dry_run)
-
-    if success:
-        if dry_run:
-            service_url_placeholder = f"https://{service_name}-mock-url.a.run.app"
-            logger.info(
-                f"Successfully deployed service {service_name} (dry run). URL (placeholder): {service_url_placeholder}"
-            )
-            return service_url_placeholder
-
-        # Get the service URL after successful deployment
-        get_url_cmd = [
+        deploy_cmd_list = [
             "run",
-            "services",
-            "describe",
+            "deploy",
             service_name,
+            "--image",
+            image_name_tag,
             "--region",
             gcp_region,
             "--project",
             gcp_project_id,
-            "--format",
-            "value(status.url)",
+            "--port",
+            str(service_port),
+            # "--platform", "managed", # Default for Cloud Run
         ]
-        url_success, url_stdout, url_stderr = _run_gcloud_command(
-            get_url_cmd, dry_run=False
-        )  # Always try to get URL if deploy was not dry_run
 
-        if url_success and url_stdout:
-            service_url = url_stdout.strip()
-            logger.info(
-                f"Successfully deployed service {service_name}. URL: {service_url}"
-            )
-            return service_url
+        if allow_unauthenticated:
+            deploy_cmd_list.append("--allow-unauthenticated")
         else:
-            logger.error(
-                f"Deployed service {service_name}, but failed to retrieve its URL. Stderr: {url_stderr}"
+            # For IAM based auth, would be --no-allow-unauthenticated and then set IAM policy
+            deploy_cmd_list.append("--no-allow-unauthenticated")
+            logger.info(
+                "Note: --no-allow-unauthenticated set. Further IAM configuration might be needed."
             )
-            return None  # Consider deployment failed if URL cannot be retrieved
-    else:
-        logger.error(f"Failed to deploy service {service_name}. Stderr: {stderr}")
+
+        if env_vars:
+            env_vars_str = ",".join([f"{k}={v}" for k, v in env_vars.items()])
+            deploy_cmd_list.extend(["--set-env-vars", env_vars_str])
+
+        if secrets_to_mount:
+            # Format: ENV_VAR_NAME=secret_name:version,...
+            # Secret name here is just the short ID, not the full path.
+            # gcloud will resolve it within the project.
+            # Example: MY_API_KEY=my-api-key-secret:latest
+            secrets_str_list = []
+            for env_var_name, secret_manager_full_id in secrets_to_mount.items():
+                # Parse projects/PROJECT_ID/secrets/SECRET_ID/versions/VERSION
+                parts = secret_manager_full_id.split("/")
+                if (
+                    len(parts) == 6
+                    and parts[0] == "projects"
+                    and parts[2] == "secrets"
+                    and parts[4] == "versions"
+                ):
+                    secret_id = parts[3]
+                    secret_version = parts[5]
+                    secrets_str_list.append(f"{env_var_name}={secret_id}:{secret_version}")
+                else:
+                    logger.warning(
+                        f"Invalid secret manager full ID format: {secret_manager_full_id}. Skipping secret mount for {env_var_name}."
+                    )
+
+            if secrets_str_list:
+                deploy_cmd_list.extend(["--update-secrets", ",".join(secrets_str_list)])
+
+        success, stdout, stderr = _run_gcloud_command(deploy_cmd_list, dry_run=dry_run)
+
+        if success:
+            if dry_run:
+                service_url_placeholder = f"https://{service_name}-mock-url.a.run.app"
+                logger.info(
+                    f"Successfully deployed service {service_name} (dry run). URL (placeholder): {service_url_placeholder}"
+                )
+                return service_url_placeholder
+
+            # Get the service URL after successful deployment
+            get_url_cmd = [
+                "run",
+                "services",
+                "describe",
+                service_name,
+                "--region",
+                gcp_region,
+                "--project",
+                gcp_project_id,
+                "--format",
+                "value(status.url)",
+            ]
+            url_success, url_stdout, url_stderr = _run_gcloud_command(
+                get_url_cmd, dry_run=False
+            )  # Always try to get URL if deploy was not dry_run
+
+            if url_success and url_stdout:
+                service_url = url_stdout.strip()
+                if not service_url.startswith("https://"):
+                    logger.error(
+                        f"Service URL is not valid (must be HTTPS): {service_url}"
+                    )
+                    return None
+                logger.info(
+                    f"Successfully deployed service {service_name}. URL: {service_url}"
+                )
+                return service_url
+            else:
+                logger.error(
+                    f"Deployed service {service_name}, but failed to retrieve its URL. Stderr: {url_stderr}"
+                )
+                return None  # Consider deployment failed if URL cannot be retrieved
+        else:
+            logger.error(f"Failed to deploy service {service_name}. Stderr: {stderr}")
+            return None
+    except Exception as e:
+        logger.error(f"An error occurred during Cloud Run deployment for service {service_name}: {e}")
         return None
 
 
@@ -267,64 +284,68 @@ def ensure_artifact_registry_repo_exists(
         f"Ensuring Artifact Registry repository '{repo_name}' exists in project '{project_id}', region '{region}'."
     )
 
-    describe_cmd = [
-        "artifacts",
-        "repositories",
-        "describe",
-        repo_name,
-        "--project",
-        project_id,
-        "--location",
-        region,
-    ]
-
-    # Don't use dry_run for describe, as we need to know if it exists
-    success, stdout, stderr = _run_gcloud_command(describe_cmd, dry_run=False)
-
-    if success:
-        logger.info(f"Artifact Registry repository '{repo_name}' already exists.")
-        return True
-
-    # If describe failed, check if it's because the repo was not found
-    # gcloud typically returns non-zero exit code and an error message to stderr for "not found"
-    if (
-        "NOT_FOUND" in stderr.upper() or "failed to find" in stderr.lower()
-    ):  # Heuristic check
-        logger.info(
-            f"Artifact Registry repository '{repo_name}' not found. Attempting to create it."
-        )
-        create_cmd = [
+    try:
+        describe_cmd = [
             "artifacts",
             "repositories",
-            "create",
+            "describe",
             repo_name,
             "--project",
             project_id,
-            "--repository-format",
-            "docker",
             "--location",
             region,
-            "--description",
-            "Repository for reward-kit evaluators (auto-created by reward-kit CLI)",
         ]
-        create_success, create_stdout, create_stderr = _run_gcloud_command(
-            create_cmd, dry_run=dry_run
-        )
-        if create_success:
-            logger.info(
-                f"Successfully created Artifact Registry repository '{repo_name}'."
-            )
+
+        # Don't use dry_run for describe, as we need to know if it exists
+        success, stdout, stderr = _run_gcloud_command(describe_cmd, dry_run=False)
+
+        if success:
+            logger.info(f"Artifact Registry repository '{repo_name}' already exists.")
             return True
+
+        # If describe failed, check if it's because the repo was not found
+        # gcloud typically returns non-zero exit code and an error message to stderr for "not found"
+        if (
+            "NOT_FOUND" in stderr.upper() or "failed to find" in stderr.lower()
+        ):  # Heuristic check
+            logger.info(
+                f"Artifact Registry repository '{repo_name}' not found. Attempting to create it."
+            )
+            create_cmd = [
+                "artifacts",
+                "repositories",
+                "create",
+                repo_name,
+                "--project",
+                project_id,
+                "--repository-format",
+                "docker",
+                "--location",
+                region,
+                "--description",
+                "Repository for reward-kit evaluators (auto-created by reward-kit CLI)",
+            ]
+            create_success, create_stdout, create_stderr = _run_gcloud_command(
+                create_cmd, dry_run=dry_run
+            )
+            if create_success:
+                logger.info(
+                    f"Successfully created Artifact Registry repository '{repo_name}'."
+                )
+                return True
+            else:
+                logger.error(
+                    f"Failed to create Artifact Registry repository '{repo_name}'. Stderr: {create_stderr}"
+                )
+                return False
         else:
+            # Describe failed for a reason other than "not found"
             logger.error(
-                f"Failed to create Artifact Registry repository '{repo_name}'. Stderr: {create_stderr}"
+                f"Error describing Artifact Registry repository '{repo_name}'. Stderr: {stderr}"
             )
             return False
-    else:
-        # Describe failed for a reason other than "not found"
-        logger.error(
-            f"Error describing Artifact Registry repository '{repo_name}'. Stderr: {stderr}"
-        )
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while ensuring Artifact Registry repository '{repo_name}': {e}")
         return False
 
 
@@ -343,8 +364,17 @@ def ensure_gcp_secret(
     Returns the full resource name of the new secret version if successful, else None.
     e.g., projects/PROJECT_ID/secrets/SECRET_ID/versions/VERSION
     """
-    logger.info(f"Ensuring secret '{secret_id}' in project '{project_id}'.")
+    if not project_id:
+        logger.error("GCP Project ID is required to manage secrets.")
+        return None
+    if not secret_id:
+        logger.error("Secret ID is required to manage secrets.")
+        return None
+    if secret_value is None:  # Allow empty string, but not None
+        logger.error("Secret value is required to create or update a secret.")
+        return None
 
+    logger.info(f"Ensuring secret '{secret_id}' in project '{project_id}'.")
     describe_cmd = ["secrets", "describe", secret_id, "--project", project_id]
     secret_exists, _, describe_stderr = _run_gcloud_command(
         describe_cmd, dry_run=False

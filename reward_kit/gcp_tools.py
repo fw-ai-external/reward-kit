@@ -364,8 +364,17 @@ def ensure_gcp_secret(
     Returns the full resource name of the new secret version if successful, else None.
     e.g., projects/PROJECT_ID/secrets/SECRET_ID/versions/VERSION
     """
-    logger.info(f"Ensuring secret '{secret_id}' in project '{project_id}'.")
+    if not project_id:
+        logger.error("GCP Project ID is required to manage secrets.")
+        return None
+    if not secret_id:
+        logger.error("Secret ID is required to manage secrets.")
+        return None
+    if secret_value is None:  # Allow empty string, but not None
+        logger.error("Secret value is required to create or update a secret.")
+        return None
 
+    logger.info(f"Ensuring secret '{secret_id}' in project '{project_id}'.")
     describe_cmd = ["secrets", "describe", secret_id, "--project", project_id]
     secret_exists, _, describe_stderr = _run_gcloud_command(
         describe_cmd, dry_run=False

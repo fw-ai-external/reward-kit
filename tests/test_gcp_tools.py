@@ -443,7 +443,7 @@ class TestGCPTools(unittest.TestCase):
     def test_ensure_gcp_secret_no_project_id(self):
         with patch.object(logger, 'error') as mock_logger_error:
             result_version = ensure_gcp_secret(
-                gcp_project_id=None,
+                project_id=None, # Changed here
                 secret_id=self.mock_secret_id,
                 secret_value=self.mock_secret_value
             )
@@ -454,7 +454,7 @@ class TestGCPTools(unittest.TestCase):
     def test_ensure_gcp_secret_no_secret_id(self):
         with patch.object(logger, 'error') as mock_logger_error:
             result_version = ensure_gcp_secret(
-                gcp_project_id=self.mock_project_id,
+                project_id=self.mock_project_id, # Changed here
                 secret_id=None,
                 secret_value=self.mock_secret_value
             )
@@ -465,7 +465,7 @@ class TestGCPTools(unittest.TestCase):
     def test_ensure_gcp_secret_no_secret_value(self):
         with patch.object(logger, 'error') as mock_logger_error:
             result_version = ensure_gcp_secret(
-                gcp_project_id=self.mock_project_id,
+                project_id=self.mock_project_id, # Changed here
                 secret_id=self.mock_secret_id,
                 secret_value=None
             )

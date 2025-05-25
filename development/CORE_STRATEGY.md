@@ -34,10 +34,12 @@ This roadmap outlines the development priorities. Tasks within each phase can be
 *(Focus: Stabilize core APIs, improve code quality infrastructure, fix critical documentation, and enhance basic usability.)*
 
 *   **P1.1: [CRITICAL] Improve Agent Multi-Step Rollout Implementation:**
-    *   [ ] Review existing agent multi-step rollout capabilities.
-    *   [ ] Identify key areas for improvement in terms of robustness, flexibility, and observability.
-    *   [ ] Implement and test prioritized enhancements.
-    *   [ ] Update relevant documentation and examples.
+    *   **Detailed Plan:** See [Multi-Step RL Enhancement Plan Overview](./notes/multi_step_rl_enhancement_plan_overview.md)
+    *   [ ] Review existing agent multi-step rollout capabilities (as per Phase 0 in detailed plan).
+    *   [ ] Implement Phase 1: Foundational RL Enablement (Tasks 1.1 - 1.5).
+    *   [ ] Implement Phase 2: Advanced RL Algorithms and Observability (Tasks 2.1 - 2.4).
+    *   [ ] Implement Phase 3: Scalability and Productionization (Tasks 3.1 - 3.2).
+    *   [ ] Update relevant documentation and examples throughout the implementation.
 *   **P1.2: [CRITICAL] Complete API & Data Format Refactor:**
     *   [ ] **Core Reward Functions:** Finish refactoring all remaining functions in `reward_kit/rewards/` (e.g., `multiple_choice_math_reward.py`, `reasoning_steps.py`, `accuracy_length.py`) and their tests to align with the new `messages`/`ground_truth` paradigm and Pydantic type hinting.
     *   [ ] **Example Scripts:** Update all existing example scripts in `examples/` to use the new API and data formats.

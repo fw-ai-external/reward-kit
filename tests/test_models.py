@@ -3,7 +3,11 @@ from typing import Dict
 
 import pytest
 
-from reward_kit.models import EvaluateResult, MetricResult
+from reward_kit.models import (  # Added Message to existing import
+    EvaluateResult,
+    Message,
+    MetricResult,
+)
 
 
 def test_metric_result_creation():
@@ -210,6 +214,7 @@ def test_evaluate_result_dict_access():
         "metrics",
         "error",
         "is_score_valid",
+        "step_outputs",  # Added this field due to model extension
     }
 
     # values() - check presence due to potential order variation of model_fields
@@ -229,6 +234,7 @@ def test_evaluate_result_dict_access():
             ("metrics", metrics_dict),
             ("error", "Test Error"),
             ("is_score_valid", False),
+            ("step_outputs", None),  # Added, assuming default is None
         ]
     )
     # result.items() returns a list of tuples, so convert to list then sort.
@@ -244,4 +250,33 @@ def test_evaluate_result_dict_access():
         "metrics",
         "error",
         "is_score_valid",
+        "step_outputs",  # Added this field
     }
+
+
+# Removed the redundant import from here
+
+
+def test_message_creation_requires_role():
+    """Test that creating a Message requires the 'role' field."""
+    from pydantic import ValidationError  # Ensure ValidationError is imported
+
+    # Test direct instantiation
+    with pytest.raises(
+        ValidationError, match="Field required"
+    ):  # Pydantic's typical error for missing field
+        Message(content="test content")
+
+    # Test model_validate if it's intended to be a primary validation path
+    # (though Pydantic's __init__ should catch it first)
+    with pytest.raises(ValueError, match="Role is required"):
+        Message.model_validate({"content": "test content"})
+
+    # Test valid creation
+    msg = Message(role="user", content="hello")
+    assert msg.role == "user"
+    assert msg.content == "hello"
+
+    msg_none_content = Message(role="user")  # content defaults to ""
+    assert msg_none_content.role == "user"
+    assert msg_none_content.content == ""

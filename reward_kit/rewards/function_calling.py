@@ -469,7 +469,7 @@ def schema_jaccard_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(
+    return exact_tool_match_reward(  # type: ignore[return-value]
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 
@@ -515,7 +515,7 @@ def llm_judge_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(
+    return exact_tool_match_reward(  # type: ignore[return-value]
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 
@@ -563,7 +563,7 @@ def composite_function_call_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(
+    return exact_tool_match_reward(  # type: ignore[return-value]
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 

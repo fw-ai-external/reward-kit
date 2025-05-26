@@ -24,7 +24,6 @@ class GCPCloudRunConfig(BaseModel):
     secrets: Optional[Dict[str, str]] = {}  # Maps ENV_VAR_NAME to GCP Secret Manager ID
 
 
-
 class AWSLambdaConfig(BaseModel):
     region: Optional[str] = None
     function_name_template: Optional[str] = "rewardeval-{evaluator_id}"

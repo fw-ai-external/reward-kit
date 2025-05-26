@@ -1,4 +1,5 @@
 import json
+from typing import Union  # Added for StepOutput
 from typing import Any, Dict, List, Optional
 
 from openai.types.chat.chat_completion_message import (
@@ -70,22 +71,66 @@ class MetricResult(BaseModel):
         return iter(self.__fields__.keys())  # Changed to __fields__
 
 
-class EvaluateResult(BaseModel):
-    """The complete result of an evaluator with multiple metrics.
-
-    Attributes:
-        is_score_valid (bool): Whether the overall score is valid (required).
-        score (float): The overall evaluation score.
-        reason (Optional[str]): Optional explanation for the overall score.
-        error (Optional[str]): Optional error message.
-        metrics (Dict[str, MetricResult]): Dictionary of component metrics.
+class StepOutput(BaseModel):
+    """Defines the base reward and other metrics for a single conceptual step within a rollout,
+    as determined by the user's reward function.
     """
 
-    error: Optional[str] = None
-    score: float = Field(..., ge=0.0, le=1.0)
-    reason: Optional[str] = None
-    is_score_valid: bool = True
-    metrics: Dict[str, MetricResult]
+    step_index: Union[int, str] = Field(
+        description="User-defined index for the step (e.g., assistant message index, turn number). This is used by the system to map this output to the internal StepData."
+    )
+    base_reward: float = Field(
+        description="Base reward calculated by the user's reward function for this step."
+    )
+    metrics: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Optional dictionary of custom metrics for this step.",
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Optional explanation for the step's base reward or metrics.",
+    )
+
+
+class EvaluateResult(BaseModel):
+    """The complete result of an evaluator.
+    For standard evaluation, it provides an overall score and component metrics.
+    For Reinforcement Learning, it can also provide per-step base rewards via 'step_outputs'.
+
+    Attributes:
+        score (float): The overall evaluation score.
+        is_score_valid (bool): Whether the overall score is valid. Defaults to True.
+        reason (Optional[str]): Optional explanation for the overall score.
+        metrics (Dict[str, MetricResult]): Dictionary of component metrics for detailed evaluation.
+        step_outputs (Optional[List[StepOutput]]): For RL, a list of outputs for each conceptual step,
+                                                  providing base rewards.
+        error (Optional[str]): Optional error message if evaluation failed.
+    """
+
+    score: float = Field(
+        ..., description="The overall evaluation score, typically between 0.0 and 1.0."
+    )
+    is_score_valid: bool = Field(
+        default=True, description="Whether the overall score is valid."
+    )
+    reason: Optional[str] = Field(
+        default=None, description="Optional explanation for the overall score."
+    )
+    metrics: Dict[str, MetricResult] = Field(
+        default_factory=dict,
+        description="Dictionary of component metrics for detailed breakdown.",
+    )  # Added default_factory
+
+    # New field for RL per-step base rewards
+    step_outputs: Optional[List[StepOutput]] = Field(
+        default=None,
+        description="For RL, a list of outputs for each conceptual step, providing base rewards.",
+    )
+
+    error: Optional[str] = Field(
+        default=None,
+        description="Optional error message if the evaluation itself encountered an issue.",
+    )
 
     def __getitem__(self, key: str) -> Any:
         if key in self.__fields__:  # Changed to __fields__

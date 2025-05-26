@@ -252,9 +252,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                 if (
                     HAS_REWARD_KIT_MATH_FUNCTIONS
                 ):  # extract_numbers is from reward_kit.rewards.math
-                    orig_gt_extracts = extract_numbers(
-                        gt_answer_content
-                    )
+                    orig_gt_extracts = extract_numbers(gt_answer_content)
 
                     if len(orig_gt_extracts) == 1 and isinstance(
                         orig_gt_extracts[0][1], (float, int)
@@ -272,9 +270,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                         )
 
                         # Check if solution_content already has the correct boxed answer
-                        sol_extracts = extract_numbers(
-                            solution_content
-                        )
+                        sol_extracts = extract_numbers(solution_content)
                         already_correctly_boxed = False
                         for sol_text, sol_val in sol_extracts:
                             if (

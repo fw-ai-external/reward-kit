@@ -9,7 +9,6 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-
 def _run_gcloud_command(
     command: List[str], dry_run: bool = False
 ) -> Tuple[bool, str, str]:

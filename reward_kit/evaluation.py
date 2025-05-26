@@ -14,6 +14,9 @@ import requests
 
 from reward_kit.auth import get_fireworks_account_id, get_fireworks_api_key
 
+# Import EvaluationMode from typed_interface
+from reward_kit.typed_interface import EvaluationMode
+
 logger = logging.getLogger(__name__)
 
 # Flag to track if the preview API was successfully used
@@ -121,7 +124,6 @@ def huggingface_dataset_to_jsonl(
     return output_file
 
 
-
 class EvaluatorPreviewResult:
     def __init__(self):
         self.results = []
@@ -162,13 +164,15 @@ class EvaluatorPreviewResult:
 class Evaluator:
     def __init__(
         self,
-        multi_metrics=False,
+        multi_metrics=False,  # Relates to output structure (dict of metrics vs single)
         remote_url: Optional[str] = None,
         ts_mode_config: Optional[Dict[str, Any]] = None,
+        reward_function_mode: EvaluationMode = "pointwise",  # New parameter for input processing mode
     ):
         self.multi_metrics = multi_metrics
         self.remote_url = remote_url
         self.ts_mode_config = ts_mode_config
+        self.reward_function_mode = reward_function_mode  # Store the mode
         self.code_files = {}
         self.metric_folders: Dict[str, Any] = {}
         self.description = ""
@@ -227,7 +231,6 @@ class Evaluator:
             raise ValueError(f"main.py is required in {folder_path}")
 
         return files
-
 
     def load_metric_folder(self, metric_name, folder_path):
         """
@@ -468,7 +471,8 @@ class Evaluator:
             "evaluator": {
                 "displayName": self.display_name,
                 "description": self.description,
-                "multiMetrics": payload_multi_metrics,
+                "multiMetrics": payload_multi_metrics,  # How results are structured
+                "rewardFunctionMode": self.reward_function_mode,  # How input is processed by user func
                 "criteria": self._construct_criteria(criteria_data={}),
                 "requirements": "",
                 "rollupSettings": payload_rollup_settings,
@@ -768,6 +772,7 @@ def preview_evaluation(
     huggingface_message_key_map: Optional[Dict[str, str]] = None,
     huggingface_response_key: str = "response",
     huggingface_prompt_key: str = "prompt",
+    reward_function_mode: EvaluationMode = "pointwise",  # Added for consistency
 ):
     ts_mode_config = None
     if python_code_to_evaluate:
@@ -787,10 +792,14 @@ def preview_evaluation(
         # due to how ts_mode_config is handled (sets self.multi_metrics = True for payload).
         # The multi_metrics flag passed to Evaluator here should be the original one for folder logic.
         evaluator = Evaluator(
-            multi_metrics=multi_metrics, ts_mode_config=ts_mode_config
+            multi_metrics=multi_metrics,
+            ts_mode_config=ts_mode_config,
+            reward_function_mode=reward_function_mode,
         )
     else:
-        evaluator = Evaluator(multi_metrics=multi_metrics)
+        evaluator = Evaluator(
+            multi_metrics=multi_metrics, reward_function_mode=reward_function_mode
+        )
         if multi_metrics:
             if not folder:
                 raise ValueError("`folder` must be specified for multi_metrics mode.")
@@ -891,6 +900,7 @@ def create_evaluation(
     huggingface_response_key: str = "response",
     huggingface_prompt_key: str = "prompt",
     remote_url: Optional[str] = None,
+    reward_function_mode: EvaluationMode = "pointwise",  # Added
 ):
     ts_mode_config = None
     if python_code_to_evaluate:
@@ -909,6 +919,7 @@ def create_evaluation(
         multi_metrics=multi_metrics,
         remote_url=remote_url,
         ts_mode_config=ts_mode_config,
+        reward_function_mode=reward_function_mode,  # Pass mode to Evaluator
     )
 
     if remote_url:

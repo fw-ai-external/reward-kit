@@ -1,0 +1,4 @@
+- dataset=gsm8k_local_jsonl
+- output.file_path=outputs/gsm8k_local_jsonl_converted.jsonl
+- dataset.max_samples=5
+- processing.filter_by_match=true

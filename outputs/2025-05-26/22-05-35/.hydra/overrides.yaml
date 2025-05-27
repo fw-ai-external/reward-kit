@@ -1,0 +1,2 @@
+- dataset=gsm8k_full_test_prompts
+- evaluation_params.limit_samples=5

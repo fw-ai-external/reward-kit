@@ -112,59 +112,80 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     }
     """
     # Extract parameters from Hydra config
-    dataset_name = cfg.dataset_definition.name
-    output_file_path = (
-        cfg.output.file_path
-    )  # This will be relative to Hydra's run dir if not absolute
-    query_column = cfg.dataset_params.query_column
-    solution_column_for_assistant = cfg.dataset_params.solution_column_for_assistant
-    ground_truth_answer_column = cfg.dataset_params.ground_truth_answer_column
-    split = cfg.dataset_params.split
+    # The dataset itself will be instantiated via hydra.utils.instantiate(cfg.dataset)
+    # Other parameters are accessed from cfg.output, cfg.processing, and cfg.dataset (which holds the dataset config)
+
+    output_file_path = cfg.output.file_path # Relative to Hydra's run dir
     filter_by_match = cfg.processing.filter_by_match
     math_type = cfg.processing.math_type
-    config_name = cfg.dataset_params.config_name
 
-    # If output_file_path is relative, it's relative to the Hydra output directory.
-    # If it needs to be relative to the original CWD or an absolute path is preferred,
-    # one might use: output_file_path = hydra.utils.to_absolute_path(cfg.output.file_path)
-    # For simplicity, we'll assume cfg.output.file_path is handled as needed (e.g., absolute or relative to hydra's dir).
-    # Hydra changes CWD to its output dir, so relative paths in cfg.output.file_path will be created there.
+    # Dataset parameters are now within cfg.dataset (which is the resolved dataset config object)
+    # The actual dataset object (e.g., Hugging Face Dataset) will be loaded via instantiation.
+    # Column names will be derived from cfg.dataset.column_mapping after ensuring they exist.
 
     if not HAS_DATASETS_LIB:
-        logger.error(
-            "The 'datasets' library is not installed. Please install it with 'pip install datasets'."
-        )
+        logger.error("The 'datasets' library is not installed. Please install it with 'pip install datasets'.")
         return
     if filter_by_match and not HAS_REWARD_KIT_MATH_FUNCTIONS:
-        logger.error(
-            "Filtering by match requires math reward functions and MetricResult from reward_kit, which could not be imported."
-        )
+        logger.error("Filtering by match requires math reward functions and MetricResult from reward_kit, which could not be imported.")
         return
 
-    logger.info(
-        f"Loading dataset '{dataset_name}' (config: {config_name}), split '{split}'..."
-    )
+    logger.info(f"Attempting to load dataset using configuration: {OmegaConf.to_yaml(cfg.dataset)}")
     try:
-        dataset_hf = load_dataset(  # Renamed to avoid conflict with cfg.dataset
-            dataset_name, name=config_name, split=split, trust_remote_code=True
-        )
+        # Instantiate the dataset using the configuration provided under cfg.dataset
+        # This will call reward_kit.datasets.loader.load_and_process_dataset
+        dataset_hf = hydra.utils.instantiate(cfg.dataset)
+        if not isinstance(dataset_hf, (Dataset, DatasetDict)): # Assuming loader returns HF Dataset/DatasetDict
+            logger.error(f"Loaded dataset is not a Hugging Face Dataset or DatasetDict. Type: {type(dataset_hf)}")
+            # If it's a DatasetDict and a specific split was intended, it should have been handled by the loader
+            # or selected here if the loader returns the whole dict.
+            # For this script, we expect a single Dataset object.
+            if isinstance(dataset_hf, DatasetDict):
+                if cfg.dataset.split and cfg.dataset.split in dataset_hf:
+                    logger.info(f"Selecting split '{cfg.dataset.split}' from loaded DatasetDict.")
+                    dataset_hf = dataset_hf[cfg.dataset.split]
+                else:
+                    available_splits = list(dataset_hf.keys())
+                    logger.error(f"Loaded a DatasetDict, but the configured split '{cfg.dataset.split}' is not available or not specified for selection. Available: {available_splits}")
+                    return
+            else: # Not a Dataset or DatasetDict
+                 logger.error("The loaded dataset object is not of a recognized type for this script.")
+                 return
+
+
     except Exception as e:
-        logger.error(
-            f"Failed to load dataset '{dataset_name}' (config: {config_name}): {e}"
-        )
+        logger.error(f"Failed to load or instantiate dataset using cfg.dataset: {e}", exc_info=True)
         return
 
-    logger.info(f"Dataset loaded. Features: {dataset_hf.features}")
+    logger.info(f"Dataset loaded successfully. Type: {type(dataset_hf)}. Features: {dataset_hf.features}")
 
-    required_cols = {
+    # Determine column names from the dataset config's column_mapping
+    # The loader itself doesn't rename columns yet, so we use the source names from mapping values.
+    # If column_mapping is not exhaustive, direct access to cfg.dataset.column_mapping might be needed.
+    # For this script, we need 'query', 'solution' (for assistant), and 'ground_truth'.
+    
+    query_column = cfg.dataset.column_mapping.get("query", "query") # Default to 'query' if not mapped
+    solution_column_for_assistant = cfg.dataset.column_mapping.get("solution", "solution") # Default to 'solution'
+    ground_truth_answer_column = cfg.dataset.column_mapping.get("ground_truth", "ground_truth") # Default
+
+    logger.info(f"Using column for query: '{query_column}'")
+    logger.info(f"Using column for assistant's solution: '{solution_column_for_assistant}'")
+    logger.info(f"Using column for ground truth answer: '{ground_truth_answer_column}'")
+
+
+    required_cols_in_loaded_dataset = {
         query_column,
         solution_column_for_assistant,
         ground_truth_answer_column,
     }
-    for col_name in required_cols:
+    # Filter out None values if some mappings are optional and not provided
+    required_cols_in_loaded_dataset = {col for col in required_cols_in_loaded_dataset if col}
+
+
+    for col_name in required_cols_in_loaded_dataset:
         if col_name not in dataset_hf.column_names:
             logger.error(
-                f"Required column '{col_name}' not found in dataset. Available columns: {dataset_hf.column_names}"
+                f"Required column '{col_name}' (from column_mapping) not found in loaded dataset. Available columns: {dataset_hf.column_names}"
             )
             return
 
@@ -464,96 +485,30 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     logger.info(f"Output written to: {os.path.abspath(output_file_path)}")
 
 
-@hydra.main(config_path="conf", config_name="config", version_base=None)
+@hydra.main(config_path="conf", config_name="config", version_base=None) # config_path is relative to this script
 def run_conversion(cfg: DictConfig) -> None:
     """
     Main entry point for the script, configured by Hydra.
+    The `cfg` object will now have a `dataset` group populated by Hydra
+    based on the defaults in this script's local `config.yaml` (e.g., `defaults: - dataset: gsm8k`).
+    The `gsm8k.yaml` (or other chosen dataset config) will be resolved from `project_root/conf/dataset/`.
     """
     logger.info("Starting dataset conversion process with Hydra configuration...")
-    logger.info(f"Full configuration:\n{OmegaConf.to_yaml(cfg)}")
+    # The full configuration, including the resolved dataset config, is in `cfg`
+    logger.info(f"Full configuration provided to script:\n{OmegaConf.to_yaml(cfg)}")
 
-    # Call the main conversion function with the Hydra config
-    # The convert_math_dataset_to_openai_jsonl function now directly accepts the cfg object.
-    # logger.info(f"Full configuration:\\n{OmegaConf.to_yaml(cfg)}") # This was replaced by more specific logging below
-    logger.info(
-        f"Main configuration (from examples/math_example/conf/config.yaml):\n{OmegaConf.to_yaml(cfg)}"
-    )
+    # The `cfg.dataset` attribute now holds the fully resolved dataset configuration
+    # (e.g., contents of gsm8k.yaml merged with base_dataset.yaml and any command-line overrides).
+    # The `convert_math_dataset_to_openai_jsonl` function will use `hydra.utils.instantiate(cfg.dataset)`
+    # to load the actual dataset.
 
-    # Construct the path to the dataset-specific configuration file
-    dataset_config_basename = cfg.dataset_config_name
+    # No need to manually load dataset_specific_cfg anymore. Hydra handles it.
+    # The `effective_cfg` logic is also simplified as `cfg` already contains everything needed.
 
-    original_cwd = hydra.utils.get_original_cwd()
-    # Path assuming hydra is launched from reward-kit root
-    dataset_config_path = os.path.join(
-        original_cwd, "conf/dataset", f"{dataset_config_basename}.yaml"
-    )
-
-    # Fallback strategies for finding the global dataset config
-    if not os.path.exists(dataset_config_path):
-        # Fallback 1: if original_cwd is examples/math_example, go up three levels
-        alt_path_1 = os.path.abspath(
-            os.path.join(
-                original_cwd, "../../../conf/dataset", f"{dataset_config_basename}.yaml"
-            )
-        )
-        if os.path.exists(alt_path_1):
-            dataset_config_path = alt_path_1
-        else:
-            # Fallback 2: if script CWD is examples/math_example (e.g. direct run `python convert_dataset.py`)
-            script_dir = os.path.dirname(
-                os.path.realpath(__file__)
-            )  # examples/math_example
-            base_project_dir = os.path.abspath(
-                os.path.join(script_dir, "../../..")
-            )  # reward-kit root
-            alt_path_2 = os.path.join(
-                base_project_dir, "conf/dataset", f"{dataset_config_basename}.yaml"
-            )
-            if os.path.exists(alt_path_2):
-                dataset_config_path = alt_path_2
-            else:
-                # Fallback 3: if CWD is reward-kit root (e.g. `python examples/math_example/convert_dataset.py`)
-                current_cwd_path = os.path.join(
-                    os.getcwd(), "conf/dataset", f"{dataset_config_basename}.yaml"
-                )
-                if os.path.exists(current_cwd_path):
-                    dataset_config_path = current_cwd_path
-                else:
-                    logger.error(
-                        f"Dataset configuration file '{dataset_config_basename}.yaml' not found. Tried paths based on original CWD ('{original_cwd}'), script location, and current CWD ('{os.getcwd()}'). Specific paths checked: {os.path.join(original_cwd, 'conf/dataset', f'{dataset_config_basename}.yaml')}, {alt_path_1}, {alt_path_2}, {current_cwd_path}"
-                    )
-                    sys.exit(1)
-
-    logger.info(
-        f"Loading dataset-specific configuration from: {os.path.abspath(dataset_config_path)}"
-    )
-    dataset_specific_cfg = OmegaConf.load(dataset_config_path)
-    logger.info(
-        f"Loaded dataset-specific configuration ('{dataset_config_basename}.yaml'):\n{OmegaConf.to_yaml(dataset_specific_cfg)}"
-    )
-
-    # Create an effective configuration object for the conversion function
-    effective_cfg = OmegaConf.create()
-    if "processing" in cfg:  # From main config.yaml
-        effective_cfg.processing = cfg.processing
-    if "output" in cfg:  # From main config.yaml
-        effective_cfg.output = cfg.output
-    if "dataset_usage" in cfg:  # From main config.yaml
-        effective_cfg.dataset_params = cfg.dataset_usage
-    else:
-        logger.error("Missing 'dataset_usage' section in the main configuration.")
-        sys.exit(1)
-
-    effective_cfg.dataset_config_name = cfg.dataset_config_name  # For reference
-    effective_cfg.dataset_definition = (
-        dataset_specific_cfg  # Content of the loaded global dataset YAML
-    )
-
-    logger.info(
-        f"Effective configuration for conversion function:\n{OmegaConf.to_yaml(effective_cfg)}"
-    )
-
-    convert_math_dataset_to_openai_jsonl(effective_cfg)
+    # We pass the entire `cfg` to the conversion function.
+    # The conversion function will access `cfg.dataset` for dataset loading parameters,
+    # `cfg.output` for output parameters, and `cfg.processing` for processing parameters.
+    convert_math_dataset_to_openai_jsonl(cfg)
 
     logger.info("Dataset conversion process finished.")
 

@@ -1,9 +1,17 @@
 # Hydra Configuration for convert_dataset.py
 
+defaults:
+  - dataset: gsm8k # Points to project_root/conf/dataset/gsm8k.yaml by default
+  # To use a different dataset, override from CLI:
+  # python examples/math_example/convert_dataset.py dataset=custom_jsonl_dataset
+  # Ensure 'custom_jsonl_dataset.yaml' exists in project_root/conf/dataset/
+  - _self_ # Allows this file to override values from the chosen dataset config
+
 hydra:
   run:
     # Hydra's output directory, can be overridden.
-    # Default is outputs/YYYY-MM-DD/HH-MM-SS
+    # Default is outputs/YYYY-MM-DD/HH-MM-SS relative to the launch directory.
+    # When running from project root: reward-kit/outputs/...
     dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   job_logging:
     root:
@@ -12,23 +20,17 @@ hydra:
     dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
 
+# The 'dataset' group will be populated by Hydra based on the 'defaults' above.
+# It will contain the resolved configuration from, e.g., project_root/conf/dataset/gsm8k.yaml.
+# Parameters like 'source_type', 'path_or_name', 'split', 'column_mapping', etc.,
+# will come from that global dataset config.
+# You can override specific dataset parameters here or from the command line.
+# For example, to override the split for the chosen dataset:
+# dataset:
+#   split: "test"
+#   max_samples: 100
 
-# Name of the dataset configuration to load from /workspace/reward-kit/conf/dataset/
-# Example: "gsm8k" to load /workspace/reward-kit/conf/dataset/gsm8k.yaml
-dataset_config_name: "gsm8k" # Default to gsm8k for now, user should override
-
-# Script-specific parameters for how to use the loaded dataset
-dataset_usage:
-  # HuggingFace dataset config name (e.g., "main" for gsm8k, "default" for openbookqa)
-  config_name: null
-  split: "train"                      # Default dataset split
-
-  # Column names in the source dataset (specific to this script's needs for query, assistant response, and ground truth)
-  query_column: "problem"
-  solution_column_for_assistant: "solution"
-  ground_truth_answer_column: "answer"
-
-# Parameters for processing the dataset (these are specific to the conversion script)
+# Parameters for processing the dataset (these are specific to this conversion script)
 processing:
   filter_by_match: false              # Enable filtering by matching solution to ground truth
   math_type: "numeric"                # Type of math reward for filtering: "numeric", "mcq", "list"
@@ -39,3 +41,7 @@ output:
   # If relative, it will be inside Hydra's output directory (hydra.run.dir).
   # If absolute, it will be used as is.
   file_path: "converted_dataset.jsonl"
+
+# Removed old sections:
+# - dataset_config_name: (now handled by `defaults: - dataset: ...`)
+# - dataset_usage: (parameters like split, config_name, column names are now part of the global dataset config)

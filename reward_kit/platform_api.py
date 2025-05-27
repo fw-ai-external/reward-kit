@@ -4,6 +4,7 @@ import sys  # Added sys import
 from typing import Any, Dict, Optional
 
 import requests
+from dotenv import find_dotenv, load_dotenv
 
 from reward_kit.auth import (
     get_fireworks_account_id,
@@ -12,6 +13,27 @@ from reward_kit.auth import (
 )
 
 logger = logging.getLogger(__name__)
+
+# --- Load .env files ---
+# Attempt to load .env.dev first, then .env as a fallback.
+# This happens when the module is imported.
+# We use override=False (default) so that existing environment variables
+# (e.g., set in the shell) are NOT overridden by .env files.
+ENV_DEV_PATH = find_dotenv(filename=".env.dev", raise_error_if_not_found=False, usecwd=True)
+if ENV_DEV_PATH:
+    load_dotenv(dotenv_path=ENV_DEV_PATH, override=False)
+    logger.info(f"reward_kit.platform_api: Loaded environment variables from: {ENV_DEV_PATH}")
+else:
+    ENV_PATH = find_dotenv(filename=".env", raise_error_if_not_found=False, usecwd=True)
+    if ENV_PATH:
+        load_dotenv(dotenv_path=ENV_PATH, override=False)
+        logger.info(f"reward_kit.platform_api: Loaded environment variables from: {ENV_PATH}")
+    else:
+        logger.info(
+            "reward_kit.platform_api: No .env.dev or .env file found. "
+            "Relying on shell/existing environment variables."
+        )
+# --- End .env loading ---
 
 
 class PlatformAPIError(Exception):
@@ -283,45 +305,11 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     )
 
-    try:
-        from dotenv import find_dotenv, load_dotenv
+    # Note: .env file loading is now handled at the module level when platform_api.py is imported.
+    # The section that was here for loading .env files specifically for __main__ has been removed
+    # to rely on the module-level loading.
 
-        # Try to load .env.dev first, then .env if .env.dev is not found
-        env_dev_path = find_dotenv(
-            filename=".env.dev", raise_error_if_not_found=False, usecwd=True
-        )
-        loaded_custom = False
-        if env_dev_path and load_dotenv(
-            dotenv_path=env_dev_path, override=True
-        ):  # Added override=True
-            logger.info(
-                f"Loaded and overrode environment variables from: {env_dev_path}"
-            )
-            loaded_custom = True
-        else:
-            # Try default .env if .env.dev not loaded
-            env_path = find_dotenv(
-                filename=".env", raise_error_if_not_found=False, usecwd=True
-            )
-            if env_path and load_dotenv(
-                dotenv_path=env_path, override=True
-            ):  # Added override=True
-                logger.info(
-                    f"Loaded and overrode environment variables from: {env_path}"
-                )
-                loaded_custom = True
-
-        if not loaded_custom:
-            logger.info(
-                "No .env or .env.dev file found/loaded. Relying on shell environment variables."
-            )
-
-    except ImportError:
-        logger.info(
-            "python-dotenv not installed. Relying on shell environment variables for testing."
-        )
-
-    # These should be set in your .env file (or shell environment) for this test to run
+    # These should be set in your .env.dev, .env file (or shell environment) for this test to run
     # FIREWORKS_API_KEY="your_fireworks_api_key"
     # FIREWORKS_ACCOUNT_ID="your_fireworks_account_id"
     # FIREWORKS_API_BASE="https://api.fireworks.ai" # or your dev/staging endpoint

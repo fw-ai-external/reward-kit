@@ -1,0 +1,5 @@
+- dataset=gsm8k
+- output.file_path=outputs/gsm8k_hf_converted.jsonl
+- dataset.split=test
+- dataset.max_samples=10
+- processing.filter_by_match=true

@@ -39,7 +39,9 @@ def main():
     import reward_kit.evaluation as evaluation_module
 
     if (
-        hasattr(evaluation_module, "used_preview_api")  # Check if the fallback detection flag is present
+        hasattr(
+            evaluation_module, "used_preview_api"
+        )  # Check if the fallback detection flag is present
         and not evaluation_module.used_preview_api  # Check if fallback mode was used
     ):
         print("Note: The preview used fallback mode due to server issues.")

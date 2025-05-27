@@ -1,60 +1,82 @@
 # Base schema for dataset configurations.
-# Individual dataset configs (e.g., gsm8k.yaml) should adhere to this structure.
-# They are selected by `dataset_config_name` in the main application config (e.g., in convert_dataset.py).
+# This is an abstract base, meant to be inherited by specific dataset configs.
+# Individual dataset configs (e.g., gsm8k.yaml) will use this as a default
+# and provide concrete values.
 
-# --- Expected Fields ---
+# REQUIRED by Hydra for instantiation. Points to the function that loads the dataset.
+_target_: reward_kit.datasets.loader.load_and_process_dataset
 
-# REQUIRED: A unique name for the dataset configuration.
-# This is used for identification and potentially for referencing specific loading logic.
-name: ???
+# REQUIRED: Specifies the type of the dataset source.
+# Examples: "huggingface", "jsonl", "fireworks" (fireworks is not yet implemented)
+source_type: ???
 
-# OPTIONAL: A brief description of the dataset.
-description: "Provide a description here."
+# REQUIRED: Path to the dataset file or Hugging Face dataset name/ID.
+# - For "huggingface": HF dataset name (e.g., "gsm8k", "cais/mmlu").
+# - For "jsonl": Path to the .jsonl file (e.g., "path/to/my/data.jsonl").
+#                Can also be used with `data_files` for more complex local setups.
+# - For "fireworks": The Fireworks dataset ID (once implemented).
+path_or_name: ???
 
-# REQUIRED: Path or identifier for the dataset.
-# - For Hugging Face datasets: use the dataset ID (e.g., "gsm8k", "cais/mmlu").
-# - For local datasets: this could be a path to a directory, a script, or a specific file.
-#   The interpretation depends on the dataset loading logic in `reward_kit.datasets.loader`.
-path: ???
+# OPTIONAL: The specific split of the dataset to load (e.g., "train", "test", "validation").
+# If loading a Hugging Face DatasetDict or multiple JSONL files mapped to splits via `data_files`,
+# this will select the specified split after loading.
+# Default behavior might load a default split (e.g., "train") or all splits if not specified,
+# depending on the loader function's implementation and other parameters.
+split: "train" # Default to "train" as per the plan
 
-# OPTIONAL: Parameters specifically for loading from Hugging Face `datasets.load_dataset()`.
-# Common parameters include `name` (for subsets/configurations like "main" in gsm8k or "all" in mmlu),
-# `split` (though often handled by `dataset_usage` in main config), `trust_remote_code`.
-# Example: {name: "main", trust_remote_code: true}
-hf_load_params: null
+# OPTIONAL: For Hugging Face datasets, the specific configuration name if the dataset has multiple (e.g., "main", "all").
+# Corresponds to the 'name' parameter in Hugging Face's `load_dataset`.
+config_name: null
 
-# REQUIRED: Column mapping.
-# This section maps generic roles (used by processing scripts) to the actual column names
-# present in the specific dataset.
-columns:
-  # REQUIRED: The name of the column in the dataset that contains the primary input text
-  # (e.g., the question, the prompt, the instance to be evaluated).
-  query: ???
+# OPTIONAL: For loading local files (like JSONL, CSV) using Hugging Face's `datasets.load_dataset`.
+# Can be a single file path, a list of file paths, or a dictionary mapping split names to file paths.
+# Example for JSONL: {"train": "path/to/train.jsonl", "test": "path/to/test.jsonl"}
+# If `source_type` is "jsonl" and `path_or_name` is a direct .jsonl file path,
+# this can be omitted, and the loader will use `path_or_name` for the specified `split`.
+data_files: null
 
-  # REQUIRED: The name of the column that contains the ground truth answer, solution, or label.
-  answer: ???
+# OPTIONAL: Maximum number of samples to load from the dataset or from each split if a DatasetDict is loaded.
+# If null or 0, all samples are loaded.
+max_samples: null
 
-  # OPTIONAL: Add other common roles if your dataset processing logic expects them.
-  # For example, for multiple-choice questions:
-  # choices: null # Name of the column containing a list of choices.
-  # id: null      # Name of a unique identifier column for each sample.
-
-# OPTIONAL: Information about available splits in the dataset.
-# The values should be the names of the splits as understood by the dataset loader
-# (e.g., "train", "test", "validation" for Hugging Face datasets, or specific file names for local data).
-# The actual split to be used is typically specified in the main application config (e.g., `dataset_usage.split`).
-splits:
-  train: null
-  test: null
-  validation: null
+# OPTIONAL: Column mapping to rename dataset columns to a standard format expected by processing scripts.
+# The keys are the standard names (e.g., "query", "ground_truth"), and values are the actual column names
+# in the source dataset. This will be applied by the loader or a subsequent processing step.
+# Example:
+# column_mapping:
+#   query: "problem_statement"
+#   ground_truth: "expected_answer"
+#   solution: "model_output" # If applicable
+column_mapping:
+  query: "query" # Default to "query"
+  ground_truth: "ground_truth" # Default to "ground_truth"
+  solution: null # OPTIONAL: Name of the column containing the model's proposed solution/answer.
 
 # OPTIONAL: A list of preprocessing steps or transformations to apply to the dataset after loading.
-# The interpretation and execution of these steps would be handled by the dataset loading logic.
-# Example: ["remove_html_tags", "normalize_whitespace"]
-preprocessing_steps: [] # Default to an empty list
+# These would be identifiers for functions or configurable objects that perform the preprocessing.
+# (Actual implementation of these steps is a TODO in the loader).
+# Example: ["remove_html", "normalize_text"]
+preprocessing_steps: []
 
-# OPTIONAL: A dictionary for any other dataset-specific parameters or metadata.
-# This can be used to store information that doesn't fit into the predefined fields
-# but might be useful for custom dataset loading or processing logic.
-# Scripts can access these via `cfg.dataset_definition.extra_params` (for example).
-extra_params: {} # Default to an empty dict
+# OPTIONAL: Extra parameters to pass directly to Hugging Face's `datasets.load_dataset()`.
+# Useful for parameters not explicitly covered above, like `trust_remote_code=True`.
+# Example:
+# hf_extra_load_params:
+#   trust_remote_code: True
+hf_extra_load_params: {}
+
+# --- Metadata (not directly passed to the loader function but useful for config organization) ---
+# These fields are for documentation and understanding the config file itself.
+
+# OPTIONAL: A brief description of this dataset configuration.
+description: "Base dataset configuration. Override fields in specific dataset files."
+
+# OPTIONAL: Information about available splits in the dataset (for documentation).
+# The actual split to load is determined by the 'split' parameter above.
+# available_splits:
+#   train: "train_split_identifier"
+#   test: "test_split_identifier"
+#   validation: "validation_split_identifier"
+
+# OPTIONAL: Any other dataset-specific metadata not used by the loader but useful for users.
+# extra_metadata: {}

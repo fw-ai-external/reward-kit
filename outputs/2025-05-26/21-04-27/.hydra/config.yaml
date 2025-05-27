@@ -1,0 +1,20 @@
+dataset:
+  _target_: reward_kit.datasets.loader.load_and_process_dataset
+  source_type: jsonl
+  path_or_name: development/gsm8k_sample.jsonl
+  split: train
+  config_name: null
+  data_files: null
+  max_samples: 5
+  column_mapping:
+    query: question
+    ground_truth: ground_truth_answer
+    solution: model_solution
+  preprocessing_steps: []
+  hf_extra_load_params: {}
+  description: Local JSONL version of a GSM8K sample (5 examples from test set).
+processing:
+  filter_by_match: true
+  math_type: numeric
+output:
+  file_path: outputs/gsm8k_local_jsonl_converted.jsonl

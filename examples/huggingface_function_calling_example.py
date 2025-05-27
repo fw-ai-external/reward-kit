@@ -22,9 +22,7 @@ import json
 from typing import Any, Dict, List, cast
 
 # Import the evaluation functions
-from reward_kit.rewards.function_calling import (
-    exact_tool_match_reward,
-)
+from reward_kit.rewards.function_calling import exact_tool_match_reward
 
 
 def main():

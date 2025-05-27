@@ -89,7 +89,7 @@ For Phase 2 details (Rollout Generation & GiGPO Advantage Calculation):
                 #     # 5. (Simulated) PPO Policy Update
                 #     # Flatten the batch for PPO update
                 #     all_steps_for_update: List[StepData] = [step for traj in batch_step_data_with_advantages for step in traj]
-                #     
+                #
                 #     # In a real PPO trainer, you'd use StepData.policy_logprobs and StepData.advantage
                 #     # agent_policy.update(all_steps_for_update) # Conceptual update
                 #     print(f"Iter {training_iter}: Simulated PPO update with {len(all_steps_for_update)} steps using GiGPO advantages.")

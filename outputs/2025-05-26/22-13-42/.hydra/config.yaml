@@ -1,0 +1,43 @@
+dataset:
+  _target_: reward_kit.datasets.loader.load_and_process_dataset
+  source_type: jsonl
+  path_or_name: gsm8k_test_prompts.jsonl
+  split: train
+  config_name: null
+  data_files: null
+  max_samples: null
+  column_mapping:
+    query: null
+    ground_truth: null
+    solution: null
+    id: id
+    user_query: user_query
+    ground_truth_for_eval: ground_truth_for_eval
+  preprocessing_steps: []
+  hf_extra_load_params: {}
+  description: Full GSM8K test set (1319 samples) in prompt format.
+system_prompt: Solve the following math problem. Show your work clearly. Put the final
+  numerical answer between <answer> and </answer> tags.
+generation:
+  enabled: true
+  model_name: accounts/fireworks/models/llama-v3p1-8b-instruct
+  temperature: 0.0
+  max_tokens: 1024
+  api_base: https://api.fireworks.ai/inference/v1
+  api_params:
+    rate_limit_qps: 1.0
+    max_retries: 3
+    max_concurrent_requests: 5
+  cache:
+    cache_dir: generated_responses_cache
+reward:
+  function_path: examples.math_example.main.evaluate
+  params:
+    tolerance: 0.001
+    require_units: false
+evaluation_params:
+  limit_samples: 20
+output:
+  results_file: math_example_results.jsonl
+logging_params:
+  batch_log_interval: 1

@@ -33,11 +33,7 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 
 from reward_kit import reward_function
-from reward_kit.models import (
-    EvaluateResult,
-    Message,
-    MetricResult,
-)
+from reward_kit.models import EvaluateResult, Message, MetricResult
 from reward_kit.server import serve
 
 

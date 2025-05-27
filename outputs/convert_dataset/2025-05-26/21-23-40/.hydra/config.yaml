@@ -1,0 +1,18 @@
+dataset:
+  _target_: reward_kit.datasets.loader.load_and_process_dataset
+  source_type: huggingface
+  path_or_name: gsm8k
+  split: test
+  config_name: main
+  data_files: null
+  max_samples: null
+  column_mapping:
+    query: question
+    ground_truth: answer
+    solution: null
+  preprocessing_steps: []
+  hf_extra_load_params: {}
+  description: GSM8K (Grade School Math 8K) is a dataset of 8.5K high quality linguistically
+    diverse grade school math word problems created by human problem writers.
+output:
+  file_path: gsm8k_test_prompts.jsonl

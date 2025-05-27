@@ -1,0 +1,3 @@
+- dataset=gsm8k_full_test_prompts
+- evaluation_params.limit_samples=5
+- generation.model_name=accounts/fireworks/models/llama-v3p1-8b-instruct

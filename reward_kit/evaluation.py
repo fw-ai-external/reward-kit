@@ -121,7 +121,6 @@ def huggingface_dataset_to_jsonl(
     return output_file
 
 
-
 class EvaluatorPreviewResult:
     def __init__(self):
         self.results = []
@@ -227,7 +226,6 @@ class Evaluator:
             raise ValueError(f"main.py is required in {folder_path}")
 
         return files
-
 
     def load_metric_folder(self, metric_name, folder_path):
         """

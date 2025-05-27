@@ -1,0 +1,3 @@
+- dataset=gsm8k
+- dataset.split=test
+- output.file_path=gsm8k_test_prompts.jsonl

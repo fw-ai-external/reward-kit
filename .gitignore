@@ -196,6 +196,10 @@ examples/math_example/math_grpo_trainer_output_qwen
 # Ignore build artifacts and large data directories
 examples/math_example/math_grpo_trainer_output_qwen/
 
+# Generated response caches
+generated_responses_cache/
+examples/math_example/generated_responses_cache/
+
 # You can add other patterns here as needed, for example:
 # __pycache__/
 # *.pyc

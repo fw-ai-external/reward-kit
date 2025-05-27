@@ -37,6 +37,7 @@ setup(
             "datasets",  # trl examples often use datasets
             "hydra-core>=1.3.2",  # For Hydra configuration
             "omegaconf>=2.3.0",  # For Hydra configuration objects
+            "pre-commit",  # Added pre-commit
         ],
         "deepseek": [
             "datasets>=2.12.0",

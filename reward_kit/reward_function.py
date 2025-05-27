@@ -5,16 +5,7 @@ import logging
 import os
 import warnings
 from functools import wraps
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, cast
 
 import requests
 

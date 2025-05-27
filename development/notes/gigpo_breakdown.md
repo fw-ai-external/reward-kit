@@ -15,23 +15,23 @@ The pseudocode below illustrates computing episode-level advantages for a group 
 
 ```python
 # Assume we have N trajectories in a group, all with identical initial state (Confirmed:contentReference[oaicite:15]{index=15})
-trajectories = [traj_1, traj_2, ..., traj_N]  
+trajectories = [traj_1, traj_2, ..., traj_N]
 
 # Compute total return for each trajectory (sum of rewards over the episode)
 returns = [sum(traj.rewards) for traj in trajectories]  # (Confirmed: total return per traj:contentReference[oaicite:16]{index=16})
 
 # Calculate group statistics
 mean_return = mean(returns)
-if normalization_mode == "std":  
+if normalization_mode == "std":
     norm_factor = stdev(returns)  # (Confirmed: default normalization is std:contentReference[oaicite:17]{index=17})
-else:  
+else:
     norm_factor = const_F        # (Confirmed: fixed factor to avoid bias:contentReference[oaicite:18]{index=18}, exact value from RLOO)
 
 # Compute episode-level advantages for each trajectory
 episode_advantages = []
 for R_i in returns:
     # Episode advantage A^E_i = (R_i - mean_return) / norm_factor
-    A_E_i = (R_i - mean_return) / norm_factor  
+    A_E_i = (R_i - mean_return) / norm_factor
     episode_advantages.append(A_E_i)
     # ^ Confirmed from source: advantage normalized by group's mean & factor:contentReference[oaicite:19]{index=19}
 ```
@@ -56,7 +56,7 @@ Now we compute the **step relative advantage** for each action occurrence in the
 # Build anchor-state groups for step-level comparisons (Confirmed logic:contentReference[oaicite:38]{index=38}):
 anchor_groups = {}  # maps state -> list of (action, discounted_return)
 for i, traj in enumerate(trajectories):
-    for t, (s, a, r) in enumerate(traj.steps):  
+    for t, (s, a, r) in enumerate(traj.steps):
         # Each step has state s, action a, immediate reward r
         if s not in anchor_groups:
             anchor_groups[s] = []
@@ -121,7 +121,7 @@ for i, traj in enumerate(trajectories):
         # (For simplicity, assume anchor_groups[s] order matches trajectory order; otherwise we'd match by action id.)
         A_S = step_advantages[state].pop(0)  # take the next advantage value for state (Inferred retrieval)
         # Compute weighted combined advantage
-        A_comb = omega * A_E + (1 - omega) * A_S  
+        A_comb = omega * A_E + (1 - omega) * A_S
         combined_advantages.append((i, t, A_comb))
         # ^ Confirmed combination logic: blends episode (global) and step (local) advantages:contentReference[oaicite:55]{index=55}
 ```
@@ -169,7 +169,7 @@ In this snippet, each action’s contribution to the loss is scaled by its combi
 
 -----
 
-Follow up question from me: 
+Follow up question from me:
 
 Wait, does that mean the trainer somehow need to support different reward for different tokens in the same rollout??
 
@@ -246,4 +246,3 @@ So:
 **Yes**, GiGPO requires **per-step reward signals** within a trajectory.
 **No**, you don’t have to assign one reward per token — just per *logical action step* (e.g., tool call, reasoning turn).
 This means your trainer must support computing and applying **advantages step-by-step** rather than one reward per rollout.
-

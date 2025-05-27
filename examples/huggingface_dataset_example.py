@@ -22,7 +22,6 @@ if not os.environ.get("FIREWORKS_API_KEY"):
 from reward_kit.evaluation import huggingface_dataset_to_jsonl
 
 
-
 def main():
     # Example 1: Convert a HuggingFace dataset to JSONL for manual inspection
     print("Converting DeepSeek-ProverBench dataset to JSONL...")

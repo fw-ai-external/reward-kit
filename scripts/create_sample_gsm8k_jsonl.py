@@ -1,6 +1,8 @@
 import json
 import os
+
 from datasets import load_dataset
+
 
 def create_sample_jsonl():
     """
@@ -9,7 +11,9 @@ def create_sample_jsonl():
     """
     try:
         # Load the GSM8K dataset, 'main' config, 'test' split
-        dataset = load_dataset("gsm8k", name="main", split="test", trust_remote_code=True)
+        dataset = load_dataset(
+            "gsm8k", name="main", split="test", trust_remote_code=True
+        )
         print(f"Successfully loaded GSM8K test set. It has {len(dataset)} samples.")
     except Exception as e:
         print(f"Failed to load GSM8K dataset: {e}")
@@ -32,10 +36,14 @@ def create_sample_jsonl():
         for i in range(min(num_samples_to_take, len(dataset))):
             sample = dataset[i]
             question_content = sample.get("question")
-            answer_content = sample.get("answer") # This contains reasoning and final answer
+            answer_content = sample.get(
+                "answer"
+            )  # This contains reasoning and final answer
 
             if question_content is None or answer_content is None:
-                print(f"Skipping sample {i} due to missing 'question' or 'answer' field.")
+                print(
+                    f"Skipping sample {i} due to missing 'question' or 'answer' field."
+                )
                 continue
 
             # For this sample, we use the 'answer' field (which includes reasoning)
@@ -44,15 +52,16 @@ def create_sample_jsonl():
             record = {
                 "id": record_id,
                 "user_query": question_content,
-                "ground_truth_for_eval": answer_content # Full answer string for math_reward
+                "ground_truth_for_eval": answer_content,  # Full answer string for math_reward
             }
             f.write(json.dumps(record) + "\n")
             samples_written += 1
-    
+
     if samples_written > 0:
         print(f"Successfully wrote {samples_written} samples to {output_filepath}")
     else:
         print(f"No samples were written. Check dataset loading and content.")
+
 
 if __name__ == "__main__":
     create_sample_jsonl()

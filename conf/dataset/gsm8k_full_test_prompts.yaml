@@ -9,7 +9,7 @@ source_type: "jsonl"
 
 # Path to the generated JSONL file containing all test prompts.
 # Assumes it's at the project root.
-path_or_name: "gsm8k_test_prompts.jsonl" 
+path_or_name: "gsm8k_test_prompts.jsonl"
 
 split: "train" # JSONL files are typically treated as a single split by HF loader
 

@@ -110,9 +110,7 @@ class MessageAPI:
         Returns:
             new_id (int): A unique ID for a message.
         """
-        new_id = self._random.randint(
-            10000, 99999
-        )
+        new_id = self._random.randint(10000, 99999)
         while new_id in self.generated_ids:
             new_id = self._random.randint(10000, 99999)
         self.generated_ids.add(new_id)

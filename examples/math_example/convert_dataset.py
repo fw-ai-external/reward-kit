@@ -12,7 +12,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 try:
-    from datasets import Dataset, load_dataset
+    from datasets import Dataset, DatasetDict, load_dataset
 
     HAS_DATASETS_LIB = True
 except ImportError:
@@ -115,7 +115,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     # The dataset itself will be instantiated via hydra.utils.instantiate(cfg.dataset)
     # Other parameters are accessed from cfg.output, cfg.processing, and cfg.dataset (which holds the dataset config)
 
-    output_file_path = cfg.output.file_path # Relative to Hydra's run dir
+    output_file_path = cfg.output.file_path  # Relative to Hydra's run dir
     filter_by_match = cfg.processing.filter_by_match
     math_type = cfg.processing.math_type
 
@@ -124,54 +124,81 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     # Column names will be derived from cfg.dataset.column_mapping after ensuring they exist.
 
     if not HAS_DATASETS_LIB:
-        logger.error("The 'datasets' library is not installed. Please install it with 'pip install datasets'.")
+        logger.error(
+            "The 'datasets' library is not installed. Please install it with 'pip install datasets'."
+        )
         return
     if filter_by_match and not HAS_REWARD_KIT_MATH_FUNCTIONS:
-        logger.error("Filtering by match requires math reward functions and MetricResult from reward_kit, which could not be imported.")
+        logger.error(
+            "Filtering by match requires math reward functions and MetricResult from reward_kit, which could not be imported."
+        )
         return
 
-    logger.info(f"Attempting to load dataset using configuration: {OmegaConf.to_yaml(cfg.dataset)}")
+    logger.info(
+        f"Attempting to load dataset using configuration: {OmegaConf.to_yaml(cfg.dataset)}"
+    )
     try:
         # Instantiate the dataset using the configuration provided under cfg.dataset
         # This will call reward_kit.datasets.loader.load_and_process_dataset
         dataset_hf = hydra.utils.instantiate(cfg.dataset)
-        if not isinstance(dataset_hf, (Dataset, DatasetDict)): # Assuming loader returns HF Dataset/DatasetDict
-            logger.error(f"Loaded dataset is not a Hugging Face Dataset or DatasetDict. Type: {type(dataset_hf)}")
+        if not isinstance(
+            dataset_hf, (Dataset, DatasetDict)
+        ):  # Assuming loader returns HF Dataset/DatasetDict
+            logger.error(
+                f"Loaded dataset is not a Hugging Face Dataset or DatasetDict. Type: {type(dataset_hf)}"
+            )
             # If it's a DatasetDict and a specific split was intended, it should have been handled by the loader
             # or selected here if the loader returns the whole dict.
             # For this script, we expect a single Dataset object.
             if isinstance(dataset_hf, DatasetDict):
                 if cfg.dataset.split and cfg.dataset.split in dataset_hf:
-                    logger.info(f"Selecting split '{cfg.dataset.split}' from loaded DatasetDict.")
+                    logger.info(
+                        f"Selecting split '{cfg.dataset.split}' from loaded DatasetDict."
+                    )
                     dataset_hf = dataset_hf[cfg.dataset.split]
                 else:
                     available_splits = list(dataset_hf.keys())
-                    logger.error(f"Loaded a DatasetDict, but the configured split '{cfg.dataset.split}' is not available or not specified for selection. Available: {available_splits}")
+                    logger.error(
+                        f"Loaded a DatasetDict, but the configured split '{cfg.dataset.split}' is not available or not specified for selection. Available: {available_splits}"
+                    )
                     return
-            else: # Not a Dataset or DatasetDict
-                 logger.error("The loaded dataset object is not of a recognized type for this script.")
-                 return
-
+            else:  # Not a Dataset or DatasetDict
+                logger.error(
+                    "The loaded dataset object is not of a recognized type for this script."
+                )
+                return
 
     except Exception as e:
-        logger.error(f"Failed to load or instantiate dataset using cfg.dataset: {e}", exc_info=True)
+        logger.error(
+            f"Failed to load or instantiate dataset using cfg.dataset: {e}",
+            exc_info=True,
+        )
         return
 
-    logger.info(f"Dataset loaded successfully. Type: {type(dataset_hf)}. Features: {dataset_hf.features}")
+    logger.info(
+        f"Dataset loaded successfully. Type: {type(dataset_hf)}. Features: {dataset_hf.features}"
+    )
 
     # Determine column names from the dataset config's column_mapping
     # The loader itself doesn't rename columns yet, so we use the source names from mapping values.
     # If column_mapping is not exhaustive, direct access to cfg.dataset.column_mapping might be needed.
     # For this script, we need 'query', 'solution' (for assistant), and 'ground_truth'.
-    
-    query_column = cfg.dataset.column_mapping.get("query", "query") # Default to 'query' if not mapped
-    solution_column_for_assistant = cfg.dataset.column_mapping.get("solution", "solution") # Default to 'solution'
-    ground_truth_answer_column = cfg.dataset.column_mapping.get("ground_truth", "ground_truth") # Default
+
+    query_column = cfg.dataset.column_mapping.get(
+        "query", "query"
+    )  # Default to 'query' if not mapped
+    solution_column_for_assistant = cfg.dataset.column_mapping.get(
+        "solution", "solution"
+    )  # Default to 'solution'
+    ground_truth_answer_column = cfg.dataset.column_mapping.get(
+        "ground_truth", "ground_truth"
+    )  # Default
 
     logger.info(f"Using column for query: '{query_column}'")
-    logger.info(f"Using column for assistant's solution: '{solution_column_for_assistant}'")
+    logger.info(
+        f"Using column for assistant's solution: '{solution_column_for_assistant}'"
+    )
     logger.info(f"Using column for ground truth answer: '{ground_truth_answer_column}'")
-
 
     required_cols_in_loaded_dataset = {
         query_column,
@@ -179,8 +206,9 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
         ground_truth_answer_column,
     }
     # Filter out None values if some mappings are optional and not provided
-    required_cols_in_loaded_dataset = {col for col in required_cols_in_loaded_dataset if col}
-
+    required_cols_in_loaded_dataset = {
+        col for col in required_cols_in_loaded_dataset if col
+    }
 
     for col_name in required_cols_in_loaded_dataset:
         if col_name not in dataset_hf.column_names:
@@ -485,7 +513,9 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     logger.info(f"Output written to: {os.path.abspath(output_file_path)}")
 
 
-@hydra.main(config_path="conf", config_name="config", version_base=None) # config_path is relative to this script
+@hydra.main(
+    config_path="conf", config_name="config", version_base=None
+)  # config_path is relative to this script
 def run_conversion(cfg: DictConfig) -> None:
     """
     Main entry point for the script, configured by Hydra.

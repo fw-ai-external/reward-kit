@@ -9,7 +9,6 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-
 def _run_gcloud_command(
     command: List[str], dry_run: bool = False
 ) -> Tuple[bool, str, str]:
@@ -214,7 +213,9 @@ def deploy_to_cloud_run(
                 ):
                     secret_id = parts[3]
                     secret_version = parts[5]
-                    secrets_str_list.append(f"{env_var_name}={secret_id}:{secret_version}")
+                    secrets_str_list.append(
+                        f"{env_var_name}={secret_id}:{secret_version}"
+                    )
                 else:
                     logger.warning(
                         f"Invalid secret manager full ID format: {secret_manager_full_id}. Skipping secret mount for {env_var_name}."
@@ -270,7 +271,9 @@ def deploy_to_cloud_run(
             logger.error(f"Failed to deploy service {service_name}. Stderr: {stderr}")
             return None
     except Exception as e:
-        logger.error(f"An error occurred during Cloud Run deployment for service {service_name}: {e}")
+        logger.error(
+            f"An error occurred during Cloud Run deployment for service {service_name}: {e}"
+        )
         return None
 
 
@@ -345,7 +348,9 @@ def ensure_artifact_registry_repo_exists(
             )
             return False
     except Exception as e:
-        logger.error(f"An unexpected error occurred while ensuring Artifact Registry repository '{repo_name}': {e}")
+        logger.error(
+            f"An unexpected error occurred while ensuring Artifact Registry repository '{repo_name}': {e}"
+        )
         return False
 
 

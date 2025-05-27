@@ -1015,7 +1015,7 @@ class TestExactToolMatchReward:
                 ],
             },
         ]
-        ground_truth = {"tool_calls": []}  # Expects no tool calls
+        ground_truth: Dict[str, Any] = {"tool_calls": []}  # Expects no tool calls
         result = exact_tool_match_reward(messages=messages, ground_truth=ground_truth)
         assert result.score == 0.0
 
@@ -1045,7 +1045,7 @@ class TestExactToolMatchReward:
             {"role": "user", "content": "Tell me a joke."},
             {"role": "assistant", "content": "Why did the chicken cross the road?"},
         ]
-        ground_truth = {"tool_calls": []}
+        ground_truth: Dict[str, Any] = {"tool_calls": []}
         result = exact_tool_match_reward(messages=messages, ground_truth=ground_truth)
         assert result.score == 1.0
 
@@ -1147,7 +1147,7 @@ class TestExactToolMatchReward:
             {"role": "user", "content": "Query"},
             {"role": "assistant", "content": "Assistant response"},
         ]
-        ground_truth = {"some_other_key": []}  # Missing 'tool_calls'
+        ground_truth: Dict[str, Any] = {"some_other_key": []}  # Missing 'tool_calls'
         result = exact_tool_match_reward(messages=messages, ground_truth=ground_truth)
         # This implies no tool calls are expected, so if assistant also makes no calls, score is 1.0
         assert result.score == 1.0

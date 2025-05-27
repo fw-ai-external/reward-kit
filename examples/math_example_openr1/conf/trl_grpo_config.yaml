@@ -1,0 +1,31 @@
+# Hydra Configuration for examples/math_example_openr1/trl_grpo_integration.py
+
+hydra:
+  run:
+    dir: ./outputs/trl_grpo_math_openr1/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job_logging:
+    root:
+      level: INFO
+
+# Path to the processed dataset file (JSONL format) for TRL training
+dataset_file_path: "dataset.jsonl" # Default, assumes dataset.jsonl is in the same dir as the script
+
+# Model and output directory (can be overridden)
+model_name: "Qwen/Qwen2-0.5B-Instruct"
+
+# GRPOConfig settings
+grpo:
+  learning_rate: 1.41e-5
+  beta: 0.1
+  num_train_epochs: 1
+  max_steps: 5
+  logging_steps: 1
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 1
+  max_completion_length: 50
+  top_k: 0.0
+  top_p: 1.0
+  do_sample: True
+
+# Test mode flag
+test_mode_trl: false

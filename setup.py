@@ -35,6 +35,8 @@ setup(
             "trl>=0.7.0",  # Added trl for GRPOTrainer
             "peft>=0.7.0",  # Added peft for LoRA
             "datasets",  # trl examples often use datasets
+            "hydra-core>=1.3.2",  # For Hydra configuration
+            "omegaconf>=2.3.0",  # For Hydra configuration objects
         ],
         "deepseek": [
             "datasets>=2.12.0",

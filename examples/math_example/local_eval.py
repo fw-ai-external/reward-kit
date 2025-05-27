@@ -2,6 +2,9 @@ import logging
 import os
 import sys
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
 # Ensure reward-kit is in the path
 # This assumes the script is run from the 'examples/math_example/' directory or reward-kit is installed
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -10,17 +13,22 @@ from reward_kit.common_utils import load_jsonl
 from reward_kit.models import Message
 from reward_kit.rewards.math import math_reward
 
-# Configure basic logging if you want to see logs from load_jsonl
-# logging.basicConfig(level=logging.INFO)
+# Configure basic logging
+logger = logging.getLogger(__name__)  # Use Hydra's logger or configure one
 
 # Removed local load_dataset function
 
 
-def main():
-    dataset_path = os.path.join(os.path.dirname(__file__), "dataset.jsonl")
+@hydra.main(config_path="conf", config_name="local_eval_config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    dataset_path = hydra.utils.to_absolute_path(cfg.dataset_file_path)
+    # Using print for initial messages as Hydra logger might not be fully set up or for emphasis
+    print(f"Hydra configuration:\n{OmegaConf.to_yaml(cfg)}")
+    print(f"Resolved dataset path: {dataset_path}")
 
     if not os.path.exists(dataset_path):
         print(f"Error: Dataset file not found at {dataset_path}")
+        # logger.error(f"Dataset file not found at {dataset_path}") # Alternative with logger
         return
 
     dataset = load_jsonl(dataset_path)
@@ -29,6 +37,7 @@ def main():
     passed_samples = 0
 
     print(f"Starting local evaluation for Math Example using {dataset_path}...\n")
+    # logger.info(f"Starting local evaluation for Math Example using {dataset_path}...")
 
     for i, item in enumerate(dataset):
         messages_data = item.get("messages")

@@ -112,17 +112,17 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
     }
     """
     # Extract parameters from Hydra config
-    dataset_name = cfg.dataset.name
+    dataset_name = cfg.dataset_definition.name
     output_file_path = (
         cfg.output.file_path
     )  # This will be relative to Hydra's run dir if not absolute
-    query_column = cfg.dataset.query_column
-    solution_column_for_assistant = cfg.dataset.solution_column_for_assistant
-    ground_truth_answer_column = cfg.dataset.ground_truth_answer_column
-    split = cfg.dataset.split
+    query_column = cfg.dataset_params.query_column
+    solution_column_for_assistant = cfg.dataset_params.solution_column_for_assistant
+    ground_truth_answer_column = cfg.dataset_params.ground_truth_answer_column
+    split = cfg.dataset_params.split
     filter_by_match = cfg.processing.filter_by_match
     math_type = cfg.processing.math_type
-    config_name = cfg.dataset.config_name
+    config_name = cfg.dataset_params.config_name
 
     # If output_file_path is relative, it's relative to the Hydra output directory.
     # If it needs to be relative to the original CWD or an absolute path is preferred,
@@ -252,9 +252,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                 if (
                     HAS_REWARD_KIT_MATH_FUNCTIONS
                 ):  # extract_numbers is from reward_kit.rewards.math
-                    orig_gt_extracts = extract_numbers(
-                        gt_answer_content
-                    )
+                    orig_gt_extracts = extract_numbers(gt_answer_content)
 
                     if len(orig_gt_extracts) == 1 and isinstance(
                         orig_gt_extracts[0][1], (float, int)
@@ -272,9 +270,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                         )
 
                         # Check if solution_content already has the correct boxed answer
-                        sol_extracts = extract_numbers(
-                            solution_content
-                        )
+                        sol_extracts = extract_numbers(solution_content)
                         already_correctly_boxed = False
                         for sol_text, sol_val in sol_extracts:
                             if (
@@ -463,7 +459,7 @@ def convert_math_dataset_to_openai_jsonl(cfg: DictConfig):
                 )
 
     logger.info(
-        f"Successfully processed {processed_count} examples. Kept and converted {kept_count} examples from '{cfg.dataset.name}' to '{output_file_path}'."
+        f"Successfully processed {processed_count} examples. Kept and converted {kept_count} examples from '{cfg.dataset_definition.name}' to '{output_file_path}'."
     )
     logger.info(f"Output written to: {os.path.abspath(output_file_path)}")
 
@@ -478,7 +474,86 @@ def run_conversion(cfg: DictConfig) -> None:
 
     # Call the main conversion function with the Hydra config
     # The convert_math_dataset_to_openai_jsonl function now directly accepts the cfg object.
-    convert_math_dataset_to_openai_jsonl(cfg)
+    # logger.info(f"Full configuration:\\n{OmegaConf.to_yaml(cfg)}") # This was replaced by more specific logging below
+    logger.info(
+        f"Main configuration (from examples/math_example/conf/config.yaml):\n{OmegaConf.to_yaml(cfg)}"
+    )
+
+    # Construct the path to the dataset-specific configuration file
+    dataset_config_basename = cfg.dataset_config_name
+
+    original_cwd = hydra.utils.get_original_cwd()
+    # Path assuming hydra is launched from reward-kit root
+    dataset_config_path = os.path.join(
+        original_cwd, "conf/dataset", f"{dataset_config_basename}.yaml"
+    )
+
+    # Fallback strategies for finding the global dataset config
+    if not os.path.exists(dataset_config_path):
+        # Fallback 1: if original_cwd is examples/math_example, go up three levels
+        alt_path_1 = os.path.abspath(
+            os.path.join(
+                original_cwd, "../../../conf/dataset", f"{dataset_config_basename}.yaml"
+            )
+        )
+        if os.path.exists(alt_path_1):
+            dataset_config_path = alt_path_1
+        else:
+            # Fallback 2: if script CWD is examples/math_example (e.g. direct run `python convert_dataset.py`)
+            script_dir = os.path.dirname(
+                os.path.realpath(__file__)
+            )  # examples/math_example
+            base_project_dir = os.path.abspath(
+                os.path.join(script_dir, "../../..")
+            )  # reward-kit root
+            alt_path_2 = os.path.join(
+                base_project_dir, "conf/dataset", f"{dataset_config_basename}.yaml"
+            )
+            if os.path.exists(alt_path_2):
+                dataset_config_path = alt_path_2
+            else:
+                # Fallback 3: if CWD is reward-kit root (e.g. `python examples/math_example/convert_dataset.py`)
+                current_cwd_path = os.path.join(
+                    os.getcwd(), "conf/dataset", f"{dataset_config_basename}.yaml"
+                )
+                if os.path.exists(current_cwd_path):
+                    dataset_config_path = current_cwd_path
+                else:
+                    logger.error(
+                        f"Dataset configuration file '{dataset_config_basename}.yaml' not found. Tried paths based on original CWD ('{original_cwd}'), script location, and current CWD ('{os.getcwd()}'). Specific paths checked: {os.path.join(original_cwd, 'conf/dataset', f'{dataset_config_basename}.yaml')}, {alt_path_1}, {alt_path_2}, {current_cwd_path}"
+                    )
+                    sys.exit(1)
+
+    logger.info(
+        f"Loading dataset-specific configuration from: {os.path.abspath(dataset_config_path)}"
+    )
+    dataset_specific_cfg = OmegaConf.load(dataset_config_path)
+    logger.info(
+        f"Loaded dataset-specific configuration ('{dataset_config_basename}.yaml'):\n{OmegaConf.to_yaml(dataset_specific_cfg)}"
+    )
+
+    # Create an effective configuration object for the conversion function
+    effective_cfg = OmegaConf.create()
+    if "processing" in cfg:  # From main config.yaml
+        effective_cfg.processing = cfg.processing
+    if "output" in cfg:  # From main config.yaml
+        effective_cfg.output = cfg.output
+    if "dataset_usage" in cfg:  # From main config.yaml
+        effective_cfg.dataset_params = cfg.dataset_usage
+    else:
+        logger.error("Missing 'dataset_usage' section in the main configuration.")
+        sys.exit(1)
+
+    effective_cfg.dataset_config_name = cfg.dataset_config_name  # For reference
+    effective_cfg.dataset_definition = (
+        dataset_specific_cfg  # Content of the loaded global dataset YAML
+    )
+
+    logger.info(
+        f"Effective configuration for conversion function:\n{OmegaConf.to_yaml(effective_cfg)}"
+    )
+
+    convert_math_dataset_to_openai_jsonl(effective_cfg)
 
     logger.info("Dataset conversion process finished.")
 

@@ -3,57 +3,25 @@ import os
 import sys
 from typing import Any, Dict, List
 
+import hydra  # Added
 import torch
 from datasets import Dataset
+from omegaconf import DictConfig, OmegaConf  # Added
 from peft import LoraConfig, get_peft_model  # For PEFT
-from transformers import (  # For base model
+from transformers import (  # For base model; DataCollatorWithPadding, # Not explicitly used with GRPOTrainer in this setup
     AutoModelForCausalLM,
     AutoTokenizer,
-    DataCollatorWithPadding,
 )
-from trl import (  # SFTTrainer, # Not used in this simplified example; AutoModelForCausalLMWithValueHead, # Base model loaded differently now
-    GRPOConfig,
-    GRPOTrainer,
-)
+from trl import GRPOConfig, GRPOTrainer
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from reward_kit.common_utils import load_jsonl
 from reward_kit.models import Message
-from reward_kit.rewards.math import math_reward  # Corrected: use the imported name
+from reward_kit.rewards.math import math_reward
 
-# Configure basic logging if you want to see logs from load_jsonl
-# logging.basicConfig(level=logging.INFO)
-
-# --- Configuration ---
-MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"  # Updated model
-OUTPUT_DIR = "math_grpo_trainer_output_qwen"  # Updated output dir
-DATASET_PATH = os.path.join(os.path.dirname(__file__), "dataset.jsonl")
-
-# GRPO Configuration
-grpo_config = GRPOConfig(
-    # Arguments for GRPOConfig based on trl examples, ensure these are valid
-    # Many common training args (batch_size, gradient_accumulation, etc.) might be expected by GRPOTrainer via this config
-    # For simplicity, keeping only core GRPO/TRL args.
-    # Refer to TRL's GRPOConfig documentation for all available fields.
-    learning_rate=1.41e-5,  # Keep
-    beta=0.1,  # Keep: Beta for GRPO
-    num_train_epochs=1,  # Keep: Just a few steps for example
-    max_steps=(1 if os.environ.get("TEST_MODE_TRL") == "true" else 5),  # Keep
-    logging_steps=1,  # Keep
-    # Removed other args that caused errors, relying on defaults or trainer handling
-    # Add other necessary GRPOConfig fields if required by GRPOTrainer or your setup
-    # e.g., output_dir, per_device_train_batch_size, etc. might be needed from TrainingArguments style
-    # For now, this is minimal. The GRPOTrainer in trl_integration/grpo_example.py uses more.
-    output_dir=OUTPUT_DIR,  # Usually needed
-    remove_unused_columns=False,  # Important for keeping 'response' for reward
-    per_device_train_batch_size=8,  # Adjusted to be a multiple of GRPOTrainer's default num_generations_per_prompt (8)
-    gradient_accumulation_steps=1,  # Example value
-    # num_generations_per_prompt is not a GRPOConfig arg, GRPOTrainer defaults to 8
-    # cpu argument was invalid. Use no_cuda for TrainingArguments based configs.
-    no_cuda=(True if os.environ.get("TEST_MODE_TRL") == "true" else False),
-)
+logger = logging.getLogger(__name__)  # Added
 
 
 # --- Helper Functions ---
@@ -61,13 +29,15 @@ def load_jsonl_dataset(file_path: str):
     """Loads data from a JSONL file, expecting 'messages' field, and processes it for TRL."""
     raw_data = load_jsonl(file_path)
     if not raw_data:
-        return []  # Return empty list if loading failed or file was empty
+        # Consider using logger.warning or raising an error if file not found or empty
+        print(f"Warning: No data loaded from {file_path}. Returning empty list.")
+        return []
 
     processed_trl_data = []
     for item in raw_data:
         messages = item.get("messages")
         if not messages:
-            # logger.warning(f"Skipping item due to missing 'messages': {item}") # Optional logging
+            logger.warning(f"Skipping item due to missing 'messages': {item}")
             continue
 
         user_msg_content = next(
@@ -87,15 +57,13 @@ def load_jsonl_dataset(file_path: str):
                     "messages": messages,  # Keep original messages for the reward function context
                 }
             )
-        # else:
-        # logger.warning(f"Skipping item due to missing user message: {item}") # Optional logging
+        else:
+            logger.warning(f"Skipping item due to missing user message: {item}")
 
     return processed_trl_data
 
 
 # --- Reward Function for TRL ---
-
-
 # math_reward is imported from reward_kit.rewards.math
 # This adapted function will be passed to GRPOTrainer's reward_funcs
 def adapted_math_reward(
@@ -108,31 +76,28 @@ def adapted_math_reward(
     'kwargs' should contain other columns from the original dataset, e.g., kwargs['response'] for ground truth.
     """
     rewards = []
-    # kwargs["response"] should be a list of ground truth strings, aligned with prompts and completions
     ground_truth_responses = kwargs.get("response", [])
 
     if len(ground_truth_responses) != len(prompts):
-        print(
-            f"Warning: Length mismatch between ground_truth_responses ({len(ground_truth_responses)}) and prompts ({len(prompts)}). Rewards may be incorrect."
+        logger.warning(
+            f"Length mismatch between ground_truth_responses ({len(ground_truth_responses)}) and prompts ({len(prompts)}). Rewards may be incorrect."
         )
-        # Fallback or error handling if lengths don't match
-        # For now, we'll proceed but this indicates a problem in data alignment from GRPOTrainer
 
     for i in range(len(completions)):
         user_query_str = prompts[i]
         generated_completion_str = completions[i]
-
         ground_truth_answer_str = ""
+
         if i < len(ground_truth_responses):
             ground_truth_answer_str = ground_truth_responses[i]
         else:
-            print(
-                f"Warning: No ground truth response found for prompt index {i}: {user_query_str}"
+            logger.warning(
+                f"No ground truth response found for prompt index {i}: {user_query_str}"
             )
 
-        if not ground_truth_answer_str:
-            print(
-                f"Warning: Empty ground_truth_answer_str for prompt: {user_query_str}"
+        if not ground_truth_answer_str:  # Check if ground_truth is empty or None
+            logger.warning(
+                f"Empty ground_truth_answer_str for prompt: {user_query_str}. Assigning 0 reward."
             )
             rewards.append(torch.tensor(0.0, dtype=torch.float32))
             continue
@@ -143,77 +108,127 @@ def adapted_math_reward(
         ]
 
         try:
-            # math_reward primarily uses the 'ground_truth' string for comparison.
-            # Context, if needed by math_reward when ground_truth is a string, will be derived from messages_for_eval[:-1].
-            eval_result = math_reward(  # Use the imported name 'math_reward'
+            eval_result = math_reward(
                 messages=messages_for_eval,
                 ground_truth=ground_truth_answer_str,
             )
             rewards.append(torch.tensor(eval_result.score, dtype=torch.float32))
         except Exception as e:
-            print(f"Error in math_reward during TRL for prompt '{user_query_str}': {e}")
-            rewards.append(torch.tensor(0.0, dtype=torch.float32))  # Penalize errors
+            logger.error(
+                f"Error in math_reward for prompt '{user_query_str}': {e}",
+                exc_info=True,
+            )
+            rewards.append(torch.tensor(0.0, dtype=torch.float32))
     return rewards
 
 
 # --- Main Script ---
-def main():
+@hydra.main(config_path="conf", config_name="trl_grpo_config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    logger.info(f"Hydra configuration:\n{OmegaConf.to_yaml(cfg)}")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(
+        f"Hydra output directory: {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}"
+    )
+
+    # --- Configuration from Hydra ---
+    MODEL_NAME = cfg.model_name
+    DATASET_PATH = hydra.utils.to_absolute_path(cfg.dataset_file_path)
+
+    max_steps_config = 1 if cfg.test_mode_trl else cfg.grpo.max_steps
+
+    grpo_config = GRPOConfig(
+        output_dir=hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+        learning_rate=cfg.grpo.learning_rate,
+        beta=cfg.grpo.beta,
+        num_train_epochs=cfg.grpo.num_train_epochs,
+        max_steps=max_steps_config,
+        logging_steps=cfg.grpo.logging_steps,
+        remove_unused_columns=False,  # Crucial for keeping 'response' for reward_funcs
+        per_device_train_batch_size=cfg.grpo.per_device_train_batch_size,
+        gradient_accumulation_steps=cfg.grpo.gradient_accumulation_steps,
+        no_cuda=cfg.test_mode_trl,
+        max_completion_length=cfg.grpo.max_completion_length,
+        top_k=cfg.grpo.top_k,
+        top_p=cfg.grpo.top_p,
+        do_sample=cfg.grpo.do_sample,
+        # Other TRL/TrainingArguments can be added here from cfg if needed
+    )
+    logger.info(f"GRPOConfig prepared: {grpo_config}")
     # 1. Load Tokenizer and Model
+    logger.info(f"Loading tokenizer for model: {MODEL_NAME}")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+        logger.info(
+            f"Tokenizer pad_token was None, set to eos_token: {tokenizer.eos_token}"
+        )
 
     # Load base model for PEFT
+    logger.info(f"Loading base model: {MODEL_NAME}")
     attn_implementation_config = None
-    if os.environ.get("TEST_MODE_TRL") == "true":
-        print(
+    if cfg.test_mode_trl:  # Use cfg.test_mode_trl
+        logger.info(
             "TRL Test Mode: Forcing CPU, default dtype, and eager attention for model loading."
         )
         device_map_config = "cpu"
-        torch_dtype_config = None  # Let transformers/torch decide default for CPU
-        attn_implementation_config = "eager"  # Force eager attention for CPU test mode
+        torch_dtype_config = None
+        attn_implementation_config = "eager"
     else:
         device_map_config = "auto"
-        torch_dtype_config = torch.float16
-        # For non-test mode, Hugging Face Transformers will attempt to use the most optimal
-        # attention mechanism available (e.g., SDPA, Flash Attention 2).
-        # Explicitly: attn_implementation_config = "sdpa" or "flash_attention_2" if desired and available.
+        torch_dtype_config = torch.float16  # Consider making this configurable
+        # attn_implementation_config can be "sdpa" or "flash_attention_2" if available
+        # For now, let transformers decide by passing None if not "eager"
+        logger.info(
+            f"Using device_map: {device_map_config}, torch_dtype: {torch_dtype_config}, attn_implementation: {attn_implementation_config}"
+        )
 
     base_model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch_dtype_config,
         device_map=device_map_config,
-        attn_implementation=attn_implementation_config,  # Pass the attention implementation config
+        attn_implementation=attn_implementation_config,
     )
+    logger.info(f"Base model {MODEL_NAME} loaded.")
 
-    # PEFT Configuration (LoRA)
+    # PEFT Configuration (LoRA) - consider moving to Hydra config, e.g. cfg.lora.r etc.
     lora_config = LoraConfig(
-        r=8,
-        lora_alpha=16,  # Common practice: alpha = 2*r
-        lora_dropout=0.05,
-        target_modules=["q_proj", "v_proj"],  # Check these for Qwen2-0.5B
-        bias="none",
-        task_type="CAUSAL_LM",
+        r=8,  # Example, make configurable: cfg.lora.r
+        lora_alpha=16,  # Example, make configurable: cfg.lora.alpha
+        lora_dropout=0.05,  # Example, make configurable: cfg.lora.dropout
+        target_modules=[
+            "q_proj",
+            "v_proj",
+        ],  # Example, make configurable: cfg.lora.target_modules
+        bias="none",  # Example, make configurable: cfg.lora.bias
+        task_type="CAUSAL_LM",  # Example, make configurable: cfg.lora.task_type
     )
+    logger.info(f"LoRA config: {lora_config}")
 
     policy_model = get_peft_model(base_model, lora_config)
-    policy_model.print_trainable_parameters()
+    trainable_params, all_param = policy_model.get_nb_trainable_parameters()
+    logger.info(
+        f"Trainable PEFT params: {trainable_params}. All params: {all_param}. Percentage: {100 * trainable_params / all_param:.2f}%"
+    )
 
     # Load the dataset
-    raw_dataset_data = load_jsonl_dataset(DATASET_PATH)
+    logger.info(f"Loading dataset from: {DATASET_PATH}")
+    raw_dataset_data = load_jsonl_dataset(DATASET_PATH)  # DATASET_PATH is from cfg
     if not raw_dataset_data:
-        print(f"No data loaded from {DATASET_PATH}. Exiting.")
+        logger.error(f"No data loaded from {DATASET_PATH}. Exiting.")
         return
 
     dataset = Dataset.from_list(raw_dataset_data)
+    logger.info(f"Dataset loaded with {len(dataset)} samples.")
 
     # Preprocess dataset for TRL - tokenize "prompt"
     def preprocess_function(examples):
+        # Consider making max_length configurable, e.g., cfg.tokenizer.max_length
         return tokenizer(
             examples["prompt"], truncation=True, padding="max_length", max_length=512
-        )  # Changed "query" to "prompt"
+        )
 
-    # Keep original 'prompt' and 'response' columns for the reward function
+    logger.info("Tokenizing dataset...")
     tokenized_dataset = dataset.map(preprocess_function, batched=True)
     tokenized_dataset.set_format(
         type="torch",
@@ -222,73 +237,55 @@ def main():
             "attention_mask",
             "prompt",
             "response",
-        ],  # Changed "query" to "prompt"
+        ],
     )
-
-    # Ensure output directory exists
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-    # Logs dir is handled by TrainingArguments/GRPOConfig if report_to is set
+    logger.info("Dataset tokenized and formatted.")
 
     # GRPOTrainer instantiation
-    # data_collator = DataCollatorWithPadding(tokenizer=tokenizer) # Removed explicit data_collator
     grpo_trainer = GRPOTrainer(
-        model=policy_model,  # This is now the PeftModel
-        args=grpo_config,  # GRPOConfig object
+        model=policy_model,
+        args=grpo_config,  # This is the GRPOConfig object created from cfg
         train_dataset=tokenized_dataset,
         reward_funcs=[adapted_math_reward],
-        # No explicit ref_model, so policy model is its own reference
-        # GRPOTrainer might handle collation internally or expect a specific dataset format.
+        # tokenizer=tokenizer, # Pass if needed, TRL might infer from model
     )
+    logger.info("GRPOTrainer instantiated.")
 
-    print("Starting GRPO training loop for Math Example with PEFT...")
-
-    # 3. Training
-    # GRPOTrainer handles the training loop internally when train() is called.
-    # It will use the train_dataset, reward_funcs, and args (GRPOConfig) provided.
-    # Generation parameters like max_new_tokens should be part of GRPOConfig.
-    # GRPOConfig has `max_completion_length`.
-
-    # Update grpo_config with generation parameters if not already set or to override defaults
-    # These were previously in a manual generation_kwargs dictionary.
-    # Note: Some of these might already be default or covered by other GRPOConfig settings.
-    # Check TRL's GRPOConfig documentation for the best way to set these.
-    if (
-        not hasattr(grpo_config, "max_completion_length")
-        or grpo_config.max_completion_length is None
-    ):
-        grpo_config.max_completion_length = 50
-    if not hasattr(grpo_config, "top_k") or grpo_config.top_k is None:
-        grpo_config.top_k = 0.0
-    if not hasattr(grpo_config, "top_p") or grpo_config.top_p is None:
-        grpo_config.top_p = 1.0
-    if not hasattr(grpo_config, "do_sample") or grpo_config.do_sample is None:
-        grpo_config.do_sample = True
-    # pad_token_id and eos_token_id are usually handled by the tokenizer/model config,
-    # but can be set in generation_config of TrainingArguments if needed.
-    # For GRPOTrainer, these might be inferred or set via specific generation args if available.
-
+    logger.info("Starting GRPO training loop...")
     grpo_trainer.train()
+    logger.info("GRPO training loop completed.")
 
-    print("\nGRPO training loop completed for Math Example.")
-
-    # Optionally save the model
-    # final_save_path = os.path.join(OUTPUT_DIR, "final_model")
-    # grpo_trainer.save_model(final_save_path)
-    # tokenizer.save_pretrained(final_save_path)
-    # print(f"Model saved to {final_save_path}")
+    # Model is automatically saved by GRPOTrainer to its args.output_dir (Hydra's output dir)
+    # Optionally, save tokenizer explicitly if not handled by trainer or if specific path needed.
+    tokenizer_save_path = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    tokenizer.save_pretrained(tokenizer_save_path)
+    logger.info(f"Tokenizer saved to {tokenizer_save_path}")
 
 
 if __name__ == "__main__":
-    # Add a check for torch and transformers availability if desired
+    # This block is for attempting to run the script directly, not via Hydra CLI.
+    # Hydra's @hydra.main decorator changes how main() is called.
+    # Running `python script_name.py` will typically show Hydra's help message.
+    # To properly run with Hydra, use `python script_name.py --config-name=trl_grpo_config`
+
+    # Basic import check for user convenience if trying to run directly.
     try:
+        import accelerate
         import datasets
+        import peft
         import torch
         import transformers
         import trl
-    except ImportError:
-        print("Error: PyTorch, Transformers, TRL, or Datasets library not found.")
-        print("Please install them: pip install torch transformers trl datasets")
+    except ImportError as e:
+        # Using print for immediate visibility if logger isn't set up without Hydra
+        print(f"Import error: {e}. Some required libraries are missing.")
+        print(
+            "Please ensure PyTorch, Transformers, TRL, Datasets, PEFT, and Accelerate are installed."
+        )
+        print("Example: pip install torch transformers trl datasets peft accelerate")
         sys.exit(1)
 
+    # Calling main() directly here will invoke Hydra's initialization process.
+    # If no command-line arguments are provided to specify the config, Hydra might error
+    # or use defaults if `config_path` in @hydra.main is structured to allow it.
     main()

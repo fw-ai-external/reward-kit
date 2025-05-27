@@ -13,18 +13,22 @@ hydra:
     subdir: ${hydra.job.num}
 
 
-# Parameters for the dataset source
-dataset:
-  name: "open-r1/OpenR1-Math-220k"    # Default HF dataset name
-  config_name: null                   # Optional: e.g., "main" for gsm8k, "default" for openbookqa
+# Name of the dataset configuration to load from /workspace/reward-kit/conf/dataset/
+# Example: "gsm8k" to load /workspace/reward-kit/conf/dataset/gsm8k.yaml
+dataset_config_name: "gsm8k" # Default to gsm8k for now, user should override
+
+# Script-specific parameters for how to use the loaded dataset
+dataset_usage:
+  # HuggingFace dataset config name (e.g., "main" for gsm8k, "default" for openbookqa)
+  config_name: null
   split: "train"                      # Default dataset split
 
-  # Column names in the source dataset
+  # Column names in the source dataset (specific to this script's needs for query, assistant response, and ground truth)
   query_column: "problem"
   solution_column_for_assistant: "solution"
   ground_truth_answer_column: "answer"
 
-# Parameters for processing the dataset
+# Parameters for processing the dataset (these are specific to the conversion script)
 processing:
   filter_by_match: false              # Enable filtering by matching solution to ground truth
   math_type: "numeric"                # Type of math reward for filtering: "numeric", "mcq", "list"

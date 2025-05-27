@@ -5,25 +5,26 @@ dataset processing, and the TRL training loop.
 """
 
 import json
+import logging  # Added
 import os
 import sys
 from typing import Any, Dict, List
 
+import hydra  # Added
+from omegaconf import DictConfig, OmegaConf  # Added
+
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-# TRL and Transformers imports (assuming they are installed)
+# TRL and Transformers imports
 try:
-    from transformers import (  # Or sequence-to-sequence if appropriate
-        AutoModelForCausalLM,
-        AutoTokenizer,
-    )
-    from trl import (  # Or other relevant collator
-        DataCollatorForCompletionOnlyLM,
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from trl import (  # Removed DataCollatorForCompletionOnlyLM for now
         GRPOConfig,
         GRPOTrainer,
     )
 except ImportError:
+    # This print will be replaced by logger if Hydra initializes logging first
     print(
         "Please install transformers and trl: pip install transformers trl peft bitsandbytes"
     )
@@ -31,46 +32,28 @@ except ImportError:
 
 from reward_kit.rewards.function_calling import composite_function_call_reward
 
-# from reward_kit.models import Message # If needed for strict type handling
-
-# --- Configuration ---
-MODEL_NAME = (
-    "Salesforce/codegen25-7b-multi"  # Example model, replace with a suitable one
-)
-OUTPUT_DIR = "./grpo_function_calling_output"
-DATASET_PATH = "examples/tool_calling_example/dataset.jsonl"
-MAX_SAMPLES_TRAIN = 100  # Limit samples for example run
-MAX_SAMPLES_EVAL = 20
-
-# GRPO Configuration (example values, tune as needed)
-grpo_config = GRPOConfig(
-    model_name=MODEL_NAME,
-    reward_adapter_name="reward_adapter",  # Name for the reward adapter
-    beta=0.1,  # Weight for the KL divergence term
-    output_dir=OUTPUT_DIR,
-    per_device_train_batch_size=1,
-    per_device_eval_batch_size=1,
-    gradient_accumulation_steps=4,
-    learning_rate=1e-5,
-    num_train_epochs=1,
-    eval_steps=10,
-    logging_steps=1,
-    save_steps=50,
-    max_length=1024,  # Adjust based on model and data
-    max_prompt_length=512,  # Adjust
-    remove_unused_columns=False,  # Important for custom datasets
-    # reward_baseline=0.5, # Optional: baseline for rewards
-)
+logger = logging.getLogger(__name__)  # Added
 
 
-def load_raw_dataset(file_path: str) -> List[Dict[str, Any]]:
+# --- Helper Functions ---
+def load_raw_dataset(
+    file_path: str, max_samples: int = -1
+) -> List[Dict[str, Any]]:  # Added max_samples
     """Loads the raw dataset from a .jsonl file."""
     dataset = []
-    with open(file_path, "r") as f:
-        for i, line in enumerate(f):
-            # if i >= MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL: # Limit total loaded for speed
-            #     break
-            dataset.append(json.loads(line))
+    logger.info(f"Loading raw dataset from: {file_path}")
+    try:
+        with open(file_path, "r") as f:
+            for i, line in enumerate(f):
+                if max_samples > 0 and i >= max_samples:
+                    logger.info(f"Loaded {max_samples} samples, stopping as per limit.")
+                    break
+                dataset.append(json.loads(line))
+        logger.info(f"Successfully loaded {len(dataset)} raw samples.")
+    except FileNotFoundError:
+        logger.error(f"Dataset file not found: {file_path}")
+    except Exception as e:
+        logger.error(f"Error loading dataset from {file_path}: {e}", exc_info=True)
     return dataset
 
 
@@ -78,175 +61,352 @@ def format_prompt_and_extract_ground_truth(item: Dict[str, Any]) -> Dict[str, An
     """
     Formats a dataset item into a prompt for the model and extracts ground truth.
     This needs careful implementation based on how the chosen model expects input for function calling.
-    It should linearize the 'tools' definitions and 'messages' history.
     """
-    # Example Linearization (very basic, needs significant improvement):
+    # Basic Linearization (placeholder, needs model-specific improvement)
     tools_str = "\n".join(
         [
             f"Tool: {t['function']['name']}: {t['function']['description']}"
             for t in item.get("tools", [])
         ]
     )
+    messages_history = item.get("messages", [])
+    # Filter out assistant messages that are only ground truth for previous turns
+    # The prompt should end with the user's last message, or system messages setting up the scenario.
+    prompt_messages = [m for m in messages_history if m.get("role") != "assistant"]
+
     messages_str = "\n".join(
         [
             f"{m['role']}: {m.get('content', '')}"
             + (
                 f" (called: {m['tool_calls'][0]['function']['name']})"
                 if m.get("tool_calls")
+                and m.get("role") != "tool"  # Avoid printing tool results as calls
                 else ""
             )
-            for m in item.get("messages", [])
-            if m.get("role") != "assistant"
+            for m in prompt_messages
         ]
-    )  # Up to user turn
+    )
 
-    # This prompt format is highly dependent on the base model and how it was trained for tool use.
-    prompt = f"Available Tools:\n{tools_str}\n\nConversation:\n{messages_str}\nAssistant (should generate tool calls if appropriate):"
+    prompt = f"Available Tools:\n{tools_str}\n\nConversation History:\n{messages_str}\n\nAssistant (generate tool calls or a direct answer):"
 
-    # The 'response' here would be the ground truth assistant message, including tool_calls
-    # For GRPO, we often provide the prompt and the trainer handles generation.
-    # The ground_truth_for_reward is what our reward function needs.
     return {
         "prompt": prompt,
-        "ground_truth_for_reward": item.get(
-            "ground_truth"
-        ),  # This is the dict for our reward function
-        "original_messages_for_reward": item.get(
-            "messages"
-        ),  # Pass original messages for reward context
+        "ground_truth_for_reward": item.get("ground_truth"),
+        "original_messages_for_reward": messages_history,  # Pass all original messages
     }
 
 
-def main():
-    # 1. Load Model and Tokenizer
-    # TODO: Add model loading with PEFT/LoRA if needed, quantization, etc.
-    # tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    # model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-    # if tokenizer.pad_token is None:
-    #     tokenizer.pad_token = tokenizer.eos_token
-    print(
-        f"Note: Model loading and tokenizer setup is currently a placeholder in this script."
+# --- Main Script ---
+@hydra.main(config_path="conf", config_name="trl_grpo_config", version_base=None)
+def main(cfg: DictConfig) -> None:
+    logger.info(f"Hydra configuration (Tool Calling TRL):\n{OmegaConf.to_yaml(cfg)}")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(
+        f"Hydra output directory: {hydra.core.hydra_config.HydraConfig.get().runtime.output_dir}"
     )
-    print(f"Please implement model loading for '{MODEL_NAME}' or your chosen model.\n")
+
+    MODEL_NAME = cfg.model_name
+    DATASET_PATH = hydra.utils.to_absolute_path(cfg.dataset_file_path)
+    MAX_SAMPLES_TRAIN = cfg.get("max_samples_train", 100)  # Get from cfg or default
+    MAX_SAMPLES_EVAL = cfg.get("max_samples_eval", 20)  # Get from cfg or default
+
+    max_steps_config = 1 if cfg.test_mode_trl else cfg.grpo.max_steps
+
+    # GRPO Configuration from Hydra
+    grpo_config = GRPOConfig(
+        output_dir=hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+        beta=cfg.grpo.beta,
+        per_device_train_batch_size=cfg.grpo.per_device_train_batch_size,
+        gradient_accumulation_steps=cfg.grpo.gradient_accumulation_steps,
+        learning_rate=cfg.grpo.learning_rate,
+        num_train_epochs=cfg.grpo.num_train_epochs,
+        logging_steps=cfg.grpo.logging_steps,
+        max_completion_length=cfg.grpo.max_completion_length,
+        max_prompt_length=cfg.grpo.get("max_prompt_length", 512),
+        remove_unused_columns=False,
+        no_cuda=cfg.test_mode_trl,
+        top_k=cfg.grpo.top_k,
+        top_p=cfg.grpo.top_p,
+        do_sample=cfg.grpo.do_sample,
+        max_steps=max_steps_config,
+    )
+    logger.info(f"GRPOConfig prepared (Tool Calling): {grpo_config}")
+
+    import torch  # For MockModel
+    from datasets import Dataset  # For converting list to Dataset object
+
+    # 1. Load Model and Tokenizer (Placeholder - Requires Implementation)
+    logger.warning(
+        f"Attempting to load tokenizer for model: {MODEL_NAME} (Tool Calling)"
+    )
+    # tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME) # Needs to be implemented
+    # if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
+
+    logger.warning(f"Attempting to load base model: {MODEL_NAME} (Tool Calling)")
+    # model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, ...) # Needs to be implemented
+
+    # For this scaffold, we'll simulate a tokenizer and model to allow GRPOTrainer to instantiate
+    # This is NOT a functional training setup without real model/tokenizer.
+    class MockTokenizer:
+        def __init__(self, model_name):
+            self.model_name = model_name
+            self.pad_token_id = 0
+            self.eos_token_id = 1  # Added eos_token_id
+
+        def __call__(self, text, **kwargs):
+            return {
+                "input_ids": [[0, 1, 2]],
+                "attention_mask": [[1, 1, 1]],
+            }  # Dummy tokenization
+
+        def save_pretrained(self, path):
+            logger.info(f"MockTokenizer saved to {path}")
+
+    class MockModel(torch.nn.Module):
+        def __init__(self, model_name):
+            super().__init__()
+            self.model_name = model_name
+            # GRPOTrainer checks for model.config.is_encoder_decoder and model.config.model_type
+            self.config = type(
+                "config",
+                (),
+                {
+                    "is_encoder_decoder": False,
+                    "model_type": "mock",
+                    "pad_token_id": 0,
+                    "eos_token_id": 1,
+                },
+            )()  # Added pad/eos
+
+        def forward(
+            self, input_ids, attention_mask=None, labels=None, **kwargs
+        ):  # Added attention_mask, labels
+            # Dummy logits: (batch_size, sequence_length, vocab_size)
+            return (torch.randn(input_ids.shape[0], input_ids.shape[1], 10),)
+
+        def save_pretrained(self, path):
+            logger.info(f"MockModel saved to {path}")
+
+        # GRPOTrainer needs generate method
+        def generate(
+            self, input_ids, attention_mask=None, **kwargs
+        ):  # Added attention_mask
+            # Dummy generation: just return input_ids extended by one dummy token
+            dummy_completion = torch.full(
+                (input_ids.shape[0], 1),
+                3,
+                dtype=input_ids.dtype,
+                device=input_ids.device,
+            )
+            return torch.cat([input_ids, dummy_completion], dim=1)
+
+        def get_input_embeddings(self):
+            return torch.nn.Embedding(10, 10)
+
+        def prepare_inputs_for_generation(
+            self, input_ids, **kwargs
+        ):  # Needed by generate
+            return {"input_ids": input_ids}
+
+    if cfg.get("use_mock_model_tokenizer", True):
+        logger.warning(
+            "Using MOCK Tokenizer and MOCK Model for Tool Calling TRL example. THIS WILL NOT TRAIN A REAL MODEL."
+        )
+        tokenizer = MockTokenizer(MODEL_NAME)
+        model = MockModel(MODEL_NAME)
+    else:
+        logger.error(
+            "Real model/tokenizer loading is not implemented in this scaffold. Set use_mock_model_tokenizer=true to run."
+        )
+        return
 
     # 2. Load and Prepare Dataset
-    raw_dataset = load_raw_dataset(DATASET_PATH)
-    # This mapping needs to be carefully designed.
-    # TRL GRPOTrainer expects specific column names like 'prompt' and often 'response' or 'label'.
-    # We also need to pass necessary info to our reward function.
+    logger.info(f"Loading and preparing dataset from: {DATASET_PATH} (Tool Calling)")
+    raw_dataset = load_raw_dataset(
+        DATASET_PATH, max_samples=(MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL)
+    )
 
-    # For GRPOTrainer, we typically provide prompts, and the model generates responses.
-    # The reward function then scores these (prompt, generated_response) pairs.
-
-    # This is a simplified dataset preparation.
-    # In practice, you'd use Hugging Face `datasets.Dataset` and `map`.
-    processed_dataset = [
+    processed_data_for_trl = [
         format_prompt_and_extract_ground_truth(item) for item in raw_dataset
     ]
 
-    # Split into train and eval - simplistic split for example
-    train_dataset = processed_dataset[:MAX_SAMPLES_TRAIN]
-    eval_dataset = processed_dataset[
-        MAX_SAMPLES_TRAIN : MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL
+    valid_processed_data = [
+        d for d in processed_data_for_trl if d.get("prompt") is not None
     ]
+    if not valid_processed_data:
+        logger.error(
+            "No valid data after processing for TRL. Check format_prompt_and_extract_ground_truth."
+        )
+        return
 
-    print(
-        f"Loaded and processed {len(train_dataset)} training samples and {len(eval_dataset)} eval samples."
+    full_dataset_hf = Dataset.from_list(valid_processed_data)
+
+    if len(full_dataset_hf) < MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL:
+        logger.warning(
+            f"Total samples ({len(full_dataset_hf)}) is less than requested train+eval ({MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL}). Adjusting split."
+        )
+        train_dataset_hf = full_dataset_hf.select(
+            range(min(MAX_SAMPLES_TRAIN, len(full_dataset_hf)))
+        )
+        if len(full_dataset_hf) > MAX_SAMPLES_TRAIN:
+            eval_dataset_hf = full_dataset_hf.select(
+                range(MAX_SAMPLES_TRAIN, len(full_dataset_hf))
+            )
+        else:
+            eval_dataset_hf = Dataset.from_list([])
+    else:
+        train_dataset_hf = full_dataset_hf.select(range(MAX_SAMPLES_TRAIN))
+        eval_dataset_hf = full_dataset_hf.select(
+            range(MAX_SAMPLES_TRAIN, MAX_SAMPLES_TRAIN + MAX_SAMPLES_EVAL)
+        )
+
+    logger.info(
+        f"Prepared {len(train_dataset_hf)} training samples and {len(eval_dataset_hf)} eval samples (Tool Calling)."
     )
-    if not train_dataset:
-        print("No training data. Exiting.")
-        sys.exit(1)
 
-    # print("\nExample Training Prompt:")
-    # print(train_dataset[0]['prompt'])
-    # print("\nExample Ground Truth for Reward:")
-    # print(json.dumps(train_dataset[0]['ground_truth_for_reward'], indent=2))
+    if len(train_dataset_hf) == 0:  # Check length, not object itself
+        logger.error("No training data after split. Exiting.")
+        return
+
+    def tokenize_prompts(examples):
+        # Ensure max_prompt_length is used from grpo_config
+        return tokenizer(
+            examples["prompt"],
+            truncation=True,
+            max_length=grpo_config.max_prompt_length,
+            padding=(
+                "max_length" if cfg.get("pad_prompts_to_max_length", False) else True
+            ),
+        )
+
+    train_dataset_tokenized = train_dataset_hf.map(tokenize_prompts, batched=True)
+    # Keep necessary columns for reward function metadata and trainer
+    columns_to_keep = [
+        "input_ids",
+        "attention_mask",
+        "prompt",
+        "ground_truth_for_reward",
+        "original_messages_for_reward",
+    ]
+    train_dataset_tokenized = train_dataset_tokenized.remove_columns(
+        [
+            col
+            for col in train_dataset_tokenized.column_names
+            if col not in columns_to_keep
+        ]
+    )
+    train_dataset_tokenized.set_format(
+        type="torch", columns=columns_to_keep
+    )  # Specify columns for set_format
+
+    eval_dataset_tokenized = None
+    if len(eval_dataset_hf) > 0:  # Check length
+        eval_dataset_tokenized = eval_dataset_hf.map(tokenize_prompts, batched=True)
+        eval_dataset_tokenized = eval_dataset_tokenized.remove_columns(
+            [
+                col
+                for col in eval_dataset_tokenized.column_names
+                if col not in columns_to_keep
+            ]
+        )
+        eval_dataset_tokenized.set_format(type="torch", columns=columns_to_keep)
 
     # 3. Define Reward Function for GRPOTrainer
-    # The GRPOTrainer will call this function with generated text and other metadata.
-    # We need to adapt our `composite_function_call_reward` to fit the expected signature.
-    # GRPOTrainer typically passes: List[str] (prompts), List[str] (responses), List[Dict[str,Any]] (metadata from dataset)
-
-    # This is a conceptual wrapper. The actual signature and data flow within GRPOTrainer
-    # need to be matched precisely.
     def grpo_reward_fn(
         prompts: List[str], responses: List[str], metadata: List[Dict[str, Any]]
     ) -> List[float]:
         rewards = []
         for i in range(len(prompts)):
-            # Reconstruct the 'messages' list for our reward function
-            # The 'responses[i]' is the text generated by the LLM.
-            # We need to parse it into the assistant message format, potentially extracting tool calls.
-
-            # This is a placeholder for parsing the raw model output string `responses[i]`
-            # into the structured assistant message format that our reward function expects.
-            # This parsing is CRITICAL and model-dependent.
-
-            # Conceptual parsing:
             generated_assistant_message = {"role": "assistant", "content": responses[i]}
-            # If model outputs structured tool_calls (e.g. via special tokens or JSON mode):
-            #   tool_calls = parse_model_output_for_tool_calls(responses[i])
-            #   generated_assistant_message["tool_calls"] = tool_calls
-            # If tool calls are embedded in text (like <tool_call>...</tool_call>):
-            #   Our reward function's `eval_tool_call` already handles parsing from 'content'.
-
-            # The 'metadata' should carry the original messages and ground_truth for this item.
-            # We assume 'original_messages_for_reward' and 'ground_truth_for_reward' were passed in metadata.
-            original_user_messages = metadata[i].get("original_messages_for_reward", [])
-            # We need to take messages up to the point of generation
+            original_all_messages = metadata[i].get("original_messages_for_reward", [])
             context_messages = [
-                m for m in original_user_messages if m.get("role") != "assistant"
+                m for m in original_all_messages if m.get("role") != "assistant"
             ]
-
             messages_for_eval = context_messages + [generated_assistant_message]
             ground_truth = metadata[i].get("ground_truth_for_reward")
 
-            eval_result = composite_function_call_reward(
-                messages=messages_for_eval, ground_truth=ground_truth
-            )
-            rewards.append(eval_result.score)
+            if ground_truth is None:
+                logger.warning(
+                    f"Missing ground_truth_for_reward for prompt: {prompts[i][:100]}... Assigning 0 reward."
+                )
+                rewards.append(0.0)
+                continue
+            try:
+                eval_result = composite_function_call_reward(
+                    messages=messages_for_eval, ground_truth=ground_truth
+                )
+                rewards.append(eval_result.score)
+            except Exception as e:
+                logger.error(
+                    f"Error in reward function for prompt '{prompts[i][:100]}...': {e}",
+                    exc_info=True,
+                )
+                rewards.append(0.0)
         return rewards
 
-    print(
-        f"\nNote: GRPOTrainer setup and reward function adaptation are conceptual in this script."
-    )
-    print(
-        f"The actual implementation of 'grpo_reward_fn' and data collation needs careful alignment with TRL's GRPOTrainer.\n"
-    )
-
     # 4. Initialize GRPOTrainer
-    # TODO: Implement the actual GRPOTrainer initialization
-    # This requires a fully set up model, tokenizer, and datasets formatted correctly.
-    # Data collator might be needed, e.g., DataCollatorForCompletionOnlyLM.
+    logger.info("Initializing GRPOTrainer (Tool Calling)...")
 
-    # Example (conceptual, will not run without model/tokenizer/proper dataset objects):
-    # trainer = GRPOTrainer(
-    #     model=model,
-    #     tokenizer=tokenizer,
-    #     config=grpo_config,
-    #     reward_function=grpo_reward_fn,
-    #     train_dataset=train_dataset_hf, # This should be a Hugging Face Dataset object
-    #     eval_dataset=eval_dataset_hf,   # This should be a Hugging Face Dataset object
-    #     # data_collator=... ,
-    # )
+    trainer = GRPOTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        args=grpo_config,
+        reward_fn=grpo_reward_fn,
+        train_dataset=train_dataset_tokenized,
+        eval_dataset=eval_dataset_tokenized,  # Pass None if empty
+    )
+    logger.info("GRPOTrainer initialized.")
 
     # 5. Train
-    # TODO: Implement training call
-    # trainer.train()
+    if len(train_dataset_tokenized) > 0:  # Check length
+        logger.info("Starting TRL GRPO training (Tool Calling)...")
+        try:
+            trainer.train()
+            logger.info("TRL GRPO training completed.")
 
-    # 6. Save model (optional)
-    # trainer.save_model(os.path.join(OUTPUT_DIR, "final_checkpoint"))
-    # tokenizer.save_pretrained(os.path.join(OUTPUT_DIR, "final_checkpoint"))
+            final_save_path = os.path.join(
+                hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+                "final_model",
+            )
+            if hasattr(model, "save_pretrained"):
+                model.save_pretrained(final_save_path)  # MockModel has it
+            if hasattr(tokenizer, "save_pretrained"):
+                tokenizer.save_pretrained(final_save_path)
+            logger.info(
+                f"Final model and tokenizer potentially saved to {final_save_path}"
+            )
 
-    print("TRL GRPO integration script scaffold created.")
-    print(
-        "This script requires significant further implementation for actual training."
-    )
-    print(
-        "Key areas to implement: model loading, tokenizer setup, dataset formatting for TRL,"
-    )
-    print("and precise GRPOTrainer initialization and reward function wrapping.")
+        except Exception as e:
+            logger.error(f"Error during GRPOTrainer training: {e}", exc_info=True)
+            # If using mock model, some errors might be expected if TRL tries deep interactions
+            logger.warning(
+                "If using mock model, some errors during trainer.train() might be due to mock limitations."
+            )
+    else:
+        logger.warning("No training data available, skipping GRPOTrainer.train().")
+
+    logger.info("Tool Calling TRL GRPO integration script finished.")
+    if cfg.get("use_mock_model_tokenizer", True):
+        logger.warning(
+            "This script used a MOCK model and tokenizer. Real training requires implementing model/tokenizer loading and disabling mock mode."
+        )
 
 
 if __name__ == "__main__":
+    try:
+        import accelerate
+        import bitsandbytes
+        import datasets
+        import peft
+        import torch
+        import transformers
+        import trl
+    except ImportError as e:
+        print(
+            f"Import error: {e}. Some libraries missing for Tool Calling TRL example."
+        )
+        print(
+            "Install: pip install torch transformers trl datasets peft bitsandbytes accelerate"
+        )
+        sys.exit(1)
     main()

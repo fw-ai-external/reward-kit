@@ -16,7 +16,7 @@ class TestCLI:
         # Test preview command
         # Note: This test is less comprehensive than tests/test_cli_args.py
         # It doesn't check for --remote-url here.
-        args = parse_args(
+        args, _ = parse_args(  # Unpack tuple
             ["preview", "--samples", "test.jsonl", "--metrics-folders", "m=p"]
         )  # Added metrics folders to pass new check
         assert args.command == "preview"
@@ -24,7 +24,7 @@ class TestCLI:
         assert args.max_samples == 5  # default value
 
         # Test deploy command
-        args = parse_args(
+        args, _ = parse_args(  # Unpack tuple
             ["deploy", "--id", "test-eval", "--metrics-folders", "test=./test"]
         )
         assert args.command == "deploy"

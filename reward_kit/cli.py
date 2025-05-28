@@ -12,6 +12,8 @@ import traceback
 import uuid
 from pathlib import Path
 
+logger = logging.getLogger(__name__)  # Added logger initialization
+
 from reward_kit.evaluation import create_evaluation, preview_evaluation
 
 from .cli_commands.agent_eval_cmd import (  # Now points to the V2 logic
@@ -24,9 +26,7 @@ from .cli_commands.common import (
 )
 from .cli_commands.deploy import deploy_command
 from .cli_commands.preview import preview_command
-
-# importlib.util was unused
-
+from .cli_commands.run_eval_cmd import hydra_cli_entry_point  # Import for run command
 
 # Note: validate_task_bundle, find_task_dataset, get_toolset_config, export_tool_specs
 # were helpers for the old agent_eval_command and are now moved into agent_eval_cmd.py
@@ -244,7 +244,17 @@ def parse_args(args=None):
         help="Override MODEL_AGENT environment variable (format: provider/model_name).",
     )
 
-    return parser.parse_args(args)
+    # Run command (for Hydra-based evaluations)
+    # This subparser intentionally defines no arguments itself.
+    # All arguments after 'run' will be passed to Hydra by parse_known_args.
+    subparsers.add_parser(
+        "run",
+        help="Run an evaluation using a Hydra configuration. All arguments after 'run' are passed to Hydra.",
+        # add_help=False # Optionally disable help for this subparser if Hydra's help is preferred
+    )
+
+    # Use parse_known_args to allow Hydra to handle its own arguments
+    return parser.parse_known_args(args)
 
 
 def main():
@@ -252,15 +262,17 @@ def main():
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(override=True)  # Load .env file, overriding existing shell env vars
+        # .env.dev for development-specific overrides, .env for general
+        load_dotenv(dotenv_path=Path(".") / ".env.dev", override=True)
+        load_dotenv(override=True)
     except ImportError:
-        # python-dotenv not installed, proceed without it.
-        # Consider logging a warning if .env support is considered core.
         pass
 
-    args = parse_args()
-    # Setup logging based on global verbose/debug flags if they exist on args,
-    # or command-specific if not. getattr is good for this.
+    # Store original sys.argv[0] because Hydra might manipulate it
+    # and we need it if we're not calling a Hydra app.
+    original_script_name = sys.argv[0]
+    args, remaining_argv = parse_args()  # Use parse_known_args
+
     setup_logging(args.verbose, getattr(args, "debug", False))
 
     if args.command == "preview":
@@ -269,16 +281,56 @@ def main():
         return deploy_command(args)
     elif args.command == "agent-eval":
         return agent_eval_command(args)
-    else:
-        # No command provided, show help
-        # This case should ideally not be reached if subparsers are required.
-        # If a command is not matched, argparse usually shows help or an error.
-        # Keeping this for safety or if top-level `reward-kit` without command is allowed.
-        parser = (
-            argparse.ArgumentParser()
-        )  # This might need to be the main parser instance
-        parser.print_help()
+    elif args.command == "run":
+        # For the 'run' command, Hydra takes over argument parsing.
+
+        # Filter out the initial '--' if present in remaining_argv, which parse_known_args might add
+        hydra_specific_args = [arg for arg in remaining_argv if arg != "--"]
+
+        processed_hydra_args = []
+        i = 0
+        while i < len(hydra_specific_args):
+            arg = hydra_specific_args[i]
+            if arg == "--config-path":
+                processed_hydra_args.append(arg)  # Add --config-path flag
+                i += 1
+                if i < len(hydra_specific_args):
+                    path_val = hydra_specific_args[i]
+                    abs_path = os.path.abspath(path_val)
+                    logger.debug(
+                        f"Converting relative --config-path '{path_val}' (space separated) to absolute '{abs_path}'"
+                    )
+                    processed_hydra_args.append(abs_path)
+                else:
+                    logger.error("--config-path specified without a value.")
+                    # Or raise an error: raise ValueError("--config-path specified without a value")
+                    # For now, let Hydra handle the missing value if it occurs.
+                    pass
+            elif arg.startswith("--config-path="):
+                flag_part, path_val = arg.split("=", 1)
+                processed_hydra_args.append(flag_part)  # Add --config-path flag
+                abs_path = os.path.abspath(path_val)
+                logger.debug(
+                    f"Converting relative --config-path '{path_val}' (equals separated) to absolute '{abs_path}'"
+                )
+                processed_hydra_args.append(abs_path)
+            else:
+                processed_hydra_args.append(arg)
+            i += 1
+
+        sys.argv = [sys.argv[0]] + processed_hydra_args
+        logger.info(
+            f"SYSCALL_ARGV_FOR_HYDRA (after potential abspath conversion): {sys.argv}"
+        )
+
+        hydra_cli_entry_point()
         return 0
+    else:
+        temp_parser = argparse.ArgumentParser(
+            prog=os.path.basename(original_script_name)
+        )
+        temp_parser.print_help()
+        return 1
 
 
 if __name__ == "__main__":

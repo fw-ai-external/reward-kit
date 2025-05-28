@@ -44,12 +44,15 @@ class ResponseCache:
         user_query: str,  # Or full messages list for more robustness
         model_name: str,
         temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        max_tokens: int,
+        reasoning_effort: Optional[str],  # Added reasoning_effort
         # Potentially add other generation params like max_tokens, top_p if they affect output
     ) -> str:
         """Generates a cache key."""
-        key_material = (
-            f"{sample_id}-{system_prompt}-{user_query}-{model_name}-{temperature}"
-        )
+        key_material = f"{sample_id}-{system_prompt}-{user_query}-{model_name}-{temperature}-{top_p}-{top_k}-{min_p}-{max_tokens}-{reasoning_effort}"
         return hashlib.md5(key_material.encode()).hexdigest()
 
     def get(
@@ -59,6 +62,11 @@ class ResponseCache:
         user_query: str,
         model_name: str,
         temperature: float,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        max_tokens: int,
+        reasoning_effort: Optional[str],  # Added reasoning_effort
     ) -> Optional[str]:
         """Retrieves an item from the cache. Returns None if not found or error."""
         if not self.cache_dir:
@@ -71,7 +79,16 @@ class ResponseCache:
             return None
 
         cache_key = self._generate_key(
-            sample_id, system_prompt, user_query, model_name, temperature
+            sample_id,
+            system_prompt,
+            user_query,
+            model_name,
+            temperature,
+            top_p,
+            top_k,
+            min_p,
+            max_tokens,
+            reasoning_effort,
         )
         cache_file_path = os.path.join(self.cache_dir, f"{cache_key}.json")
 
@@ -108,6 +125,11 @@ class ResponseCache:
         model_name: str,
         temperature: float,
         response: str,
+        top_p: float,
+        top_k: int,
+        min_p: float,
+        max_tokens: int,
+        reasoning_effort: Optional[str],  # Added reasoning_effort
     ) -> None:
         """Stores an item in the cache."""
         if not self.cache_dir:
@@ -117,7 +139,16 @@ class ResponseCache:
             return
 
         cache_key = self._generate_key(
-            sample_id, system_prompt, user_query, model_name, temperature
+            sample_id,
+            system_prompt,
+            user_query,
+            model_name,
+            temperature,
+            top_p,
+            top_k,
+            min_p,
+            max_tokens,
+            reasoning_effort,
         )
         cache_file_path = os.path.join(self.cache_dir, f"{cache_key}.json")
 

@@ -70,15 +70,23 @@ import os  # Ensure os is imported for path manipulation
 # Path from reward_kit/cli_commands/ to examples/math_example/conf/
 # Construct an absolute path or a file:// URL to make it more robust.
 _RUN_EVAL_CMD_DIR = os.path.dirname(os.path.abspath(__file__))
-_EXAMPLE_CONFIG_PATH = os.path.abspath(
-    os.path.join(_RUN_EVAL_CMD_DIR, "..", "..", "examples", "math_example", "conf")
+# Default config_path for @hydra.main, relative to this file.
+# Points to the project's top-level 'conf' directory.
+_DEFAULT_HYDRA_CONFIG_PATH = os.path.abspath(
+    os.path.join(_RUN_EVAL_CMD_DIR, "..", "..", "conf")
 )
 
 
 @hydra.main(
-    config_path=_EXAMPLE_CONFIG_PATH, config_name="run_math_eval", version_base=None
+    config_path=_DEFAULT_HYDRA_CONFIG_PATH, config_name=None, version_base="1.3"
 )
 def hydra_cli_entry_point(cfg: DictConfig) -> None:
+    # config_path and config_name from CLI will override the defaults in the decorator.
+    # If --config-name is not provided via CLI, Hydra would look for a default config
+    # (e.g., config.yaml) in the _DEFAULT_HYDRA_CONFIG_PATH.
+    # However, our reward-kit run command will always pass --config-path and --config-name.
+    # passed to `reward-kit run` (e.g., --config-path, --config-name)
+    # or by Hydra's default search behavior if not provided via CLI.
     run_evaluation_command_logic(cfg)
 
 

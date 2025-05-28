@@ -26,18 +26,18 @@ setup(
             "flake8>=3.9.2",
             "autopep8>=1.5.0",
             "transformers>=4.0.0",
-            "pytest-asyncio",  # Added pytest-asyncio
-            "types-setuptools",  # For Mypy
-            "types-requests",  # For Mypy
-            "types-PyYAML",  # For Mypy
-            "types-docker",  # For Mypy
-            "torch>=1.9",  # Added torch for transformers and trl
-            "trl>=0.7.0",  # Added trl for GRPOTrainer
-            "peft>=0.7.0",  # Added peft for LoRA
-            "datasets",  # trl examples often use datasets
-            "hydra-core>=1.3.2",  # For Hydra configuration
-            "omegaconf>=2.3.0",  # For Hydra configuration objects
-            "pre-commit",  # Added pre-commit
+            "pytest-asyncio",
+            "types-setuptools",
+            "types-requests",
+            "types-PyYAML",
+            "types-docker",
+            "torch>=1.9",
+            "trl>=0.7.0",
+            "peft>=0.7.0",
+            "datasets",
+            "hydra-core>=1.3.2",
+            "omegaconf>=2.3.0",
+            "pre-commit",
         ],
         "deepseek": [
             "datasets>=2.12.0",

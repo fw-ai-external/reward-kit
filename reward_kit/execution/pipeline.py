@@ -72,11 +72,18 @@ class EvaluationPipeline:
         self,
         sample: Dict[str, Any],
         http_session: Optional[aiohttp.ClientSession],  # Required if generation is on
+        original_index: Optional[int] = None,  # Added original_index
     ) -> Optional[Dict[str, Any]]:
         """
         Processes a single sample: generates response (if needed) and evaluates.
         """
-        sample_id = sample.get("id", "unknown_id_" + os.urandom(4).hex())
+        # Use original_index for a more stable fallback ID if 'id' is not in sample
+        sample_id_fallback = (
+            f"idx_{original_index}"
+            if original_index is not None
+            else "unknown_id_" + os.urandom(4).hex()
+        )
+        sample_id = sample.get("id", sample_id_fallback)
         user_query = sample.get("user_query")  # From standardized prompt dataset
         ground_truth_for_eval = sample.get("ground_truth_for_eval")
 
@@ -105,35 +112,51 @@ class EvaluationPipeline:
                 # This case should ideally be prevented by checks in run() or __init__
                 return {"id": sample_id, "error": "Generation client not configured"}
 
-            # Check cache first
-            assistant_response_content = self.cache.get(
-                sample_id=sample_id,
-                system_prompt=self.cfg.get("system_prompt"),
-                user_query=user_query,
-                model_name=self.model_client.model_name,  # Get from client instance
-                temperature=self.model_client.temperature,  # Get from client instance
-            )
+            assistant_response_content = None
+            if self.cfg.generation.cache.enabled:
+                # Check cache first
+                assistant_response_content = self.cache.get(
+                    sample_id=sample_id,
+                    system_prompt=self.cfg.get("system_prompt"),
+                    user_query=user_query,
+                    model_name=self.model_client.model_name,
+                    temperature=self.model_client.temperature,
+                    top_p=self.model_client.top_p,  # Pass top_p
+                    top_k=self.model_client.top_k,  # Pass top_k
+                    min_p=self.model_client.min_p,  # Pass min_p
+                    max_tokens=self.model_client.max_tokens,  # Pass max_tokens
+                    reasoning_effort=self.model_client.reasoning_effort,  # Pass reasoning_effort
+                )
             if assistant_response_content:
                 logger.info(f"Using cached response for sample {sample_id}")
-            else:
-                logger.info(f"Generating response for sample {sample_id}...")
+
+            if (
+                not assistant_response_content
+            ):  # If not found in cache OR cache was disabled for GET
+                # The "Generating response for sample..." log was moved to the semaphore wrapper for better timing.
+                # logger.info(f"Generating response for sample {sample_id}...") # This line is intentionally removed/commented
                 try:
                     assistant_response_content = await self.model_client.generate(
                         messages=messages_for_generation,
                         session=http_session,  # Pass the session
                     )
-                    if (
-                        assistant_response_content
-                        and self.model_client.temperature == 0.0
-                    ):
-                        self.cache.put(
-                            sample_id=sample_id,
-                            system_prompt=self.cfg.get("system_prompt"),
-                            user_query=user_query,
-                            model_name=self.model_client.model_name,
-                            temperature=self.model_client.temperature,
-                            response=assistant_response_content,
-                        )
+                    if assistant_response_content and self.cfg.generation.cache.enabled:
+                        if (
+                            self.model_client.temperature == 0.0
+                        ):  # Keep existing temp check
+                            self.cache.put(
+                                sample_id=sample_id,
+                                system_prompt=self.cfg.get("system_prompt"),
+                                user_query=user_query,
+                                model_name=self.model_client.model_name,
+                                temperature=self.model_client.temperature,
+                                response=assistant_response_content,
+                                top_p=self.model_client.top_p,  # Pass top_p
+                                top_k=self.model_client.top_k,  # Pass top_k
+                                min_p=self.model_client.min_p,  # Pass min_p
+                                max_tokens=self.model_client.max_tokens,  # Pass max_tokens
+                                reasoning_effort=self.model_client.reasoning_effort,  # Pass reasoning_effort
+                            )
                         logger.info(f"Cached new response for sample {sample_id}")
                 # except ModelAuthError as e: # Example of specific error handling
                 #     logger.error(f"Authentication error for sample {sample_id}: {e}")
@@ -164,21 +187,60 @@ class EvaluationPipeline:
                     "evaluation_reason": "No response",
                 }
         else:  # Generation disabled
-            # Expect pre-generated assistant response in the input sample
-            assistant_response_content = sample.get(
-                self.cfg.dataset.get("column_mapping", {}).get(
-                    "assistant_response_column", "assistant_response"
+            # Generation disabled.
+            # 1. Try to get response from a pre-existing column in the input sample.
+            assistant_response_col_name = self.cfg.dataset.get(
+                "column_mapping", {}
+            ).get("assistant_response_column", "assistant_response")
+            assistant_response_content = sample.get(assistant_response_col_name)
+
+            if assistant_response_content:
+                logger.info(
+                    f"Using pre-existing response from input sample {sample_id} (column: {assistant_response_col_name})"
                 )
-            )
+            else:  # If not in input sample, try to get from cache.
+                # Ensure model_name and temperature are available from config for cache key generation.
+                # These should be present in cfg.generation even if generation.enabled is false.
+                # Ensure model_name and temperature are available from config for cache key generation.
+                # These should be present in cfg.generation even if generation.enabled is false.
+                gen_cfg = self.cfg.generation
+                model_name_for_cache = gen_cfg.get("model_name", "unknown_model")
+                temperature_for_cache = gen_cfg.get("temperature", 0.0)
+                top_p_for_cache = gen_cfg.get("top_p", 0.95)
+                top_k_for_cache = gen_cfg.get("top_k", 20)
+                min_p_for_cache = gen_cfg.get("min_p", 0.0)
+                max_tokens_for_cache = gen_cfg.get("max_tokens", 1024)
+                reasoning_effort_for_cache = gen_cfg.get("reasoning_effort", None)
+
+                logger.debug(
+                    f"Attempting cache lookup for sample {sample_id} with generation disabled."
+                )
+                assistant_response_content = self.cache.get(
+                    sample_id=sample_id,
+                    system_prompt=self.cfg.get("system_prompt"),
+                    user_query=user_query,
+                    model_name=model_name_for_cache,
+                    temperature=temperature_for_cache,
+                    top_p=top_p_for_cache,
+                    top_k=top_k_for_cache,
+                    min_p=min_p_for_cache,
+                    max_tokens=max_tokens_for_cache,
+                    reasoning_effort=reasoning_effort_for_cache,
+                )
+                if assistant_response_content:
+                    logger.info(
+                        f"Using cached response for sample {sample_id} (generation disabled)."
+                    )
+
             if not assistant_response_content:
                 logger.warning(
-                    f"Generation disabled and no pre-existing assistant response found for sample {sample_id} (expected column: {self.cfg.dataset.get('column_mapping',{}).get('assistant_response_column', 'assistant_response')})."
+                    f"Generation disabled. No pre-existing response in input sample (column: {assistant_response_col_name}) and no cache hit for sample {sample_id}."
                 )
                 return {
                     "id": sample_id,
-                    "error": "No pre-existing response",
+                    "error": "No pre-existing or cached response",
                     "evaluation_score": 0.0,
-                    "evaluation_reason": "No response",
+                    "evaluation_reason": "No response available (generation disabled)",
                 }
 
         # Construct final messages list for the reward function
@@ -283,12 +345,23 @@ class EvaluationPipeline:
                 self.cfg.generation.api_params.get("max_concurrent_requests", 5)
             )
 
-            async def process_with_semaphore_wrapper(sample_data: Dict[str, Any]):
+            async def process_with_semaphore_wrapper(
+                sample_idx: int, sample_data: Dict[str, Any]
+            ):
+                # Construct a preliminary sample_id for logging before _process_single_sample does its own.
+                prelim_sample_id = sample_data.get("id", f"idx_{sample_idx}")
                 async with semaphore:
-                    return await self._process_single_sample(sample_data, http_session)
+                    # Log that a semaphore slot has been acquired and processing for this sample is starting.
+                    logger.info(
+                        f"Concurrency slot acquired for sample '{prelim_sample_id}', attempting to process."
+                    )
+                    # Pass original_index for more robust ID generation if 'id' is missing in sample_data
+                    return await self._process_single_sample(
+                        sample_data, http_session, original_index=sample_idx
+                    )
 
             for i in range(samples_to_process_count):
-                tasks.append(process_with_semaphore_wrapper(prompt_dataset[i]))
+                tasks.append(process_with_semaphore_wrapper(i, prompt_dataset[i]))
 
             # Process tasks, potentially in batches for logging
             batch_size_for_logging = self.cfg.logging_params.get(

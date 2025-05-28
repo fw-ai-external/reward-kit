@@ -3,14 +3,80 @@ Hydra-based dataset loading and processing.
 """
 
 import json
+import logging  # Added import
 import os
 from typing import Any, Dict, List, Optional, Union
 
 import datasets
 from datasets import Dataset, DatasetDict
 
+logger = logging.getLogger(__name__)  # Added logger initialization
+
+import importlib  # Added for dynamic function import
+
 # Placeholder for Fireworks API client if needed in the future
 # from ..fireworks_client import FireworksClient # Example
+
+# --- Preprocessing Functions ---
+# These can be moved to a separate processors.py if they grow numerous.
+
+
+def transform_codeparrot_apps_sample(example: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transforms a single sample from codeparrot/apps dataset to include
+    a 'transformed_ground_truth' field compatible with apps_coding_reward.
+    """
+    gt_dict = {}
+    # fn_name can be None or missing for some APPS problems (standard input based)
+    if example.get("fn_name"):
+        gt_dict["fn_name"] = example["fn_name"]
+
+    input_output_str = example.get("input_output")
+    if input_output_str:
+        try:
+            parsed_io = json.loads(input_output_str)
+            # Ensure 'inputs' and 'outputs' keys exist in the parsed JSON
+            # and are lists, as expected by apps_testing_util.py
+            gt_dict["inputs"] = parsed_io.get("inputs", [])
+            gt_dict["outputs"] = parsed_io.get("outputs", [])
+            if not isinstance(gt_dict["inputs"], list) or not isinstance(
+                gt_dict["outputs"], list
+            ):
+                logger.warning(
+                    f"Parsed input_output for problem_id {example.get('problem_id', 'Unknown')} "
+                    f"does not contain 'inputs'/'outputs' as lists. IO: {input_output_str}"
+                )
+                # Fallback to empty lists if types are wrong to prevent downstream errors
+                gt_dict["inputs"] = (
+                    [] if not isinstance(gt_dict["inputs"], list) else gt_dict["inputs"]
+                )
+                gt_dict["outputs"] = (
+                    []
+                    if not isinstance(gt_dict["outputs"], list)
+                    else gt_dict["outputs"]
+                )
+
+        except json.JSONDecodeError:
+            logger.warning(
+                f"Failed to parse input_output JSON for problem_id {example.get('problem_id', 'Unknown')}. "
+                f"Content: {input_output_str}"
+            )
+            # Initialize to empty lists to prevent downstream errors if JSON is malformed
+            gt_dict["inputs"] = []
+            gt_dict["outputs"] = []
+    else:
+        # If input_output field is missing or empty, provide empty lists
+        gt_dict["inputs"] = []
+        gt_dict["outputs"] = []
+        logger.warning(
+            f"Missing or empty input_output field for problem_id {example.get('problem_id', 'Unknown')}."
+        )
+
+    example["transformed_ground_truth"] = json.dumps(gt_dict)
+    return example
+
+
+# --- End Preprocessing Functions ---
 
 
 def load_jsonl_file(file_path: str) -> List[Dict[str, Any]]:
@@ -62,24 +128,41 @@ def load_and_process_dataset(
         Loaded dataset, typically as Hugging Face Dataset or DatasetDict.
     """
     loaded_dataset: Union[Dataset, DatasetDict, List[Dict[str, Any]]]
-    load_kwargs = hf_extra_load_params.copy() if hf_extra_load_params else {}
-    load_kwargs.update(kwargs)  # Merge any other relevant kwargs passed directly
+
+    # Prepare kwargs for datasets.load_dataset, separating out custom ones
+    load_kwargs_for_hf = hf_extra_load_params.copy() if hf_extra_load_params else {}
+
+    # Pop custom parameters from kwargs before they are merged
+    column_mapping_from_kwargs = kwargs.pop("column_mapping", None)
+    preprocessing_steps_from_kwargs = kwargs.pop("preprocessing_steps", None)
+    dataset_description = kwargs.pop("description", "No description provided.")
+    logger.info(f"Dataset description: {dataset_description}")
+
+    load_kwargs_for_hf.update(
+        kwargs
+    )  # Merge remaining kwargs (actual HF load_dataset params)
 
     if source_type == "huggingface":
-        if config_name:
-            load_kwargs["name"] = config_name
+        if config_name:  # config_name is a standard HF param
+            load_kwargs_for_hf["name"] = config_name
         # The 'split' argument for datasets.load_dataset can be complex.
         # If data_files is a dict mapping splits to files, 'split' might not be needed here,
         # as load_dataset will return a DatasetDict.
         # If data_files is a single file/list, or path_or_name is a hub ID, 'split' is used.
         if split and not (isinstance(data_files, dict) and split in data_files):
-            load_kwargs["split"] = split
+            load_kwargs_for_hf["split"] = split
+
+        # trust_remote_code will be handled by HF_DATASETS_TRUST_REMOTE_CODE=1 env var
 
         loaded_dataset = datasets.load_dataset(
-            path_or_name, data_files=data_files, **load_kwargs
+            path_or_name,
+            data_files=data_files,
+            # trust_remote_code removed, rely on env var
+            **load_kwargs_for_hf,  # Remaining kwargs (e.g. download_mode if re-added)
         )
     elif source_type == "jsonl":
         # Using Hugging Face's 'json' loader for consistency and features.
+        # trust_remote_code will be handled by HF_DATASETS_TRUST_REMOTE_CODE=1 env var
         # path_or_name can be a direct path to a .jsonl file for single file loading.
         # data_files can be used for more complex setups (multiple files, multiple splits).
 
@@ -101,24 +184,33 @@ def load_and_process_dataset(
         # it returns a DatasetDict, and then you select the split. If data_files is a single path/list,
         # 'split' selects that split.
         hf_split_param = split
-        if isinstance(
-            effective_data_files, dict
-        ):  # If loading multiple splits defined in data_files
-            hf_split_param = None  # Load all splits defined in data_files, then select later if 'split' is also provided
+        if isinstance(effective_data_files, dict) and split:
+            hf_split_param = None
 
         loaded_dataset = datasets.load_dataset(
-            "json",  # Assuming JSONL, so use "json" type for HF loader
+            "json",
             data_files=effective_data_files,
             split=hf_split_param,
-            **load_kwargs,
+            # trust_remote_code removed, rely on env var
+            **load_kwargs_for_hf,
         )
-        # If a specific split was requested and we loaded a DatasetDict
+
         if split and isinstance(loaded_dataset, DatasetDict):
             if split not in loaded_dataset:
                 raise ValueError(
-                    f"Split '{split}' not found in loaded jsonl. Available splits: {list(loaded_dataset.keys())}"
+                    f"Split '{split}' not found in loaded jsonl DatasetDict. Available splits: {list(loaded_dataset.keys())}"
                 )
             loaded_dataset = loaded_dataset[split]
+        elif (
+            split
+            and not isinstance(loaded_dataset, DatasetDict)
+            and hf_split_param == split
+        ):
+            pass
+        elif not split and isinstance(loaded_dataset, DatasetDict):
+            logger.info(
+                f"Loaded multiple splits from JSONL: {list(loaded_dataset.keys())}. No specific split requested via 'split' arg."
+            )
 
     elif source_type == "fireworks":
         # Placeholder for Fireworks dataset loading.
@@ -154,9 +246,119 @@ def load_and_process_dataset(
             if len(loaded_dataset) > max_samples:
                 loaded_dataset = loaded_dataset[:max_samples]
 
-    # TODO: Implement column mapping based on `column_mapping` argument.
-    # Example: if column_mapping: loaded_dataset = loaded_dataset.rename_columns(column_mapping)
+    # Apply column mapping if provided
+    if column_mapping_from_kwargs and isinstance(
+        loaded_dataset, (Dataset, DatasetDict)
+    ):
+        logger.info(f"Applying column mapping: {column_mapping_from_kwargs}")
+        # Note: Column mapping should happen *after* preprocessing if preprocessors add new columns
+        # that are then mapped. Or, mapping happens first, and preprocessors use the new names.
+        # Current Hugging Face `map` function adds new columns, doesn't modify in place by default,
+        # so preprocessors creating 'transformed_ground_truth' is fine before mapping it.
+        # Let's assume mapping is done *after* preprocessing for now.
+        pass  # Deferred until after preprocessing
 
-    # TODO: Implement preprocessing steps based on `preprocessing_steps` argument.
+    # Apply preprocessing steps
+    if preprocessing_steps_from_kwargs and isinstance(
+        loaded_dataset, (Dataset, DatasetDict)
+    ):
+        logger.info(f"Applying preprocessing steps: {preprocessing_steps_from_kwargs}")
+        for step_path in preprocessing_steps_from_kwargs:
+            try:
+                module_path, func_name = step_path.rsplit(".", 1)
+                module = importlib.import_module(module_path)
+                preprocessor_func = getattr(module, func_name)
+
+                if isinstance(loaded_dataset, Dataset):
+                    # Pass existing column names to avoid issues if map tries to remove them by default
+                    # and they are needed by subsequent steps or final output.
+                    # However, if the preprocessor is designed to remove columns, this might interfere.
+                    # For now, assume preprocessors add/modify columns.
+                    # `batched=False` is default for `map` but can be specified by preprocessor if needed.
+                    loaded_dataset = loaded_dataset.map(preprocessor_func)
+                elif isinstance(loaded_dataset, DatasetDict):
+                    for s_name in loaded_dataset.keys():
+                        logger.info(
+                            f"Applying preprocessor {func_name} to split '{s_name}'"
+                        )
+                        loaded_dataset[s_name] = loaded_dataset[s_name].map(
+                            preprocessor_func
+                        )
+                logger.info(f"Successfully applied preprocessor: {step_path}")
+            except Exception as e:
+                logger.error(
+                    f"Failed to apply preprocessing step {step_path}: {e}",
+                    exc_info=True,
+                )
+                raise  # Re-raise to halt execution if a preprocessor fails
+
+    # Apply column mapping (now after preprocessing)
+    if column_mapping_from_kwargs and isinstance(
+        loaded_dataset, (Dataset, DatasetDict)
+    ):
+        logger.info(
+            f"Applying column mapping (post-preprocessing): {column_mapping_from_kwargs}"
+        )
+        if isinstance(loaded_dataset, Dataset):
+            # Filter out mappings where the new name is null/empty or old name doesn't exist
+            valid_mapping = {
+                old: new
+                for old, new in column_mapping_from_kwargs.items()
+                if new and old in loaded_dataset.column_names
+            }
+            if valid_mapping:
+                # Ensure no attempt to rename to an existing column not part of this specific mapping op
+                # This is complex; rename_columns handles conflicts by appending '_'.
+                # For safety, let's check if a 'new' name is already a column and not the 'old' one.
+                final_mapping = {}
+                for old, new in valid_mapping.items():
+                    if new in loaded_dataset.column_names and new != old:
+                        logger.warning(
+                            f"Attempting to map column '{old}' to '{new}', but '{new}' already exists and is not '{old}'. This may lead to unexpected behavior or errors. Skipping this specific rename."
+                        )
+                    else:
+                        final_mapping[old] = new
+
+                if final_mapping:
+                    loaded_dataset = loaded_dataset.rename_columns(final_mapping)
+                else:
+                    logger.info(
+                        "Column mapping resulted in no columns to rename after validation."
+                    )
+            else:
+                logger.warning(
+                    "Column mapping provided but resulted in no valid columns to rename (original columns not found or new names empty)."
+                )
+
+        elif isinstance(loaded_dataset, DatasetDict):
+            for s_name in loaded_dataset.keys():
+                current_split_dataset = loaded_dataset[s_name]
+                valid_mapping = {
+                    old: new
+                    for old, new in column_mapping_from_kwargs.items()
+                    if new and old in current_split_dataset.column_names
+                }
+                if valid_mapping:
+                    final_mapping = {}
+                    for old, new in valid_mapping.items():
+                        if new in current_split_dataset.column_names and new != old:
+                            logger.warning(
+                                f"For split '{s_name}', attempting to map column '{old}' to '{new}', but '{new}' already exists and is not '{old}'. Skipping this specific rename for the split."
+                            )
+                        else:
+                            final_mapping[old] = new
+
+                    if final_mapping:
+                        loaded_dataset[s_name] = current_split_dataset.rename_columns(
+                            final_mapping
+                        )
+                    else:
+                        logger.info(
+                            f"Column mapping for split '{s_name}' resulted in no columns to rename after validation."
+                        )
+                else:
+                    logger.warning(
+                        f"Column mapping for split '{s_name}' resulted in no valid columns to rename."
+                    )
 
     return loaded_dataset

@@ -17,7 +17,7 @@ class TestCliArgParsing:
             "--samples",
             "dummy.jsonl",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "preview"
         assert parsed.remote_url == "http://example.com/eval"
         assert parsed.samples == "dummy.jsonl"
@@ -31,7 +31,7 @@ class TestCliArgParsing:
             "--hf",
             "dataset_name",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "preview"
         assert parsed.remote_url == "http://example.com/eval"
         assert parsed.huggingface_dataset == "dataset_name"
@@ -47,7 +47,7 @@ class TestCliArgParsing:
             "--samples",
             "s.jsonl",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "preview"
         assert parsed.remote_url == "http://example.com/eval"
         assert parsed.metrics_folders == ["mf=path"]
@@ -61,7 +61,7 @@ class TestCliArgParsing:
             "--samples",
             "dummy.jsonl",
         ]  # No --remote-url, no --metrics-folders
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "preview"
         assert parsed.remote_url is None
         assert parsed.metrics_folders is None
@@ -76,7 +76,7 @@ class TestCliArgParsing:
             "--samples",
             "dummy.jsonl",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "preview"
         assert parsed.metrics_folders == ["mf=path"]
         assert parsed.remote_url is None
@@ -90,7 +90,7 @@ class TestCliArgParsing:
             "--remote-url",
             "http://example.com/deploy-eval",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "deploy"
         assert parsed.id == "my-eval"
         assert parsed.remote_url == "http://example.com/deploy-eval"
@@ -109,7 +109,7 @@ class TestCliArgParsing:
             "--metrics-folders",
             "mf=path",
         ]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "deploy"
         assert parsed.id == "my-eval"
         assert parsed.remote_url == "http://example.com/eval"
@@ -117,7 +117,7 @@ class TestCliArgParsing:
 
     def test_deploy_traditional_without_remote_url(self):
         args_list = ["deploy", "--id", "my-eval", "--metrics-folders", "mf=path"]
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "deploy"
         assert parsed.id == "my-eval"
         assert parsed.metrics_folders == ["mf=path"]
@@ -134,7 +134,7 @@ class TestCliArgParsing:
             "my-eval",
         ]  # No --metrics-folders, no --remote-url
         # This should parse fine, but deploy_command will raise error.
-        parsed = parse_args(args_list)
+        parsed, _ = parse_args(args_list)
         assert parsed.command == "deploy"
         assert parsed.id == "my-eval"
         assert parsed.metrics_folders is None
@@ -147,17 +147,17 @@ class TestCliArgParsing:
     # General verbose flag
     def test_verbose_flag(self):
         # Global flags like -v or --verbose should typically come before the subcommand
-        parsed_verbose_short = parse_args(
+        parsed_verbose_short, _ = parse_args(
             ["-v", "preview", "--samples", "s.jsonl", "--metrics-folders", "m=p"]
         )
         assert parsed_verbose_short.verbose is True
 
-        parsed_verbose_long = parse_args(
+        parsed_verbose_long, _ = parse_args(
             ["--verbose", "preview", "--samples", "s.jsonl", "--metrics-folders", "m=p"]
         )
         assert parsed_verbose_long.verbose is True
 
-        parsed_not_verbose = parse_args(
+        parsed_not_verbose, _ = parse_args(
             ["preview", "--samples", "s.jsonl", "--metrics-folders", "m=p"]
         )
         assert parsed_not_verbose.verbose is False

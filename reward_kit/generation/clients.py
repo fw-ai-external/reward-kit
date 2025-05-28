@@ -25,6 +25,11 @@ class ModelClient(abc.ABC):
         self.model_name = client_config.get("model_name", "unknown_model")
         self.temperature = client_config.get("temperature", 0.0)
         self.max_tokens = client_config.get("max_tokens", 1024)
+        self.top_p = client_config.get("top_p", 0.95)
+        self.top_k = client_config.get("top_k", 20)
+        self.min_p = client_config.get("min_p", 0.0)
+        # Add reasoning_effort, defaulting to None if not specified in config
+        self.reasoning_effort = client_config.get("reasoning_effort", None)
 
     @abc.abstractmethod
     async def generate(
@@ -54,16 +59,25 @@ class FireworksModelClient(ModelClient):
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "min_p": self.min_p,
         }
+        if self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
 
-        logger.debug(
-            f"Calling Fireworks API: {url}, Model: {self.model_name}, Temp: {self.temperature}, Prompt: {messages[-1]['content'][:50]}..."
-        )
+        debug_payload_log = payload.copy()
+        if "messages" in debug_payload_log and debug_payload_log["messages"]:
+            debug_payload_log["messages"][-1]["content"] = (
+                debug_payload_log["messages"][-1]["content"][:50] + "..."
+            )
+        logger.debug(f"Calling Fireworks API: {url}, Payload: {debug_payload_log}")
 
         # TODO: Implement robust retries (e.g., with tenacity) and rate limiting.
         # The following is a simplified version.

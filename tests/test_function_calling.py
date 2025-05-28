@@ -689,7 +689,7 @@ class TestExactToolMatchReward:
                 ],
             },
         ]
-        ground_truth = {
+        ground_truth: Dict[str, Any] = {
             "tool_calls": [
                 {
                     "type": "function",
@@ -1182,7 +1182,7 @@ class TestExactToolMatchReward:
         result = exact_tool_match_reward(messages=messages, ground_truth=ground_truth)
         assert result.score == 1.0
 
-        ground_truth_diff_string = {
+        ground_truth_diff_string: Dict[str, Any] = {
             "tool_calls": [
                 {
                     "type": "function",
@@ -1218,7 +1218,7 @@ class TestExactToolMatchReward:
                 ],
             ),
         ]
-        ground_truth = {
+        ground_truth: Dict[str, Any] = {
             "tool_calls": [
                 {
                     # ID in ground_truth doesn't need to match the one in assistant message,

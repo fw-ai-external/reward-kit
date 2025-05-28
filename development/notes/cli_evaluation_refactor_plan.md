@@ -2,82 +2,80 @@
 
 **Objective:** Move the core logic from `examples/math_example/main.py` (dataset loading, system prompt handling, model response generation with caching & API client features, and evaluation orchestration) into the `reward-kit` core library and expose it via an enhanced or new CLI command. The example `main.py` (and similar examples) should become minimal, primarily defining custom reward logic if necessary.
 
-**Phase 1: Core Library Enhancements (`reward_kit/`)**
+**[COMPLETED] Phase 1: Core Library Enhancements (`reward_kit/`)**
 
-1.  **New Orchestration Module (e.g., `reward_kit/execution/pipeline.py`):**
-    *   This module will house the main orchestration logic.
-    *   **Input:** A comprehensive configuration object (Pydantic model or OmegaConf DictConfig) covering:
-        *   Prompt Dataset configuration.
-        *   System prompt (optional string).
-        *   Generation parameters (`enabled`, `model_client_config`, `cache_config`).
-        *   Reward function reference (Python import path string).
-        *   Reward function parameters.
-        *   Output/logging parameters.
-    *   **Responsibilities:**
-        *   Load prompt dataset (using `reward_kit.datasets.loader`).
-        *   For each sample:
-            *   Construct initial messages (system prompt + user query).
-            *   If generation enabled: Check cache -> (Generate if needed via ModelClient) -> Store to cache.
-            *   Else: Retrieve pre-existing model response from dataset.
-            *   Dynamically load and call the specified reward function.
-            *   Collect results.
-        *   Return aggregated results and/or save detailed results.
+1.  **[COMPLETED] New Orchestration Module (`reward_kit/execution/pipeline.py`):**
+    *   Houses `EvaluationPipeline` for main orchestration logic.
+    *   Handles: Prompt Dataset loading, System prompt, Generation (via ModelClient), Caching, Dynamic Reward Function loading, Result collection.
+2.  **[COMPLETED] Model Client Abstraction (`reward_kit/generation/clients.py`):**
+    *   `ModelClient` ABC created.
+    *   `FireworksModelClient` implemented with `aiohttp`, basic retry, and auth error handling.
+3.  **[COMPLETED] Caching Logic (`reward_kit/generation/cache.py`):**
+    *   `ResponseCache` class implemented for file-based JSON storage, keyed by sample ID, prompt, model, temp.
+4.  **[COMPLETED] Configuration Models (`reward_kit/config_models.py`):**
+    *   Placeholder file created, then removed as Hydra structured configs are sufficient for now.
+5.  **[COMPLETED] Dynamic Reward Function Loading Utility (`reward_kit/utils/module_loader.py`):**
+    *   `load_function` helper created.
 
-2.  **Model Client Abstraction (e.g., `reward_kit/generation/clients.py`):**
-    *   Base class `ModelClient` (e.g., `async generate(messages) -> Optional[str]`).
-    *   Implement `FireworksModelClient(ModelClient)`:
-        *   Handles `aiohttp` calls, auth, robust error handling (custom exceptions for Auth, RateLimit, etc.), retries (`tenacity`), rate limiting (token bucket/semaphore).
-    *   Extensible for other model providers.
+**[COMPLETED] Phase 2: CLI Enhancements (`reward_kit/cli.py` and `reward_kit/cli_commands/`)**
 
-3.  **Caching Logic (e.g., `reward_kit/generation/cache.py`):**
-    *   `ResponseCache` class (`get(key)`, `put(key, value)`).
-    *   Key generation (sample ID, prompt, model, temp).
-    *   File-based JSON storage.
+1.  **[COMPLETED] New CLI Command (`reward-kit run`):**
+    *   Implemented as a Hydra application (`reward_kit/cli_commands/run_eval_cmd.py`).
+    *   Default configuration schema at `conf/cli/run_eval_config.yaml`.
+    *   Supports CLI overrides for pipeline parameters.
+2.  **[COMPLETED] Update `reward_kit/cli.py`:** Added the `run` subcommand and delegation to the Hydra app.
+3.  **[COMPLETED] Create `reward_kit/cli_commands/run_eval_cmd.py`:** Houses the Hydra entry point and logic for the `run` command.
 
-4.  **Configuration Models (e.g., `reward_kit/config_models.py`):**
-    *   Pydantic models for pipeline configurations (e.g., `GenerationConfig`, `PipelineConfig`) if not solely relying on Hydra schemas for library internals.
+**[COMPLETED] Phase 3: Refactor `examples/math_example/`**
 
-5.  **Dynamic Reward Function Loading Utility (e.g., `reward_kit/utils/module_loader.py`):**
-    *   Helper to load a function from its import path string.
+1.  **[COMPLETED] `examples/math_example/main.py` (Minimal):**
+    *   Simplified to define a wrapper reward function `evaluate` (as per user feedback for consistency with potential preview API expectations).
+2.  **[COMPLETED] New Hydra Config for CLI (`examples/math_example/conf/run_math_eval.yaml`):**
+    *   Created to configure the `reward-kit run` command for the math example.
+3.  **[COMPLETED] Update `examples/math_example/README.md`:**
+    *   Updated to focus on the new `reward-kit run` CLI workflow.
+4.  **[COMPLETED] Cleanup:** Removed old/redundant example configs and scripts (`local_eval.py`, `main_config.yaml`, old planning docs, `gsm8k_local_jsonl.yaml`). Updated `.gitignore`.
 
-**Phase 2: CLI Enhancements (`reward_kit/cli.py` and `reward_kit/cli_commands/`)**
+**Phase 4: Scale Testing & Client Robustness (Next Steps)**
 
-1.  **New CLI Command (e.g., `reward-kit run` or `reward-kit exec-eval`):**
-    *   Will be a Hydra application.
-    *   Primary config file (e.g., `conf/cli/run_eval_config_schema.yaml` for structure, users provide instances).
-    *   **CLI Overrides:** For dataset, model, reward function, system prompt, generation toggle, output file, etc.
-    *   The command's function will:
-        *   Initialize pipeline configuration from Hydra.
-        *   Instantiate and run the core evaluation pipeline.
-        *   Display/save results.
+1.  **Run on Full GSM8K Test Set:**
+    *   Execute: `.venv/bin/python -m reward_kit.cli run dataset=gsm8k_full_test_prompts evaluation_params.limit_samples=null` (or a large number like 1319).
+    *   Monitor performance, API call volume, and caching effectiveness.
+    *   Verify results for a larger set of diverse samples.
+2.  **Enhance `FireworksModelClient`:**
+    *   Implement more robust rate limiting (e.g., using an asynchronous token bucket algorithm).
+    *   Integrate a library like `tenacity` for configurable retry strategies with exponential backoff and jitter for API calls.
+    *   Refine concurrency management if the current `asyncio.Semaphore` approach shows limitations at scale.
+    *   Define and use specific custom exceptions for API errors (e.g., `ModelAuthError`, `RateLimitError`, `ModelGenerationError`) to be raised by the client and handled by the pipeline.
 
-2.  **Update `reward_kit/cli.py`:** Add the new command.
-3.  **Create `reward_kit/cli_commands/run_eval_cmd.py`** for the command logic.
+**Phase 5: Formal Testing (Next Steps)**
 
-**Phase 3: Refactor `examples/math_example/`**
+1.  **Unit Tests:**
+    *   `EvaluationPipeline`: Mock dependencies (dataset loader, model client, cache, reward function) to test orchestration logic, config handling, and control flow for different scenarios (e.g., generation enabled/disabled, cache hit/miss, errors from components).
+    *   `FireworksModelClient`: Mock `aiohttp.ClientSession.post` to test API request construction, response parsing, retry logic, and error handling (429, 401/403, 5xx).
+    *   `ResponseCache`: Test key generation, `put`/`get` operations, cache miss/hit, behavior with `temperature != 0.0`, and handling of corrupted cache files.
+    *   `module_loader.load_function`: Test successful loading and error cases (module not found, function not found, not callable).
+2.  **Integration Tests:**
+    *   For `reward-kit run` CLI command:
+        *   Use `hydra.experimental.compose` and `hydra.experimental.initialize` to set up test configurations programmatically.
+        *   Invoke `run_evaluation_command_logic` (or the `hydra_cli_entry_point`).
+        *   Alternatively, run `reward-kit run` as a subprocess and assert on output files or console logs.
+        *   Test with small, self-contained mock datasets and a simple mock reward function.
+        *   Verify end-to-end flow including (mocked) generation, caching, and evaluation.
 
-1.  **`examples/math_example/main.py` (Minimal):**
-    *   If using a standard library reward function (like `math_reward`), this file might be removed or just contain comments pointing to the CLI usage.
-    *   If demonstrating a *custom* reward function, it would only define that function:
-        ```python
-        from reward_kit import reward_function, EvaluateResult, Message
-        from reward_kit.rewards.math import math_reward
+**Phase 6: Replicate to Other Examples (Future)**
 
-        @reward_function
-        def custom_math_eval(messages: list[Message], ground_truth: str, **kwargs) -> EvaluateResult:
-            return math_reward(messages=messages, ground_truth=ground_truth, **kwargs)
-        ```
-2.  **New Hydra Config for CLI (`examples/math_example/conf/run_math_eval.yaml`):**
-    *   This config is for the new `reward-kit run` CLI command.
-    *   Specifies: `dataset` (prompt dataset), `reward_function_path`, `system_prompt`, `generation` block, `reward_params`, `output_file`.
-3.  **Update `examples/math_example/README.md`:**
-    *   Focus on the `reward-kit run` CLI command with `run_math_eval.yaml`.
-    *   Explain prompt dataset prep using `convert_dataset.py`.
-4.  **Cleanup:** Remove old `examples/math_example/conf/main_config.yaml`.
+1.  Identify other examples (e.g., from `verl` project, other internal use cases) that fit the generate-then-evaluate pattern.
+2.  For each identified example:
+    *   Create necessary prompt dataset converters (if source format differs).
+    *   Define Hydra dataset configurations for these prompt datasets in `conf/dataset/`.
+    *   Implement custom reward functions in the example's directory if needed.
+    *   Create an example-specific Hydra run configuration (like `run_math_eval.yaml`) for the `reward-kit run` command.
+    *   Update or create a README for the example, explaining how to use `reward-kit run`.
 
-**Phase 4: Documentation**
+**Phase 7: Broader Documentation (Future - was Phase 4)**
 
-1.  Document the new CLI command, its configuration, and usage.
-2.  Document the core evaluation pipeline.
-
-This refactoring centralizes complex logic into the framework, making examples cleaner and the CLI more powerful.
+1.  Update main project documentation (e.g., in `docs/`) for the new `reward-kit run` CLI command, its comprehensive configuration options, and typical usage patterns.
+2.  Document the `EvaluationPipeline` architecture and its components for developers wanting to extend or understand the framework.
+3.  Provide guidance on implementing and using custom `ModelClient` subclasses for different model providers.
+4.  Explain the prompt dataset format and how to prepare data for the pipeline.

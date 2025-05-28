@@ -44,6 +44,18 @@ E2B_EXAMPLES = [
     "e2b_fallback_example.py",
 ]
 
+# CLI-based examples that require Fireworks API
+CLI_FIREWORKS_EXAMPLES = {
+    "apps_coding_example_cli": [  # Command as a list of arguments
+        "reward-kit",
+        "run",
+        "--config-dir",
+        "examples/apps_coding_example/conf",
+        "--config-name",
+        "run_eval",
+    ]
+}
+
 
 def list_examples():
     """List all available example scripts."""
@@ -56,19 +68,28 @@ def list_examples():
     )
 
     logger.info("Available examples:")
-    for example in all_examples:
+    # Python script examples
+    for example_name in all_examples:
         example_type = []
-        if example in DEPLOY_EXAMPLES:
+        if example_name in DEPLOY_EXAMPLES:
             example_type.append("DEPLOY")
-        if example in E2B_EXAMPLES:
+        if example_name in E2B_EXAMPLES:
             example_type.append("E2B")
 
-        if example_type:
-            logger.info(f"  {example} [{', '.join(example_type)}]")
-        else:
-            logger.info(f"  {example}")
+        type_str = f" [{', '.join(example_type)}]" if example_type else ""
+        logger.info(f"  {example_name}{type_str}")
 
-    return all_examples
+    # CLI examples
+    if CLI_FIREWORKS_EXAMPLES:
+        logger.info("\nAvailable CLI-based examples:")
+        for example_name in sorted(CLI_FIREWORKS_EXAMPLES.keys()):
+            # All in CLI_FIREWORKS_EXAMPLES are considered DEPLOY for now
+            logger.info(f"  {example_name} [CLI, DEPLOY]")
+
+    # Combine all example names for return if needed, or adjust return type
+    # For now, the original return is fine as it's only used by the script if not listing.
+    # If the script were to use the returned list for running, this would need adjustment.
+    return all_examples  # Keeping original return for now
 
 
 def run_example(example_path, env=None):
@@ -126,6 +147,49 @@ def run_example(example_path, env=None):
         return False
 
 
+def run_cli_example(example_name, command_list, env=None, timeout_seconds=600):
+    """Run a specific CLI example command as a subprocess."""
+    logger.info(f"Running CLI example: {example_name} (CMD: {' '.join(command_list)})")
+
+    try:
+        run_env = os.environ.copy()
+        if env:
+            run_env.update(env)
+
+        result = subprocess.run(
+            command_list,  # command_list is already a list of arguments
+            env=run_env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+
+        if result.returncode == 0:
+            logger.info(f"✅ CLI: {example_name} completed successfully")
+            if result.stdout.strip():
+                logger.debug(
+                    f"Output: {result.stdout.strip()}"
+                )  # Debug for potentially long output
+            return True
+        else:
+            msg = f"❌ CLI: {example_name} failed with code {result.returncode}"
+            logger.error(msg)
+            if result.stdout.strip():
+                logger.error(f"Output: {result.stdout.strip()}")
+            if result.stderr.strip():
+                logger.error(f"Error: {result.stderr.strip()}")
+            return False
+    except subprocess.TimeoutExpired:
+        logger.error(
+            f"❌ CLI: {example_name} timed out after {timeout_seconds} seconds"
+        )
+        return False
+    except Exception as e:
+        logger.error(f"❌ CLI: {example_name} failed with exception: {str(e)}")
+        return False
+
+
 def run_all_examples(args):
     """Run all examples or a subset based on the command line arguments."""
     # Get list of all example scripts
@@ -175,12 +239,36 @@ def run_all_examples(args):
             env["FIREWORKS_API_KEY"] = os.environ["DEV_FIREWORKS_API_KEY"]
             env["FIREWORKS_API_BASE"] = "https://dev.api.fireworks.ai"
 
-    # Run each example
+    # Run each Python script example
     success_count = 0
     fail_count = 0
+    total_run_count = 0
 
+    logger.info("\n--- Running Python Script Examples ---")
     for example_path in examples_to_run:
+        total_run_count += 1
         if run_example(example_path, env):
+            success_count += 1
+        else:
+            fail_count += 1
+
+    # Prepare and run CLI examples
+    cli_examples_to_run = []
+    if CLI_FIREWORKS_EXAMPLES:
+        logger.info("\n--- Running CLI-Based Examples ---")
+        for example_name, command_list in CLI_FIREWORKS_EXAMPLES.items():
+            if args.only and args.only != example_name:
+                continue
+            if args.skip_deploy:  # All current CLI examples use Fireworks
+                logger.info(f"Skipping CLI deploy example: {example_name}")
+                continue
+            cli_examples_to_run.append({"name": example_name, "cmd": command_list})
+
+    for cli_example_spec in cli_examples_to_run:
+        total_run_count += 1
+        # Potentially longer timeout for CLI examples like APPS
+        # The default in run_cli_example is 600s, can be overridden if needed.
+        if run_cli_example(cli_example_spec["name"], cli_example_spec["cmd"], env):
             success_count += 1
         else:
             fail_count += 1
@@ -188,7 +276,7 @@ def run_all_examples(args):
     # Print summary
     logger.info(
         f"\nSummary: {success_count} succeeded, "
-        f"{fail_count} failed, {len(examples_to_run)} total"
+        f"{fail_count} failed, {total_run_count} total examples attempted."
     )
 
     # Return success if all examples succeeded

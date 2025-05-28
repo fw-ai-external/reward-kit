@@ -48,7 +48,7 @@ hydra:
 
 generation:
   enabled: true
-  model_name: "accounts/fireworks/models/llama-v3p1-8b-instruct" # Default, can be overridden
+  model_name: "accounts/fireworks/models/llama-v3p3-70b-instruct" # Try a different model
   temperature: 0.0
   max_tokens: 1024
   api_base: "https://api.fireworks.ai/inference/v1"

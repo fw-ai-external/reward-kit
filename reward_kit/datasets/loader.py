@@ -303,24 +303,25 @@ def load_and_process_dataset(
             f"Applying column mapping (post-preprocessing): {column_mapping_from_kwargs}"
         )
         if isinstance(loaded_dataset, Dataset):
-            # Filter out mappings where the new name is null/empty or old name doesn't exist
+            # Filter out mappings where the old name is null/empty or doesn't exist
+            # column_mapping_from_kwargs format: {new_name: old_name}
             valid_mapping = {
-                old: new
-                for old, new in column_mapping_from_kwargs.items()
-                if new and old in loaded_dataset.column_names
+                old_name: new_name
+                for new_name, old_name in column_mapping_from_kwargs.items()
+                if old_name and old_name in loaded_dataset.column_names
             }
             if valid_mapping:
                 # Ensure no attempt to rename to an existing column not part of this specific mapping op
                 # This is complex; rename_columns handles conflicts by appending '_'.
                 # For safety, let's check if a 'new' name is already a column and not the 'old' one.
                 final_mapping = {}
-                for old, new in valid_mapping.items():
-                    if new in loaded_dataset.column_names and new != old:
+                for old_name, new_name in valid_mapping.items():
+                    if new_name in loaded_dataset.column_names and new_name != old_name:
                         logger.warning(
-                            f"Attempting to map column '{old}' to '{new}', but '{new}' already exists and is not '{old}'. This may lead to unexpected behavior or errors. Skipping this specific rename."
+                            f"Attempting to map column '{old_name}' to '{new_name}', but '{new_name}' already exists and is not '{old_name}'. This may lead to unexpected behavior or errors. Skipping this specific rename."
                         )
                     else:
-                        final_mapping[old] = new
+                        final_mapping[old_name] = new_name
 
                 if final_mapping:
                     loaded_dataset = loaded_dataset.rename_columns(final_mapping)
@@ -337,19 +338,22 @@ def load_and_process_dataset(
             for s_name in loaded_dataset.keys():
                 current_split_dataset = loaded_dataset[s_name]
                 valid_mapping = {
-                    old: new
-                    for old, new in column_mapping_from_kwargs.items()
-                    if new and old in current_split_dataset.column_names
+                    old_name: new_name
+                    for new_name, old_name in column_mapping_from_kwargs.items()
+                    if old_name and old_name in current_split_dataset.column_names
                 }
                 if valid_mapping:
                     final_mapping = {}
-                    for old, new in valid_mapping.items():
-                        if new in current_split_dataset.column_names and new != old:
+                    for old_name, new_name in valid_mapping.items():
+                        if (
+                            new_name in current_split_dataset.column_names
+                            and new_name != old_name
+                        ):
                             logger.warning(
-                                f"For split '{s_name}', attempting to map column '{old}' to '{new}', but '{new}' already exists and is not '{old}'. Skipping this specific rename for the split."
+                                f"For split '{s_name}', attempting to map column '{old_name}' to '{new_name}', but '{new_name}' already exists and is not '{old_name}'. Skipping this specific rename for the split."
                             )
                         else:
-                            final_mapping[old] = new
+                            final_mapping[old_name] = new_name
 
                     if final_mapping:
                         loaded_dataset[s_name] = current_split_dataset.rename_columns(
@@ -410,16 +414,16 @@ def convert_to_evaluation_format(
     """
 
     def transform_example(example):
-        # Build user query
+        # Keep user query separate from system prompt
         user_query = example.get(query_column, "")
-        if system_prompt:
-            user_query = f"{system_prompt}\n\n{user_query}"
 
         # Extract ground truth
         ground_truth = example.get(ground_truth_column, "")
 
-        # Create evaluation format
+        # Create evaluation format with separate system prompt
         result = {"user_query": user_query, "ground_truth_for_eval": ground_truth}
+        if system_prompt:
+            result["system_prompt"] = system_prompt
 
         # Preserve id if it exists
         if "id" in example:

@@ -94,10 +94,11 @@ class EvaluationPipeline:
             return None
 
         messages_for_generation: List[Dict[str, str]] = []
-        if self.cfg.get("system_prompt"):
-            messages_for_generation.append(
-                {"role": "system", "content": self.cfg.system_prompt}
-            )
+
+        # Check for system prompt in sample data first, then fall back to config
+        system_prompt = sample.get("system_prompt") or self.cfg.get("system_prompt")
+        if system_prompt:
+            messages_for_generation.append({"role": "system", "content": system_prompt})
         messages_for_generation.append({"role": "user", "content": user_query})
 
         assistant_response_content: Optional[str] = None

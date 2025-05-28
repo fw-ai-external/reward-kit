@@ -25,42 +25,45 @@ logger = logging.getLogger(__name__)  # Added
 
 
 # --- Helper Functions ---
-def load_jsonl_dataset(file_path: str):
-    """Loads data from a JSONL file, expecting 'messages' field, and processes it for TRL."""
-    raw_data = load_jsonl(file_path)
-    if not raw_data:
-        # Consider using logger.warning or raising an error if file not found or empty
-        print(f"Warning: No data loaded from {file_path}. Returning empty list.")
+def load_math_dataset_for_trl():
+    """Loads math dataset using the new simplified dataset approach."""
+    try:
+        from reward_kit.datasets.loader import load_derived_dataset
+
+        # Load the GSM8K math dataset with system prompts
+        dataset = load_derived_dataset("gsm8k_math_prompts", num_samples=10)
+
+        processed_trl_data = []
+        for item in dataset:
+            user_query = item.get("user_query", "")
+            ground_truth = item.get("ground_truth_for_eval", "")
+            system_prompt = item.get("system_prompt", "")
+
+            if user_query:
+                # Create messages format expected by TRL
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": user_query})
+                if ground_truth:
+                    messages.append({"role": "assistant", "content": ground_truth})
+
+                processed_trl_data.append(
+                    {
+                        "prompt": user_query,
+                        "response": ground_truth if ground_truth else "",
+                        "messages": messages,
+                    }
+                )
+            else:
+                logger.warning(f"Skipping item due to missing user_query: {item}")
+
+        logger.info(f"Loaded {len(processed_trl_data)} samples from GSM8K math dataset")
+        return processed_trl_data
+
+    except Exception as e:
+        logger.error(f"Failed to load dataset: {e}")
         return []
-
-    processed_trl_data = []
-    for item in raw_data:
-        messages = item.get("messages")
-        if not messages:
-            logger.warning(f"Skipping item due to missing 'messages': {item}")
-            continue
-
-        user_msg_content = next(
-            (m.get("content") for m in messages if m.get("role") == "user"), None
-        )
-        assistant_msg_content = next(
-            (m.get("content") for m in messages if m.get("role") == "assistant"), None
-        )
-
-        if user_msg_content:
-            processed_trl_data.append(
-                {
-                    "prompt": user_msg_content,
-                    "response": (
-                        assistant_msg_content if assistant_msg_content else ""
-                    ),  # Ground truth for reward
-                    "messages": messages,  # Keep original messages for the reward function context
-                }
-            )
-        else:
-            logger.warning(f"Skipping item due to missing user message: {item}")
-
-    return processed_trl_data
 
 
 # --- Reward Function for TRL ---
@@ -133,7 +136,6 @@ def main(cfg: DictConfig) -> None:
 
     # --- Configuration from Hydra ---
     MODEL_NAME = cfg.model_name
-    DATASET_PATH = hydra.utils.to_absolute_path(cfg.dataset_file_path)
 
     max_steps_config = 1 if cfg.test_mode_trl else cfg.grpo.max_steps
 
@@ -151,7 +153,7 @@ def main(cfg: DictConfig) -> None:
         max_completion_length=cfg.grpo.max_completion_length,
         top_k=cfg.grpo.top_k,
         top_p=cfg.grpo.top_p,
-        do_sample=cfg.grpo.do_sample,
+        # Note: do_sample is a generation parameter, not a GRPOConfig parameter
         # Other TRL/TrainingArguments can be added here from cfg if needed
     )
     logger.info(f"GRPOConfig prepared: {grpo_config}")
@@ -211,11 +213,11 @@ def main(cfg: DictConfig) -> None:
         f"Trainable PEFT params: {trainable_params}. All params: {all_param}. Percentage: {100 * trainable_params / all_param:.2f}%"
     )
 
-    # Load the dataset
-    logger.info(f"Loading dataset from: {DATASET_PATH}")
-    raw_dataset_data = load_jsonl_dataset(DATASET_PATH)  # DATASET_PATH is from cfg
+    # Load the dataset using new simplified approach
+    logger.info("Loading math dataset using simplified dataset architecture")
+    raw_dataset_data = load_math_dataset_for_trl()
     if not raw_dataset_data:
-        logger.error(f"No data loaded from {DATASET_PATH}. Exiting.")
+        logger.error("No data loaded from math dataset. Exiting.")
         return
 
     dataset = Dataset.from_list(raw_dataset_data)
@@ -253,7 +255,7 @@ def main(cfg: DictConfig) -> None:
 
     logger.info("Starting GRPO training loop...")
     grpo_trainer.train()
-    logger.info("GRPO training loop completed.")
+    logger.info("GRPO training loop completed for Math Example.")
 
     # Model is automatically saved by GRPOTrainer to its args.output_dir (Hydra's output dir)
     # Optionally, save tokenizer explicitly if not handled by trainer or if specific path needed.

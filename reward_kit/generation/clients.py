@@ -54,17 +54,19 @@ class FireworksModelClient(ModelClient):
         self, messages: List[Dict[str, str]], session: aiohttp.ClientSession
     ) -> Optional[str]:
         url = f"{self.api_base}/chat/completions"
+        # TEMPORARY FIX: Use minimal parameters to avoid API issues
         payload = {
             "model": self.model_name,
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
-            "top_p": self.top_p,
-            "top_k": self.top_k,
-            "min_p": self.min_p,
         }
-        if self.reasoning_effort is not None:
-            payload["reasoning_effort"] = self.reasoning_effort
+        # Only add optional parameters if they have non-default values
+        # if self.top_p != 0.95:
+        #     payload["top_p"] = self.top_p
+        # # Skip top_k and min_p as they might be causing issues with this model
+        # if self.reasoning_effort is not None:
+        #     payload["reasoning_effort"] = self.reasoning_effort
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -72,7 +74,10 @@ class FireworksModelClient(ModelClient):
             "Accept": "application/json",
         }
 
-        debug_payload_log = payload.copy()
+        # Create debug payload with properly truncated content to avoid modifying original
+        import json
+
+        debug_payload_log = json.loads(json.dumps(payload))  # Deep copy
         if "messages" in debug_payload_log and debug_payload_log["messages"]:
             debug_payload_log["messages"][-1]["content"] = (
                 debug_payload_log["messages"][-1]["content"][:50] + "..."

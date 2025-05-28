@@ -15,6 +15,12 @@ system_prompt: "Solve the following math problem. Show your work clearly. Put th
 # Convert to evaluation format with user_query and ground_truth_for_eval
 output_format: "evaluation_format"
 
+# Column mapping to rename GSM8K columns to expected format
+# GSM8K has 'question' and 'answer', but we need 'query' and 'ground_truth'
+derived_column_mapping:
+  query: "question"
+  ground_truth: "answer"
+
 # For testing, limit to a small number of samples
 derived_max_samples: 5
 

@@ -317,9 +317,13 @@ class EvaluationPipeline:
                     f"Loaded dataset is not a Hugging Face Dataset. Type: {type(prompt_dataset)}"
                 )
                 return []
-            logger.info(
-                f"Loaded {len(prompt_dataset)} samples from {prompt_dataset_config.path_or_name}."
+            # Log dataset info with fallback for derived datasets
+            dataset_source = getattr(
+                prompt_dataset_config,
+                "path_or_name",
+                getattr(prompt_dataset_config, "base_dataset", "dataset"),
             )
+            logger.info(f"Loaded {len(prompt_dataset)} samples from {dataset_source}.")
         except Exception as e:
             logger.error(f"Failed to load prompt dataset: {e}", exc_info=True)
             return []

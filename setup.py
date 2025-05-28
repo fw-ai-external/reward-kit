@@ -15,6 +15,9 @@ setup(
         "aiosqlite",
         "aiohttp",
         "PyYAML>=5.0",  # Added PyYAML
+        "datasets>=2.12.0",  # For dataset loading functionality
+        "hydra-core>=1.3.2",  # For configuration management
+        "omegaconf>=2.3.0",  # For configuration objects
     ],
     extras_require={
         "dev": [
@@ -34,13 +37,10 @@ setup(
             "torch>=1.9",
             "trl>=0.7.0",
             "peft>=0.7.0",
-            "datasets",
-            "hydra-core>=1.3.2",
-            "omegaconf>=2.3.0",
+            # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
         ],
         "deepseek": [
-            "datasets>=2.12.0",
             "difflib>=3.0.0",
         ],
     },

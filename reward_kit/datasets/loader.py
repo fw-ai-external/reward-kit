@@ -9,6 +9,9 @@ from typing import Any, Dict, List, Optional, Union
 
 import datasets
 from datasets import Dataset, DatasetDict
+from hydra import compose, initialize_config_dir
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)  # Added logger initialization
 
@@ -362,3 +365,195 @@ def load_and_process_dataset(
                     )
 
     return loaded_dataset
+
+
+def apply_column_mapping(dataset: Dataset, column_mapping: Dict[str, str]) -> Dataset:
+    """
+    Apply column mapping to rename dataset columns.
+
+    Args:
+        dataset: The dataset to rename columns in
+        column_mapping: Dict mapping new names to existing column names
+
+    Returns:
+        Dataset with renamed columns
+    """
+    # Filter out null mappings and reverse the mapping (old_name -> new_name)
+    rename_mapping = {}
+    for new_name, old_name in column_mapping.items():
+        if old_name is not None and old_name in dataset.column_names:
+            rename_mapping[old_name] = new_name
+
+    if rename_mapping:
+        dataset = dataset.rename_columns(rename_mapping)
+
+    return dataset
+
+
+def convert_to_evaluation_format(
+    dataset: Dataset,
+    system_prompt: Optional[str] = None,
+    query_column: str = "query",
+    ground_truth_column: str = "ground_truth",
+) -> Dataset:
+    """
+    Convert dataset to evaluation format with user_query and ground_truth_for_eval.
+
+    Args:
+        dataset: Input dataset
+        system_prompt: Optional system prompt to prepend to queries
+        query_column: Name of the query/question column
+        ground_truth_column: Name of the ground truth/answer column
+
+    Returns:
+        Dataset in evaluation format
+    """
+
+    def transform_example(example):
+        # Build user query
+        user_query = example.get(query_column, "")
+        if system_prompt:
+            user_query = f"{system_prompt}\n\n{user_query}"
+
+        # Extract ground truth
+        ground_truth = example.get(ground_truth_column, "")
+
+        # Create evaluation format
+        result = {"user_query": user_query, "ground_truth_for_eval": ground_truth}
+
+        # Preserve id if it exists
+        if "id" in example:
+            result["id"] = example["id"]
+        elif query_column in example:
+            # Generate a simple id from the query if no id exists
+            result["id"] = str(hash(example[query_column]))[1:8]  # Simple hash-based id
+
+        return result
+
+    return dataset.map(transform_example)
+
+
+def load_derived_dataset(
+    base_dataset: Union[str, DictConfig],
+    system_prompt: Optional[str] = None,
+    output_format: str = "evaluation_format",
+    transformations: Optional[List[str]] = None,
+    derived_column_mapping: Optional[Dict[str, str]] = None,
+    derived_max_samples: Optional[int] = None,
+    **kwargs: Any,
+) -> Dataset:
+    """
+    Load a derived dataset that references a base dataset and applies transformations.
+
+    Args:
+        base_dataset: Either a string name of a dataset config or a DictConfig
+        system_prompt: Optional system prompt to add to queries
+        output_format: Format to convert the dataset to
+        transformations: List of additional transformations to apply
+        derived_column_mapping: Column mapping for the derived dataset
+        derived_max_samples: Maximum samples for the derived dataset
+        kwargs: Additional arguments
+
+    Returns:
+        Transformed dataset
+    """
+    # Load base dataset
+    if isinstance(base_dataset, str):
+        # Load base dataset configuration by name
+        # Try to find the config in the current Hydra config search path first
+        try:
+            from hydra.core.global_hydra import GlobalHydra
+
+            # Check if Hydra is already initialized
+            if GlobalHydra.instance().is_initialized():
+                # Try to use existing Hydra context first
+                try:
+                    base_cfg = compose(config_name=f"dataset/{base_dataset}")
+                except Exception:
+                    # If that fails, try using the project root config directory
+                    config_dir = os.path.abspath(
+                        os.path.join(os.path.dirname(__file__), "../../conf")
+                    )
+                    if os.path.exists(config_dir):
+                        with initialize_config_dir(
+                            config_dir=config_dir, version_base="1.3"
+                        ):
+                            base_cfg = compose(config_name=f"dataset/{base_dataset}")
+                    else:
+                        raise FileNotFoundError(
+                            f"Config directory not found: {config_dir}"
+                        )
+            else:
+                # Try to initialize with the project root config path
+                config_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../../conf")
+                )
+                if os.path.exists(config_dir):
+                    with initialize_config_dir(
+                        config_dir=config_dir, version_base="1.3"
+                    ):
+                        base_cfg = compose(config_name=f"dataset/{base_dataset}")
+                else:
+                    raise FileNotFoundError(f"Config directory not found: {config_dir}")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load base dataset config '{base_dataset}': {e}"
+            )
+
+        # The compose() returns a config with nested 'dataset' key if it's a full config
+        if "dataset" in base_cfg:
+            base_dataset_cfg = base_cfg.dataset
+        else:
+            base_dataset_cfg = base_cfg
+
+        # Instantiate the base dataset
+        base_loaded_dataset = instantiate(base_dataset_cfg)
+    elif isinstance(base_dataset, DictConfig):
+        # Base dataset is already a config object
+        base_loaded_dataset = instantiate(base_dataset)
+    else:
+        raise ValueError(
+            f"base_dataset must be a string or DictConfig, got {type(base_dataset)}"
+        )
+
+    # Ensure we have a Dataset (not DatasetDict)
+    if isinstance(base_loaded_dataset, DatasetDict):
+        # Use the first available split or 'train' if available
+        if "train" in base_loaded_dataset:
+            dataset = base_loaded_dataset["train"]
+        else:
+            dataset = list(base_loaded_dataset.values())[0]
+    else:
+        dataset = base_loaded_dataset
+
+    # Apply derived column mapping if provided
+    if derived_column_mapping:
+        dataset = apply_column_mapping(dataset, derived_column_mapping)
+
+    # Apply max samples if specified
+    if derived_max_samples is not None and derived_max_samples > 0:
+        if len(dataset) > derived_max_samples:
+            dataset = dataset.select(range(derived_max_samples))
+
+    # Apply format conversion
+    if output_format == "evaluation_format":
+        dataset = convert_to_evaluation_format(
+            dataset,
+            system_prompt=system_prompt,
+            query_column="query",
+            ground_truth_column="ground_truth",
+        )
+    elif output_format == "conversation_format":
+        # TODO: Implement conversation format conversion if needed
+        raise NotImplementedError("conversation_format not yet implemented")
+    elif output_format == "jsonl":
+        # Keep as-is, already in a compatible format
+        pass
+    else:
+        raise ValueError(f"Unsupported output_format: {output_format}")
+
+    # TODO: Apply additional transformations if specified
+    if transformations:
+        raise NotImplementedError("Custom transformations not yet implemented")
+
+    return dataset

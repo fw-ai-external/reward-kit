@@ -1,43 +1,39 @@
 import math
 import re
-from typing import List, Optional
 
 import numpy as np
 import pydantic
 
-from reward_kit.models import Message  # Added import
-from reward_kit.typed_interface import reward_function  # Added import
+from reward_kit.models import Message
+from reward_kit.typed_interface import reward_function
 
 
 @reward_function
-def evaluate(
-    messages: List[Message], ground_truth: str, **kwargs
-) -> dict:  # Changed signature
+def evaluate(messages: list[Message], ground_truth: str, **kwargs) -> dict:
     """
     Evaluates a single entry from the dataset. This function is required in the `main.py` file.
     This template is when you skip rollup in a multi-metrics evaluation.
 
     Args:
-        messages: A list of Message objects.
-        ground_truth: The ground truth string.
-        kwargs: Additional keyword arguments.
+        messages: A list of dictionaries representing a single line from the dataset jsonl file.
+        kwargs: Additional keyword arguments. Highly recommended to not remove this due to potential more keywords being passed to the function.
     Returns:
         dict: Evaluate result that should include is_score_valid, score, and reason
     """
 
-    # ground_truth is now directly from the function signature
-    # Removed: ground_truth = kwargs.get('ground_truth')
-    completion = messages[-1].content  # Access content from Message object
+    # ground_truth is now directly passed as a parameter due to @reward_function decorator.
+    # Assuming messages[-1] is an object with a 'content' attribute
+    completion = messages[-1].content
 
     # Evaluate accuracy and format compliance
     (accuracy_reward, extracted_completion_answer, extracted_ground_truth_answer) = (
         accuracy_reward_fn(completion, ground_truth, True)
-    )  # Pass ground_truth from signature
+    )
 
     format_reward = format_reward_fn(completion)
 
     return {
-        "score": accuracy_reward,  # This will now reflect numerical accuracy primarily
+        "score": (accuracy_reward + format_reward) * 0.5,
         "is_score_valid": True,
         "reason": "This is the eval result for the score used",
         "extracted_completion_answer": extracted_completion_answer,
@@ -57,13 +53,11 @@ def evaluate(
     }
 
 
-def extract_last_number(text: Optional[str]) -> float:  # Made text Optional
+def extract_last_number(text: str) -> float:
     """
     Extract the last number from the text.
     Returns the float value, or float('nan') if not found or not convertible.
     """
-    if text is None:
-        return float("nan")
     num_match = re.findall(r"([-+]?\$?\d[\d,]*\.?\d*)", text)
     if num_match:
         answer = num_match[-1]
@@ -75,13 +69,11 @@ def extract_last_number(text: Optional[str]) -> float:  # Made text Optional
     return float("nan")
 
 
-def fraction_to_float(text: Optional[str]) -> float:  # Made text Optional
-    """
+def fraction_to_float(text: str) -> float:
+    r"""
     Detects and converts LaTeX fraction strings to float.
-    Supports frac{}{} formats.
+    Supports \dfrac{}{} and \frac{}{} formats.
     """
-    if text is None:
-        return float("nan")
     pattern = r"\\(?:d?frac)\{([\d.]+)\}\{([\d.]+)\}"
     match = re.search(pattern, text)
     if match:
@@ -90,18 +82,24 @@ def fraction_to_float(text: Optional[str]) -> float:  # Made text Optional
         try:
             return numerator / denominator
         except ZeroDivisionError:
-            return float("nan")
-    return float("nan")
+            return float("nan")  # Handle division by zero
+    return float("nan")  # Return NaN if no match is found
 
 
-def extract_boxed_value(text: Optional[str]) -> float:  # Made text Optional
-    """
+def extract_boxed_value(text: str) -> float:
+    r"""
     Extract the value from the last \\boxed{} pattern in the text.
     Returns the float value, or float('nan') if not found or not convertible.
     First tries to convert directly to float, then tries fraction_to_float if that fails.
+
+    Args:
+        text (str): The input text containing \\boxed{} patterns.
+
+    Returns:
+        float: The extracted value from the last \\boxed{} pattern as a float,
+               or float('nan') if no valid pattern is found or conversion fails.
     """
-    if text is None:
-        return float("nan")
+
     boxed_match = list(re.finditer(r"\\boxed\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", text))
     if boxed_match:
         answer = boxed_match[-1].group(1)
@@ -109,81 +107,87 @@ def extract_boxed_value(text: Optional[str]) -> float:  # Made text Optional
         try:
             return float(answer.strip())
         except ValueError:
+            # Try to extract as a fraction if direct float conversion fails
             return fraction_to_float(answer.strip())
+
     return float("nan")
 
 
-def extract_math_answer(completion: Optional[str]) -> float:
+def extract_math_answer(completion: str) -> float:
     """
     Extract the answer from the text.
     Returns the float value, or float('nan') if not found or not convertible.
     """
-    if completion is None:
-        return float("nan")
 
+    # Check if the format is correct
     pattern = r".*<answer>([\s\S]*?)</answer>"
     match = re.search(pattern, completion, re.DOTALL)
     if match:
-        completion_content = match.group(1).strip()
-    else:
-        completion_content = completion  # Use original if <answer> not found
+        completion = match.group(1).strip()
 
-    answer = extract_boxed_value(completion_content)
+    answer = extract_boxed_value(completion)
     if not math.isnan(answer):
         return answer
 
-    answer = fraction_to_float(completion_content)
+    answer = fraction_to_float(completion)
     if not math.isnan(answer):
         return answer
 
-    answer = extract_last_number(completion_content)
+    answer = extract_last_number(completion)
     if not math.isnan(answer):
         return answer
     return float("nan")
 
 
-def format_reward_fn(completion: Optional[str]) -> float:
+def format_reward_fn(completion: str) -> float:
     """Reward function that checks if the completion has a specific format."""
-    if completion is None:
-        return 0.0
-    pattern = r"^<think>[\s\S]*?</think>\s*<answer>[\s\S]*?</answer>$"
+    # Match the entire string. Allows any characters between </think> and <answer>.
+    pattern = r"^<think>[\s\S]*?</think>[\s\S]*?<answer>[\s\S]*?</answer>$"
     match = re.match(pattern, completion)
     return 1.0 if match else 0.0
 
 
 def accuracy_reward_fn(
-    completion: Optional[str],
-    ground_truth: Optional[str],
-    force_format_reward: bool = True,
+    completion: str, ground_truth: str, force_format_reward: bool = True
 ) -> tuple[float, float, float]:
     """
     Reward function that checks if the completion's answer matches the ground truth.
+
+    Args:
+        completion: The model completion text
+        ground_truth: The ground truth text
+        force_format_reward: If True, checks for correct format before computing the accuracy reward
+
+    Returns:
+        Tuple containing:
+        - Reward value (1.0 if correct, 0.0 if incorrect)
+        - Extracted completion answer
+        - Extracted ground truth answer
     """
+
     extracted_completion_answer = extract_math_answer(completion)
     extracted_ground_truth_answer = extract_math_answer(ground_truth)
 
-    if math.isnan(extracted_completion_answer) or math.isnan(
-        extracted_ground_truth_answer
-    ):
-        return 0.0, extracted_completion_answer, extracted_ground_truth_answer
-
-    # Decouple numerical accuracy from strict <think> tag format for the main score
-    # The format_reward is still calculated in evaluate() and reported as a separate metric.
-    is_correct = abs(extracted_completion_answer - extracted_ground_truth_answer) < 1e-6
-
-    # If force_format_reward is true, and format is bad, the score from evaluate() might still be low
-    # if it considers format_reward metric. But accuracy_reward itself will be numerical.
-    # For the specific request of fixing GSM8K answer extraction to get non-zero score,
-    # we ensure this function returns numerical correctness.
-    # The user's pasted code had reinstated the format check to gate this.
-    # Reverting to the logic that prioritizes numerical score:
     if force_format_reward:
-        format_score = format_reward_fn(completion)
-        if format_score == 0.0:
-            # Still return numerical correctness, but format metric will be 0
-            # To make the main score 0 if format is bad (as per user's pasted code),
-            # this would be: return 0.0, ...
-            # For now, let's reflect numerical accuracy primarily.
-            pass  # Let is_correct stand
-
-    return float(is_correct), extracted_completion_answer, extracted_ground_truth_answer
+        # If the format is incorrect, return 0.0 accuracy reward
+        format_reward = format_reward_fn(completion)
+        if format_reward == 0.0:
+            return 0.0, extracted_completion_answer, extracted_ground_truth_answer
+        else:
+            is_correct = (
+                abs(extracted_completion_answer - extracted_ground_truth_answer) < 1e-6
+            )
+            return (
+                float(is_correct),
+                extracted_completion_answer,
+                extracted_ground_truth_answer,
+            )
+    else:
+        is_correct = (
+            abs(extracted_completion_answer - extracted_ground_truth_answer) < 1e-6
+        )
+        return (
+            float(is_correct),
+            extracted_completion_answer,
+            extracted_ground_truth_answer,
+        )

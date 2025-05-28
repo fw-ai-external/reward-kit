@@ -74,8 +74,8 @@ For a streamlined local development experience, especially when managing multipl
     Example content for `.env.dev`:
     ```
     FIREWORKS_API_KEY="your_dev_fireworks_api_key"
-    FIREWORKS_ACCOUNT_ID="pyroworks-dev"
-    FIREWORKS_API_BASE="https://dev.api.fireworks.ai"
+    FIREWORKS_ACCOUNT_ID="abc"
+    FIREWORKS_API_BASE="https://api.fireworks.ai"
     E2B_API_KEY="your_e2b_api_key"
     ```
 

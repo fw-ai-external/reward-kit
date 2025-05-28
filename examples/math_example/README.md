@@ -1,66 +1,233 @@
 # Math Example
 
-This directory contains examples demonstrating:
-1.  Dataset conversion for math problems.
-2.  Local evaluation of models on math problems.
-3.  TRL GRPO training for math problem-solving.
+This example demonstrates how to evaluate and train models on math word problems using the GSM8K dataset. It showcases the simplified dataset architecture with on-the-fly conversion from HuggingFace datasets.
 
-## Scripts
+## Overview
 
-### 1. `convert_dataset.py`
-*   **Purpose**: Converts a raw dataset (e.g., GSM8K) into the JSONL format expected by other scripts and the reward kit.
-*   **Configuration**: Uses `conf/config.yaml`. This script also uses Hydra.
-*   **How to Run**:
-    ```bash
-    # Ensure your virtual environment is active
-    source .venv/bin/activate
-    # Navigate to the repository root
-    # cd /path/to/reward-kit
+The math example provides three different approaches to working with math problems:
 
-    # Run with default config (assumes gsm8k dataset is downloaded and paths in config.yaml are correct)
-    .venv/bin/python examples/math_example/convert_dataset.py
+1. **CLI-based Evaluation** - Use the reward-kit CLI for streamlined evaluation
+2. **Local Evaluation** - Programmatic evaluation with full control
+3. **TRL GRPO Training** - Fine-tune models using reinforcement learning
 
-    # Override parameters (example)
-    .venv/bin/python examples/math_example/convert_dataset.py dataset_config_name=gsm8k dataset_usage.split=test dataset_usage.output_file_path=./outputs/my_converted_math_test_data.jsonl
-    ```
-    Refer to `conf/config.yaml` and `conf/dataset/gsm8k.yaml` (and other dataset configs) for all options.
+## Key Features
 
-### 2. `local_eval.py`
-*   **Purpose**: Performs local evaluation of a model's responses against a dataset.
-*   **Configuration**: Uses Hydra and `conf/local_eval_config.yaml`.
-*   **How to Run**:
-    ```bash
-    # Ensure your virtual environment is active
-    source .venv/bin/activate
-    # Navigate to the repository root
-    # cd /path/to/reward-kit
+- **Simplified Dataset Handling**: Direct integration with HuggingFace GSM8K dataset
+- **Automatic Format Conversion**: No need for manual dataset preprocessing
+- **System Prompt Integration**: Math-specific prompts built into dataset configuration
+- **Flexible Evaluation**: Support for different model providers and custom reward functions
 
-    # Run with default config (expects dataset.jsonl in the current directory, or as specified in config)
-    .venv/bin/python examples/math_example/local_eval.py
+## Quick Start
 
-    # Override dataset path and other parameters
-    .venv/bin/python examples/math_example/local_eval.py dataset_file_path=path/to/your/dataset.jsonl
-    ```
-    Refer to `conf/local_eval_config.yaml` for configuration options. Outputs are saved to Hydra's default output directory (e.g., `outputs/YYYY-MM-DD/HH-MM-SS/` relative to the execution directory).
+### Prerequisites
 
-### 3. `trl_grpo_integration.py`
-*   **Purpose**: Demonstrates fine-tuning a model for math problem-solving using TRL (Transformer Reinforcement Learning) with GRPO (Generative Rejection Policy Optimization).
-*   **Configuration**: Uses Hydra and `conf/trl_grpo_config.yaml`.
-*   **How to Run**:
-    ```bash
-    # Ensure your virtual environment is active
-    source .venv/bin/activate
-    # Navigate to the repository root
-    # cd /path/to/reward-kit
+```bash
+# Ensure your virtual environment is active and dependencies are installed
+source .venv/bin/activate
+.venv/bin/pip install -e ".[dev]"
 
-    # Run with default config (expects dataset.jsonl, uses default model)
-    .venv/bin/python examples/math_example/trl_grpo_integration.py
+# Set up your Fireworks API credentials (if using Fireworks models)
+export FIREWORKS_API_KEY="your_api_key"
+export FIREWORKS_ACCOUNT_ID="your_account_id"
+```
 
-    # Override dataset path, model, and training parameters
-    .venv/bin/python examples/math_example/trl_grpo_integration.py dataset_file_path=my_math_train.jsonl model_name=Qwen/Qwen2-1.5B-Instruct grpo.learning_rate=1e-5 grpo.num_train_epochs=3
-    ```
-    Refer to `conf/trl_grpo_config.yaml` for all configuration options. Outputs (logs, checkpoints) are saved to Hydra's default output directory.
+### 1. CLI-based Evaluation (Recommended)
 
-## Dataset
+The simplest way to run math evaluation using the reward-kit CLI:
 
-A sample `dataset.jsonl` is provided, which is typically the output of `convert_dataset.py`. Ensure your dataset for `local_eval.py` and `trl_grpo_integration.py` follows this JSONL format, where each line is a JSON object containing at least "messages" and "ground_truth" (or fields specified in the respective configs).
+```bash
+# Navigate to the repository root
+cd /path/to/reward-kit
+
+# Run evaluation with the math configuration
+python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path examples/math_example/conf
+
+# Override parameters as needed
+python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path examples/math_example/conf \
+  generation.model_name="accounts/fireworks/models/llama-v3p1-405b-instruct" \
+  evaluation_params.limit_samples=10
+```
+
+**What this does:**
+- Loads GSM8K dataset directly from HuggingFace
+- Applies math-specific system prompt automatically
+- Generates model responses using Fireworks API
+- Evaluates responses using the math reward function
+- Saves results to timestamped output directory
+
+### 2. Local Evaluation
+
+For more programmatic control over the evaluation process:
+
+```bash
+# Run local evaluation with Hydra configuration
+.venv/bin/python examples/math_example/local_eval.py
+
+# Override dataset size and model
+.venv/bin/python examples/math_example/local_eval.py \
+  dataset_file_path=path/to/custom/dataset.jsonl \
+  model_name="accounts/fireworks/models/llama-v3p1-8b-instruct"
+```
+
+Configuration is managed through `conf/local_eval_config.yaml`.
+
+### 3. TRL GRPO Training
+
+Fine-tune models using reinforcement learning with the math reward function:
+
+```bash
+# Run GRPO training with default settings
+.venv/bin/python examples/math_example/trl_grpo_integration.py
+
+# Customize training parameters
+.venv/bin/python examples/math_example/trl_grpo_integration.py \
+  model_name="Qwen/Qwen2-1.5B-Instruct" \
+  grpo.learning_rate=1e-5 \
+  grpo.num_train_epochs=3
+```
+
+Configuration is managed through `conf/trl_grpo_config.yaml`.
+
+## Dataset Configuration
+
+The example uses a **derived dataset** approach that simplifies dataset handling:
+
+### Base Dataset (`conf/dataset/gsm8k.yaml`)
+- Defines connection to HuggingFace GSM8K dataset
+- Handles column mapping from GSM8K format to standard format
+- Supports different splits (train/test)
+
+### Derived Dataset (`conf/dataset/gsm8k_math_prompts.yaml`)
+- References the base GSM8K dataset
+- Adds math-specific system prompt
+- Converts to evaluation format with `user_query` and `ground_truth_for_eval`
+- Limits samples for quick testing
+
+**Example system prompt:**
+```
+Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags.
+```
+
+## File Structure
+
+```
+math_example/
+├── README.md                     # This file
+├── main.py                       # Core evaluation logic and reward function
+├── local_eval.py                 # Standalone local evaluation script
+├── trl_grpo_integration.py       # TRL training integration
+├── fireworks_preview.py          # Fireworks-specific preview functionality
+├── fireworks_regenerate.py       # Fireworks response regeneration
+└── conf/                         # Configuration files
+    ├── run_math_eval.yaml        # CLI evaluation configuration
+    ├── local_eval_config.yaml    # Local evaluation configuration
+    ├── trl_grpo_config.yaml      # TRL training configuration
+    └── dataset/                  # Dataset configurations
+        ├── base_dataset.yaml     # Base dataset schema
+        ├── base_derived_dataset.yaml # Derived dataset schema
+        ├── gsm8k.yaml            # GSM8K base dataset config
+        └── gsm8k_math_prompts.yaml # GSM8K with math prompts
+```
+
+## Key Components
+
+### Evaluation Logic (`main.py`)
+- Contains the `evaluate()` function used as the reward function
+- Extracts numerical answers from model responses
+- Compares against ground truth with configurable tolerance
+- Handles various answer formats and edge cases
+
+### Dataset Pipeline
+- **Direct HuggingFace Integration**: No need for manual dataset conversion
+- **Automatic Format Conversion**: Transforms data to evaluation format on-the-fly
+- **System Prompt Integration**: Prompts are part of dataset configuration, not evaluation logic
+- **Flexible Column Mapping**: Adapts different dataset formats to standard interface
+
+## Configuration Options
+
+### Common Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `dataset` | Dataset configuration to use | `gsm8k_math_prompts` |
+| `generation.model_name` | Model to evaluate | `accounts/fireworks/models/llama-v3p1-8b-instruct` |
+| `evaluation_params.limit_samples` | Number of samples to evaluate | `10` |
+| `reward.params.tolerance` | Numerical tolerance for answers | `0.001` |
+
+### Dataset Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `base_dataset` | Base dataset to derive from | `gsm8k` |
+| `system_prompt` | Prompt added to each query | `"Solve the math problem..."` |
+| `derived_max_samples` | Limit samples in derived dataset | `5` |
+| `output_format` | Format conversion type | `evaluation_format` |
+
+## Output
+
+Results are saved to timestamped directories under `outputs/` with detailed metrics:
+
+```jsonl
+{
+  "sample_id": "idx_0",
+  "user_query": "Natalia sold clips to 48 of her friends...",
+  "model_response": "Let me solve this step by step...",
+  "ground_truth_for_eval": "72",
+  "evaluation_result": {
+    "score": 1.0,
+    "reason": "Extracted answer 72 matches ground truth 72",
+    "is_score_valid": true
+  }
+}
+```
+
+## Advanced Usage
+
+### Custom Dataset
+To use your own math dataset:
+
+1. Create a new dataset config in `conf/dataset/my_dataset.yaml`
+2. Update `run_math_eval.yaml` to reference your dataset
+3. Ensure your dataset has appropriate column mappings
+
+### Custom Reward Function
+To modify the evaluation logic:
+
+1. Edit the `evaluate()` function in `main.py`
+2. Adjust parameters in the configuration files
+3. Test with a small sample first
+
+### Different Models
+The example supports any model accessible through the Fireworks API:
+
+```bash
+python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path examples/math_example/conf \
+  generation.model_name="accounts/fireworks/models/mixtral-8x7b-instruct"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Dataset Loading Errors**: Ensure HuggingFace datasets library is installed
+2. **API Authentication**: Verify FIREWORKS_API_KEY is set correctly
+3. **Memory Issues**: Reduce `limit_samples` or `derived_max_samples`
+4. **Timeout Errors**: Increase API timeout settings in configuration
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path examples/math_example/conf \
+  hydra.verbose=true
+```
+
+## Next Steps
+
+- Explore other examples in the `examples/` directory
+- Try different base models and compare performance
+- Experiment with custom system prompts
+- Integrate with your own datasets and reward functions
+
+For more information about the reward kit framework, see the main [README.md](../../README.md) and [documentation](../../docs/).

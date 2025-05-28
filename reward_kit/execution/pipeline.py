@@ -94,10 +94,11 @@ class EvaluationPipeline:
             return None
 
         messages_for_generation: List[Dict[str, str]] = []
-        if self.cfg.get("system_prompt"):
-            messages_for_generation.append(
-                {"role": "system", "content": self.cfg.system_prompt}
-            )
+
+        # Check for system prompt in sample data first, then fall back to config
+        system_prompt = sample.get("system_prompt") or self.cfg.get("system_prompt")
+        if system_prompt:
+            messages_for_generation.append({"role": "system", "content": system_prompt})
         messages_for_generation.append({"role": "user", "content": user_query})
 
         assistant_response_content: Optional[str] = None
@@ -317,9 +318,13 @@ class EvaluationPipeline:
                     f"Loaded dataset is not a Hugging Face Dataset. Type: {type(prompt_dataset)}"
                 )
                 return []
-            logger.info(
-                f"Loaded {len(prompt_dataset)} samples from {prompt_dataset_config.path_or_name}."
+            # Log dataset info with fallback for derived datasets
+            dataset_source = getattr(
+                prompt_dataset_config,
+                "path_or_name",
+                getattr(prompt_dataset_config, "base_dataset", "dataset"),
             )
+            logger.info(f"Loaded {len(prompt_dataset)} samples from {dataset_source}.")
         except Exception as e:
             logger.error(f"Failed to load prompt dataset: {e}", exc_info=True)
             return []

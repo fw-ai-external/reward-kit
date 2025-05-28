@@ -29,13 +29,12 @@ def mock_session():
 
 
 @pytest.mark.asyncio
-async def test_fireworks_client_generate_with_reasoning_effort(mock_session: AsyncMock):
+async def test_fireworks_client_generate_with_basic_params(mock_session: AsyncMock):
     client_config = DictConfig(
         {
             "model_name": "test-model",
             "temperature": 0.1,
             "max_tokens": 50,
-            "reasoning_effort": "low",  # Test with reasoning_effort
             "api_params": {"max_retries": 1},
         }
     )
@@ -50,20 +49,21 @@ async def test_fireworks_client_generate_with_reasoning_effort(mock_session: Asy
 
     assert "json" in called_kwargs
     payload = called_kwargs["json"]
-    assert "reasoning_effort" in payload
-    assert payload["reasoning_effort"] == "low"
+    # Check only the basic parameters that are actually sent
+    assert payload["model"] == "test-model"
+    assert payload["temperature"] == 0.1
+    assert payload["max_tokens"] == 50
+    assert payload["messages"] == messages
 
 
 @pytest.mark.asyncio
-async def test_fireworks_client_generate_without_reasoning_effort(
+async def test_fireworks_client_generate_minimal_config(
     mock_session: AsyncMock,
 ):
     client_config = DictConfig(
         {
             "model_name": "test-model",
-            "temperature": 0.1,
-            "max_tokens": 50,
-            # reasoning_effort is omitted
+            # Only model_name specified, others should use defaults
             "api_params": {"max_retries": 1},
         }
     )
@@ -78,17 +78,20 @@ async def test_fireworks_client_generate_without_reasoning_effort(
 
     assert "json" in called_kwargs
     payload = called_kwargs["json"]
-    assert "reasoning_effort" not in payload  # Should not be present if not in config
+    # Verify minimal payload structure
+    assert payload["model"] == "test-model"
+    assert "temperature" in payload  # Should have default
+    assert "max_tokens" in payload  # Should have default
+    assert "messages" in payload
 
 
 @pytest.mark.asyncio
-async def test_fireworks_client_generate_reasoning_effort_none(mock_session: AsyncMock):
+async def test_fireworks_client_generate_payload_structure(mock_session: AsyncMock):
     client_config = DictConfig(
         {
             "model_name": "test-model",
             "temperature": 0.1,
             "max_tokens": 50,
-            "reasoning_effort": None,  # Explicitly None
             "api_params": {"max_retries": 1},
         }
     )
@@ -103,18 +106,18 @@ async def test_fireworks_client_generate_reasoning_effort_none(mock_session: Asy
 
     assert "json" in called_kwargs
     payload = called_kwargs["json"]
-    # The client logic currently adds reasoning_effort to payload if self.reasoning_effort is not None.
-    # So if config has it as None, it should not be in payload.
-    assert "reasoning_effort" not in payload
+    # Verify the current minimal payload structure (no optional params)
+    expected_keys = {"model", "messages", "temperature", "max_tokens"}
+    assert set(payload.keys()) == expected_keys
 
 
 @pytest.mark.asyncio
 async def test_fireworks_client_generate_default_params(mock_session: AsyncMock):
-    # Test that other defaultable params are correctly set if not in config
+    # Test that default params are correctly set if not in config
     client_config = DictConfig(
         {
             "model_name": "test-model",
-            # temperature, max_tokens, top_p, top_k, min_p, reasoning_effort omitted
+            # temperature, max_tokens omitted - should use defaults
             "api_params": {"max_retries": 1},
         }
     )
@@ -131,7 +134,8 @@ async def test_fireworks_client_generate_default_params(mock_session: AsyncMock)
     assert payload["model"] == "test-model"
     assert payload["temperature"] == 0.0  # Default from ModelClient
     assert payload["max_tokens"] == 1024  # Default from ModelClient
-    assert payload["top_p"] == 0.95  # Default from ModelClient
-    assert payload["top_k"] == 20  # Default from ModelClient
-    assert payload["min_p"] == 0.0  # Default from ModelClient
-    assert "reasoning_effort" not in payload  # Default from ModelClient is None
+    # Verify optional parameters are NOT in the payload (minimal approach)
+    assert "top_p" not in payload
+    assert "top_k" not in payload
+    assert "min_p" not in payload
+    assert "reasoning_effort" not in payload

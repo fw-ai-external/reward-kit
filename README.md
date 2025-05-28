@@ -9,6 +9,7 @@
 *   **Flexible Evaluation**: Evaluate model outputs based on single or multiple custom metrics.
 *   **Seamless Deployment**: Deploy your reward functions to platforms like Fireworks AI.
 *   **CLI Support**: Manage and interact with your reward functions via a command-line interface.
+*   **Simplified Dataset Integration**: Direct integration with HuggingFace datasets and on-the-fly format conversion.
 *   **Extensible**: Designed to be adaptable for various LLM evaluation scenarios.
 
 ## Installation
@@ -223,6 +224,44 @@ my_function.deploy(
     force=True
 )
 ```
+
+## Dataset Integration
+
+Reward Kit provides seamless integration with popular datasets through a simplified configuration system:
+
+### Direct HuggingFace Integration
+
+Load datasets directly from HuggingFace Hub without manual preprocessing:
+
+```bash
+# Evaluate using GSM8K dataset with math-specific prompts
+reward-kit run --config-name run_math_eval.yaml --config-path examples/math_example/conf
+```
+
+### Derived Datasets
+
+Create specialized dataset configurations that reference base datasets and apply transformations:
+
+```yaml
+# conf/dataset/gsm8k_math_prompts.yaml
+defaults:
+  - base_derived_dataset
+  - _self_
+
+base_dataset: "gsm8k"
+system_prompt: "Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags."
+output_format: "evaluation_format"
+derived_max_samples: 5
+```
+
+### Key Benefits
+
+- **No Manual Conversion**: Datasets are converted to evaluation format on-the-fly
+- **System Prompt Integration**: Prompts are part of dataset configuration, not evaluation logic
+- **Flexible Column Mapping**: Automatically adapts different dataset formats
+- **Reusable Configurations**: Base datasets can be extended for different use cases
+
+See the [math example](examples/math_example/) for a complete demonstration of the dataset system.
 
 ## Detailed Documentation
 

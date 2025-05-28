@@ -26,7 +26,7 @@ defaults:
   # We need to select a dataset. Let's use the local sample prompt dataset.
   # This assumes `gsm8k_local_prompts.yaml` is in `project_root/conf/dataset/`
   # and that the `reward-kit run` command's Hydra setup can find it.
-  - dataset: gsm8k_local_prompts
+  - dataset: gsm8k_math_prompts
   - override hydra/job_logging: default # Use default Hydra logging
   - override hydra/hydra_logging: default # Use default Hydra logging
   - _self_
@@ -44,11 +44,11 @@ hydra:
 # dataset:
 #   max_samples: 3 # Override max_samples from the chosen dataset config
 
-system_prompt: "Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags."
+# system_prompt is now part of the dataset configuration (gsm8k_math_prompts)
 
 generation:
   enabled: true
-  model_name: "accounts/fireworks/models/llama-v3p1-8b-instruct" # Default, can be overridden
+  model_name: "accounts/fireworks/models/llama-v3p3-70b-instruct" # Try a different model
   temperature: 0.0
   max_tokens: 1024
   api_base: "https://api.fireworks.ai/inference/v1"
@@ -57,6 +57,7 @@ generation:
     max_retries: 3
     max_concurrent_requests: 5
   cache:
+    enabled: true
     # Cache dir relative to the Hydra run's output directory.
     # The `run_eval_cmd.py` sets `cfg.hydra_output_dir`.
     # The `ResponseCache` currently makes cache_dir relative to CWD if not absolute.

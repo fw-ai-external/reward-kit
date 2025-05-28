@@ -57,6 +57,38 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 For development and testing interactions with the Fireworks AI platform, you need to configure your Fireworks AI credentials. Reward Kit supports two methods:
 
+### Local Development Configuration (.env.dev)
+
+For a streamlined local development experience, especially when managing multiple environment variables, Reward Kit utilizes a `.env.dev` file in the root of the project. This file is used to load environment variables automatically when running the application locally.
+
+**Setup:**
+
+1.  **Create the `.env.dev` file:**
+    Copy the example environment file to create your local development configuration:
+    ```bash
+    cp .env.example .env.dev
+    ```
+2.  **Populate `.env.dev`:**
+    Open `.env.dev` and fill in the necessary environment variables, such as `FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`, and any other variables required for your development tasks (e.g., `E2B_API_KEY`).
+
+    Example content for `.env.dev`:
+    ```
+    FIREWORKS_API_KEY="your_dev_fireworks_api_key"
+    FIREWORKS_ACCOUNT_ID="pyroworks-dev"
+    FIREWORKS_API_BASE="https://dev.api.fireworks.ai"
+    E2B_API_KEY="your_e2b_api_key"
+    ```
+
+**Important:**
+*   The `.env.dev` file should **not** be committed to version control. It is already listed in the `.gitignore` file.
+*   Variables set directly in your shell environment will take precedence over those defined in `.env.dev` if `python-dotenv` is configured to not override existing variables (which is the default behavior).
+
+This file simplifies managing development-specific settings without needing to export them in every terminal session.
+
+### Authentication Setup for Development (Continued)
+
+For development and testing interactions with the Fireworks AI platform, you need to configure your Fireworks AI credentials. Reward Kit supports two methods:
+
 **A. Environment Variables (Highest Priority)**
 
 Set the following environment variables. For development, you might use specific development keys or a dedicated development account:

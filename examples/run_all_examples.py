@@ -112,6 +112,10 @@ def run_example(example_path, env=None):
         elif example_name == "server_example.py":
             # For the server example, use the test script instead
             cmd[1] = str(Path(example_path).parent / "server_example_test.py")
+        elif example_name == "bfcl_evaluation_example.py":
+            # Provide a default task for bfcl_evaluation_example.py
+            cmd.extend(["--task", str(EXAMPLES_DIR / "test_tasks/calculator.json")])
+            cmd.append("--test-mode") # Add test-mode to avoid large downloads or extensive processing
 
         # Run the example as a subprocess with a timeout
         result = subprocess.run(

@@ -19,15 +19,21 @@ logger = logging.getLogger(__name__)
 # This happens when the module is imported.
 # We use override=False (default) so that existing environment variables
 # (e.g., set in the shell) are NOT overridden by .env files.
-ENV_DEV_PATH = find_dotenv(filename=".env.dev", raise_error_if_not_found=False, usecwd=True)
+ENV_DEV_PATH = find_dotenv(
+    filename=".env.dev", raise_error_if_not_found=False, usecwd=True
+)
 if ENV_DEV_PATH:
     load_dotenv(dotenv_path=ENV_DEV_PATH, override=False)
-    logger.info(f"reward_kit.platform_api: Loaded environment variables from: {ENV_DEV_PATH}")
+    logger.info(
+        f"reward_kit.platform_api: Loaded environment variables from: {ENV_DEV_PATH}"
+    )
 else:
     ENV_PATH = find_dotenv(filename=".env", raise_error_if_not_found=False, usecwd=True)
     if ENV_PATH:
         load_dotenv(dotenv_path=ENV_PATH, override=False)
-        logger.info(f"reward_kit.platform_api: Loaded environment variables from: {ENV_PATH}")
+        logger.info(
+            f"reward_kit.platform_api: Loaded environment variables from: {ENV_PATH}"
+        )
     else:
         logger.info(
             "reward_kit.platform_api: No .env.dev or .env file found. "

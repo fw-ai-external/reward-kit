@@ -324,8 +324,8 @@ class Evaluator:
             raise ValueError("Missing Fireworks Account ID or API Key.")
 
         # Determine multiMetrics for payload based on ts_mode_config or original flag
-        payload_multi_metrics = True if self.ts_mode_config else self.multi_metrics
-        payload_rollup_settings = {"skipRollup": True} if self.ts_mode_config else None
+        payload_multi_metrics = True
+        payload_rollup_settings = {"skipRollup": True}
 
         # For preview, evaluator_id might not be as critical for shim's env var name,
         # but pass it for consistency. Use display_name as a proxy if no specific ID.
@@ -347,6 +347,7 @@ class Evaluator:
         }
 
         api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
+        print("show payload", payload)
         if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
             account_id = "pyroworks-dev"
 
@@ -460,12 +461,8 @@ class Evaluator:
         self.description = description or f"Evaluator created from {evaluator_id}"
 
         # Determine multiMetrics for payload
-        payload_multi_metrics = (
-            True if self.ts_mode_config or self.remote_url else self.multi_metrics
-        )
-        payload_rollup_settings = (
-            {"skipRollup": True} if self.ts_mode_config or self.remote_url else None
-        )
+        payload_multi_metrics = True
+        payload_rollup_settings = {"skipRollup": True}
 
         payload_data = {
             "evaluator": {
@@ -634,22 +631,38 @@ def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] 
         else:  # Folder-based, non-multi_metrics
             for metric_name in self.metric_folders:
                 file_contents = {}
-                for k, v in self.code_files.items():
-                    if k.startswith(f"{metric_name}/"):
-                        simple_name = (
-                            k.split("/", 1)[1] if isinstance(k, str) and "/" in k else k
-                        )
-                        file_contents[simple_name] = self._update_evaluate_signature(v)
+                # Prioritize sending only main.py for the preview evaluator
+                main_py_key = f"{metric_name}/main.py"
+                if main_py_key in self.code_files:
+                    file_contents["main.py"] = self._update_evaluate_signature(
+                        self.code_files[main_py_key]
+                    )
+                else:
+                    # Fallback to sending all files if main.py isn't found directly under metric_name/ (should not happen with current loading logic)
+                    # Or if a more complex structure was intended. For now, this path means an issue.
+                    logger.warning(
+                        f"main.py not found for metric '{metric_name}' with key '{main_py_key}'. "
+                        "The preview payload might be incorrect or incomplete."
+                    )
+                    # Original logic to include all files for the metric folder as a fallback:
+                    # for k, v in self.code_files.items():
+                    #     if k.startswith(f"{metric_name}/"):
+                    #         simple_name = (
+                    #             k.split("/", 1)[1] if isinstance(k, str) and "/" in k else k
+                    #         )
+                    #         file_contents[simple_name] = self._update_evaluate_signature(v)
+
                 if not file_contents:
                     logger.warning(
-                        f"No Python files for metric '{metric_name}', skipping."
+                        f"No Python files (specifically main.py) prepared for metric '{metric_name}', skipping this metric for criteria."
                     )
                     continue
+
                 assertions.append(
                     {
                         "codeSnippets": {
                             "language": "python",
-                            "fileContents": file_contents,
+                            "fileContents": file_contents,  # Should now ideally only contain main.py
                         },
                         "name": metric_name,
                         "type": "CODE_SNIPPETS",

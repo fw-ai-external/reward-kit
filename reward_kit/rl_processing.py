@@ -1,8 +1,9 @@
-from typing import List, Dict, Any, Union, Optional
+from typing import Any, Dict, List, Optional, Union
+
+from reward_kit.agent.models import StepData  # Internal StepData model
 
 # Assuming models are structured as planned
-from reward_kit.models import EvaluateResult # Extended EvaluateResult
-from reward_kit.agent.models import StepData # Internal StepData model
+from reward_kit.models import EvaluateResult  # Extended EvaluateResult
 
 # Placeholder for actual Message type if needed for type hinting complex observation_data
 # from reward_kit.models import Message
@@ -20,7 +21,7 @@ class RLDataAligner:
         self,
         current_eval_result: EvaluateResult,
         current_step_data_list: List[StepData],
-        rollout_id: str # For logging or if needed
+        rollout_id: str,  # For logging or if needed
     ) -> List[StepData]:
         """
         Aligns the EvaluateResult (from user's reward function) with the
@@ -58,11 +59,13 @@ class RLDataAligner:
                 # Strategy: Use 'assistant_turn_index' stored in StepData.step_info
                 # by RLRolloutWorker. User's StepOutput.step_index should match this.
                 # This assumes RLRolloutWorker adds this info.
-                user_defined_step_idx = s_data.step_info.get('assistant_turn_index')
+                user_defined_step_idx = s_data.step_info.get("assistant_turn_index")
 
                 if user_defined_step_idx is not None:
                     if user_defined_step_idx in user_step_rewards_map:
-                        s_data.base_reward = user_step_rewards_map[user_defined_step_idx]
+                        s_data.base_reward = user_step_rewards_map[
+                            user_defined_step_idx
+                        ]
                         # print(f"Rollout {rollout_id}, SystemStep {s_data.system_step_index}: "
                         #       f"Aligned base_reward {s_data.base_reward} from UserStepIdx {user_defined_step_idx}")
                     else:

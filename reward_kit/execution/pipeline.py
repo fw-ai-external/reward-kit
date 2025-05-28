@@ -269,7 +269,7 @@ class EvaluationPipeline:
             return {
                 "id": sample_id,
                 "user_query": user_query,
-                "system_prompt": self.cfg.get("system_prompt"),
+                "system_prompt": system_prompt,  # Use the resolved system_prompt variable
                 "assistant_response": assistant_response_content,
                 "ground_truth_for_eval": ground_truth_for_eval,
                 "evaluation_score": eval_result.score,
@@ -426,6 +426,60 @@ class EvaluationPipeline:
                 )
             except Exception as e:
                 logger.error(f"Failed to save results to {output_file_path}: {e}")
+
+        # Save input/output pairs for preview command
+        preview_pairs_file_path = self.cfg.output.get(
+            "preview_pairs_file", "preview_input_output_pairs.jsonl"
+        )
+        if preview_pairs_file_path:
+            if not os.path.isabs(preview_pairs_file_path) and self.cfg.hydra_output_dir:
+                preview_pairs_file_path = os.path.join(
+                    self.cfg.hydra_output_dir, preview_pairs_file_path
+                )
+
+            preview_data_to_save = []
+            for result_item in all_results:
+                if (
+                    "error" in result_item
+                    or not result_item.get("user_query")
+                    or not result_item.get("assistant_response")
+                ):
+                    # Skip items with errors or missing critical fields for preview
+                    continue
+
+                messages = []
+                if result_item.get("system_prompt"):
+                    messages.append(
+                        {"role": "system", "content": result_item["system_prompt"]}
+                    )
+                messages.append({"role": "user", "content": result_item["user_query"]})
+                messages.append(
+                    {"role": "assistant", "content": result_item["assistant_response"]}
+                )
+
+                pair_item = {"messages": messages}
+                if result_item.get("ground_truth_for_eval"):
+                    pair_item["ground_truth"] = result_item["ground_truth_for_eval"]
+
+                # Optionally, carry over the sample ID if present
+                if result_item.get("id"):
+                    pair_item["id"] = result_item["id"]
+
+                preview_data_to_save.append(pair_item)
+
+            if preview_data_to_save:
+                try:
+                    os.makedirs(os.path.dirname(preview_pairs_file_path), exist_ok=True)
+                    with open(preview_pairs_file_path, "w", encoding="utf-8") as f:
+                        for item in preview_data_to_save:
+                            f.write(json.dumps(item) + "\n")
+                    logger.info(
+                        f"Input/output pairs for preview saved to: {os.path.abspath(preview_pairs_file_path)}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to save preview pairs to {preview_pairs_file_path}: {e}"
+                    )
 
         logger.info("Evaluation pipeline run finished.")
         return all_results

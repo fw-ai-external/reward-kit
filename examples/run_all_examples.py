@@ -115,7 +115,9 @@ def run_example(example_path, env=None):
         elif example_name == "bfcl_evaluation_example.py":
             # Provide a default task for bfcl_evaluation_example.py
             cmd.extend(["--task", str(EXAMPLES_DIR / "test_tasks/calculator.json")])
-            cmd.append("--test-mode") # Add test-mode to avoid large downloads or extensive processing
+            cmd.append(
+                "--test-mode"
+            )  # Add test-mode to avoid large downloads or extensive processing
 
         # Run the example as a subprocess with a timeout
         result = subprocess.run(

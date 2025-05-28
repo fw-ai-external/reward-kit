@@ -4,11 +4,10 @@ This example demonstrates how to evaluate and train models on math word problems
 
 ## Overview
 
-The math example provides three different approaches to working with math problems:
+The math example provides two different approaches to working with math problems:
 
 1. **CLI-based Evaluation** - Use the reward-kit CLI for streamlined evaluation
-2. **Local Evaluation** - Programmatic evaluation with full control
-3. **TRL GRPO Training** - Fine-tune models using reinforcement learning
+2. **TRL GRPO Training** - Fine-tune models using reinforcement learning
 
 ## Key Features
 
@@ -53,25 +52,10 @@ python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path exam
 - Applies math-specific system prompt automatically
 - Generates model responses using Fireworks API
 - Evaluates responses using the math reward function
-- Saves results to timestamped output directory
+- Saves detailed evaluation results to `<config_output_name>.jsonl` (e.g., `math_example_results.jsonl`) in a timestamped output directory
+- Saves generated prompt/response pairs to `preview_input_output_pairs.jsonl` in the same output directory, suitable for inspection or use with `reward-kit preview`
 
-### 2. Local Evaluation
-
-For more programmatic control over the evaluation process:
-
-```bash
-# Run local evaluation with Hydra configuration
-.venv/bin/python examples/math_example/local_eval.py
-
-# Override dataset size and model
-.venv/bin/python examples/math_example/local_eval.py \
-  dataset_file_path=path/to/custom/dataset.jsonl \
-  model_name="accounts/fireworks/models/llama-v3p1-8b-instruct"
-```
-
-Configuration is managed through `conf/local_eval_config.yaml`.
-
-### 3. TRL GRPO Training
+### 2. TRL GRPO Training
 
 Fine-tune models using reinforcement learning with the math reward function:
 
@@ -114,13 +98,9 @@ Solve the following math problem. Show your work clearly. Put the final numerica
 math_example/
 ├── README.md                     # This file
 ├── main.py                       # Core evaluation logic and reward function
-├── local_eval.py                 # Standalone local evaluation script
 ├── trl_grpo_integration.py       # TRL training integration
-├── fireworks_preview.py          # Fireworks-specific preview functionality
-├── fireworks_regenerate.py       # Fireworks response regeneration
 └── conf/                         # Configuration files
     ├── run_math_eval.yaml        # CLI evaluation configuration
-    ├── local_eval_config.yaml    # Local evaluation configuration
     ├── trl_grpo_config.yaml      # TRL training configuration
     └── dataset/                  # Dataset configurations
         ├── base_dataset.yaml     # Base dataset schema
@@ -165,21 +145,43 @@ math_example/
 
 ## Output
 
-Results are saved to timestamped directories under `outputs/` with detailed metrics:
+The `reward-kit run` command saves its results to a timestamped directory under `outputs/`. Two main files are typically generated:
 
-```jsonl
-{
-  "sample_id": "idx_0",
-  "user_query": "Natalia sold clips to 48 of her friends...",
-  "model_response": "Let me solve this step by step...",
-  "ground_truth_for_eval": "72",
-  "evaluation_result": {
-    "score": 1.0,
-    "reason": "Extracted answer 72 matches ground truth 72",
-    "is_score_valid": true
-  }
-}
-```
+1.  **Detailed Evaluation Results (`<config_output_name>.jsonl`, e.g., `math_example_results.jsonl`)**:
+    This file contains comprehensive information for each processed sample, including the original query, system prompt, generated assistant response, ground truth, the overall evaluation score, reason, and any sub-metric scores.
+
+    Example entry from `math_example_results.jsonl`:
+    ```jsonl
+    {
+      "id": "2389214",
+      "user_query": "Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?",
+      "system_prompt": "Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags.",
+      "assistant_response": "To find the total number of clips Natalia sold, we need to calculate the number of clips she sold in May and add it to the number of clips she sold in April...",
+      "ground_truth_for_eval": "Natalia sold 48/2 = <<48/2=24>>24 clips in May...",
+      "evaluation_score": 1.0,
+      "evaluation_reason": "This is the eval result for the score used",
+      "evaluation_metrics": {
+        "accuracy_reward": {"is_score_valid": true, "score": 1.0, "reason": "This is the eval result for result accuracy"},
+        "format_reward": {"is_score_valid": true, "score": 0.0, "reason": "This is the eval result for format matching"}
+      }
+    }
+    ```
+
+2.  **Prompt/Response Pairs for Preview (`preview_input_output_pairs.jsonl`)**:
+    This file contains the system prompt, user query, and the model's generated assistant response for successfully processed samples, formatted for potential use with the `reward-kit preview` command or other analysis tools.
+
+    Example entry from `preview_input_output_pairs.jsonl`:
+    ```jsonl
+    {
+      "messages": [
+        {"role": "system", "content": "Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags."},
+        {"role": "user", "content": "Natalia sold clips to 48 of her friends in April..."},
+        {"role": "assistant", "content": "To find the total number of clips Natalia sold..."}
+      ],
+      "ground_truth": "Natalia sold 48/2 = <<48/2=24>>24 clips in May...",
+      "id": "2389214"
+    }
+    ```
 
 ## Advanced Usage
 
@@ -204,6 +206,24 @@ The example supports any model accessible through the Fireworks API:
 python -m reward_kit.cli run --config-name run_math_eval.yaml --config-path examples/math_example/conf \
   generation.model_name="accounts/fireworks/models/mixtral-8x7b-instruct"
 ```
+
+### Using Generated Pairs with `reward-kit preview`
+
+The `preview_input_output_pairs.jsonl` file generated by the `run` command (located in the run's output directory, e.g., `outputs/<timestamp_dir>/preview_input_output_pairs.jsonl`) can be used as input to `reward-kit preview`. This allows you to re-evaluate the generated responses using a different evaluator, perhaps one defined by local metric scripts or a deployed remote evaluator.
+
+```bash
+# Example: Using preview with local metric scripts
+# (Ensure your_metrics_folder contains a main.py with a reward function)
+python -m reward_kit.cli preview \
+  --samples ./outputs/<timestamp_dir>/preview_input_output_pairs.jsonl \
+  --metrics-folders custom_metric_name=./path/to/your_metrics_folder
+
+# Example: Using preview with a deployed remote evaluator
+python -m reward_kit.cli preview \
+  --samples ./outputs/<timestamp_dir>/preview_input_output_pairs.jsonl \
+  --remote-url <your_deployed_evaluator_url>
+```
+**Note**: The local evaluation mechanism of `reward-kit preview --metrics-folders` is primarily designed for composing evaluators from simpler, individual metric scripts. To re-evaluate using the exact complex logic from this example's `main.py` (which is used by `reward-kit run`), you would typically point to a deployed version of that logic via `--remote-url` if you have deployed it as an evaluator. The `preview` command's local mode might have different behavior or requirements for how it loads and combines reward functions from `--metrics-folders` compared to the `run` command's single `reward.function_path`.
 
 ## Troubleshooting
 

@@ -1,10 +1,14 @@
+from typing import Any, Dict, List, Union
+
 import pytest
 from pydantic import ValidationError
-from typing import List, Dict, Any, Union
+
+from reward_kit.agent.models import StepData
 
 # Assuming these are the correct import paths based on our plan
-from reward_kit.models import EvaluateResult, StepOutput, Message as RewardKitMessage
-from reward_kit.agent.models import StepData
+from reward_kit.models import EvaluateResult
+from reward_kit.models import Message as RewardKitMessage
+from reward_kit.models import StepOutput
 
 # Minimal Message for StepData if direct import from reward_kit.models is problematic in tests
 # For now, assume RewardKitMessage from reward_kit.models works.
@@ -14,7 +18,9 @@ class TestRLDataStructures:
 
     def test_step_output_creation_valid(self):
         """Test valid creation of StepOutput."""
-        so = StepOutput(step_index=0, base_reward=0.5, reason="Good step", metrics={"accuracy": 0.9})
+        so = StepOutput(
+            step_index=0, base_reward=0.5, reason="Good step", metrics={"accuracy": 0.9}
+        )
         assert so.step_index == 0
         assert so.base_reward == 0.5
         assert so.reason == "Good step"
@@ -29,9 +35,11 @@ class TestRLDataStructures:
     def test_step_output_invalid_types(self):
         """Test StepOutput validation errors for incorrect types."""
         with pytest.raises(ValidationError):
-            StepOutput(step_index="0", base_reward="not_a_float") # base_reward should be float
+            StepOutput(
+                step_index="0", base_reward="not_a_float"
+            )  # base_reward should be float
         with pytest.raises(ValidationError):
-            StepOutput(step_index=None, base_reward=0.5) # step_index is required
+            StepOutput(step_index=None, base_reward=0.5)  # step_index is required
 
     def test_evaluate_result_extended(self):
         """Test extended EvaluateResult with step_outputs."""
@@ -60,20 +68,20 @@ class TestRLDataStructures:
         assert er_old_style.score == 0.9
         assert er_old_style.reason == "Simple score"
         assert er_old_style.step_outputs is None
-        assert er_old_style.metrics == {} # Due to default_factory=dict
+        assert er_old_style.metrics == {}  # Due to default_factory=dict
 
         er_with_empty_steps = EvaluateResult(score=0.6, step_outputs=[])
         assert er_with_empty_steps.score == 0.6
         assert er_with_empty_steps.step_outputs == []
-
 
     def test_evaluate_result_invalid_step_outputs(self):
         """Test EvaluateResult with invalid step_outputs type."""
         with pytest.raises(ValidationError):
             EvaluateResult(score=0.5, step_outputs="not_a_list")
         with pytest.raises(ValidationError):
-            EvaluateResult(score=0.5, step_outputs=[{"step_index":0, "base_reward":"wrong_type"}])
-
+            EvaluateResult(
+                score=0.5, step_outputs=[{"step_index": 0, "base_reward": "wrong_type"}]
+            )
 
     def test_step_data_creation_minimal(self):
         """Test minimal valid creation of StepData."""
@@ -81,9 +89,12 @@ class TestRLDataStructures:
         action = {"type": "text", "content": "Hi"}
         step = StepData(
             system_step_index=0,
-            observation_data={"history": msg_hist}, # Example observation
+            observation_data={"history": msg_hist},  # Example observation
             action_taken=action,
-            resulting_messages_history=[*msg_hist, RewardKitMessage(role="assistant", content="Hi")]
+            resulting_messages_history=[
+                *msg_hist,
+                RewardKitMessage(role="assistant", content="Hi"),
+            ],
         )
         assert step.system_step_index == 0
         assert step.action_taken == action
@@ -108,7 +119,7 @@ class TestRLDataStructures:
             step_info={"tool_used": "none", "latency_ms": 100},
             base_reward=0.5,
             advantage=0.1,
-            return_to_go=0.6
+            return_to_go=0.6,
         )
         assert step.policy_value_estimate == 0.95
         assert step.is_done is True
@@ -120,16 +131,16 @@ class TestRLDataStructures:
     def test_step_data_field_validation(self):
         """Test StepData field type validations."""
         with pytest.raises(ValidationError):
-            StepData( # Missing required fields
+            StepData(  # Missing required fields
                 system_step_index=0,
                 observation_data=[],
             )
         with pytest.raises(ValidationError):
             StepData(
-                system_step_index="not_an_int", # system_step_index should be int
+                system_step_index="not_an_int",  # system_step_index should be int
                 observation_data=[],
                 action_taken={},
-                resulting_messages_history=[]
+                resulting_messages_history=[],
             )
         with pytest.raises(ValidationError):
             StepData(
@@ -137,7 +148,7 @@ class TestRLDataStructures:
                 observation_data=[],
                 action_taken={},
                 resulting_messages_history=[],
-                is_done="not_a_bool" # is_done should be bool
+                is_done="not_a_bool",  # is_done should be bool
             )
 
     def test_step_data_message_import(self):
@@ -151,6 +162,6 @@ class TestRLDataStructures:
             system_step_index=0,
             observation_data=[m1],
             action_taken={"type": "text", "content": "Response"},
-            resulting_messages_history=[m1, m2]
+            resulting_messages_history=[m1, m2],
         )
         assert isinstance(step.resulting_messages_history[0], RewardKitMessage)

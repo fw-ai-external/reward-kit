@@ -1,0 +1,19 @@
+This PR includes several improvements to the math example and the CLI developer experience:
+
+1.  **Math Example Cleanup**:
+    *   Removed deprecated `local_eval.py`, `fireworks_preview.py`, `fireworks_regenerate.py` scripts and associated configurations from `examples/math_example/`.
+    *   Updated `examples/math_example/README.md` to reflect these changes and current best practices.
+
+2.  **`reward-kit run` Command Enhancements**:
+    *   The `run` command now generates an additional `preview_input_output_pairs.jsonl` file in the output directory. This file contains system prompts, user queries, and assistant responses, formatted for easier inspection and potential use with `reward-kit preview` or other tools.
+    *   Fixed a bug in `reward_kit/execution/pipeline.py` to ensure the correct system prompt (resolved from dataset or config) is included in the output data.
+    *   Updated `examples/math_example/main.py` to resolve `TypeError` and `NameError` issues, improve robustness of answer extraction functions, and ensure the main score accurately reflects numerical correctness.
+
+3.  **`reward-kit preview` Command Improvements**:
+    *   Modified `reward_kit/evaluation.py` to send only `main.py` to the `previewEvaluator` API when using `--metrics-folders`, reducing payload size.
+    *   User-applied fixes have now enabled the `preview` command to work correctly with the `previewEvaluator` API for the math example.
+
+4.  **README Update**:
+    *   `examples/math_example/README.md` was comprehensively updated to detail the new output files from the `run` command and provide guidance on using the generated pairs.
+
+These changes aim to make the math example a cleaner template, improve the reliability of the `run` command, and enhance the overall developer experience for creating and testing evaluation logic.

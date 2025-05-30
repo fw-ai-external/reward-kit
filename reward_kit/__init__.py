@@ -8,8 +8,6 @@ The library also provides an agent evaluation framework for testing and evaluati
 tool-augmented models using self-contained task bundles.
 """
 
-__version__ = "0.2.0"
-
 import warnings
 
 from .models import EvaluateResult, Message, MetricResult
@@ -26,3 +24,6 @@ __all__ = [
     "reward_function",
     "RewardFunction",
 ]
+
+from . import _version
+__version__ = _version.get_versions()['version']

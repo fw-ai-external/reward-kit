@@ -1,8 +1,10 @@
 from setuptools import find_packages, setup
+import versioneer
 
 setup(
     name="reward-kit",
-    version="0.2.11",
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
     install_requires=[
         "requests>=2.25.0",
@@ -35,6 +37,7 @@ setup(
             "types-requests",
             "types-PyYAML",
             "types-docker",
+            "versioneer>=0.20",
             "torch>=1.9",
             "trl>=0.7.0",
             "peft>=0.7.0",

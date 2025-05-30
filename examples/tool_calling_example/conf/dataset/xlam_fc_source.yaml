@@ -1,0 +1,38 @@
+# Base dataset configuration for Salesforce/xlam-function-calling-60k
+# Defines the connection to the raw Hugging Face dataset.
+
+defaults:
+  - _self_
+  - base_dataset # Inherits from base_dataset.yaml
+
+dataset_name: xlam_fc_source
+pretty_name: "XLAM Function Calling Source"
+# source_type: "huggingface" # This will be inherited from base_dataset and should be overridden here.
+# path_or_name: "Salesforce/xlam-function-calling-60k" # This will be inherited and overridden.
+
+# Override fields from base_dataset.yaml
+source_type: "huggingface"
+path_or_name: "Salesforce/xlam-function-calling-60k"
+split: "train" # Dataset has a 'train' split with 60k rows
+config_name: null # No specific sub-configuration name needed for this dataset
+
+# hf_revision: null # Use the default revision (can be added if specific revision needed)
+
+# Initial column mapping (optional, can also be done in derived dataset)
+# The raw dataset has 'id', 'query', 'tools', 'answers'
+# We will primarily use 'query', 'tools', and 'answers'
+# The 'ground_truth' column will be created by the preprocessing_steps.
+# We need to ensure it's correctly named 'ground_truth' after mapping.
+column_mapping:
+  id: "id"
+  query: "query"
+  tools_str: "tools" # Raw 'tools' column is a JSON string
+  answers_str: "answers" # Raw 'answers' column is a JSON string
+  ground_truth: "ground_truth" # Ensures the column created by preprocessor is kept and named correctly
+
+# Preprocessing step to reformat 'answers_str' into a 'ground_truth' field
+# containing a JSON string of a dictionary: {"role": "assistant", "tool_calls": [...]}.
+preprocessing_steps:
+  - "examples.tool_calling_example.custom_processors.reformat_answers_str_to_ground_truth_dict_string"
+
+# hf_extra_load_params: {} # Inherited or can be overridden

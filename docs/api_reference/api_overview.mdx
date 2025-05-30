@@ -1,0 +1,141 @@
+# Reward Kit API Reference
+
+This API reference provides detailed documentation for the key classes, functions, and data models in the Reward Kit.
+
+## Core Components
+
+### Classes and Decorators
+
+- [RewardFunction Class](reward_function_class.md): Core class for wrapping and calling reward functions
+- [reward_function Decorator](reward_function_decorator.md): Decorator for creating deployable reward functions
+
+### Data Models
+
+- [Data Models](data_models.md): Documentation for Message, EvaluateResult, MetricResult, and other data models
+
+## Modules
+
+### reward_function Module
+
+The `reward_function` module contains the core functionality for creating and using reward functions.
+
+```python
+from reward_kit.reward_function import RewardFunction, reward_function
+```
+
+### evaluation Module
+
+The `evaluation` module provides functions for previewing and creating evaluations.
+
+```python
+from reward_kit.evaluation import preview_evaluation, create_evaluation
+```
+
+Key functions:
+
+- **`preview_evaluation`**: Previews an evaluation with sample data before deployment
+- **`create_evaluation`**: Creates and deploys an evaluator to Fireworks
+
+### models Module
+
+The `models` module contains data models used throughout the Reward Kit.
+
+```python
+from reward_kit.models import EvaluateResult, MetricResult, Message
+```
+
+### rewards Module
+
+The `rewards` module contains specialized reward functions for specific use cases.
+
+```python
+from reward_kit.rewards.function_calling import match_function_call
+```
+
+### server Module
+
+The `server` module provides functionality for running a reward function as a server.
+
+```python
+from reward_kit.server import run_server
+```
+
+### auth Module
+
+The `auth` module handles authentication with Fireworks.
+
+```python
+from reward_kit.auth import get_authentication
+```
+
+## Command Line Interface
+
+The Reward Kit provides a command-line interface for common operations:
+
+```bash
+# Show help
+reward-kit --help
+
+# Preview an evaluator
+reward-kit preview --metrics-folders "metric=./path" --samples ./samples.jsonl
+
+# Deploy an evaluator
+reward-kit deploy --id my-evaluator --metrics-folders "metric=./path" --force
+```
+
+For detailed CLI documentation, see the [CLI Reference](../cli_reference/cli_overview.mdx).
+
+## Common Patterns
+
+### Creating a Basic Reward Function
+
+```python
+from reward_kit import reward_function, EvaluateResult, MetricResult
+
+@reward_function
+def my_reward_function(messages, original_messages=None, **kwargs):
+    # Your evaluation logic here
+    response = messages[-1].get("content", "")
+    # Assume calculate_score returns a float between 0.0 and 1.0
+    # and calculate_success returns a boolean
+    score = calculate_score(response)
+    success = calculate_success(response) # Assume calculate_success is defined
+
+    return EvaluateResult(
+        score=score,
+        reason="Overall evaluation reason for my_reward_function", # Added top-level reason
+        metrics={
+            "my_metric": MetricResult(
+                score=score,
+                success=success, # Added success field
+                reason="Explanation for the metric score"
+            )
+        }
+    )
+```
+
+### Using a Deployed Reward Function
+
+```python
+from reward_kit import RewardFunction
+
+# Create a reference to a deployed reward function
+reward_fn = RewardFunction(
+    name="my-deployed-evaluator",
+    mode="remote"
+)
+
+# Call the reward function
+result = reward_fn(messages=[
+    {"role": "user", "content": "What is machine learning?"},
+    {"role": "assistant", "content": "Machine learning is..."}
+])
+
+print(f"Score: {result.score}")
+```
+
+## Next Steps
+
+- Explore the [Examples](../examples/) for practical implementations
+- Follow the [Tutorials](../tutorials/) for step-by-step guidance
+- Review the [Developer Guide](../developer_guide/) for conceptual understanding

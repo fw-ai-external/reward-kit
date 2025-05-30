@@ -1,0 +1,82 @@
+# Hydra configuration for running the math example via `reward-kit run`
+# Usage: reward-kit run --config-dir examples/math_example/conf --config-name run_math_eval
+#        (or if `conf/cli/run_eval_config.yaml` has search paths set up correctly,
+#         and this file is moved to `conf/experiments/run_math_eval.yaml` or similar,
+#         then `reward-kit run experiment=run_math_eval` might work)
+# For now, assume it's used with --config-dir and --config-name.
+
+defaults:
+  # The primary structure comes from the default config for the `run` command.
+  # This path needs to be resolvable by Hydra from where `reward-kit run` is invoked.
+  # If `reward-kit run`'s @hydra.main has `config_path="../../conf/cli"`,
+  # then `run_eval_config` is the default. We are overriding/specializing it here.
+  # This file itself acts as an override/specialization if named `run_eval_config.yaml`
+  # and placed in a dir that `reward-kit run`'s hydra.main looks into.
+  #
+  # Let's assume `reward-kit run` uses `conf/cli/run_eval_config.yaml` as its base.
+  # This file can then be used as an "experiment" config if `run_eval_config.yaml`
+  # is set up to include an `experiment` group, or this file can be passed directly
+  # using `reward-kit run --config-name examples/math_example/conf/run_math_eval.yaml`
+  # (if paths are set up for that).
+  #
+  # For simplicity, this file defines the full structure expected by the pipeline,
+  # potentially overriding parts of a global `run_eval_config.yaml` if loaded as part of a composition.
+  # If used standalone with `reward-kit run --config-file path/to/this/run_math_eval.yaml`, it works directly.
+
+  # We need to select a dataset. Let's use the local sample prompt dataset.
+  # This assumes `gsm8k_local_prompts.yaml` is in `project_root/conf/dataset/`
+  # and that the `reward-kit run` command's Hydra setup can find it.
+  - dataset: gsm8k_math_prompts
+  - override hydra/job_logging: default # Use default Hydra logging
+  - override hydra/hydra_logging: default # Use default Hydra logging
+  - _self_
+
+hydra:
+  searchpath:
+    # Add project_root/conf to search for dataset configs.
+    # Assuming the script is run from the project root.
+    - file://${oc.env:PWD}/conf
+    # This allows `dataset: gsm8k_local_prompts` to find
+    # `project_root/conf/dataset/gsm8k_local_prompts.yaml`.
+
+# Dataset group is inherited from `gsm8k_local_prompts` via defaults.
+# We can override parts of it here if needed, e.g.:
+# dataset:
+#   max_samples: 3 # Override max_samples from the chosen dataset config
+
+# system_prompt is now part of the dataset configuration (gsm8k_math_prompts)
+
+generation:
+  enabled: true
+  model_name: "accounts/fireworks/models/llama-v3p3-70b-instruct" # Try a different model
+  temperature: 0.0
+  max_tokens: 1024
+  api_base: "https://api.fireworks.ai/inference/v1"
+  api_params:
+    rate_limit_qps: 1.0
+    max_retries: 3
+    max_concurrent_requests: 5
+  cache:
+    enabled: true
+    # Cache dir relative to the Hydra run's output directory.
+    # The `run_eval_cmd.py` sets `cfg.hydra_output_dir`.
+    # The `ResponseCache` currently makes cache_dir relative to CWD if not absolute.
+    # If `reward-kit run` changes CWD to its output dir, this will be fine.
+    cache_dir: "generated_responses_cache"
+
+reward:
+  # Path to the reward function to use for evaluation.
+  function_path: "examples.math_example.main.evaluate" # Points to the function in our example
+  params: # Parameters for the reward function (passed as kwargs)
+    tolerance: 0.001
+    require_units: false
+    # custom_processing_param: true # Example if `evaluate` took this
+
+evaluation_params:
+  limit_samples: 2 # For quick testing of this example config
+
+output:
+  results_file: "math_example_results.jsonl" # Saved in this run's Hydra output directory
+
+logging_params:
+  batch_log_interval: 1 # Log after every sample for small test

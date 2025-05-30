@@ -1,0 +1,337 @@
+"""
+Command-line interface for reward-kit.
+"""
+
+import argparse
+import asyncio
+import json
+import logging
+import os
+import sys
+import traceback
+import uuid
+from pathlib import Path
+
+logger = logging.getLogger(__name__)  # Added logger initialization
+
+from reward_kit.evaluation import create_evaluation, preview_evaluation
+
+from .cli_commands.agent_eval_cmd import (  # Now points to the V2 logic
+    agent_eval_command,
+)
+from .cli_commands.common import (
+    check_agent_environment,
+    check_environment,
+    setup_logging,
+)
+from .cli_commands.deploy import deploy_command
+from .cli_commands.preview import preview_command
+from .cli_commands.run_eval_cmd import hydra_cli_entry_point  # Import for run command
+
+# Note: validate_task_bundle, find_task_dataset, get_toolset_config, export_tool_specs
+# were helpers for the old agent_eval_command and are now moved into agent_eval_cmd.py
+# or will be part of the new agent_eval_v2_command logic.
+# For now, they are removed from cli.py as agent_eval_command is imported.
+
+
+def parse_args(args=None):
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="reward-kit: Tools for evaluation and reward modeling"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    # Preview command
+    preview_parser = subparsers.add_parser(
+        "preview", help="Preview an evaluator with sample data"
+    )
+    preview_parser.add_argument(
+        "--metrics-folders",
+        "-m",
+        nargs="+",
+        help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'",
+    )
+
+    # Make samples optional to allow HF dataset option
+    preview_parser.add_argument(
+        "--samples",
+        "-s",
+        required=False,
+        help="Path to JSONL file containing sample data",
+    )
+    preview_parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=5,
+        help="Maximum number of samples to process (default: 5)",
+    )
+
+    # Add HuggingFace dataset options
+    hf_group = preview_parser.add_argument_group("HuggingFace Dataset Options")
+    hf_group.add_argument(
+        "--huggingface-dataset",
+        "--hf",
+        help="HuggingFace dataset name (e.g., 'deepseek-ai/DeepSeek-ProverBench')",
+    )
+    hf_group.add_argument(
+        "--huggingface-split",
+        default="train",
+        help="Dataset split to use (default: 'train')",
+    )
+    hf_group.add_argument(
+        "--huggingface-prompt-key",
+        default="prompt",
+        help="Key in the dataset containing the prompt text (default: 'prompt')",
+    )
+    hf_group.add_argument(
+        "--huggingface-response-key",
+        default="response",
+        help="Key in the dataset containing the response text (default: 'response')",
+    )
+    hf_group.add_argument(
+        "--huggingface-key-map",
+        help="JSON mapping of dataset keys to reward-kit message keys",
+    )
+    preview_parser.add_argument(
+        "--remote-url",
+        help="URL of a remote reward function endpoint to preview against. If provided, metrics-folders might be ignored.",
+    )
+
+    # Deploy command
+    deploy_parser = subparsers.add_parser(
+        "deploy", help="Create and deploy an evaluator, or register a remote one"
+    )
+    deploy_parser.add_argument("--id", required=True, help="ID for the evaluator")
+    deploy_parser.add_argument(
+        "--metrics-folders",
+        "-m",
+        nargs="+",
+        required=False,  # No longer strictly required if --remote-url is used
+        help="Metric folders in format 'name=path', e.g., 'clarity=./metrics/clarity'. Required if not using --remote-url.",
+    )
+    deploy_parser.add_argument(
+        "--display-name",
+        help="Display name for the evaluator (defaults to ID if not provided)",
+    )
+    deploy_parser.add_argument("--description", help="Description for the evaluator")
+    deploy_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force update if evaluator already exists",
+    )
+
+    # Add HuggingFace dataset options to deploy command
+    hf_deploy_group = deploy_parser.add_argument_group("HuggingFace Dataset Options")
+    hf_deploy_group.add_argument(
+        "--huggingface-dataset",
+        "--hf",
+        help="HuggingFace dataset name (e.g., 'deepseek-ai/DeepSeek-ProverBench')",
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-split",
+        default="train",
+        help="Dataset split to use (default: 'train')",
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-prompt-key",
+        default="prompt",
+        help="Key in the dataset containing the prompt text (default: 'prompt')",
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-response-key",
+        default="response",
+        help="Key in the dataset containing the response text (default: 'response')",
+    )
+    hf_deploy_group.add_argument(
+        "--huggingface-key-map",
+        help="JSON mapping of dataset keys to reward-kit message keys",
+    )
+    deploy_parser.add_argument(
+        "--remote-url",
+        help="URL of a pre-deployed remote reward function. If provided, deploys by registering this URL with Fireworks AI.",
+    )
+
+    # GCP deployment options
+    gcp_group = deploy_parser.add_argument_group(
+        "GCP Cloud Run Deployment Options (used if --target is gcp-cloud-run)"
+    )
+    gcp_group.add_argument(
+        "--target",
+        choices=["fireworks", "gcp-cloud-run"],
+        default="fireworks",
+        help="Deployment target. 'fireworks' for standard deployment, 'gcp-cloud-run' for deploying to Google Cloud Run.",
+    )
+    gcp_group.add_argument(
+        "--function-ref",
+        help="Reference to the reward function to deploy (e.g., 'examples.gcp_cloud_run_deployment_example.dummy_rewards.hello_world_reward'). Required for gcp-cloud-run target.",
+    )
+    gcp_group.add_argument(
+        "--gcp-project",
+        required=False,
+        help="Google Cloud Project ID. Must be provided via CLI or rewardkit.yaml.",
+    )
+    gcp_group.add_argument(
+        "--gcp-region",
+        required=False,
+        help="Google Cloud Region for deployment (e.g., 'us-central1'). Must be provided via CLI or rewardkit.yaml.",
+    )
+    gcp_group.add_argument(
+        "--gcp-ar-repo",
+        required=False,
+        help="Google Artifact Registry repository name. Optional, defaults to value in rewardkit.yaml or 'reward-kit-evaluators' if not specified.",
+    )
+    gcp_group.add_argument(
+        "--service-account",
+        help="Email of the GCP service account to run the Cloud Run service. Optional.",
+    )
+    gcp_group.add_argument(
+        "--entry-point",
+        default="reward_function",
+        help="The name of the entry point function within your --function-ref module (default: reward_function). Only for gcp-cloud-run.",
+    )
+    gcp_group.add_argument(
+        "--runtime",
+        default="python311",  # Or a sensible default
+        help="The Cloud Functions/Run runtime (e.g., python311). Only for gcp-cloud-run.",
+    )
+    gcp_group.add_argument(
+        "--gcp-auth-mode",
+        choices=["open", "api-key"],  # Add 'iam' later
+        default=None,  # Default will be resolved in deploy_command
+        help="Authentication mode for the deployed GCP Cloud Run service. "
+        "'open': Publicly accessible. "
+        "'api-key': Service is publicly accessible but requires an API key in requests (handled by the application). "
+        "If not specified, defaults to value in rewardkit.yaml or 'api-key'. Optional.",
+    )
+
+    # Agent-eval command
+    agent_eval_parser = subparsers.add_parser(
+        "agent-eval", help="Run agent evaluation using the ForkableResource framework."
+    )
+    agent_eval_parser.add_argument(
+        "--task-def",
+        required=True,
+        help="Path to task definition file or directory containing task definitions.",
+    )
+    agent_eval_parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Execute tasks in parallel when multiple tasks are specified.",
+    )
+    agent_eval_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=3,
+        help="Maximum number of tasks to execute in parallel (default: 3).",
+    )
+    agent_eval_parser.add_argument(
+        "--filter",
+        nargs="+",
+        help="Run only tasks matching the specified task IDs.",
+    )
+    agent_eval_parser.add_argument(
+        "--output-dir",
+        default="./agent_runs",
+        help="Directory to store agent evaluation run results (default: ./agent_runs).",
+    )
+    agent_eval_parser.add_argument(
+        "--model",
+        help="Override MODEL_AGENT environment variable (format: provider/model_name).",
+    )
+
+    # Run command (for Hydra-based evaluations)
+    # This subparser intentionally defines no arguments itself.
+    # All arguments after 'run' will be passed to Hydra by parse_known_args.
+    subparsers.add_parser(
+        "run",
+        help="Run an evaluation using a Hydra configuration. All arguments after 'run' are passed to Hydra.",
+        # add_help=False # Optionally disable help for this subparser if Hydra's help is preferred
+    )
+
+    # Use parse_known_args to allow Hydra to handle its own arguments
+    return parser.parse_known_args(args)
+
+
+def main():
+    """Main entry point for the CLI"""
+    try:
+        from dotenv import load_dotenv
+
+        # .env.dev for development-specific overrides, .env for general
+        load_dotenv(dotenv_path=Path(".") / ".env.dev", override=True)
+        load_dotenv(override=True)
+    except ImportError:
+        pass
+
+    # Store original sys.argv[0] because Hydra might manipulate it
+    # and we need it if we're not calling a Hydra app.
+    original_script_name = sys.argv[0]
+    args, remaining_argv = parse_args()  # Use parse_known_args
+
+    setup_logging(args.verbose, getattr(args, "debug", False))
+
+    if args.command == "preview":
+        return preview_command(args)
+    elif args.command == "deploy":
+        return deploy_command(args)
+    elif args.command == "agent-eval":
+        return agent_eval_command(args)
+    elif args.command == "run":
+        # For the 'run' command, Hydra takes over argument parsing.
+
+        # Filter out the initial '--' if present in remaining_argv, which parse_known_args might add
+        hydra_specific_args = [arg for arg in remaining_argv if arg != "--"]
+
+        processed_hydra_args = []
+        i = 0
+        while i < len(hydra_specific_args):
+            arg = hydra_specific_args[i]
+            if arg == "--config-path":
+                processed_hydra_args.append(arg)  # Add --config-path flag
+                i += 1
+                if i < len(hydra_specific_args):
+                    path_val = hydra_specific_args[i]
+                    abs_path = os.path.abspath(path_val)
+                    logger.debug(
+                        f"Converting relative --config-path '{path_val}' (space separated) to absolute '{abs_path}'"
+                    )
+                    processed_hydra_args.append(abs_path)
+                else:
+                    logger.error("--config-path specified without a value.")
+                    # Or raise an error: raise ValueError("--config-path specified without a value")
+                    # For now, let Hydra handle the missing value if it occurs.
+                    pass
+            elif arg.startswith("--config-path="):
+                flag_part, path_val = arg.split("=", 1)
+                processed_hydra_args.append(flag_part)  # Add --config-path flag
+                abs_path = os.path.abspath(path_val)
+                logger.debug(
+                    f"Converting relative --config-path '{path_val}' (equals separated) to absolute '{abs_path}'"
+                )
+                processed_hydra_args.append(abs_path)
+            else:
+                processed_hydra_args.append(arg)
+            i += 1
+
+        sys.argv = [sys.argv[0]] + processed_hydra_args
+        logger.info(
+            f"SYSCALL_ARGV_FOR_HYDRA (after potential abspath conversion): {sys.argv}"
+        )
+
+        hydra_cli_entry_point()
+        return 0
+    else:
+        temp_parser = argparse.ArgumentParser(
+            prog=os.path.basename(original_script_name)
+        )
+        temp_parser.print_help()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -8,7 +8,7 @@
 *   **Local Testing**: Quickly test your reward functions with sample data.
 *   **Flexible Evaluation**: Evaluate model outputs based on single or multiple custom metrics.
 *   **Seamless Deployment**: Deploy your reward functions to platforms like Fireworks AI.
-*   **CLI Support**: Manage and interact with your reward functions via a command-line interface.
+*   **Comprehensive CLI**: Manage reward functions, preview evaluations (`reward-kit preview`), deploy (`reward-kit deploy`), and run complex evaluation pipelines (`reward-kit run`).
 *   **Simplified Dataset Integration**: Direct integration with HuggingFace datasets and on-the-fly format conversion.
 *   **Extensible**: Designed to be adaptable for various LLM evaluation scenarios.
 
@@ -22,71 +22,202 @@ pip install reward-kit
 
 The Reward Kit simplifies the creation and deployment of reward functions for evaluating AI model outputs.
 
-### 1. Creating a Simple Reward Function
+### 1. Creating a Reward Function for Tool Calling
 
-Create a reward function to evaluate the quality of AI responses:
+Reward Kit allows you to define custom logic to evaluate model responses. Here's an example of how you might use the built-in `exact_tool_match_reward` for evaluating tool/function calls. This reward function checks if the model's generated tool calls exactly match the expected ones.
 
 ```python
+# This is a conceptual example of how exact_tool_match_reward is defined and used.
+# You would typically import it from reward_kit.rewards.function_calling.
+# For actual usage, you configure it in your YAML files for `reward-kit run`.
+
 from reward_kit import reward_function
-from reward_kit.models import EvaluateResult, MetricResult, Message # Assuming models are here
-from typing import List, Dict, Any, Optional
+from reward_kit.models import EvaluateResult, Message, MetricResult
+from typing import List, Dict, Any, Optional, Union
+
+# Definition of exact_tool_match_reward (simplified for brevity, see source for full details)
+# from reward_kit.rewards.function_calling import exact_tool_match_reward, eval_tool_call
 
 @reward_function
-def informativeness(
-    messages: List[Dict[str, Any]], # Or List[Message] if using Message type directly
-    original_messages: Optional[List[Dict[str, Any]]] = None, # Or List[Message]
-    **kwargs: Any
+def exact_tool_match_reward(
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Dict[str, Any]] = None,
+    **kwargs,
 ) -> EvaluateResult:
-    """Evaluate the informativeness of a response."""
-    # Get the assistant's response
-    response = messages[-1].get("content", "")
+    if not messages:
+        return EvaluateResult(
+            score=0.0, reason="No messages provided for evaluation.", metrics={}
+        )
 
-    # Simple evaluation: word count
-    word_count = len(response.split())
-    # Score normalized to 0-1, assuming 100 words is a good target for this example
-    score = min(word_count / 100.0, 1.0)
-    is_informative_enough = word_count > 10 # Example success condition
+    generation_message_obj = messages[-1]
+    generation_dict: Dict[str, Any]
 
-    return EvaluateResult(
-        score=score,
-        reason=f"Word count: {word_count}",
-        metrics={
-            "word_count": MetricResult(
-                score=score,
-                success=is_informative_enough,
-                reason=f"Word count: {word_count}"
-            )
+    if isinstance(generation_message_obj, Message):
+        generation_dict = {
+            "role": generation_message_obj.role,
+            "content": generation_message_obj.content,
         }
-    )
+        if generation_message_obj.tool_calls:
+            generation_dict["tool_calls"] = [
+                tc.model_dump() if hasattr(tc, "model_dump") else tc
+                for tc in generation_message_obj.tool_calls
+            ]
+    elif isinstance(generation_message_obj, dict):
+        generation_dict = generation_message_obj
+    else:
+        # Handle error for unexpected type
+        return EvaluateResult(score=0.0, reason="Unexpected generation message type.", metrics={})
+
+    if ground_truth is None:
+        # Handle missing ground truth (e.g., score 0 if generation has tool calls, 1 if not)
+        # This logic is simplified here.
+        has_gen_tc = bool(generation_dict.get("tool_calls") or "<tool_call>" in generation_dict.get("content", ""))
+        score = 0.0 if has_gen_tc else 1.0
+        return EvaluateResult(score=score, reason="Ground truth not provided.", metrics={})
+
+    # Ensure ground_truth is a dict (it might be a JSON string from some datasets)
+    if isinstance(ground_truth, str):
+        try:
+            ground_truth = json.loads(ground_truth)
+        except json.JSONDecodeError:
+            return EvaluateResult(score=0.0, reason="Ground truth string failed to parse.", metrics={})
+    
+    if not isinstance(ground_truth, dict):
+         return EvaluateResult(score=0.0, reason="Ground truth is not a dictionary.", metrics={})
+
+    # The core logic from eval_tool_call would be used here.
+    # This is a placeholder for the actual comparison logic.
+    # score = float(eval_tool_call(generation_dict, ground_truth)) # eval_tool_call is a helper
+    
+    # Simplified placeholder for the actual comparison:
+    # Real implementation involves detailed comparison of tool call names and arguments.
+    # See reward_kit/rewards/function_calling.py for the full `eval_tool_call` logic.
+    expected_tcs = ground_truth.get("tool_calls", [])
+    generated_tcs = generation_dict.get("tool_calls", [])
+    
+    # This is a highly simplified check. The actual function is much more robust.
+    is_match = (len(expected_tcs) == len(generated_tcs)) # Placeholder
+    score = 1.0 if is_match else 0.0
+    
+    reason = f"Exact tool match evaluation score: {score}"
+    return EvaluateResult(score=score, reason=reason, metrics={
+        "tool_call_match": MetricResult(score=score, success=is_match, reason=reason)
+    })
+
 ```
+This example illustrates the structure. The actual `exact_tool_match_reward` in `reward_kit.rewards.function_calling` handles complex parsing and comparison of tool calls.
 
-### 2. Testing Your Reward Function
+### 2. Testing Your Reward Function with a Dataset
 
-Test your reward function locally:
+Effective testing of a reward function involves evaluating it against a representative dataset. The key is the **dataset/reward function pair**: your dataset should provide the necessary `ground_truth` information that your reward function expects.
+
+**Crafting Your Dataset:**
+
+1.  **Define `ground_truth`**: For each sample in your dataset, the `ground_truth_for_eval` (or a similarly named field specified in your dataset configuration) must contain the information your reward function needs to make a judgment.
+    *   For `exact_tool_match_reward`, `ground_truth` should be a dictionary, often with a `tool_calls` key. This key would hold a list of expected tool calls, each specifying the `name` and `arguments` of the function call. Example:
+        ```json
+        {
+          "role": "assistant",
+          "tool_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {"location": "San Francisco, CA", "unit": "celsius"}
+            }
+          ]
+        }
+        ```
+2.  **Format**: Datasets are typically JSONL files, where each line is a JSON object representing a sample. Each sample should include:
+    *   `messages`: The input conversation history for the model.
+    *   `tools` (optional, for tool calling): A list of available tools the model can use.
+    *   `ground_truth_for_eval`: The expected output or data for the reward function (e.g., the structure shown above for tool calling).
+    *   An `id` for tracking.
+
+**Example Test Snippet (Conceptual):**
+
+While `reward-kit run` is the primary way to evaluate with datasets, here's a conceptual local test:
 
 ```python
-# Test messages
-test_messages = [
-    {"role": "user", "content": "What is machine learning?"},
-    {"role": "assistant", "content": "Machine learning is a method of data analysis that automates analytical model building."}
-]
+from reward_kit.rewards.function_calling import exact_tool_match_reward # Import the actual function
+from reward_kit.models import Message
 
-# Test your reward function
-result = informativeness(messages=test_messages)
-print(f"Score: {result.score}")
-print(f"Reason: {result.reason}")
+# Sample 1: Correct tool call
+test_messages_correct = [
+    Message(role="user", content="What's the weather in SF?"),
+    Message(role="assistant", tool_calls=[ # Model's generated tool call
+        {"id": "call_123", "type": "function", "function": {"name": "get_weather", "arguments": '{"location": "San Francisco, CA", "unit": "celsius"}'}}
+    ])
+]
+ground_truth_correct = { # Expected tool call for the reward function
+    "tool_calls": [
+        {"name": "get_weather", "arguments": {"location": "San Francisco, CA", "unit": "celsius"}}
+    ]
+}
+
+# Sample 2: Incorrect tool call
+test_messages_incorrect = [
+    Message(role="user", content="What's the weather in SF?"),
+    Message(role="assistant", tool_calls=[
+        {"id": "call_456", "type": "function", "function": {"name": "get_current_time", "arguments": '{}'}}
+    ])
+]
+# Ground truth remains the same as we expect get_weather
+
+# Test with the actual reward function
+result_correct = exact_tool_match_reward(messages=test_messages_correct, ground_truth=ground_truth_correct)
+print(f"Correct Call - Score: {result_correct.score}, Reason: {result_correct.reason}")
+
+result_incorrect = exact_tool_match_reward(messages=test_messages_incorrect, ground_truth=ground_truth_correct)
+print(f"Incorrect Call - Score: {result_incorrect.score}, Reason: {result_incorrect.reason}")
 ```
+This local test helps verify the reward function's logic with specific inputs. For comprehensive evaluation, use `reward-kit run` with a full dataset (see next section).
 
 ### 3. Running Local Evaluations with `reward-kit run`
 
-For more comprehensive local evaluations, especially when working with datasets and complex configurations, use the `reward-kit run` command. This command leverages Hydra for configuration management, allowing you to define your evaluation pipeline (dataset, model, reward function, etc.) in YAML files.
+For comprehensive local evaluations, especially when working with datasets and complex configurations, the `reward-kit run` command is the recommended tool. It leverages Hydra for configuration management, allowing you to define your evaluation pipeline (dataset, model, reward function, etc.) in YAML files.
+
+**Example: Math Evaluation using `codeparrot/gsm8k`**
+
+The `examples/math_example` demonstrates evaluating models on math word problems.
 
 ```bash
-# Example: Running the math_example evaluation
-# (Assumes you have the reward-kit repository cloned and are in its root)
-reward-kit run --config-path examples/math_example/conf --config-name run_math_eval.yaml
+# Ensure you are in the repository root
+# cd /path/to/reward-kit
+
+# Run evaluation with the math configuration
+reward-kit run --config-name run_math_eval.yaml --config-path examples/math_example/conf
+
+# Override parameters directly from the command line:
+reward-kit run --config-name run_math_eval.yaml --config-path examples/math_example/conf \
+  generation.model_name="accounts/fireworks/models/llama-v3p1-405b-instruct" \
+  evaluation_params.limit_samples=10
 ```
-This command processes the specified dataset, generates model responses, applies reward functions, and saves detailed results. For more details on this command and Hydra configuration, see the [CLI Overview](docs/cli_reference/cli_overview.mdx) and [Hydra Configuration Guide](docs/developer_guide/hydra_configuration.mdx).
+
+**What this command does (typically):**
+*   Loads the specified dataset (e.g., GSM8K directly from HuggingFace).
+*   Applies any dataset-specific prompts or preprocessing defined in the configuration.
+*   Generates model responses (e.g., using the Fireworks API or other configured providers).
+*   Evaluates the generated responses using the specified reward function(s).
+*   Saves detailed evaluation results to `<config_output_name>.jsonl` (e.g., `math_example_results.jsonl`) in a timestamped output directory (e.g., under `outputs/`).
+*   Saves generated prompt/response pairs to `preview_input_output_pairs.jsonl` in the same output directory, suitable for inspection or re-evaluation with `reward-kit preview`.
+
+**Example: APPS Coding Evaluation**
+
+The `examples/apps_coding_example` shows evaluation on code generation tasks using the `codeparrot/apps` dataset.
+
+```bash
+# Run evaluation with the APPS coding configuration
+reward-kit run --config-path examples/apps_coding_example/conf --config-name run_eval
+
+# Example: Limit samples for a quick test
+reward-kit run --config-path examples/apps_coding_example/conf --config-name run_eval evaluation_params.limit_samples=2
+
+# Example: Disable generation to test reward function on cached responses
+reward-kit run --config-path examples/apps_coding_example/conf --config-name run_eval generation.enabled=false
+```
+
+These examples showcase how `reward-kit run` can be adapted for different tasks and datasets through configuration files.
+
+For more details on this command, Hydra configuration, and advanced usage, see the [CLI Overview](docs/cli_reference/cli_overview.mdx) and [Hydra Configuration Guide](docs/developer_guide/hydra_configuration.mdx).
 
 ### Fireworks Authentication Setup (Required for Preview/Deploy with Fireworks)
 
@@ -283,8 +414,10 @@ For more comprehensive information, including API references, tutorials, and adv
 
 Check the `examples` directory for complete examples:
 
-- `evaluation_preview_example.py`: How to preview an evaluator
-- `deploy_example.py`: How to deploy a reward function to Fireworks
+- `evaluation_preview_example.py`: How to preview an evaluator.
+- `deploy_example.py`: How to deploy a reward function to Fireworks.
+- `math_example/`: Demonstrates CLI-based evaluation (`reward-kit run`) and TRL GRPO training for math problems (GSM8K dataset).
+- `apps_coding_example/`: Shows CLI-based evaluation (`reward-kit run`) for code generation tasks (APPS dataset).
 
 ## Command Line Interface
 

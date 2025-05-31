@@ -626,6 +626,6 @@ def reliability_guard(maximum_memory_bytes=None):
 
     # For reward_kit, rely on higher-level sandboxing if untrusted code execution is a concern.
     # The memory limits via `resource` are a good first step for resource exhaustion.
-    import shutil # Keep import if other shutil functions are used, or remove if not.
-    import subprocess # Keep import if other subprocess functions are used, or remove if not.
-    import sys # Keep import for sys.stdout, sys.stdin manipulations.
+    import shutil  # Keep import if other shutil functions are used, or remove if not.
+    import subprocess  # Keep import if other subprocess functions are used, or remove if not.
+    import sys  # Keep import for sys.stdout, sys.stdin manipulations.

@@ -81,24 +81,24 @@ def exact_tool_match_reward(
             ground_truth = json.loads(ground_truth)
         except json.JSONDecodeError:
             return EvaluateResult(score=0.0, reason="Ground truth string failed to parse.", metrics={})
-    
+
     if not isinstance(ground_truth, dict):
          return EvaluateResult(score=0.0, reason="Ground truth is not a dictionary.", metrics={})
 
     # The core logic from eval_tool_call would be used here.
     # This is a placeholder for the actual comparison logic.
     # score = float(eval_tool_call(generation_dict, ground_truth)) # eval_tool_call is a helper
-    
+
     # Simplified placeholder for the actual comparison:
     # Real implementation involves detailed comparison of tool call names and arguments.
     # See reward_kit/rewards/function_calling.py for the full `eval_tool_call` logic.
     expected_tcs = ground_truth.get("tool_calls", [])
     generated_tcs = generation_dict.get("tool_calls", [])
-    
+
     # This is a highly simplified check. The actual function is much more robust.
     is_match = (len(expected_tcs) == len(generated_tcs)) # Placeholder
     score = 1.0 if is_match else 0.0
-    
+
     reason = f"Exact tool match evaluation score: {score}"
     return EvaluateResult(score=score, reason=reason, metrics={
         "tool_call_match": MetricResult(score=score, success=is_match, reason=reason)

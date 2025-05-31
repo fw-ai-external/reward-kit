@@ -78,9 +78,7 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
 
     if config_path:
         pass
-    elif (
-        _loaded_config and not config_path
-    ):
+    elif _loaded_config and not config_path:
         return _loaded_config
     else:
         config_path = find_config_file()
@@ -90,9 +88,7 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
         _config_file_path = None
         return _loaded_config
 
-    if (
-        _loaded_config and config_path == _config_file_path
-    ):
+    if _loaded_config and config_path == _config_file_path:
         return _loaded_config
 
     try:

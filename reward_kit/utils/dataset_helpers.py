@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 
 try:
     from datasets import Dataset
+
     HAS_DATASETS_LIB = True
 except ImportError:
     HAS_DATASETS_LIB = False

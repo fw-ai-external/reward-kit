@@ -330,7 +330,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         for m_plain_latex in re.finditer(
             r"(?<![a-zA-Z0-9_])(-?\d+(?:\.\d+)?)(?![a-zA-Z0-9_])", content
         ):
-            if _is_coefficient(text_content=content, match_obj=m_plain_latex, num_group_idx=1):
+            if _is_coefficient(
+                text_content=content, match_obj=m_plain_latex, num_group_idx=1
+            ):
                 continue
             try:
                 potential_general_matches.append(
@@ -349,7 +351,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
 
     sci_pattern = r"(?<![a-zA-Z0-9_])(-?\d+\.?\d*[eE][-+]?\d+)(?:\s*([a-zA-Z%]+))?"
     for m in re.finditer(sci_pattern, text):
-        if _is_coefficient(text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2):
+        if _is_coefficient(
+            text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
+        ):
             continue
         try:
             potential_general_matches.append(
@@ -365,7 +369,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
 
     frac_pattern = r"(?<!\d/)(?<!\d)(?<!\.)(-?\d+)\s*/\s*(-?\d+)(?!\.\d)(?!\d*/)(?:\s+(?!(?:and|or)\b)([a-zA-Z%]+)\b)?"
     for m in re.finditer(frac_pattern, text):
-        if _is_coefficient(text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=3):
+        if _is_coefficient(
+            text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=3
+        ):
             continue
         try:
             num, den = float(m.group(1)), float(m.group(2))
@@ -391,7 +397,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         r"(?<![a-zA-Z0-9_])(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*([a-zA-Z%]+))?"
     )
     for m in re.finditer(comma_num_pattern, text):
-        if _is_coefficient(text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2):
+        if _is_coefficient(
+            text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
+        ):
             continue
         try:
             potential_general_matches.append(
@@ -409,7 +417,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
         r"(?<![a-zA-Z0-9_])(?<!,\d{3})(-?\d+\.\d+)(?!\d*[eE])(?:\s*([a-zA-Z%]+))?"
     )
     for m in re.finditer(decimal_pattern, text):
-        if _is_coefficient(text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2):
+        if _is_coefficient(
+            text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
+        ):
             continue
         try:
             potential_general_matches.append(
@@ -425,7 +435,9 @@ def _extract_general_numeric_answers(text: str) -> List[Tuple[str, Union[float, 
 
     integer_pattern = r"(?<![a-zA-Z0-9_])(?<!\d\.)(-?\d+)(?!\.\d)(?![eE][-+]?\d+)(?!,\d{3})(?!\s*/\s*\d+)(?:\s*([a-zA-Z%]+))?"
     for m in re.finditer(integer_pattern, text):
-        if _is_coefficient(text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2):
+        if _is_coefficient(
+            text_content=text, match_obj=m, num_group_idx=1, unit_group_idx=2
+        ):
             continue
         try:
             potential_general_matches.append(
@@ -828,77 +840,3 @@ def math_reward(
     return EvaluateResult(
         score=best_match_score, reason=best_match_reason, metrics=metrics
     )
-
-</final_file_content>
-
-IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
-
-<environment_details>
-# VSCode Visible Files
-reward_kit/rewards/math.py
-
-# VSCode Open Tabs
-reward_kit/__init__.py
-reward_kit/auth.py
-reward_kit/cli.py
-reward_kit/common_utils.py
-reward_kit/evaluation.py
-reward_kit/generic_server.py
-reward_kit/models.py
-reward_kit/platform_api.py
-reward_kit/reward_function.py
-reward_kit/rl_processing.py
-reward_kit/server.py
-reward_kit/typed_interface.py
-reward_kit/adapters/trl.py
-reward_kit/agent/orchestrator.py
-reward_kit/agent/resources/bfcl_sim_api_resource.py
-reward_kit/agent/resources/docker_resource.py
-reward_kit/agent/resources/filesystem_resource.py
-reward_kit/agent/resources/python_state_resource.py
-reward_kit/agent/resources/sql_resource.py
-reward_kit/cli_commands/deploy.py
-reward_kit/cli_commands/preview.py
-reward_kit/cli_commands/run_eval_cmd.py
-reward_kit/datasets/loader.py
-reward_kit/execution/pipeline.py
-reward_kit/rewards/__init__.py
-reward_kit/rewards/apps_coding_reward.py
-reward_kit/rewards/apps_execution_utils.py
-reward_kit/config.py
-reward_kit/gcp_tools.py
-development/normalize_sandbox_fusion.py
-reward_kit/packaging.py
-reward_kit/agent/resource_pool.py
-reward_kit/agent/task_manager.py
-reward_kit/agent/resources/bfcl_envs/gorilla_file_system.py
-reward_kit/cli_commands/agent_eval_cmd.py
-reward_kit/cli_commands/common.py
-reward_kit/generation/cache.py
-reward_kit/generation/clients.py
-reward_kit/rewards/accuracy_length.py
-reward_kit/rewards/accuracy.py
-reward_kit/rewards/apps_testing_util.py
-reward_kit/rewards/bfcl_reward.py
-reward_kit/rewards/code_execution_utils.py
-reward_kit/rewards/code_execution.py
-reward_kit/rewards/cpp_code.py
-reward_kit/rewards/deepcoder_reward.py
-reward_kit/rewards/format.py
-reward_kit/rewards/function_calling.py
-reward_kit/rewards/json_schema.py
-reward_kit/rewards/language_consistency.py
-reward_kit/rewards/lean_prover.py
-reward_kit/rewards/length.py
-reward_kit/rewards/list_comparison_math_reward.py
-reward_kit/rewards/math.py
-
-# Current Time
-5/30/2025, 5:14:00 PM (America/Los_Angeles, UTC-7:00)
-
-# Context Window Usage
-1,000,000 / 1,048.576K tokens used (95%)
-
-# Current Mode
-ACT MODE
-</environment_details>

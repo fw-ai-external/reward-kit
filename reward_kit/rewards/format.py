@@ -16,9 +16,7 @@ from ..typed_interface import reward_function
 @reward_function
 def format_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[
-        Union[List[Message], List[Dict[str, Any]]]
-    ] = None,
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,
     format_regex: str = r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$",
     require_exact_match: bool = True,
     **kwargs: Any

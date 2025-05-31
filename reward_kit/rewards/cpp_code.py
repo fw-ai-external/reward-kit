@@ -540,9 +540,7 @@ async def run_cpp_test_cases(
 @reward_function
 def ioi_cpp_code_reward(
     messages: List[Message],
-    ground_truth: Union[
-        Optional[str], Optional[List[Dict[str, Any]]]
-    ],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -575,9 +573,7 @@ def ioi_cpp_code_reward(
 
 def _ioi_cpp_code_reward_impl(
     messages: List[Message],
-    ground_truth: Union[
-        Optional[str], Optional[List[Dict[str, Any]]]
-    ],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -821,9 +817,7 @@ def _ioi_cpp_code_reward_impl(
 @reward_function
 def binary_cpp_code_reward(
     messages: List[Message],
-    ground_truth: Union[
-        Optional[str], Optional[List[Dict[str, Any]]]
-    ],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,

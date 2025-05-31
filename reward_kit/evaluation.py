@@ -782,14 +782,14 @@ def preview_evaluation(
         # due to how ts_mode_config is handled (sets self.multi_metrics = True for payload).
         # The multi_metrics flag passed to Evaluator here should be the original one for folder logic.
         evaluator = Evaluator(
-        multi_metrics=multi_metrics,
-        ts_mode_config=ts_mode_config,
-        reward_function_mode=reward_function_mode,
-    )
+            multi_metrics=multi_metrics,
+            ts_mode_config=ts_mode_config,
+            reward_function_mode=reward_function_mode,
+        )
     else:
         evaluator = Evaluator(
             multi_metrics=multi_metrics, reward_function_mode=reward_function_mode
-        ) # Pass mode to Evaluator
+        )  # Pass mode to Evaluator
         if multi_metrics:
             if not folder:
                 raise ValueError("`folder` must be specified for multi_metrics mode.")

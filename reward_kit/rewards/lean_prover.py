@@ -2,15 +2,14 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from reward_kit.models import Message
-from reward_kit.models import EvaluateResult, MetricResult
+from reward_kit.models import EvaluateResult, Message, MetricResult
 from reward_kit.reward_function import reward_function
 
 
 @reward_function
 def lean_prover_reward(
     messages: List[Message],
-    ground_truth: Optional[str], # This is the expected_answer (proof string)
+    ground_truth: Optional[str],  # This is the expected_answer (proof string)
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -190,7 +189,7 @@ def lean_prover_reward(
 @reward_function
 def deepseek_prover_v2_reward(
     messages: List[Message],
-    ground_truth: Optional[str], # This is the expected_proof
+    ground_truth: Optional[str],  # This is the expected_proof
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -400,6 +399,7 @@ def deepseek_huggingface_prover_benchmark(
 
         if not matched_item:
             from difflib import SequenceMatcher
+
             best_ratio: float = 0.0
             matched_ratio: float = 0.0
             for split in dataset.keys():

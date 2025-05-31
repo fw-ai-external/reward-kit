@@ -76,9 +76,7 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
         if start >= last_covered_end:
             letter_upper = match_info["letter"]
             if letter_upper not in found_mcq_letters:
-                mcq_answers.append(
-                    (match_info["text"], letter_upper)
-                )
+                mcq_answers.append((match_info["text"], letter_upper))
                 found_mcq_letters.add(letter_upper)
             last_covered_end = end
     # Renamed final_mcq_answers to mcq_answers for clarity
@@ -217,7 +215,9 @@ def multiple_choice_math_reward(
             is_score_valid=False,
             reason=f"Generated message has multiple MCQ options extracted: {format_extracted_mcq(gen_mcq_options)}",
         )
-        if len(orig_mcq_options) == 1: # Penalize if GT is specific but gen is ambiguous
+        if (
+            len(orig_mcq_options) == 1
+        ):  # Penalize if GT is specific but gen is ambiguous
             return EvaluateResult(
                 score=0.0,
                 reason="Generated answer is ambiguous (multiple MCQ options) while ground truth is specific.",

@@ -14,9 +14,7 @@ from .function_calling import (
 @reward_function
 def json_schema_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[
-        Union[List[Message], List[Dict[str, Any]]]
-    ] = None,
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
@@ -178,7 +176,7 @@ def json_schema_reward(
         if isinstance(content, dict):
             schema: Dict[str, Any] = {"type": "object", "properties": {}}
             for key, value in content.items():
-                if isinstance(schema["properties"], dict): # Should always be true
+                if isinstance(schema["properties"], dict):  # Should always be true
                     schema["properties"][key] = build_schema_from_content(value)
             return schema
         elif isinstance(content, list):
@@ -376,6 +374,7 @@ EXPLANATION: [your detailed explanation]
 """
         try:
             import os
+
             api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OpenAI API key not provided")

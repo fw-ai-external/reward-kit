@@ -1,6 +1,5 @@
 import json
-from typing import Union
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from openai.types.chat.chat_completion_message import (
     ChatCompletionMessageToolCall,

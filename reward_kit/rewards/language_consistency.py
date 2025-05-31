@@ -478,7 +478,7 @@ def count_words_by_language(text: str) -> Dict[str, int]:
     for lang, keywords in LANGUAGE_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text:
-                counts[lang] += 5 # Add extra weight for explicit language mentions
+                counts[lang] += 5  # Add extra weight for explicit language mentions
 
     words = re.findall(r"\b\w+\b", text)
 
@@ -523,7 +523,9 @@ def detect_dominant_language(text: str) -> Tuple[str, float]:
     dominant_lang = max(counts.items(), key=lambda x: x[1])
     confidence = dominant_lang[1] / total if total > 0 else 0.0
 
-    if dominant_lang[0] == "zh" and confidence > 0.5: # Ensure we have a minimum confidence for Chinese
+    if (
+        dominant_lang[0] == "zh" and confidence > 0.5
+    ):  # Ensure we have a minimum confidence for Chinese
         confidence = 0.9
 
     return (dominant_lang[0], confidence)
@@ -592,7 +594,9 @@ def language_consistency_reward(
     elif not target_language and auto_detect:
         prompt_messages = messages[:-1]
         for msg in prompt_messages:
-            if isinstance(msg, Message) and msg.role == "user": # Decorator ensures msg is Message
+            if (
+                isinstance(msg, Message) and msg.role == "user"
+            ):  # Decorator ensures msg is Message
                 content_text: str = msg.content if msg.content is not None else ""
                 if "in Spanish" in content_text:
                     target_language = "es"

@@ -67,7 +67,9 @@ class ResponseCache:
         if not self.cache_dir:
             return None
 
-        if temperature != 0.0:  # Only cache deterministic (temp=0) generations by default
+        if (
+            temperature != 0.0
+        ):  # Only cache deterministic (temp=0) generations by default
             return None
 
         cache_key = self._generate_key(

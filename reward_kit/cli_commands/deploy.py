@@ -24,9 +24,9 @@ from reward_kit.gcp_tools import (
     ensure_gcp_secret,
 )
 from reward_kit.packaging import generate_dockerfile_content
-from reward_kit.platform_api import create_or_update_fireworks_secret
 from reward_kit.platform_api import (  # For catching errors from create_evaluation
     PlatformAPIError,
+    create_or_update_fireworks_secret,
 )
 
 from .common import check_environment

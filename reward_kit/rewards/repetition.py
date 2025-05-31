@@ -31,6 +31,7 @@ def get_ngrams(
     elif language == "zh":
         try:
             import jieba
+
             words = list(jieba.cut(text))
         except ImportError:
             words = list(text)
@@ -294,15 +295,22 @@ def diversity_reward(
         if len(weights) > len(ngram_sizes):
             weights = weights[: len(ngram_sizes)]
         else:
-            missing_weight = (1.0 - sum(weights)) / (len(ngram_sizes) - len(weights)) if (len(ngram_sizes) - len(weights)) > 0 else 0
+            missing_weight = (
+                (1.0 - sum(weights)) / (len(ngram_sizes) - len(weights))
+                if (len(ngram_sizes) - len(weights)) > 0
+                else 0
+            )
             weights.extend([missing_weight] * (len(ngram_sizes) - len(weights)))
 
     total_weight = sum(weights)
-    if total_weight != 1.0 and total_weight > 0: # Avoid division by zero if total_weight is 0
+    if (
+        total_weight != 1.0 and total_weight > 0
+    ):  # Avoid division by zero if total_weight is 0
         weights = [w / total_weight for w in weights]
-    elif total_weight == 0 and len(weights) > 0: # If all weights are zero, distribute equally
-        weights = [1.0/len(weights)] * len(weights)
-
+    elif (
+        total_weight == 0 and len(weights) > 0
+    ):  # If all weights are zero, distribute equally
+        weights = [1.0 / len(weights)] * len(weights)
 
     diversity_scores = {}
     ratios = {}

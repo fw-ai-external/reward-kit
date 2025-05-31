@@ -211,7 +211,9 @@ def local_code_execution_reward(
         )
 
     if language.lower() == "python":
-        execution_result = execute_python_code(code, timeout) # max_memory_mb is handled inside _execute_python_in_subprocess
+        execution_result = execute_python_code(
+            code, timeout
+        )  # max_memory_mb is handled inside _execute_python_in_subprocess
     elif language.lower() in ["javascript", "js"]:
         execution_result = execute_javascript_code(code, timeout)
     else:
@@ -362,8 +364,7 @@ def _execute_python_in_subprocess(code: str, timeout: int) -> Dict[str, Any]:
                 "    os.unlink = None\n"
                 "    os.access = None\n"
                 "\n"
-                "_reliability_guard()\n\n"
-                + code
+                "_reliability_guard()\n\n" + code
             )
 
             temp_file.write(safe_code.encode("utf-8"))
@@ -1037,9 +1038,7 @@ def e2b_code_execution_reward(
 @reward_function
 def fractional_code_reward(
     messages: List[Message],
-    ground_truth: Union[
-        Optional[str], Optional[List[Dict[str, Any]]]
-    ],
+    ground_truth: Union[Optional[str], Optional[List[Dict[str, Any]]]],
     language: str = "python",
     timeout: int = 30,
     environment: str = "local",
@@ -1289,6 +1288,7 @@ def _run_test_cases(
 
     if language.lower() in ["python", "py"]:
         if function_to_call:
+
             def prepare_test_code(
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
@@ -1340,9 +1340,7 @@ def _run_test_cases(
                         try:
                             arg_parts = shlex.split(args_str_stripped)
                         except ValueError:
-                            arg_parts = [
-                                args_str_stripped
-                            ]
+                            arg_parts = [args_str_stripped]
 
                         for part_str in arg_parts:
                             try:
@@ -1372,6 +1370,7 @@ except Exception as e:
 """
 
         else:
+
             def prepare_test_code(
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
@@ -1399,6 +1398,7 @@ print(captured_stdout.getvalue(), end='')
 
     elif language.lower() in ["javascript", "js"]:
         if function_to_call:
+
             def prepare_test_code(
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:
@@ -1433,6 +1433,7 @@ try {{
 """
 
         else:
+
             def prepare_test_code(
                 user_code: str, test_input_str: str, func_name: Optional[str]
             ) -> str:

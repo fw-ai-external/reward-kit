@@ -51,27 +51,27 @@ def _run_gcloud_command(
 
 def build_and_push_docker_image(
     image_name_tag: str,  # e.g., gcr.io/my-project/my-reward-func:latest
-        dockerfile_content: str,
-        build_context_dir: str,  # Directory where Dockerfile and user code are (usually CWD)
-        gcp_project_id: Optional[
-            str
-        ] = None,  # Required if using gcloud builds submit without local Docker
-        dry_run: bool = False,
-    ) -> bool:
-        """
-        Builds a Docker image using the provided Dockerfile content and pushes it to a registry (e.g., GCR, Artifact Registry).
-        Can use local Docker or 'gcloud builds submit'.
+    dockerfile_content: str,
+    build_context_dir: str,  # Directory where Dockerfile and user code are (usually CWD)
+    gcp_project_id: Optional[
+        str
+    ] = None,  # Required if using gcloud builds submit without local Docker
+    dry_run: bool = False,
+) -> bool:
+    """
+    Builds a Docker image using the provided Dockerfile content and pushes it to a registry (e.g., GCR, Artifact Registry).
+    Can use local Docker or 'gcloud builds submit'.
 
-        Args:
-            image_name_tag: Full name and tag for the image (e.g., "gcr.io/project-id/image-name:tag").
-            dockerfile_content: String content of the Dockerfile.
-            build_context_dir: The build context directory for Docker.
-            gcp_project_id: GCP Project ID, used for 'gcloud builds submit'.
-            dry_run: If True, prints commands instead of executing them.
+    Args:
+        image_name_tag: Full name and tag for the image (e.g., "gcr.io/project-id/image-name:tag").
+        dockerfile_content: String content of the Dockerfile.
+        build_context_dir: The build context directory for Docker.
+        gcp_project_id: GCP Project ID, used for 'gcloud builds submit'.
+        dry_run: If True, prints commands instead of executing them.
 
-        Returns:
-            True if successful, False otherwise.
-        """
+    Returns:
+        True if successful, False otherwise.
+    """
     logger.info(
         f"Attempting to build and push Docker image using Google Cloud Build: {image_name_tag}"
     )
@@ -132,9 +132,7 @@ def deploy_to_cloud_run(
     gcp_region: str,
     allow_unauthenticated: bool = True,  # For --auth api-key, the service itself is open, auth is app-level
     env_vars: Optional[Dict[str, str]] = None,
-    secrets_to_mount: Optional[
-        Dict[str, str]
-    ] = None,
+    secrets_to_mount: Optional[Dict[str, str]] = None,
     service_port: int = 8080,
     dry_run: bool = False,
 ) -> Optional[str]:
@@ -381,9 +379,7 @@ def ensure_gcp_secret(
 
     logger.info(f"Ensuring secret '{secret_id}' in project '{project_id}'.")
     describe_cmd = ["secrets", "describe", secret_id, "--project", project_id]
-    secret_exists, _, describe_stderr = _run_gcloud_command(
-        describe_cmd, dry_run=False
-    )
+    secret_exists, _, describe_stderr = _run_gcloud_command(describe_cmd, dry_run=False)
 
     if not secret_exists:
         if (

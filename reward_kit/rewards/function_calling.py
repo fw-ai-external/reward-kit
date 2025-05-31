@@ -266,7 +266,10 @@ def maybe_deserialize_tool_call_arguments(
             continue
 
         function_details = tc_openai_format.get("function", {})
-        if not isinstance(function_details, dict) or "arguments" not in function_details:
+        if (
+            not isinstance(function_details, dict)
+            or "arguments" not in function_details
+        ):
             continue
 
         arguments_val = function_details["arguments"]

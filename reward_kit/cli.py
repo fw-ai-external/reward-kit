@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 from reward_kit.evaluation import create_evaluation, preview_evaluation
 
-from .cli_commands.agent_eval_cmd import (
-    agent_eval_command,
-)
+from .cli_commands.agent_eval_cmd import agent_eval_command
 from .cli_commands.common import (
     check_agent_environment,
     check_environment,

@@ -163,9 +163,13 @@ def length_reward(
             success = False
         elif token_count > max_length:
             excess = token_count - max_length
-            range_size = max_length - min_length if max_length > min_length else 1 # Avoid division by zero if min_length == max_length
-            progress = min(1.0, excess / range_size if range_size > 0 else (1.0 if excess > 0 else 0.0) )
-
+            range_size = (
+                max_length - min_length if max_length > min_length else 1
+            )  # Avoid division by zero if min_length == max_length
+            progress = min(
+                1.0,
+                excess / range_size if range_size > 0 else (1.0 if excess > 0 else 0.0),
+            )
 
             if scaling == "cosine":
                 score = max_reward - (max_reward - min_reward) * (
@@ -199,7 +203,10 @@ def length_reward(
     elif max_length is not None:
         if token_count > max_length:
             excess = token_count - max_length
-            progress = min(1.0, excess / max_length if max_length > 0 else (1.0 if excess > 0 else 0.0))
+            progress = min(
+                1.0,
+                excess / max_length if max_length > 0 else (1.0 if excess > 0 else 0.0),
+            )
             if scaling == "cosine":
                 score = max_reward - (max_reward - min_reward) * (
                     1.0 - math.cos(progress * math.pi / 2.0)
@@ -217,7 +224,7 @@ def length_reward(
     else:
         # This is useful when combined with correctness metrics
         # E.g., shorter correct answers > longer correct answers > incorrect answers
-        reference_length = 100 # Default length for normalization
+        reference_length = 100  # Default length for normalization
         normalized_length = token_count / reference_length
         if scaling == "cosine":
             progress = min(1.0, normalized_length)
@@ -377,7 +384,9 @@ def cosine_length_reward(
 
     metrics = {
         "cosine_length": MetricResult(
-            score=score, is_score_valid=success, reason=detailed_reason # Use detailed_reason here
+            score=score,
+            is_score_valid=success,
+            reason=detailed_reason,  # Use detailed_reason here
         ),
         "token_count": MetricResult(
             score=min(1.0, float(token_count) / max_length),

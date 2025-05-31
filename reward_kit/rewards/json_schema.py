@@ -2,8 +2,8 @@ import json
 import re
 from typing import Any, Dict, List, Optional, Union
 
-from ..models import EvaluateResult, Message, MetricResult  # Added Message import
-from ..typed_interface import reward_function  # Added import
+from ..models import EvaluateResult, Message, MetricResult
+from ..typed_interface import reward_function
 from .function_calling import (
     calculate_jaccard_similarity,
     extract_schema_properties,
@@ -11,12 +11,12 @@ from .function_calling import (
 )
 
 
-@reward_function  # Added decorator
+@reward_function
 def json_schema_reward(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
+    messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[
         Union[List[Message], List[Dict[str, Any]]]
-    ] = None,  # Added, not used by core logic
+    ] = None,
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
@@ -43,7 +43,6 @@ def json_schema_reward(
     """
     metrics = {}
 
-    # Extract JSON content from messages if not provided directly
     if json_content is None:
         if not messages:
             return EvaluateResult(
@@ -57,12 +56,12 @@ def json_schema_reward(
             )
 
         last_message = messages[-1]
-        content_text = ""  # Initialize to handle cases where content might be None or role isn't assistant
+        content_text = ""
 
         if isinstance(last_message, Message):
             if last_message.role == "assistant" and last_message.content is not None:
                 content_text = last_message.content
-            else:  # Not an assistant message or no content
+            else:
                 return EvaluateResult(
                     score=0.0,
                     reason="Last message is not a valid assistant response to extract JSON from.",
@@ -80,7 +79,7 @@ def json_schema_reward(
                 and last_message.get("content") is not None
             ):
                 content_text = last_message.get("content", "")
-            else:  # Not an assistant message or no content
+            else:
                 return EvaluateResult(
                     score=0.0,
                     reason="Last message is not a valid assistant response (dict) to extract JSON from.",
@@ -105,39 +104,30 @@ def json_schema_reward(
                 },
             )
 
-        # Try to extract JSON from the message content_text
         extracted_json_str = None
         if content_text:
             try:
-                # First look for JSON code blocks
                 pattern = r"```(?:json)?\s*([\s\S]*?)```"
                 code_blocks = re.findall(pattern, content_text)
                 if code_blocks:
                     extracted_json_str = code_blocks[0]
                 else:
-                    # Try to find JSON-like content in the message
-                    # More robust regex to find a valid JSON object or array
                     json_match = re.search(
                         r"(\{[\s\S]*\}|\[[\s\S]*\])", content_text, re.DOTALL
                     )
                     if json_match:
-                        # Attempt to parse to ensure it's valid before assigning
                         try:
                             json.loads(json_match.group(0))
                             extracted_json_str = json_match.group(0)
                         except json.JSONDecodeError:
-                            pass  # Not a valid JSON object/array
-            except Exception:  # Broad exception for regex or other issues
+                            pass
+            except Exception:
                 pass
 
         if extracted_json_str:
-            json_content = (
-                extracted_json_str  # Update json_content if successfully extracted
-            )
+            json_content = extracted_json_str
 
-        if (
-            not json_content
-        ):  # Check again if json_content is still None or empty after extraction attempt
+        if not json_content:
             return EvaluateResult(
                 score=0.0,
                 reason="No JSON content found in messages.",
@@ -150,7 +140,6 @@ def json_schema_reward(
                 },
             )
 
-    # Normalize expected schema
     if expected_schema is None:
         return EvaluateResult(
             score=0.0,
@@ -166,7 +155,6 @@ def json_schema_reward(
 
     expected_schema = normalize_schema(expected_schema)
 
-    # Parse JSON content
     try:
         if isinstance(json_content, str):
             parsed_content = json.loads(json_content)
@@ -190,12 +178,11 @@ def json_schema_reward(
         if isinstance(content, dict):
             schema: Dict[str, Any] = {"type": "object", "properties": {}}
             for key, value in content.items():
-                if isinstance(schema["properties"], dict):
+                if isinstance(schema["properties"], dict): # Should always be true
                     schema["properties"][key] = build_schema_from_content(value)
             return schema
         elif isinstance(content, list):
             if content:
-                # Use the first item as reference for array items
                 return {
                     "type": "array",
                     "items": build_schema_from_content(content[0]),
@@ -212,35 +199,26 @@ def json_schema_reward(
         else:
             return {"type": "any"}
 
-    # Build schema for the actual content
     content_schema = build_schema_from_content(parsed_content)
-
-    # Extract schema properties
     expected_properties = extract_schema_properties(expected_schema)
     actual_properties = extract_schema_properties(content_schema)
-
-    # Calculate Jaccard similarity
     schema_similarity = calculate_jaccard_similarity(
         expected_properties, actual_properties
     )
 
-    # Create detailed comparison report
     missing_props = expected_properties - actual_properties
     extra_props = actual_properties - expected_properties
     matching_props = expected_properties.intersection(actual_properties)
 
     comparison_details = []
-
     if matching_props:
         comparison_details.append(f"Matching properties ({len(matching_props)}):")
         for prop, prop_type in sorted(matching_props):
             comparison_details.append(f"  - {prop}: {prop_type}")
-
     if missing_props:
         comparison_details.append(f"Missing properties ({len(missing_props)}):")
         for prop, prop_type in sorted(missing_props):
             comparison_details.append(f"  - {prop}: {prop_type}")
-
     if extra_props:
         comparison_details.append(f"Extra properties ({len(extra_props)}):")
         for prop, prop_type in sorted(extra_props):
@@ -254,7 +232,6 @@ def json_schema_reward(
         is_score_valid=schema_similarity == 1.0,
     )
 
-    # Calculate final score based on schema similarity
     final_score = schema_similarity
     final_reason = f"Final score based on schema similarity: {final_score:.2f}."
 
@@ -262,8 +239,8 @@ def json_schema_reward(
 
 
 def json_schema_reward_with_llm_judge(
-    messages: Union[List[Message], List[Dict[str, Any]]],  # Updated type
-    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,  # Added
+    messages: Union[List[Message], List[Dict[str, Any]]],
+    ground_truth: Optional[Union[List[Message], List[Dict[str, Any]]]] = None,
     json_content: Optional[Union[Dict[str, Any], str]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -310,85 +287,65 @@ def json_schema_reward_with_llm_judge(
             },
         )
 
-    # Default weights
     if weights is None:
         weights = {"schema": 0.7, "llm": 0.3}
 
-    # Ensure weights sum to 1.0
     total_weight = sum(weights.values())
     normalized_weights = {k: v / total_weight for k, v in weights.items()}
 
-    # Run schema validation
     schema_result = json_schema_reward(
-        messages=messages,  # Pass messages through
-        ground_truth=ground_truth,  # Pass ground_truth through
+        messages=messages,
+        ground_truth=ground_truth,
         json_content=json_content,
         expected_schema=expected_schema,
         **kwargs,
     )
 
-    # Skip LLM evaluation if no behavior specified or OpenAI is not available
-    if not expected_behavior:
-        llm_score = 0.0
-        llm_reason = "Skipped: No expected behavior provided"
-    else:
-        # Extract and parse JSON content if not done already
+    llm_score = 0.0
+    llm_reason = "Skipped: No expected behavior provided"
+    if expected_behavior:
         if json_content is None:
-            # Use error from schema validation if it failed to extract JSON
             if "error" in schema_result.metrics:
                 return schema_result
-
-            # Otherwise, try to get JSON content from the last message
             last_message = messages[-1]
             content = last_message.get("content", "")
-
-            # Try to extract JSON from the message content
-            json_str = ""
+            json_str_from_msg = ""
             try:
-                # First look for JSON code blocks
                 pattern = r"```(?:json)?\s*([\s\S]*?)```"
                 code_blocks = re.findall(pattern, content)
                 if code_blocks:
-                    json_str = code_blocks[0]
+                    json_str_from_msg = code_blocks[0]
                 else:
-                    # Try to find JSON-like content in the message
                     json_matches = re.findall(r"\{.*\}", content, re.DOTALL)
                     if json_matches:
-                        json_str = json_matches[0]
+                        json_str_from_msg = json_matches[0]
             except Exception:
                 pass
-
-            # Try to parse the extracted content
             try:
-                if json_str:
-                    json_content = json.loads(json_str)
+                if json_str_from_msg:
+                    json_content = json.loads(json_str_from_msg)
             except json.JSONDecodeError:
-                json_content = json_str
+                json_content = json_str_from_msg
 
-        # Format JSON content for readability if it's a dictionary
         if isinstance(json_content, dict):
-            json_str = json.dumps(json_content, indent=2)
+            json_str_for_llm = json.dumps(json_content, indent=2)
         else:
-            json_str = str(json_content)
+            json_str_for_llm = str(json_content)
 
-        # Format expected schema for prompt
         expected_schema_str = (
             json.dumps(expected_schema, indent=2)
             if expected_schema
             else "No schema provided"
         )
 
-        # Construct prompt for LLM
         conversation_msg = "No conversation context provided"
         if messages:
             conversation_parts = []
-            # Exclude the last message with JSON response
             for msg in messages[:-1]:
                 role = msg.get("role", "")
-                content = msg.get("content", "")
-                if role and content:
-                    conversation_parts.append(f"{role}: {content}")
-
+                content_part = msg.get("content", "")
+                if role and content_part:
+                    conversation_parts.append(f"{role}: {content_part}")
             if conversation_parts:
                 conversation_msg = "\n".join(conversation_parts)
 
@@ -400,7 +357,7 @@ CONVERSATION CONTEXT:
 {conversation_msg}
 
 JSON CONTENT:
-{json_str}
+{json_str_for_llm}
 
 EXPECTED SCHEMA:
 {expected_schema_str}
@@ -417,96 +374,71 @@ Format your response as:
 SCORE: [number between 0.0 and 1.0]
 EXPLANATION: [your detailed explanation]
 """
-
         try:
-            # Get API key
             import os
-
             api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OpenAI API key not provided")
-
-            # Create OpenAI client
             client = OpenAI(api_key=api_key)
-
-            # Call the API
             response = client.chat.completions.create(
                 model=model,
                 temperature=temperature,
                 messages=[{"role": "user", "content": prompt}],
             )
-
-            # Extract the response
             llm_response = response.choices[0].message.content or ""
-
-            # Parse the score and explanation
             score_match = re.search(r"SCORE:\s*([\d.]+)", llm_response)
             explanation_match = re.search(
                 r"EXPLANATION:\s*(.*)", llm_response, re.DOTALL
             )
-
             if score_match:
                 try:
                     llm_score = float(score_match.group(1))
-                    # Ensure score is in range [0, 1]
                     llm_score = max(0.0, min(llm_score, 1.0))
                 except ValueError:
-                    llm_score = 0.5  # Default if parsing fails
+                    llm_score = 0.5
             else:
-                llm_score = 0.5  # Default if no score found
-
+                llm_score = 0.5
             llm_reason = (
                 explanation_match.group(1).strip()
                 if explanation_match
                 else "No explanation provided"
             )
-
         except Exception as e:
             llm_score = 0.0
             llm_reason = f"Error calling OpenAI API: {str(e)}"
 
-    # Combine metrics
     combined_metrics = {}
-
-    # Add schema metrics with "schema_" prefix
-    for key, metric_val in schema_result.metrics.items():  # Renamed to metric_val
+    for key, metric_val in schema_result.metrics.items():
         if key != "schema_similarity":
             combined_metrics[f"schema_{key}"] = metric_val
         else:
             combined_metrics[key] = metric_val
 
-    # Add llm metrics
     combined_metrics["llm_judge"] = MetricResult(
         score=llm_score,
         reason=llm_reason,
-        is_score_valid=llm_score >= 0.8,  # Assuming high score means success
+        is_score_valid=llm_score >= 0.8,
     )
-
-    # Add summary metrics
     combined_metrics["schema_score"] = MetricResult(
         score=schema_result.score,
         reason=f"Schema validation score: {schema_result.score:.2f}",
         is_score_valid=schema_result.score == 1.0,
     )
-
     combined_metrics["llm_score"] = MetricResult(
         score=llm_score,
         reason=f"LLM judge score: {llm_score:.2f}",
         is_score_valid=llm_score >= 0.8,
     )
 
-    # Calculate weighted final score
     schema_weight = normalized_weights.get("schema", 0.7)
     llm_weight = normalized_weights.get("llm", 0.3)
-
     final_score = (schema_result.score * schema_weight) + (llm_score * llm_weight)
     final_reason = f"Composite score. Schema ({schema_result.score:.2f} * {schema_weight:.2f}) + LLM ({llm_score:.2f} * {llm_weight:.2f})."
 
-    # Add weight information
     combined_metrics["weights"] = MetricResult(
-        score=0.0,  # Not a real score
+        score=0.0,
         reason=f"Weights used - Schema: {schema_weight:.2f}, LLM: {llm_weight:.2f}",
-        is_score_valid=True,  # Informational metric
+        is_score_valid=True,
     )
 
     return EvaluateResult(

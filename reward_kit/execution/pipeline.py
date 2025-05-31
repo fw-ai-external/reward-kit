@@ -10,9 +10,9 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-import aiohttp  # Added import
+import aiohttp
 import hydra  # For hydra.utils.instantiate if used for dataset loading
-from datasets import Dataset, DatasetDict  # Added missing imports
+from datasets import Dataset, DatasetDict
 from hydra.errors import InstantiationException  # For specific error handling
 from omegaconf import DictConfig, OmegaConf  # For config handling
 
@@ -73,7 +73,7 @@ class EvaluationPipeline:
         self,
         sample: Dict[str, Any],
         http_session: Optional[aiohttp.ClientSession],  # Required if generation is on
-        original_index: Optional[int] = None,  # Added original_index
+        original_index: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Processes a single sample: generates response (if needed) and evaluates.

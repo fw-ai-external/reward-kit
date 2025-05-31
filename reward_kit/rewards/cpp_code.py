@@ -11,8 +11,8 @@ import asyncio
 import json
 import os
 import re
-from dataclasses import dataclass  # field removed
-from typing import Any, Dict, List, Optional, Union  # Tuple removed
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
 
@@ -138,7 +138,6 @@ class PistonClient:
 
             result = await response.json()
 
-            # Check for internal errors
             if "message" in result:
                 raise PistonError(result["message"])
 
@@ -158,7 +157,7 @@ def get_piston_client(endpoint: Optional[str] = None) -> PistonClient:
     piston_endpoint = endpoint or os.environ.get(
         "PISTON_ENDPOINT", "https://emkc.org/api/v2/piston"
     )
-    assert isinstance(piston_endpoint, str)  # Ensure for mypy
+    assert isinstance(piston_endpoint, str)
     return PistonClient(base_endpoint=piston_endpoint)
 
 
@@ -173,17 +172,13 @@ def extract_code_blocks(text: str, language: str = "cpp") -> List[Dict[str, str]
     Returns:
         List of dictionaries with "code" and "language" keys
     """
-    # Match code blocks with optional language specifier
     pattern = r"```(\w*)\n([\s\S]*?)\n```"
     matches = re.findall(pattern, text)
 
     code_blocks = []
     for lang, code in matches:
-        # Skip if language filter is specified and doesn't match
-        # C++ can be specified as cpp, c++, or just c in some cases
         lang = lang.lower()
 
-        # Process language filter
         if language and lang:
             if language == "cpp" and lang not in ["cpp", "c++"]:
                 continue
@@ -192,10 +187,7 @@ def extract_code_blocks(text: str, language: str = "cpp") -> List[Dict[str, str]
             elif language not in ["c", "cpp"] and language != lang:
                 continue
 
-        # Use "unknown" for empty language specifier
         detected_lang = lang if lang else "unknown"
-
-        # Add to results
         code_blocks.append({"language": detected_lang, "code": code.strip()})
 
     return code_blocks
@@ -214,22 +206,16 @@ def add_cpp_includes(code: str) -> str:
     if not code:
         return code
 
-    # Common include for C++
     includes = []
 
-    # Check for standard includes
     if "#include <iostream>" not in code:
         includes.append("#include <iostream>")
     if "#include <vector>" not in code:
         includes.append("#include <vector>")
     if "#include <string>" not in code:
         includes.append("#include <string>")
-
-    # For competitive programming, bits/stdc++.h includes most standard libraries
     if "#include <bits/stdc++.h>" not in code:
         includes.append("#include <bits/stdc++.h>")
-
-    # Check for namespace
     if "using namespace std;" not in code and "std::" not in code:
         includes.append("using namespace std;")
 
@@ -252,10 +238,8 @@ def add_c_includes(code: str) -> str:
     if not code:
         return code
 
-    # Common includes for C
     includes = []
 
-    # Check for standard includes
     if "#include <stdio.h>" not in code:
         includes.append("#include <stdio.h>")
     if "#include <stdlib.h>" not in code:
@@ -293,23 +277,19 @@ async def execute_cpp_code(
     Returns:
         Dictionary with execution results
     """
-    # Fix common issues with the code
     if language == "cpp":
         code = add_cpp_includes(code)
     else:
         code = add_c_includes(code)
 
-    # Set up the Piston client
     client = get_piston_client(piston_endpoint)
 
     try:
-        # Set up the main file
         main_file = {
             "name": "main.cpp" if language == "cpp" else "main.c",
             "content": code,
         }
 
-        # Execute the code
         result = await client.execute(
             language=language,
             version=version,
@@ -320,7 +300,6 @@ async def execute_cpp_code(
             run_memory_limit=memory_limit,
         )
 
-        # Check compilation errors
         if "compile" in result and result["compile"]["code"] != 0:
             return {
                 "success": False,
@@ -328,7 +307,6 @@ async def execute_cpp_code(
                 "error": f"Compilation error: {result['compile']['stderr']}",
             }
 
-        # Check runtime errors
         if "run" in result:
             if result["run"]["code"] == 0:
                 return {
@@ -360,7 +338,6 @@ async def execute_cpp_code(
     except Exception as e:
         return {"success": False, "output": None, "error": f"Error: {str(e)}"}
     finally:
-        # Ensure the session is closed
         loop = asyncio.get_event_loop()
         loop.create_task(client.close())
 
@@ -381,17 +358,13 @@ def compare_outputs(actual: str, expected: str) -> float:
     if expected is None:
         expected = ""
 
-    # Normalize outputs by removing whitespace variations
     actual_norm = re.sub(r"\s+", " ", actual.strip())
     expected_norm = re.sub(r"\s+", " ", expected.strip())
 
-    # Exact match
     if actual_norm == expected_norm:
         return 1.0
 
-    # Handle numeric comparison
     try:
-        # Try to convert to float, handle both integers and floating point values
         actual_num = float(actual_norm)
         expected_num = float(expected_norm)
 
@@ -400,19 +373,17 @@ def compare_outputs(actual: str, expected: str) -> float:
 
         rel_diff = abs(actual_num - expected_num) / abs(expected_num)
 
-        if rel_diff <= 0.001:  # Very close
+        if rel_diff <= 0.001:
             return 1.0
-        elif rel_diff <= 0.01:  # Close
-            return 0.95  # Increased from 0.9 to pass test
-        elif rel_diff <= 0.1:  # Somewhat close
+        elif rel_diff <= 0.01:
+            return 0.95
+        elif rel_diff <= 0.1:
             return 0.7
         else:
             return max(0.0, 1.0 - min(1.0, rel_diff))
     except (ValueError, TypeError):
-        # Not numeric values, continue with other comparisons
         pass
 
-    # If outputs are multi-line, compare line by line
     if "\n" in actual_norm or "\n" in expected_norm:
         actual_lines = actual_norm.split("\n")
         expected_lines = expected_norm.split("\n")
@@ -421,32 +392,27 @@ def compare_outputs(actual: str, expected: str) -> float:
         if common_len == 0:
             return 0.0
 
-        # Calculate line-by-line similarity
         line_similarities = []
         for i in range(common_len):
             if actual_lines[i] == expected_lines[i]:
                 line_similarities.append(1.0)
             else:
-                # Use string similarity for different lines
                 line_similarities.append(
                     string_similarity(actual_lines[i], expected_lines[i])
                 )
 
-        # Average similarity, weighted by line importance (first lines more important)
         total_weight = sum(1 / (i + 1) for i in range(common_len))
         weighted_sum = sum(
             (1 / (i + 1)) * sim for i, sim in enumerate(line_similarities)
         )
         similarity = weighted_sum / total_weight if total_weight > 0 else 0.0
 
-        # Penalize for length difference
         length_penalty = min(len(actual_lines), len(expected_lines)) / max(
             len(actual_lines), len(expected_lines)
         )
 
         return similarity * length_penalty
 
-    # Fallback to string similarity
     return string_similarity(actual_norm, expected_norm)
 
 
@@ -466,7 +432,6 @@ def string_similarity(s1: str, s2: str) -> float:
     if not s1 or not s2:
         return 0.0
 
-    # Simple Levenshtein distance-based similarity
     distance = levenshtein_distance(s1, s2)
     max_len = max(len(s1), len(s2))
     return 1.0 - (distance / max_len if max_len > 0 else 0.0)
@@ -528,13 +493,11 @@ async def run_cpp_test_cases(
     """
     results = []
 
-    # Process each test case sequentially
     for i, test_case in enumerate(test_cases):
         test_input = test_case.get("input", "")
         expected_output = test_case.get("expected_output", "")
         test_name = test_case.get("name", f"Test {i+1}")
 
-        # Execute code with test input
         execution_result = await execute_cpp_code(
             code=code,
             stdin=test_input,
@@ -545,25 +508,20 @@ async def run_cpp_test_cases(
             piston_endpoint=piston_endpoint,
         )
 
-        # Process the result
         test_result = TestResult(test_name=test_name, expected_output=expected_output)
 
         if execution_result["success"]:
             actual_output = execution_result["output"]
             test_result.actual_output = actual_output
-
-            # Compare with expected output
             similarity = compare_outputs(actual_output, expected_output)
             test_result.score = similarity
 
-            # Determine status based on similarity
             if similarity >= 0.99:
-                test_result.status = "AC"  # Accepted
+                test_result.status = "AC"
             elif similarity > 0:
-                test_result.status = "PA"  # Partially Accepted
+                test_result.status = "PA"
             else:
-                test_result.status = "WA"  # Wrong Answer
-
+                test_result.status = "WA"
             test_result.feedback = f"Similarity: {similarity:.2f}"
         else:
             test_result.status = (
@@ -573,8 +531,6 @@ async def run_cpp_test_cases(
             test_result.score = 0.0
 
         results.append(test_result)
-
-        # If a test fails, we can optionally stop testing
         if test_result.score == 0.0:
             break
 
@@ -586,7 +542,7 @@ def ioi_cpp_code_reward(
     messages: List[Message],
     ground_truth: Union[
         Optional[str], Optional[List[Dict[str, Any]]]
-    ],  # New ground_truth type
+    ],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -598,17 +554,13 @@ def ioi_cpp_code_reward(
     """
     Wrapper function for the asynchronous implementation to make it compatible with the reward_function decorator.
     """
-    # Create a new event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        # This calls the actual implementation with all the same arguments
-        # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         return _ioi_cpp_code_reward_impl(
             messages=messages,
-            ground_truth=ground_truth,  # Pass the new combined ground_truth
-            # expected_output_str and test_cases are now derived inside _impl
+            ground_truth=ground_truth,
             language=language,
             version=version,
             timeout=timeout,
@@ -622,10 +574,10 @@ def ioi_cpp_code_reward(
 
 
 def _ioi_cpp_code_reward_impl(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
+    messages: List[Message],
     ground_truth: Union[
         Optional[str], Optional[List[Dict[str, Any]]]
-    ],  # New ground_truth
+    ],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -654,8 +606,7 @@ def _ioi_cpp_code_reward_impl(
     Returns:
         EvaluateResult with score and metrics
     """
-    # Initialize metrics dictionary
-    metrics: Dict[str, MetricResult] = {}  # Explicitly type hint
+    metrics: Dict[str, MetricResult] = {}
 
     if (
         not messages
@@ -677,14 +628,13 @@ def _ioi_cpp_code_reward_impl(
 
     response_content = messages[-1].content
 
-    # Determine if ground_truth is expected_output_str or test_cases
     expected_output_str_from_gt: Optional[str] = None
     test_cases_from_gt: Optional[List[Dict[str, Any]]] = None
 
     if isinstance(ground_truth, str):
         expected_output_str_from_gt = ground_truth
     elif isinstance(ground_truth, list):
-        if all(isinstance(item, dict) for item in ground_truth):  # Basic check
+        if all(isinstance(item, dict) for item in ground_truth):
             test_cases_from_gt = ground_truth
         else:
             return EvaluateResult(
@@ -698,7 +648,7 @@ def _ioi_cpp_code_reward_impl(
                     )
                 },
             )
-    elif ground_truth is not None:  # Not str, not list, not None - unsupported
+    elif ground_truth is not None:
         return EvaluateResult(
             score=0.0,
             reason="Invalid ground_truth format: expected string, list of test case dicts, or None.",
@@ -710,9 +660,7 @@ def _ioi_cpp_code_reward_impl(
                 )
             },
         )
-    # If ground_truth is None, both derived vars remain None.
 
-    # Extract code blocks from the model's response content
     code_blocks = extract_code_blocks(response_content, language)
 
     if not code_blocks:
@@ -728,7 +676,6 @@ def _ioi_cpp_code_reward_impl(
             },
         )
 
-    # Use the first code block for execution
     code = code_blocks[0]["code"]
 
     metrics["extracted_code"] = MetricResult(
@@ -737,7 +684,6 @@ def _ioi_cpp_code_reward_impl(
         reason=f"Extracted code:\n```{language}\n{code}\n```",
     )
 
-    # Add expected output to metrics if available (using derived expected_output_str_from_gt)
     if expected_output_str_from_gt and not test_cases_from_gt:
         metrics["expected_output"] = MetricResult(
             score=0.0,
@@ -745,15 +691,11 @@ def _ioi_cpp_code_reward_impl(
             reason=f"Expected output:\n{expected_output_str_from_gt}",
         )
 
-    # Multiple test cases
     if test_cases_from_gt:
-        # Execute the tests and get results
-        # We're already in a function that has an event loop set up,
-        # so we can just use run_until_complete
         results = asyncio.get_event_loop().run_until_complete(
             run_cpp_test_cases(
                 code=code,
-                test_cases=test_cases_from_gt,  # Use derived test_cases
+                test_cases=test_cases_from_gt,
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -762,17 +704,14 @@ def _ioi_cpp_code_reward_impl(
             )
         )
 
-        # Calculate overall score as the ratio of passed tests
         passed = sum(1 for result in results if result.score >= pass_threshold)
         total = len(results)
         overall_score = passed / total if total > 0 else 0.0
         final_reason = f"{passed}/{total} tests passed ({overall_score:.2%})."
 
-        # Add test results to metrics
         metrics["test_results"] = MetricResult(
             score=overall_score,
-            is_score_valid=overall_score
-            >= pass_threshold,  # Success if pass_threshold is met
+            is_score_valid=overall_score >= pass_threshold,
             reason=json.dumps(
                 [
                     {
@@ -789,18 +728,16 @@ def _ioi_cpp_code_reward_impl(
 
         metrics["pass_rate"] = MetricResult(
             score=overall_score,
-            is_score_valid=overall_score == 1.0,  # Full success if all pass
+            is_score_valid=overall_score == 1.0,
             reason=f"{passed}/{total} tests passed ({overall_score:.2%})",
         )
 
         return EvaluateResult(score=overall_score, reason=final_reason, metrics=metrics)
 
-    # Single test case with expected_output_str_from_gt
     elif expected_output_str_from_gt:
-        # Execute the code against the expected_output_str_from_gt
         execution_result = asyncio.get_event_loop().run_until_complete(
             execute_cpp_code(
-                code=code,  # stdin is empty by default for this path
+                code=code,
                 language=language,
                 version=version,
                 timeout=timeout,
@@ -819,7 +756,6 @@ def _ioi_cpp_code_reward_impl(
                 reason=f"Code executed successfully with output:\n{output}",
             )
 
-            # Compare with expected_output_str_from_gt
             similarity = compare_outputs(output, expected_output_str_from_gt)
             match_reason = f"Output similarity: {similarity:.2f}\n\nExpected:\n{expected_output_str_from_gt}\n\nActual:\n{output}"
             final_reason += f" Output similarity: {similarity:.2f}."
@@ -834,7 +770,6 @@ def _ioi_cpp_code_reward_impl(
                 score=similarity, reason=final_reason, metrics=metrics
             )
         else:
-            # Execution failed
             error = execution_result["error"]
             final_reason = f"Code execution failed: {error}"
 
@@ -846,9 +781,7 @@ def _ioi_cpp_code_reward_impl(
 
             return EvaluateResult(score=0.0, reason=final_reason, metrics=metrics)
 
-    # No expected output or test cases
     else:
-        # Just check if it compiles and runs
         execution_result = asyncio.get_event_loop().run_until_complete(
             execute_cpp_code(
                 code=code,
@@ -874,7 +807,6 @@ def _ioi_cpp_code_reward_impl(
 
             return EvaluateResult(score=1.0, reason=final_reason, metrics=metrics)
         else:
-            # Execution failed
             error = execution_result["error"]
             final_reason = f"Code execution failed: {error}"
             metrics["execution_result"] = MetricResult(
@@ -891,7 +823,7 @@ def binary_cpp_code_reward(
     messages: List[Message],
     ground_truth: Union[
         Optional[str], Optional[List[Dict[str, Any]]]
-    ],  # New ground_truth type
+    ],
     language: str = "cpp",
     version: str = "11.4.0",
     timeout: int = 5000,
@@ -920,17 +852,13 @@ def binary_cpp_code_reward(
     Returns:
         EvaluateResult with binary score (0.0 or 1.0) and metrics
     """
-    # Create a new event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        # Call the main reward function using the _impl version to avoid double event loop issues
-        # Pass the new ground_truth directly, _ioi_cpp_code_reward_impl will parse it
         reward_output = _ioi_cpp_code_reward_impl(
             messages=messages,
-            ground_truth=ground_truth,  # Pass the new combined ground_truth
-            # expected_output_str and test_cases are now derived inside _impl
+            ground_truth=ground_truth,
             language=language,
             version=version,
             timeout=timeout,
@@ -940,14 +868,9 @@ def binary_cpp_code_reward(
             **kwargs,
         )
 
-        # Get the score, accessing directly since we're using the _impl version
         score = reward_output.score
-
-        # Convert to binary result
         binary_score = 1.0 if score >= pass_threshold else 0.0
-
-        # Add binary result to metrics
-        metrics = dict(reward_output.metrics)  # Ensure metrics is a new dict
+        metrics = dict(reward_output.metrics)
         final_reason = f"Binary score based on threshold {pass_threshold:.2f}. Original score: {score:.2f}."
         metrics["binary_result"] = MetricResult(
             score=binary_score,

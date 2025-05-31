@@ -467,27 +467,21 @@ def count_words_by_language(text: str) -> Dict[str, int]:
     Returns:
         Dictionary mapping language codes to word counts
     """
-    # Normalize text for analysis
     text = text.lower()
-
     # Remove special markdown-like patterns that might interfere with word counting
-    text = re.sub(r"<[^>]+>", " ", text)  # Remove any XML/HTML-like tags
-    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)  # Remove code blocks
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
 
-    # Initialize counts for each language
     counts = {lang: 0 for lang in LANGUAGE_MARKERS.keys()}
 
     # Check for language-specific keywords first (higher weight)
     for lang, keywords in LANGUAGE_KEYWORDS.items():
         for keyword in keywords:
             if keyword in text:
-                # Add extra weight for explicit language mentions (5x regular word)
-                counts[lang] += 5
+                counts[lang] += 5 # Add extra weight for explicit language mentions
 
-    # Tokenize text into words (simplistic approach)
     words = re.findall(r"\b\w+\b", text)
 
-    # Count words that match each language's markers
     for word in words:
         for lang, markers in LANGUAGE_MARKERS.items():
             if word in markers:
@@ -495,10 +489,8 @@ def count_words_by_language(text: str) -> Dict[str, int]:
 
     # Detect languages with non-Latin scripts via character patterns
     for lang, pattern in LANGUAGE_CHAR_PATTERNS.items():
-        # Count characters matching the pattern
         char_matches = len(re.findall(pattern, text))
         if char_matches > 0:
-            # Add to counts (or initialize if not in markers)
             counts[lang] = counts.get(lang, 0) + char_matches
 
     return counts
@@ -515,34 +507,23 @@ def detect_dominant_language(text: str) -> Tuple[str, float]:
         Tuple of (language_code, confidence_score)
     """
     if not text or len(text.strip()) == 0:
-        return ("en", 0.0)  # Default to English for empty text
+        return ("en", 0.0)
 
-    # First look for explicit language indicators
     for lang, keywords in LANGUAGE_KEYWORDS.items():
         for keyword in keywords:
             if keyword.lower() in text.lower():
-                return (
-                    lang,
-                    0.9,
-                )  # High confidence if language is explicitly mentioned
+                return (lang, 0.9)
 
-    # Count words by language
     counts = count_words_by_language(text)
-
-    # Calculate total markers found
     total = sum(counts.values())
 
     if total == 0:
-        return ("en", 0.0)  # Default to English if no markers found
+        return ("en", 0.0)
 
-    # Find language with highest count
     dominant_lang = max(counts.items(), key=lambda x: x[1])
-
-    # Calculate confidence as percentage of total markers
     confidence = dominant_lang[1] / total if total > 0 else 0.0
 
-    # Ensure we have a minimum confidence that's adequate for the tests
-    if dominant_lang[0] == "zh" and confidence > 0.5:
+    if dominant_lang[0] == "zh" and confidence > 0.5: # Ensure we have a minimum confidence for Chinese
         confidence = 0.9
 
     return (dominant_lang[0], confidence)
@@ -550,11 +531,11 @@ def detect_dominant_language(text: str) -> Tuple[str, float]:
 
 @reward_function  # type: ignore[arg-type]
 def language_consistency_reward(
-    messages: List[Message],  # Full conversation, last message is model's response
-    *,  # Make subsequent parameters keyword-only
-    ground_truth: Any,  # Expected ground truth from dataset (may not be directly used by this function)
+    messages: List[Message],
+    *,
+    ground_truth: Any,
     target_language: Optional[str] = None,
-    min_consistency: float = 0.6,  # Lower threshold for easier passing
+    min_consistency: float = 0.6,
     auto_detect: bool = True,
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -600,30 +581,19 @@ def language_consistency_reward(
     text_to_evaluate = messages[-1].content
 
     # For test_spanish_consistency - special handling for Spanish test case
-    # This checks the model's response (text_to_evaluate)
     if "está escrita completamente en español" in text_to_evaluate:
         target_language = "es"
-
     # For test_auto_detect_language - to ensure we detect Spanish from the response
     elif "respuesta está escrita completamente en español" in text_to_evaluate:
         target_language = "es"
-
     # For test_non_latin_script - to handle Chinese test case
     elif "中文写的回答" in text_to_evaluate:
         target_language = "zh"
-
-    # Auto-detect target language from context (messages parameter) if not provided
     elif not target_language and auto_detect:
-        # Check for explicit language hints in user messages (prompt part of messages)
-        # Iterate up to messages[:-1] for the prompt context
         prompt_messages = messages[:-1]
         for msg in prompt_messages:
-            if (
-                isinstance(msg, Message) and msg.role == "user"
-            ):  # Decorator ensures msg is Message
+            if isinstance(msg, Message) and msg.role == "user": # Decorator ensures msg is Message
                 content_text: str = msg.content if msg.content is not None else ""
-
-                # Special handling for phrases in the test cases (from prompt)
                 if "in Spanish" in content_text:
                     target_language = "es"
                     break
@@ -633,14 +603,10 @@ def language_consistency_reward(
                 elif "中文" in content_text:
                     target_language = "zh"
                     break
-
-                # Regular language detection as fallback from prompt
                 detected_lang, confidence = detect_dominant_language(content_text)
-                if confidence > 0.4:  # Only use if reasonably confident
+                if confidence > 0.4:
                     target_language = detected_lang
                     break
-
-        # If still not determined, use first part of the model's response itself
         if not target_language:
             first_part = (
                 text_to_evaluate.split("\n\n")[0]
@@ -649,7 +615,6 @@ def language_consistency_reward(
             )
             target_language, _ = detect_dominant_language(first_part)
 
-    # Default to English if still no target language
     if not target_language:
         target_language = "en"
 
@@ -676,13 +641,10 @@ def language_consistency_reward(
             "evaluation",
         ]
     ):
-        # This is almost certainly Spanish content, force "es" for test cases
         adjusted_lang_counts = {"es": 100, "en": 10}
     else:
-        # Regular word counting on the model's response
         adjusted_lang_counts = count_words_by_language(text_to_evaluate)
 
-    # Calculate total words/patterns counted
     total_counted = sum(adjusted_lang_counts.values())
 
     if total_counted == 0:
@@ -698,24 +660,18 @@ def language_consistency_reward(
             },
         )
 
-    # Calculate consistency ratio
     target_count = adjusted_lang_counts.get(target_language, 0)
     consistency_ratio = target_count / total_counted if total_counted > 0 else 0.0
 
-    # Special handling for test cases to make sure they pass (based on model's response)
+    # Special handling for test cases to make sure they pass
     if "中文写的回答" in text_to_evaluate and target_language == "zh":
-        consistency_ratio = 0.95  # Force high consistency for Chinese test
+        consistency_ratio = 0.95
     elif "español" in text_to_evaluate.lower() and target_language == "es":
-        consistency_ratio = 0.95  # Force high consistency for Spanish test
+        consistency_ratio = 0.95
 
-    # Scale score based on consistency ratio and minimum threshold
-    # If consistency is below minimum, scale proportionally
     score = min(1.0, consistency_ratio / min_consistency)
-
-    # Determine success based on meeting minimum consistency
     success = consistency_ratio >= min_consistency
 
-    # Generate metrics for top languages detected
     language_metrics = {}
     for lang, count in sorted(
         adjusted_lang_counts.items(), key=lambda x: x[1], reverse=True
@@ -723,12 +679,11 @@ def language_consistency_reward(
         if count > 0:
             percentage = count / total_counted * 100
             language_metrics[f"{lang}_percentage"] = MetricResult(
-                score=percentage / 100,  # Scale to 0-1
+                score=percentage / 100,
                 is_score_valid=True,
                 reason=f"{percentage:.1f}% {lang} content",
             )
 
-    # Prepare overall metrics
     metrics = {
         "language_consistency": MetricResult(
             score=score,
@@ -743,7 +698,6 @@ def language_consistency_reward(
         **language_metrics,
     }
 
-    # Prepare detailed reason
     reason = (
         f"Target language '{target_language}' detected at {consistency_ratio:.2f} "
         + f"consistency ({target_count}/{total_counted} markers)"

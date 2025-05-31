@@ -10,9 +10,6 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from omegaconf import DictConfig
 
-# Assuming FireworksAuthError might be a common exception to raise from clients
-# from ..exceptions import ModelGenerationError, ModelAuthError, RateLimitError # Define these later
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +18,6 @@ class ModelClient(abc.ABC):
 
     def __init__(self, client_config: DictConfig):
         self.client_config = client_config
-        # Common config might include model_name, temperature, max_tokens, api_base, etc.
         self.model_name = client_config.get("model_name", "unknown_model")
         self.temperature = client_config.get("temperature", 0.0)
         self.max_tokens = client_config.get("max_tokens", 1024)
@@ -61,12 +57,6 @@ class FireworksModelClient(ModelClient):
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }
-        # Only add optional parameters if they have non-default values
-        # if self.top_p != 0.95:
-        #     payload["top_p"] = self.top_p
-        # # Skip top_k and min_p as they might be causing issues with this model
-        # if self.reasoning_effort is not None:
-        #     payload["reasoning_effort"] = self.reasoning_effort
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -138,34 +128,3 @@ class FireworksModelClient(ModelClient):
             )
             # raise ModelGenerationError(f"Unexpected error: {e}") from e
             return None
-
-
-# Example usage (for testing this module, not for direct use by pipeline)
-# async def main_test():
-#     from reward_kit.auth import get_fireworks_api_key # Relative import if this is a module
-#     api_key = get_fireworks_api_key()
-#     if not api_key:
-#         print("API key not found for test.")
-#         return
-
-#     client_cfg = DictConfig({
-#         "model_name": "accounts/fireworks/models/llama-v2-7b-chat",
-#         "temperature": 0.1,
-#         "max_tokens": 50,
-#         "api_params": {"max_retries": 2}
-#     })
-#     client = FireworksModelClient(client_cfg, api_key)
-
-#     async with aiohttp.ClientSession() as session:
-#         response = await client.generate(
-#             messages=[{"role": "user", "content": "What is 2+2?"}],
-#             session=session
-#         )
-#         print(f"Test response: {response}")
-
-# if __name__ == "__main__":
-#     logging.basicConfig(level=logging.DEBUG)
-#     # Need to load .env for get_fireworks_api_key if testing standalone
-#     # from dotenv import load_dotenv
-#     # load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env.dev"))
-#     asyncio.run(main_test())

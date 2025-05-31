@@ -5,7 +5,7 @@ This script is intended to be a Hydra application.
 
 import asyncio
 import logging
-import sys  # Added import for sys.exit
+import sys
 
 import hydra
 

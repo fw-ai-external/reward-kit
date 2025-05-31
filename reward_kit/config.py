@@ -40,8 +40,8 @@ class RewardKitConfig(BaseModel):
     gcp_cloud_run: Optional[GCPCloudRunConfig] = GCPCloudRunConfig()
     aws_lambda: Optional[AWSLambdaConfig] = AWSLambdaConfig()
     evaluator_endpoint_keys: Optional[Dict[str, str]] = (
-        {}
-    )  # Stores generated API keys for self-hosted evaluator endpoints
+        {}  # Stores generated API keys for self-hosted evaluator endpoints
+    )
 
 
 # --- Global variable to hold the loaded configuration ---
@@ -63,7 +63,7 @@ def find_config_file(start_path: Optional[str] = None) -> Optional[str]:
             return potential_path
 
         parent_path = os.path.dirname(current_path)
-        if parent_path == current_path:  # Reached root
+        if parent_path == current_path:
             return None
         current_path = parent_path
 
@@ -76,30 +76,30 @@ def load_config(config_path: Optional[str] = None) -> RewardKitConfig:
     """
     global _loaded_config, _config_file_path
 
-    if config_path:  # If a specific path is given, always try to load from it
+    if config_path:
         pass
     elif (
         _loaded_config and not config_path
-    ):  # Already loaded and no new path, return cached
+    ):
         return _loaded_config
-    else:  # Not loaded or no specific path, try to find it
+    else:
         config_path = find_config_file()
 
     if not config_path:
-        _loaded_config = RewardKitConfig()  # Return default config if no file found
+        _loaded_config = RewardKitConfig()
         _config_file_path = None
         return _loaded_config
 
     if (
         _loaded_config and config_path == _config_file_path
-    ):  # Already loaded this specific file
+    ):
         return _loaded_config
 
     try:
         with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
 
-        if raw_config is None:  # Empty YAML file
+        if raw_config is None:
             _loaded_config = RewardKitConfig()
         else:
             _loaded_config = RewardKitConfig(**raw_config)

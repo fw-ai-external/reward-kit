@@ -3,7 +3,7 @@ Hydra-based dataset loading and processing.
 """
 
 import json
-import logging  # Added import
+import logging
 import os
 from typing import Any, Dict, List, Optional, Union
 
@@ -13,7 +13,7 @@ from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-logger = logging.getLogger(__name__)  # Added logger initialization
+logger = logging.getLogger(__name__)
 
 import importlib  # Added for dynamic function import
 

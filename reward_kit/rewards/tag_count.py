@@ -37,7 +37,6 @@ def tag_count_reward(
     Returns:
         EvaluateResult with score based on tags found
     """
-    # Get last message (the model's response)
     if not messages or len(messages) == 0:
         return EvaluateResult(
             score=0.0,
@@ -49,9 +48,8 @@ def tag_count_reward(
             },
         )
 
-    response = messages[-1]  # response is a Message object
+    response = messages[-1]
 
-    # Check if it's an assistant message with content
     if response.role != "assistant" or not response.content:
         return EvaluateResult(
             score=0.0,
@@ -66,22 +64,18 @@ def tag_count_reward(
         )
     text: str = response.content
 
-    # Track metrics for each tag
     tag_metrics = {}
     found_tags: Set[str] = set()
     mismatched_tags: Set[str] = set()
     total_found = 0
 
-    # Check each required tag
     for tag in required_tags:
-        # Count opening and closing tags
         opening_pattern = f"<{tag}[^>]*>"
         closing_pattern = f"</{tag}>"
 
         opening_count = len(re.findall(opening_pattern, text))
         closing_count = len(re.findall(closing_pattern, text))
 
-        # Determine if tag is found based on balance requirements
         if require_balanced:
             is_found = (
                 opening_count > 0
@@ -104,7 +98,6 @@ def tag_count_reward(
         ):
             mismatched_tags.add(tag)
 
-        # Add metrics for this tag
         if require_balanced:
             tag_score = (
                 1.0
@@ -123,20 +116,16 @@ def tag_count_reward(
             reason=_get_tag_reason(tag, opening_count, closing_count, require_balanced),
         )
 
-    # Calculate overall score
     total_score = min(1.0, len(found_tags) * score_per_tag)
 
-    # If requiring balanced tags, penalize for mismatched tags
     if require_balanced and mismatched_tags:
         penalty = len(mismatched_tags) * score_per_tag
         total_score = max(0.0, total_score - penalty)
 
-    # Determine overall success
     success = len(found_tags) == len(required_tags) and (
         not require_balanced or not mismatched_tags
     )
 
-    # Create overall tag count metric
     reason = _get_overall_reason(
         required_tags, found_tags, mismatched_tags, require_balanced
     )

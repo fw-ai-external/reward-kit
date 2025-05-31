@@ -131,7 +131,7 @@ class RewardServer:
                 # The self.reward_func is expected to be decorated by the new @reward_function,
                 # which returns a dictionary.
                 if isinstance(result, dict) and "score" in result:
-                    return result  # Return the dictionary directly
+                    return result
                 elif isinstance(
                     result, EvaluateResult
                 ):  # Should not happen if func is from new decorator
@@ -273,7 +273,7 @@ def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:
             # The reward_func is expected to be decorated by the new @reward_function,
             # which returns a dictionary.
             if isinstance(result, dict) and "score" in result:
-                return result  # Return the dictionary directly
+                return result
             elif isinstance(
                 result, EvaluateResult
             ):  # Should not happen if func is from new decorator

@@ -21,13 +21,11 @@ def get_fireworks_api_key() -> Optional[str]:
     Returns:
         The API key if found, otherwise None.
     """
-    # 1. Try environment variable
     api_key = os.environ.get("FIREWORKS_API_KEY")
     if api_key:
         logger.debug("Using FIREWORKS_API_KEY from environment variable.")
         return api_key
 
-    # 2. Try auth.ini file
     if AUTH_INI_FILE.exists():
         try:
             config = configparser.ConfigParser()
@@ -90,13 +88,11 @@ def get_fireworks_account_id() -> Optional[str]:
     Returns:
         The Account ID if found, otherwise None.
     """
-    # 1. Try environment variable
     account_id = os.environ.get("FIREWORKS_ACCOUNT_ID")
     if account_id:
         logger.debug("Using FIREWORKS_ACCOUNT_ID from environment variable.")
         return account_id
 
-    # 2. Try auth.ini file
     if AUTH_INI_FILE.exists():
         try:
             config = configparser.ConfigParser()
@@ -144,19 +140,6 @@ def get_fireworks_account_id() -> Optional[str]:
             logger.warning(f"Configparser error reading {AUTH_INI_FILE}: {e_config}")
         except Exception as e_general:
             logger.warning(f"Unexpected error reading {AUTH_INI_FILE}: {e_general}")
-
-    # Handle Dev API special case for account ID if FIREWORKS_API_BASE is set
-    # This logic was present in the original file and might be relevant
-    # if no account_id is found yet and a dev environment is detected.
-    # However, the plan is to return None if not found.
-    # For now, strictly adhere to the plan.
-    # If this dev-specific logic is still needed, it should be handled by the caller
-    # or re-evaluated if it belongs in this module.
-
-    # api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
-    # if "dev.api.fireworks.ai" in api_base and account_id == "fireworks":
-    # logger.info("Using development API base, defaulting to pyroworks-dev account")
-    # account_id = "pyroworks-dev" # Default dev account
 
     logger.debug("Fireworks Account ID not found in environment variables or auth.ini.")
     return None

@@ -36,44 +36,19 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
     mcq_answers: List[Tuple[str, str]] = []
     found_mcq_letters = set()
 
-    # Pattern looks for A-E, in various formats: (A), [A], {A}, A. or standalone A.
-    # Each alternative captures the full option string and the letter.
-    # Order of alternatives matters for re.finditer if there could be overlaps.
-    # (?i) for case-insensitivity.
-    # Groupings:
-    # 1: Full match for (A), 2: A
-    # 3: Full match for [A], 4: A
-    # 5: Full match for {A}, 6: A
-    # 7: Full match for A.,  group 8: A
-    # 9: Full match for standalone A, group 10: A
-    # The outer group (1) captures the full matched alternative.
-    regex_pattern = r"(?i)((\(([A-E])\))|(\[([A-E])\])|(\{([A-E])\})|(([A-E])\.(?!\w))|((?<![a-zA-Z0-9_])([A-E])(?![a-zA-Z0-9_])))"
-    # For "A.": added (?!\w) to ensure "A.M." doesn't match "A."
-    # For standalone "A": used (?<![a-zA-Z0-9_]) and (?![a-zA-Z0-9_]) to avoid matching A in APPLE.
-
-    final_mcq_answers: List[Tuple[str, str]] = []
-    # processed_spans was unused, removing it.
-
-    # The regex is structured as (alt1_full(alt1_letter)|alt2_full(alt2_letter)|...)
-    # Group indices for letters: 3, 5, 7, 9, 12
-    # Group indices for full option text: 2, 4, 6, 8, 11
-    # No, this is getting too complex. Let's simplify the regex and iterate.
-
     patterns = [
-        r"(\(([A-E])\))",  # (A) - captures ((A), A)
-        r"(\[([A-E])\])",  # [A] - captures ([A], A)
-        r"(\{([A-E])\})",  # {A} - captures ({A}, A)
-        r"((?<![a-zA-Z0-9_])([A-E])\.(?!\w))",  # A. (not preceded by word char) - captures (A., A)
-        r"((?<![a-zA-Z0-9_])([A-E])(?![a-zA-Z0-9_]))",  # Standalone A (not surrounded by word chars) - captures (A, A)
+        r"(\(([A-E])\))",  # (A)
+        r"(\[([A-E])\])",  # [A]
+        r"(\{([A-E])\})",  # {A}
+        r"((?<![a-zA-Z0-9_])([A-E])\.(?!\w))",  # A.
+        r"((?<![a-zA-Z0-9_])([A-E])(?![a-zA-Z0-9_]))",  # Standalone A
     ]
 
-    # Collect all potential matches with their spans
     all_potential_matches: List[MatchInfo] = []
     for p_idx, p_str in enumerate(patterns):
         for match in re.finditer(p_str, text, re.IGNORECASE):
-            option_text = match.group(1)  # The full matched option, e.g. (A), A.
-            letter = match.group(2)  # The letter itself
-            # Ensure match.span(1) returns a tuple of two integers
+            option_text = match.group(1)
+            letter = match.group(2)
             span_tuple = match.span(1)
             if not (
                 isinstance(span_tuple, tuple)
@@ -81,8 +56,6 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
                 and isinstance(span_tuple[0], int)
                 and isinstance(span_tuple[1], int)
             ):
-                # Handle cases where span might not be as expected, though unlikely for re.match.span
-                # This is more for robustness if re.finditer behaves unexpectedly or text is unusual
                 continue
 
             match_data: MatchInfo = {
@@ -93,25 +66,23 @@ def extract_mcq_option(text: str) -> List[Tuple[str, str]]:
             }
             all_potential_matches.append(match_data)
 
-    # Sort matches: by start position, then by pattern priority (lower index = higher priority), then by length (longer preferred)
     all_potential_matches.sort(
         key=lambda m: (m["span"][0], m["priority"], -(m["span"][1] - m["span"][0]))
     )
 
-    # Filter out overlapping matches, keeping the highest priority/longest one
     last_covered_end = -1
     for match_info in all_potential_matches:
-        start, end = match_info["span"]  # Now correctly typed as Tuple[int, int]
-        if start >= last_covered_end:  # Non-overlapping or starts after last one ended
-            letter_upper = match_info["letter"]  # Now correctly typed as str
+        start, end = match_info["span"]
+        if start >= last_covered_end:
+            letter_upper = match_info["letter"]
             if letter_upper not in found_mcq_letters:
-                final_mcq_answers.append(
+                mcq_answers.append(
                     (match_info["text"], letter_upper)
-                )  # text and letter_upper are str
+                )
                 found_mcq_letters.add(letter_upper)
             last_covered_end = end
-
-    return final_mcq_answers
+    # Renamed final_mcq_answers to mcq_answers for clarity
+    return mcq_answers
 
 
 @reward_function  # type: ignore[arg-type]
@@ -165,8 +136,8 @@ def multiple_choice_math_reward(
 
     gen_content = ""
     if messages and len(messages) > 0:
-        gen_response_message = messages[-1]  # Assistant's response is the last message
-        if gen_response_message.role == "assistant":  # Assumes Pydantic Message object
+        gen_response_message = messages[-1]
+        if gen_response_message.role == "assistant":
             gen_content = gen_response_message.content or ""
 
     if not gen_content:
@@ -182,10 +153,9 @@ def multiple_choice_math_reward(
         )
 
     orig_content = ""
-    # ground_truth is expected to be a list containing the single assistant ground truth message
     if ground_truth and len(ground_truth) > 0:
         orig_response_message = ground_truth[0]
-        if orig_response_message.role == "assistant":  # Assumes Pydantic Message object
+        if orig_response_message.role == "assistant":
             orig_content = orig_response_message.content or ""
 
     if not orig_content:
@@ -233,35 +203,28 @@ def multiple_choice_math_reward(
             metrics=metrics,
         )
 
-    # For simplicity, we'll compare the first extracted option if multiple are found.
     # Ideally, MCQs should have one clear answer.
-    # If ground truth has multiple options extracted, it's ambiguous.
     if len(orig_mcq_options) > 1:
         metrics["ambiguous_original_mcq"] = MetricResult(
             score=0.0,
             is_score_valid=False,
             reason=f"Original message has multiple MCQ options extracted: {format_extracted_mcq(orig_mcq_options)}",
         )
-        # We could penalize here, or pick the first one. For now, let's pick the first.
-        # return EvaluateResult(score=0.0, reason="Original message (ground truth) has ambiguous MCQ options.", metrics=metrics)
 
-    # If generated has multiple options extracted, it's ambiguous.
     if len(gen_mcq_options) > 1:
         metrics["ambiguous_generated_mcq"] = MetricResult(
             score=0.0,
             is_score_valid=False,
             reason=f"Generated message has multiple MCQ options extracted: {format_extracted_mcq(gen_mcq_options)}",
         )
-        # Penalize for ambiguity if GT is specific
-        if len(orig_mcq_options) == 1:
+        if len(orig_mcq_options) == 1: # Penalize if GT is specific but gen is ambiguous
             return EvaluateResult(
                 score=0.0,
                 reason="Generated answer is ambiguous (multiple MCQ options) while ground truth is specific.",
                 metrics=metrics,
             )
-        # If both are ambiguous, we could try to find a common element, but for now, let's simplify and compare first vs first.
 
-    orig_answer_letter = orig_mcq_options[0][1]  # ("(A)", "A") -> "A"
+    orig_answer_letter = orig_mcq_options[0][1]
     gen_answer_letter = gen_mcq_options[0][1]
 
     is_match = orig_answer_letter == gen_answer_letter

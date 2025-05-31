@@ -140,7 +140,6 @@ def preview_command(args):
                 continue  # Skip to next sample
 
             print(f"\n--- Sample {i+1} ---")
-            # print(f"  Payload: {request_obj.model_dump_json(indent=2)}") # For debugging
 
             try:
                 response = requests.post(
@@ -201,6 +200,4 @@ def preview_command(args):
             return 0
         except Exception as e:
             print(f"Error previewing evaluator (local mode): {str(e)}")
-            # import traceback
-            # traceback.print_exc()
             return 1

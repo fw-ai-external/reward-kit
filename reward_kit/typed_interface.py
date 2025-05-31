@@ -67,7 +67,7 @@ def reward_function(
             # For 'pointwise', 'messages' is expected. For 'batch', 'rollouts_messages' is more typical.
             # This simplified wrapper signature might need adjustment if we generalize input param coercion.
             *args: Any,
-            **kwargs: Any,  # Changed to *args, **kwargs to be more general
+            **kwargs: Any,
         ) -> Union[EvaluateResult, List[EvaluateResult]]:  # Return type depends on mode
 
             # For now, we'll assume 'messages' is the primary input for pointwise,

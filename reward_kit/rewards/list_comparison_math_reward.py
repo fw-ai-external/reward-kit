@@ -17,25 +17,18 @@ def parse_number_list_from_string(s: str) -> Optional[List[float]]:
     e.g., "1, 2, 3.5, 4" -> [1.0, 2.0, 3.5, 4.0]
     """
     numbers = []
-    # Remove common math delimiters like $ and spaces around commas
     s = s.replace("$", "").strip()
-
-    # Split by comma, then try to parse each part
     parts = re.split(r"\s*,\s*", s)
-    if not parts or not any(
-        p.strip() for p in parts
-    ):  # Handle empty or whitespace-only strings
+    if not parts or not any(p.strip() for p in parts):
         return None
 
     for part in parts:
         part = part.strip()
-        if not part:  # Skip empty strings resulting from multiple commas, e.g. "1,,2"
+        if not part:
             continue
         try:
-            # Attempt to convert to float. Handles integers and decimals.
             numbers.append(float(part))
         except ValueError:
-            # If any part is not a valid number, the list is considered invalid for this parser
             return None
     return numbers if numbers else None
 
@@ -57,34 +50,30 @@ def extract_number_list(text: str) -> List[List[float]]:
     extracted_lists: List[List[float]] = []
 
     # Priority 1: Boxed LaTeX expressions
-    # Search for all \boxed{content}
     boxed_contents = re.findall(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}", text)
     if boxed_contents:
         for content in boxed_contents:
             parsed_list = parse_number_list_from_string(content)
             if parsed_list:
                 extracted_lists.append(parsed_list)
-        if extracted_lists:  # If any list found in boxed expressions, return them
+        if extracted_lists:
             return extracted_lists
 
     # Priority 2: Content within $...$ or $$...$$
-    # Combine $...$ and $$...$$ patterns
     dollar_contents = re.findall(r"\$\$(.*?)\$\$|\$(.*?)\$", text, re.DOTALL)
     if dollar_contents:
         for group_match in dollar_contents:
-            content = (
-                group_match[0] if group_match[0] else group_match[1]
-            )  # Get content from either $$ or $
+            content = group_match[0] if group_match[0] else group_match[1]
             if content:
                 parsed_list = parse_number_list_from_string(content.strip())
                 if parsed_list:
                     extracted_lists.append(parsed_list)
-        if extracted_lists:  # If any list found in dollar expressions, return them
+        if extracted_lists:
             return extracted_lists
 
     # Priority 3: Try parsing the whole text as a list if no delimiters found
     # This is a fallback and might be less reliable.
-    if not extracted_lists:  # Only if nothing was found with delimiters
+    if not extracted_lists:
         full_text_parsed_list = parse_number_list_from_string(text)
         if full_text_parsed_list:
             extracted_lists.append(full_text_parsed_list)
@@ -94,9 +83,9 @@ def extract_number_list(text: str) -> List[List[float]]:
 
 @reward_function  # type: ignore[arg-type]
 def list_comparison_math_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
-    *,  # Make subsequent parameters keyword-only
-    ground_truth: str,  # String representation of the expected list of numbers
+    messages: List[Message],
+    *,
+    ground_truth: str,
     order_matters: bool = False,
     **kwargs: Any,
 ) -> EvaluateResult:
@@ -139,11 +128,9 @@ def list_comparison_math_reward(
         )
 
     gen_content = messages[-1].content
-    orig_content = (
-        ground_truth  # The new ground_truth parameter is the expected list string
-    )
+    orig_content = ground_truth
 
-    if not gen_content:  # Model's response content is empty
+    if not gen_content:
         return EvaluateResult(
             score=0.0,
             reason="Assistant response content is empty.",
@@ -155,7 +142,7 @@ def list_comparison_math_reward(
                 )
             },
         )
-    if not orig_content:  # Ground truth string is empty
+    if not orig_content:
         return EvaluateResult(
             score=0.0,
             reason="Ground truth string (expected list) is empty.",
@@ -202,10 +189,7 @@ def list_comparison_math_reward(
     match_reason = ""
 
     if order_matters:
-        # Direct list comparison (order and counts matter)
-        # Normalize by sorting if small float differences are an issue, but for now direct.
-        # To be robust against float precision, comparison element-wise with tolerance might be needed.
-        # For now, simple equality.
+        # Note: To be robust against float precision, comparison element-wise with tolerance might be needed.
         if gen_list_to_compare == orig_list_to_compare:
             score = 1.0
             match_reason = f"Exact list match (order matters). Gen: {gen_list_to_compare} vs Orig: {orig_list_to_compare}"
@@ -213,11 +197,7 @@ def list_comparison_math_reward(
             score = 0.0
             match_reason = f"List mismatch (order matters). Gen: {gen_list_to_compare} vs Orig: {orig_list_to_compare}"
     else:
-        # Set comparison (order and duplicates within a list don't matter beyond presence)
-        # Convert lists to sets for comparison.
-        # Note: float precision can be an issue with sets.
-        # A more robust set comparison would involve tolerance.
-        # For now, direct set equality of floats.
+        # Note: float precision can be an issue with sets. A more robust set comparison would involve tolerance.
         gen_set = set(gen_list_to_compare)
         orig_set = set(orig_list_to_compare)
 
@@ -226,7 +206,6 @@ def list_comparison_math_reward(
             match_reason = f"Set match (order does not matter). Gen: {sorted(list(gen_set))} vs Orig: {sorted(list(orig_set))}"
         else:
             score = 0.0
-            # Provide more details on mismatch for sets
             missing_in_gen = orig_set - gen_set
             extra_in_gen = gen_set - orig_set
             match_reason_parts = [

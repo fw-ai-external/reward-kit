@@ -18,7 +18,7 @@ def format_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[
         Union[List[Message], List[Dict[str, Any]]]
-    ] = None,  # Not used by this function but part of standard signature
+    ] = None,
     format_regex: str = r"^<think>\n.*?</think>\n<answer>\n.*?</answer>$",
     require_exact_match: bool = True,
     **kwargs: Any
@@ -42,7 +42,6 @@ def format_reward(
     Returns:
         EvaluateResult with score 1.0 if format is correct, 0.0 otherwise
     """
-    # Get last message (the model's response)
     if not messages or len(messages) == 0:
         return EvaluateResult(
             score=0.0,
@@ -57,7 +56,6 @@ def format_reward(
 
     response = messages[-1]
 
-    # Check if it's an assistant message with content
     if isinstance(response, Message):
         if response.role != "assistant" or not response.content:
             return EvaluateResult(
@@ -88,7 +86,7 @@ def format_reward(
                 is_score_valid=False,
             )
         text = response.get("content", "")
-    else:  # Should not happen if messages contains dict or Message, but to be safe / satisfy linters
+    else:
         return EvaluateResult(
             score=0.0,
             reason="Last message is of unexpected type.",
@@ -102,10 +100,8 @@ def format_reward(
             is_score_valid=False,
         )
 
-    # Compile the regex with DOTALL flag to match across newlines
     pattern = re.compile(format_regex, re.DOTALL)
 
-    # Check if the text matches the pattern
     if require_exact_match:
         match = pattern.match(text)
     else:

@@ -15,12 +15,12 @@ except ImportError:
 import copy
 from collections import Counter
 
-from ..models import EvaluateResult, Message, MetricResult  # Added Message
-from ..typed_interface import reward_function  # Added reward_function
+from ..models import EvaluateResult, Message, MetricResult
+from ..typed_interface import reward_function
 
 
 def match_function_call(
-    messages: List[Dict[str, Any]],  # messages is for context if needed
+    messages: List[Dict[str, Any]],
     function_name: str,
     parsed_arguments: Dict[str, Any],
     expected_call_schema: Dict[str, Any],
@@ -59,13 +59,11 @@ def match_function_call(
     arg_score = 0.0
     arg_details = []
 
-    # We'll track different aspects of argument matching
     missing_args = []
     extra_args = []
     type_mismatches = []
     perfect_matches = []
 
-    # Check for expected arguments
     for arg_name, arg_schema in expected_args.items():
         expected_type = arg_schema.get("type", "any")
 
@@ -74,7 +72,6 @@ def match_function_call(
             arg_details.append(f"Missing argument: {arg_name}")
         else:
             arg_value = parsed_arguments[arg_name]
-            # Basic type checking
             type_matched = True
             if expected_type == "string" and not isinstance(arg_value, str):
                 type_mismatches.append(arg_name)
@@ -113,25 +110,20 @@ def match_function_call(
                     f"Argument {arg_name} matches expected type {expected_type}"
                 )
 
-    # Check for extra arguments
     for arg_name in parsed_arguments:
         if arg_name not in expected_args:
             extra_args.append(arg_name)
             arg_details.append(f"Unexpected argument: {arg_name}")
 
-    # Calculate argument score based on strictness
     if argument_match_strictness == "exact":
-        # All arguments must match exactly
         if missing_args or extra_args or type_mismatches:
             arg_score = 0.0
         else:
             arg_score = 1.0
     elif argument_match_strictness == "partial":
-        # Only check provided arguments, ignore missing ones
         if extra_args or type_mismatches:
             arg_score = 0.0
         else:
-            # We weight based on how many expected args were provided correctly
             total_provided = len(parsed_arguments)
             if total_provided == 0:
                 arg_score = 0.0
@@ -142,8 +134,6 @@ def match_function_call(
         argument_match_strictness == "permissive"
         or argument_match_strictness == "flexible"
     ):
-        # For permissive mode, ignore extra arguments and just check that required ones are present
-        # and have the correct type
         if missing_args or type_mismatches:
             arg_score = 0.0
         else:
@@ -160,7 +150,7 @@ def match_function_call(
         is_score_valid=arg_score == 1.0 if len(expected_args) > 0 else True,
     )
 
-    # 3. Calculate final score (equally weighted between name and args)
+    # 3. Calculate final score
     final_score = (name_score + arg_score) / 2.0
     final_reason = f"Overall score based on name match ({name_score:.2f}) and argument match ({arg_score:.2f})."
 
@@ -181,7 +171,7 @@ def calculate_jaccard_similarity(set1: Set, set2: Set) -> float:
         Jaccard similarity score between 0.0 and 1.0
     """
     if not set1 and not set2:
-        return 1.0  # Both empty means perfect similarity
+        return 1.0
 
     intersection = len(set1.intersection(set2))
     union = len(set1.union(set2))
@@ -201,45 +191,34 @@ def extract_schema_properties(schema: Dict[str, Any]) -> Set[Tuple[str, str]]:
     """
     properties = set()
 
-    # Process schema properties (handles both root-level and nested properties)
     def process_properties(schema_obj: Dict[str, Any], prefix: str = ""):
         if not isinstance(schema_obj, dict):
             return
 
-        # Handle properties field
         props = schema_obj.get("properties", {})
         for prop_name, prop_schema in props.items():
             prop_path = f"{prefix}.{prop_name}" if prefix else prop_name
             prop_type = prop_schema.get("type", "any")
             properties.add((prop_path, prop_type))
-
-            # Recursively process object properties
             if prop_type == "object":
                 process_properties(prop_schema, prop_path)
 
-        # Handle patternProperties field
         pattern_props = schema_obj.get("patternProperties", {})
         for pattern, pattern_schema in pattern_props.items():
             prop_path = f"{prefix}[{pattern}]" if prefix else f"[{pattern}]"
             prop_type = pattern_schema.get("type", "any")
             properties.add((prop_path, prop_type))
-
-            # Recursively process object pattern properties
             if prop_type == "object":
                 process_properties(pattern_schema, prop_path)
 
-        # Handle items for arrays
         items = schema_obj.get("items", {})
         if items and isinstance(items, dict):
             prop_path = f"{prefix}[]" if prefix else "[]"
             prop_type = items.get("type", "any")
             properties.add((prop_path, prop_type))
-
-            # Recursively process array item properties
             if prop_type == "object":
                 process_properties(items, prop_path)
 
-    # Start processing at the root level
     process_properties(schema)
     return properties
 
@@ -271,43 +250,31 @@ def normalize_schema(schema: Union[Dict[str, Any], str]) -> Dict[str, Any]:
 
 
 def maybe_deserialize_tool_call_arguments(
-    tool_calls: list[dict[str, Any]]  # Expects list of OpenAI formatted tool calls
-) -> list[
-    dict[str, Any]
-]:  # Returns list of OpenAI formatted tool calls with deserialized arguments
+    tool_calls: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """
     Deserializes the 'arguments' field (if it's a JSON string) within each tool call's 'function' object.
     Input tool_calls are expected to be in OpenAI format:
     [{'id': ..., 'type': 'function', 'function': {'name': ..., 'arguments': 'JSON_STRING_ARGS'}}, ...]
     """
     processed_tool_calls = []
-    if not tool_calls:  # Handle None or empty list
+    if not tool_calls:
         return []
 
     for tc_openai_format in tool_calls:
-        # Ensure basic OpenAI structure
         if not isinstance(tc_openai_format, dict) or "function" not in tc_openai_format:
-            # This indicates a malformed OpenAI tool call, skip or error
-            # print(f"DEBUG: Malformed OpenAI tool call, skipping: {tc_openai_format!r}")
             continue
 
         function_details = tc_openai_format.get("function", {})
-        if (
-            not isinstance(function_details, dict)
-            or "arguments" not in function_details
-        ):
-            # Malformed function details within the tool call
-            # print(f"DEBUG: Malformed function details in tool call, skipping: {tc_openai_format!r}")
+        if not isinstance(function_details, dict) or "arguments" not in function_details:
             continue
 
         arguments_val = function_details["arguments"]
-        deserialized_args = (
-            arguments_val  # Default to original if not a string or fails to parse
-        )
+        deserialized_args = arguments_val
 
         if isinstance(arguments_val, str):
-            if not arguments_val.strip():  # Handle empty string arguments
-                deserialized_args = {}  # Represent as empty dict
+            if not arguments_val.strip():
+                deserialized_args = {}
             else:
                 try:
                     deserialized_args = json.loads(arguments_val)
@@ -316,7 +283,6 @@ def maybe_deserialize_tool_call_arguments(
                     # This matches behavior of some models that might return non-JSON arguments.
                     pass
 
-        # Create a new dict to avoid modifying the input list items directly if they are shared
         new_tc = copy.deepcopy(tc_openai_format)
         new_tc["function"]["arguments"] = deserialized_args
         processed_tool_calls.append(new_tc)
@@ -331,8 +297,7 @@ def parse_tool_calls(completion: str) -> list:
         try:
             tool_call_str = match.strip()
             row_tool_calls.append(json.loads(tool_call_str))
-        except Exception:  # pylint: disable=bare-except
-            # print("tool call parsing error")
+        except Exception:
             continue
     return row_tool_calls
 
@@ -348,7 +313,6 @@ def compare_tool_calls(generated_tool_calls: list, gt_tool_calls: list) -> bool:
         json.dumps(item, sort_keys=True) for item in gt_tool_calls
     ]
 
-    # Direct list comparison for order sensitivity
     return generated_tool_calls_serialized == gt_tool_calls_serialized
 
 
@@ -358,12 +322,9 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
     else:
         expected_gt_tool_calls = ground_truth["tool_calls"]
 
-    # Deserialize arguments for ground truth (already in OpenAI format from preprocessor)
-    # This will convert the "arguments" JSON string inside each "function" to a dict.
     deserialized_gt_openai_tool_calls = maybe_deserialize_tool_call_arguments(
         expected_gt_tool_calls or []
     )
-    # Extract the {"name": ..., "arguments": {...}} part for comparison
     ground_truth_simple_format = [
         tc["function"] for tc in deserialized_gt_openai_tool_calls if "function" in tc
     ]
@@ -371,50 +332,32 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
     generated_simple_format = []
     raw_generated_tool_calls = generation.get("tool_calls")
 
-    if (
-        raw_generated_tool_calls
-    ):  # Model provided tool_calls in OpenAI format (list of dicts)
-        # Ensure they are dicts (e.g. from Pydantic model_dump)
+    if raw_generated_tool_calls:
         processed_gen_tool_calls_openai_format = []
         for tc in raw_generated_tool_calls:
-            if hasattr(tc, "model_dump"):  # Pydantic model
+            if hasattr(tc, "model_dump"):
                 processed_gen_tool_calls_openai_format.append(tc.model_dump())
-            elif isinstance(tc, dict):  # Already a dict
+            elif isinstance(tc, dict):
                 processed_gen_tool_calls_openai_format.append(tc)
-            # else: skip malformed items
 
-        # Deserialize arguments if they are strings
         deserialized_gen_openai_tool_calls = maybe_deserialize_tool_call_arguments(
             processed_gen_tool_calls_openai_format
         )
-        # Extract the {"name": ..., "arguments": {...}} part
         generated_simple_format = [
             tc["function"]
             for tc in deserialized_gen_openai_tool_calls
             if "function" in tc
         ]
     elif generation.get("content") and "<tool_call>" in generation["content"]:
-        # Model provided tool calls in content string.
-        # parse_tool_calls extracts the string content within <tool_call> tags and parses it as JSON.
-        # The content of the tag could be either simple format or OpenAI format.
         parsed_tool_calls_from_content_str = parse_tool_calls(generation["content"])
-
-        # Now, ensure these are consistently processed into the simple format.
-        # We need to check if items from parse_tool_calls are already simple or need OpenAI unwrapping.
         temp_openai_formatted_list = []
         for item in parsed_tool_calls_from_content_str:
-            if (
-                isinstance(item, dict) and "function" in item and "type" in item
-            ):  # Looks like OpenAI format
+            if isinstance(item, dict) and "function" in item and "type" in item:
                 temp_openai_formatted_list.append(item)
-            elif (
-                isinstance(item, dict) and "name" in item and "arguments" in item
-            ):  # Looks like simple format
-                # Convert to temporary OpenAI format for consistent processing by maybe_deserialize_tool_call_arguments
-                # This case might not be hit if parse_tool_calls always gets OpenAI format from the test string.
+            elif isinstance(item, dict) and "name" in item and "arguments" in item:
                 temp_openai_formatted_list.append(
                     {
-                        "id": f"parsed_call_{len(temp_openai_formatted_list)}",  # Dummy ID
+                        "id": f"parsed_call_{len(temp_openai_formatted_list)}",
                         "type": "function",
                         "function": {
                             "name": item["name"],
@@ -426,7 +369,6 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
                         },
                     }
                 )
-            # else: skip malformed items
 
         if temp_openai_formatted_list:
             deserialized_calls_from_content = maybe_deserialize_tool_call_arguments(
@@ -437,7 +379,6 @@ def eval_tool_call(generation: dict, ground_truth: dict) -> bool:
                 for tc in deserialized_calls_from_content
                 if "function" in tc
             ]
-        # If parsing yields nothing or malformed items, generated_simple_format remains empty.
 
     return compare_tool_calls(generated_simple_format, ground_truth_simple_format)
 
@@ -462,7 +403,6 @@ def exact_tool_match_reward(
             "content": generation_message_obj.content,
         }
         if generation_message_obj.tool_calls:
-            # Ensure tool_calls are dicts, not Pydantic models, for eval_tool_call
             generation_dict["tool_calls"] = [
                 tc.model_dump() if hasattr(tc, "model_dump") else tc
                 for tc in generation_message_obj.tool_calls
@@ -478,10 +418,8 @@ def exact_tool_match_reward(
 
     if ground_truth is None:
         has_generation_tool_calls = False
-        # Check 'tool_calls' first
         if generation_dict.get("tool_calls"):
             has_generation_tool_calls = True
-        # Then check 'content' if 'tool_calls' was not indicative
         elif "<tool_call>" in generation_dict.get("content", ""):
             if parse_tool_calls(generation_dict.get("content", "")):
                 has_generation_tool_calls = True
@@ -516,16 +454,12 @@ def exact_tool_match_reward(
 # End of New Exact Tool Match Reward Function and Helpers
 
 
-@reward_function  # Added decorator
+@reward_function
 def schema_jaccard_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[
-        Dict[str, Any]
-    ] = None,  # Ensure ground_truth type is Dict for exact_tool_match_reward
-    function_call: Optional[Dict[str, Any]] = None,  # Param becomes unused
-    expected_schema: Optional[
-        Union[Dict[str, Any], str]
-    ] = None,  # Param becomes unused
+    ground_truth: Optional[Dict[str, Any]] = None,
+    function_call: Optional[Dict[str, Any]] = None,
+    expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     **kwargs,
 ) -> EvaluateResult:
     """
@@ -540,8 +474,8 @@ def schema_jaccard_reward(
     Args:
         messages: List of conversation messages.
         ground_truth: Expected assistant response as a dictionary.
-        function_call: (Unused) Kept for signature compatibility.
-        expected_schema: (Unused) Kept for signature compatibility.
+        function_call: Kept for signature compatibility.
+        expected_schema: Kept for signature compatibility.
         **kwargs: Additional keyword arguments.
 
     Returns:
@@ -553,23 +487,21 @@ def schema_jaccard_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(  # type: ignore[return-value]
+    return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 
 
-@reward_function  # Added decorator
+@reward_function
 def llm_judge_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Dict[str, Any]] = None,  # Ensure ground_truth type is Dict
-    function_call: Optional[Dict[str, Any]] = None,  # Param becomes unused
-    expected_schema: Optional[
-        Union[Dict[str, Any], str]
-    ] = None,  # Param becomes unused
-    expected_behavior: Optional[str] = None,  # Param becomes unused
-    openai_api_key: Optional[str] = None,  # Param becomes unused
-    model: str = "gpt-4o-mini",  # Param becomes unused
-    temperature: float = 0.0,  # Param becomes unused
+    ground_truth: Optional[Dict[str, Any]] = None,
+    function_call: Optional[Dict[str, Any]] = None,
+    expected_schema: Optional[Union[Dict[str, Any], str]] = None,
+    expected_behavior: Optional[str] = None,
+    openai_api_key: Optional[str] = None,
+    model: str = "gpt-4o-mini",
+    temperature: float = 0.0,
     **kwargs,
 ) -> EvaluateResult:
     """
@@ -582,12 +514,12 @@ def llm_judge_reward(
     Args:
         messages: List of conversation messages.
         ground_truth: Expected assistant response as a dictionary.
-        function_call: (Unused) Kept for signature compatibility.
-        expected_schema: (Unused) Kept for signature compatibility.
-        expected_behavior: (Unused) Kept for signature compatibility.
-        openai_api_key: (Unused) Kept for signature compatibility.
-        model: (Unused) Kept for signature compatibility.
-        temperature: (Unused) Kept for signature compatibility.
+        function_call: Kept for signature compatibility.
+        expected_schema: Kept for signature compatibility.
+        expected_behavior: Kept for signature compatibility.
+        openai_api_key: Kept for signature compatibility.
+        model: Kept for signature compatibility.
+        temperature: Kept for signature compatibility.
         **kwargs: Additional keyword arguments.
 
     Returns:
@@ -599,7 +531,7 @@ def llm_judge_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(  # type: ignore[return-value]
+    return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 
@@ -607,9 +539,7 @@ def llm_judge_reward(
 @reward_function
 def composite_function_call_reward(
     messages: Union[List[Message], List[Dict[str, Any]]],
-    ground_truth: Optional[Dict[str, Any]] = None,  # Changed type here
-    # The following parameters are now effectively unused due to delegation
-    # but are kept for signature compatibility or future flexibility.
+    ground_truth: Optional[Dict[str, Any]] = None,
     function_call: Optional[Dict[str, Any]] = None,
     expected_schema: Optional[Union[Dict[str, Any], str]] = None,
     expected_behavior: Optional[str] = None,
@@ -630,12 +560,12 @@ def composite_function_call_reward(
         messages: List of conversation messages, where `messages[-1]` is the model's response.
         ground_truth: Expected assistant response as a dictionary, typically containing 'tool_calls'.
                       This is passed directly to exact_tool_match_reward.
-        function_call: (Unused) Kept for signature compatibility.
-        expected_schema: (Unused) Kept for signature compatibility.
-        expected_behavior: (Unused) Kept for signature compatibility.
-        openai_api_key: (Unused) Kept for signature compatibility.
-        llm_model: (Unused) Kept for signature compatibility.
-        weights: (Unused) Kept for signature compatibility.
+        function_call: Kept for signature compatibility.
+        expected_schema: Kept for signature compatibility.
+        expected_behavior: Kept for signature compatibility.
+        openai_api_key: Kept for signature compatibility.
+        llm_model: Kept for signature compatibility.
+        weights: Kept for signature compatibility.
         **kwargs: Additional keyword arguments passed to exact_tool_match_reward.
 
     Returns:
@@ -647,7 +577,7 @@ def composite_function_call_reward(
         DeprecationWarning,
         stacklevel=2,
     )
-    return exact_tool_match_reward(  # type: ignore[return-value]
+    return exact_tool_match_reward(
         messages=messages, ground_truth=ground_truth, **kwargs
     )
 

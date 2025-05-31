@@ -117,7 +117,7 @@ def create_trl_adapter(
                     mapped_kwargs_data[reward_fn_param_name] = data_list
 
         for i in range(num_samples):
-            current_prompt_item: Any = prompts[i]  # Item from the prompts list
+            current_prompt_item: Any = prompts[i]
             current_completion: str = completions[i]
 
             # Construct messages

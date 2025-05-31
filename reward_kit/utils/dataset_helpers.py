@@ -2,17 +2,13 @@ import json
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
-    # For type checking only
     from datasets import Dataset
 
-# Try to import at runtime
 try:
     from datasets import Dataset
-
     HAS_DATASETS_LIB = True
 except ImportError:
     HAS_DATASETS_LIB = False
-    # Create a placeholder for runtime when dataset is not available
     if not TYPE_CHECKING:
 
         class Dataset:
@@ -69,9 +65,7 @@ def load_jsonl_to_hf_dataset(
                     else:
                         transformed_sample = raw_sample
 
-                    if (
-                        transformed_sample is None
-                    ):  # transform_fn might return None to skip
+                    if transformed_sample is None:
                         continue
 
                     if dataset_filter_fn and not dataset_filter_fn(transformed_sample):
@@ -90,18 +84,16 @@ def load_jsonl_to_hf_dataset(
 
         if not processed_samples:
             print(f"Warning: No samples were processed from {dataset_path}.")
-            return Dataset.from_list([])  # Return empty dataset
+            return Dataset.from_list([])
 
         hf_dataset = Dataset.from_list(processed_samples)
 
-        # Validate columns
         if prompt_column not in hf_dataset.column_names:
             raise ValueError(
                 f"Dataset from {dataset_path} must contain a '{prompt_column}' column after transformation."
             )
 
         final_required_columns = set(required_columns or [])
-        # The prompt_column is implicitly required by TRL, ensure it's in the check list
         final_required_columns.add(prompt_column)
 
         for col in final_required_columns:
@@ -115,7 +107,7 @@ def load_jsonl_to_hf_dataset(
     except FileNotFoundError:
         print(f"Error: Dataset file not found at {dataset_path}")
         return None
-    except ValueError as ve:  # Catch column validation errors
+    except ValueError as ve:
         print(f"Error: {ve}")
         return None
     except Exception as e:

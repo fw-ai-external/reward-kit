@@ -51,27 +51,27 @@ def _run_gcloud_command(
 
 def build_and_push_docker_image(
     image_name_tag: str,  # e.g., gcr.io/my-project/my-reward-func:latest
-    dockerfile_content: str,
-    build_context_dir: str,  # Directory where Dockerfile and user code are (usually CWD)
-    gcp_project_id: Optional[
-        str
-    ] = None,  # Required if using gcloud builds submit without local Docker
-    dry_run: bool = False,
-) -> bool:
-    """
-    Builds a Docker image using the provided Dockerfile content and pushes it to a registry (e.g., GCR, Artifact Registry).
-    Can use local Docker or 'gcloud builds submit'.
+        dockerfile_content: str,
+        build_context_dir: str,  # Directory where Dockerfile and user code are (usually CWD)
+        gcp_project_id: Optional[
+            str
+        ] = None,  # Required if using gcloud builds submit without local Docker
+        dry_run: bool = False,
+    ) -> bool:
+        """
+        Builds a Docker image using the provided Dockerfile content and pushes it to a registry (e.g., GCR, Artifact Registry).
+        Can use local Docker or 'gcloud builds submit'.
 
-    Args:
-        image_name_tag: Full name and tag for the image (e.g., "gcr.io/project-id/image-name:tag").
-        dockerfile_content: String content of the Dockerfile.
-        build_context_dir: The build context directory for Docker.
-        gcp_project_id: GCP Project ID, used for 'gcloud builds submit'.
-        dry_run: If True, prints commands instead of executing them.
+        Args:
+            image_name_tag: Full name and tag for the image (e.g., "gcr.io/project-id/image-name:tag").
+            dockerfile_content: String content of the Dockerfile.
+            build_context_dir: The build context directory for Docker.
+            gcp_project_id: GCP Project ID, used for 'gcloud builds submit'.
+            dry_run: If True, prints commands instead of executing them.
 
-    Returns:
-        True if successful, False otherwise.
-    """
+        Returns:
+            True if successful, False otherwise.
+        """
     logger.info(
         f"Attempting to build and push Docker image using Google Cloud Build: {image_name_tag}"
     )
@@ -134,7 +134,7 @@ def deploy_to_cloud_run(
     env_vars: Optional[Dict[str, str]] = None,
     secrets_to_mount: Optional[
         Dict[str, str]
-    ] = None,  # Maps ENV_VAR_NAME to projects/PROJECT_ID/secrets/SECRET_ID/versions/VERSION
+    ] = None,
     service_port: int = 8080,
     dry_run: bool = False,
 ) -> Optional[str]:
@@ -180,7 +180,7 @@ def deploy_to_cloud_run(
             gcp_project_id,
             "--port",
             str(service_port),
-            # "--platform", "managed", # Default for Cloud Run
+            # "--platform", "managed",
         ]
 
         if allow_unauthenticated:
@@ -356,7 +356,7 @@ def ensure_artifact_registry_repo_exists(
 
 def ensure_gcp_secret(
     project_id: str,
-    secret_id: str,  # Short ID of the secret, e.g., "my-api-key"
+    secret_id: str,
     secret_value: str,
     region: Optional[
         str
@@ -375,7 +375,7 @@ def ensure_gcp_secret(
     if not secret_id:
         logger.error("Secret ID is required to manage secrets.")
         return None
-    if secret_value is None:  # Allow empty string, but not None
+    if secret_value is None:
         logger.error("Secret value is required to create or update a secret.")
         return None
 
@@ -383,7 +383,7 @@ def ensure_gcp_secret(
     describe_cmd = ["secrets", "describe", secret_id, "--project", project_id]
     secret_exists, _, describe_stderr = _run_gcloud_command(
         describe_cmd, dry_run=False
-    )  # Always check existence
+    )
 
     if not secret_exists:
         if (
@@ -460,8 +460,6 @@ def ensure_gcp_secret(
 
         # The stdout of 'versions add' usually contains the version name, but it's safer to describe.
         # Let's parse the version from the output if available, or describe to get the latest.
-        # Example output: "Created version [6] of secret [projects/...]".
-        # Or, more reliably, describe the secret and get the latest version.
         # For simplicity, if dry_run, we can't get a real version.
         if dry_run:
             logger.info(
@@ -470,7 +468,6 @@ def ensure_gcp_secret(
             return f"projects/{project_id}/secrets/{secret_id}/versions/latest-dry-run"
 
         # Get the full name of the newly added version
-        # 'gcloud secrets versions access latest --secret=SECRET_ID' gets the payload
         # 'gcloud secrets versions describe latest --secret=SECRET_ID --format="value(name)"' gets the name
         describe_version_cmd = [
             "secrets",
@@ -497,7 +494,7 @@ def ensure_gcp_secret(
             logger.error(
                 f"Added version to secret '{secret_id}', but failed to retrieve new version name. Stderr: {desc_ver_stderr}"
             )
-            return None  # Or return a placeholder like projects/PROJECT_ID/secrets/SECRET_ID/versions/latest
+            return None
 
     except Exception as e:
         logger.error(f"An error occurred while adding secret version: {e}")
@@ -511,7 +508,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
     logger.info("--- GCP Tools Module (Placeholder Examples) ---")
 
-    # Example: Build and Push
     # Note: Dockerfile content would come from packaging.py
     dummy_dockerfile = 'FROM python:3.10-slim\nCMD ["echo", "hello"]'
     img_name = "gcr.io/my-test-project/my-test-reward-eval:latest"  # Old GCR name, update for AR
@@ -527,7 +523,6 @@ if __name__ == "__main__":
         dry_run=True,
     )
 
-    # Example: Deploy to Cloud Run
     print(f"\n2. Simulating deploy to Cloud Run (dry_run=True)")
     deploy_to_cloud_run(
         service_name="my-reward-service",

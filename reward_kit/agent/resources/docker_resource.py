@@ -100,7 +100,6 @@ class DockerResource(ForkableResource):
         if container:
             try:
                 container.remove(force=True, v=True)  # v=True to remove volumes
-                # print(f"DockerResource: Removed container {container.id[:12]}")
             except NotFound:
                 pass  # Already removed
             except APIError as e:
@@ -112,7 +111,6 @@ class DockerResource(ForkableResource):
         if image_id:
             try:
                 self._client.images.remove(image=image_id, force=True)
-                # print(f"DockerResource: Removed image {image_id[:12]}")
             except NotFound:
                 pass  # Already removed
             except APIError as e:
@@ -173,7 +171,6 @@ class DockerResource(ForkableResource):
             self._container = self._client.containers.run(image_name, **run_options)
             if self._container:
                 self._container.reload()  # Ensure state is up-to-date
-            # print(f"DockerResource setup: Started container {self._container.id[:12]} ({self._container.name}) from image {image_name}")
         except APIError as e:
             raise DockerException(
                 f"Failed to start container '{container_name}' from image '{image_name}': {e}"
@@ -191,7 +188,6 @@ class DockerResource(ForkableResource):
         fork_image_tag = self._generate_name("fork_img")
         try:
             committed_image = self._container.commit(repository=fork_image_tag)
-            # print(f"DockerResource fork: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({fork_image_tag})")
         except APIError as e:
             raise DockerException(
                 f"Failed to commit container {(self._container.id or '')[:12]} for fork: {e}"
@@ -218,7 +214,6 @@ class DockerResource(ForkableResource):
             )
             if forked_resource._container:
                 forked_resource._container.reload()
-            # print(f"DockerResource fork: Started new container {forked_resource._container.id[:12]} from image {committed_image.id[:12]}")
         except APIError as e:
             self._cleanup_image(
                 committed_image.id
@@ -240,7 +235,6 @@ class DockerResource(ForkableResource):
         checkpoint_image_tag = self._generate_name("checkpoint_img")
         try:
             committed_image = self._container.commit(repository=checkpoint_image_tag)
-            # print(f"DockerResource checkpoint: Committed container {self._container.id[:12]} to image {committed_image.id[:12]} ({checkpoint_image_tag})")
             return {"type": "docker_image_id", "image_id": committed_image.id}
         except APIError as e:
             raise DockerException(
@@ -293,7 +287,6 @@ class DockerResource(ForkableResource):
             self._container = self._client.containers.run(image_id, **run_options)
             if self._container:
                 self._container.reload()
-            # print(f"DockerResource restore: Started container {self._container.id[:12]} from checkpoint image {image_id[:12]}")
         except APIError as e:
             raise DockerException(
                 f"Failed to start container from checkpoint image {image_id[:12]}: {e}"
@@ -472,7 +465,6 @@ class DockerResource(ForkableResource):
         if self._is_closed:
             return
 
-        # print(f"DockerResource close called for container: {self._container.id[:12] if self._container else 'None'}")
         self._cleanup_container(self._container)
         self._container = None
 
@@ -506,4 +498,3 @@ class DockerResource(ForkableResource):
 
         self._image_id_for_fork_or_checkpoint = None
         self._is_closed = True
-        # print("DockerResource closed.")

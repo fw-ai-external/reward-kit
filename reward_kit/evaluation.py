@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import time
-import types  # Moved from below
+import types
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 import requests
 
 from reward_kit.auth import get_fireworks_account_id, get_fireworks_api_key
-
-# Import EvaluationMode from typed_interface
 from reward_kit.typed_interface import EvaluationMode
 
 logger = logging.getLogger(__name__)
@@ -172,7 +170,7 @@ class Evaluator:
         self.multi_metrics = multi_metrics
         self.remote_url = remote_url
         self.ts_mode_config = ts_mode_config
-        self.reward_function_mode = reward_function_mode  # Store the mode
+        self.reward_function_mode = reward_function_mode
         self.code_files = {}
         self.metric_folders: Dict[str, Any] = {}
         self.description = ""
@@ -315,7 +313,7 @@ class Evaluator:
 
         account_id = get_fireworks_account_id()
         auth_token = get_fireworks_api_key()
-        logger.debug(f"Preview using account_id: {account_id}")  # Corrected logging
+        logger.debug(f"Preview using account_id: {account_id}")
 
         if not account_id or not auth_token:
             logger.error(
@@ -398,7 +396,7 @@ class Evaluator:
                 if "messages" not in sample:
                     raise ValueError(f"Sample {i+1} is missing 'messages' field")
                 _ = sample.get("messages", [])
-                _ = sample.get("ground_truth", [])  # Changed from original_messages
+                _ = sample.get("ground_truth", [])
                 _ = sample.get("tools", [])
                 _ = {
                     k: v
@@ -408,7 +406,7 @@ class Evaluator:
                         "messages",
                         "ground_truth",
                         "tools",
-                    ]  # Changed from original_messages
+                    ]
                 }
 
                 if (
@@ -547,7 +545,7 @@ import requests
 
 REMOTE_EVALUATOR_URL = "{self.remote_url}"
 
-def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs): # Added type hints
+def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] = None, tools=None, **kwargs):
     payload = {{
         "messages": messages,
         "ground_truth": ground_truth,
@@ -644,13 +642,6 @@ def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] 
                         f"main.py not found for metric '{metric_name}' with key '{main_py_key}'. "
                         "The preview payload might be incorrect or incomplete."
                     )
-                    # Original logic to include all files for the metric folder as a fallback:
-                    # for k, v in self.code_files.items():
-                    #     if k.startswith(f"{metric_name}/"):
-                    #         simple_name = (
-                    #             k.split("/", 1)[1] if isinstance(k, str) and "/" in k else k
-                    #         )
-                    #         file_contents[simple_name] = self._update_evaluate_signature(v)
 
                 if not file_contents:
                     logger.warning(
@@ -685,7 +676,6 @@ def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] 
 
         # Check if the old pattern (entry-based) exists
         if re.search(old_pattern, content):
-            # Replace the old signature with the new one
             updated_content = re.sub(old_pattern, new_signature, content, count=1)
 
             # Add a compatibility layer for the 'entry' style
@@ -732,19 +722,6 @@ def evaluate(messages, ground_truth: Optional[Union[str, List[Dict[str, Any]]]] 
             return updated_content
         elif "updated_content" in locals():
             return updated_content
-
-            # Find the function body indent level
-            func_match = re.search(
-                r"def\s+evaluate.*?:\s*\n(\s+)", updated_content, re.DOTALL
-            )
-            if func_match:
-                indent = func_match.group(1)
-                # Adjust indentation of compatibility layer
-                compat_layer = "\n".join(
-                    indent + line for line in compat_layer.strip().split("\n")
-                )
-
-                # Insert compatibility layer after function definition
         return content
 
     def _get_combined_code(self):  # This method seems unused now, consider removal
@@ -805,14 +782,14 @@ def preview_evaluation(
         # due to how ts_mode_config is handled (sets self.multi_metrics = True for payload).
         # The multi_metrics flag passed to Evaluator here should be the original one for folder logic.
         evaluator = Evaluator(
-            multi_metrics=multi_metrics,
-            ts_mode_config=ts_mode_config,
-            reward_function_mode=reward_function_mode,
-        )
+        multi_metrics=multi_metrics,
+        ts_mode_config=ts_mode_config,
+        reward_function_mode=reward_function_mode,
+    )
     else:
         evaluator = Evaluator(
             multi_metrics=multi_metrics, reward_function_mode=reward_function_mode
-        )
+        ) # Pass mode to Evaluator
         if multi_metrics:
             if not folder:
                 raise ValueError("`folder` must be specified for multi_metrics mode.")
@@ -932,7 +909,7 @@ def create_evaluation(
         multi_metrics=multi_metrics,
         remote_url=remote_url,
         ts_mode_config=ts_mode_config,
-        reward_function_mode=reward_function_mode,  # Pass mode to Evaluator
+        reward_function_mode=reward_function_mode,
     )
 
     if remote_url:

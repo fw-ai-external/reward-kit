@@ -94,8 +94,6 @@ class SQLResource(ForkableResource):
         finally:
             conn.close()
 
-        # print(f"SQLResource setup complete. Base DB at: {self._base_db_path}")
-
     async def fork(self) -> "SQLResource":
         """
         Creates a new SQLResource instance with a copy of the base database state.
@@ -118,7 +116,6 @@ class SQLResource(ForkableResource):
         forked_resource._db_path = self._temp_dir / forked_db_name
 
         shutil.copyfile(str(self._db_path), str(forked_resource._db_path))
-        # print(f"SQLResource forked. New DB at: {forked_resource._db_path} from {self._db_path}")
         return forked_resource
 
     async def checkpoint(self) -> Dict[str, Any]:
@@ -133,7 +130,6 @@ class SQLResource(ForkableResource):
         checkpoint_name = f"checkpoint_{self._db_path.stem}_{uuid.uuid4().hex}.sqlite"
         checkpoint_path = self._temp_dir / checkpoint_name
         shutil.copyfile(str(self._db_path), str(checkpoint_path))
-        # print(f"SQLResource checkpointed. DB at: {self._db_path} to {checkpoint_path}")
         return {"db_type": "sqlite", "checkpoint_path": str(checkpoint_path)}
 
     async def restore(self, state_data: Dict[str, Any]) -> None:
@@ -159,7 +155,6 @@ class SQLResource(ForkableResource):
         self._base_db_path = (
             self._db_path
         )  # The restored state becomes the new base for future forks
-        # print(f"SQLResource restored. DB at: {self._db_path} from {checkpoint_path}")
 
     async def step(self, action_name: str, action_params: Dict[str, Any]) -> Any:
         """
@@ -269,7 +264,6 @@ class SQLResource(ForkableResource):
         if self._db_path and self._db_path.exists():
             try:
                 self._db_path.unlink()
-                # print(f"SQLResource closed. Deleted DB: {self._db_path}")
             except OSError as e:
                 print(f"Error deleting database file {self._db_path}: {e}")
 

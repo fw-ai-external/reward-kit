@@ -170,4 +170,3 @@ class PythonStateResource(ForkableResource):
         """
         self._state = {}
         self._config = {}
-        # print("PythonStateResource closed.") # For debugging

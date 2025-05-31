@@ -25,7 +25,7 @@ def deepcoder_code_reward(
     messages: List[Message],  # Full conversation, model's response is messages[-1]
     ground_truth: List[Dict[str, Any]],  # This is the test_cases
     language: str,
-    timeout: int = 10,  # DeepCoder paper mentions 6-12s, default to 10s
+    timeout: int = 10,
     environment: str = "local",
     api_key: Optional[str] = None,
     target_function: Optional[str] = None,
@@ -74,7 +74,7 @@ def deepcoder_code_reward(
         )
 
     assistant_content = messages[-1].content
-    test_cases = ground_truth  # The new ground_truth parameter is the test_cases
+    test_cases = ground_truth
 
     code_blocks = extract_code_blocks(assistant_content, language)
     if not code_blocks:
@@ -99,8 +99,6 @@ def deepcoder_code_reward(
     )
 
     if not test_cases:
-        # Convert existing metrics_dict to string for details if needed, or just pass it.
-        # For simplicity, let's pass the current metrics_dict.
         return EvaluateResult(
             score=0.0,
             reason="No test cases provided.",
@@ -113,7 +111,6 @@ def deepcoder_code_reward(
             is_score_valid=False,
         )
 
-    # Use the explicitly passed target_function if available
     function_to_call = target_function
     if function_to_call:
         metrics_dict["target_function_provided"] = MetricResult(
@@ -127,9 +124,7 @@ def deepcoder_code_reward(
             is_score_valid=False,
             reason="Target function name not provided in input data. Will attempt stdin/stdout.",
         )
-        # Fallback to stdin/stdout mode will happen in _run_test_cases
 
-    # Prepare kwargs for _run_test_cases, including the new function_to_call
     run_test_cases_kwargs = {
         "code": code_to_execute,
         "language": language,
@@ -140,47 +135,29 @@ def deepcoder_code_reward(
         "function_to_call": function_to_call,
     }
 
-    # Filter out None values from kwargs
     filtered_kwargs = {k: v for k, v in run_test_cases_kwargs.items() if v is not None}
 
-    # _run_test_cases already returns EvaluateResult
     eval_result_from_tests: EvaluateResult = _run_test_cases(**filtered_kwargs)  # type: ignore
 
-    # DeepCoder reward is sparse: 1.0 if all pass (score == 1.0 from _run_test_cases), 0.0 otherwise.
     final_score = 1.0 if eval_result_from_tests.score == 1.0 else 0.0
 
-    # Combine metrics from _run_test_cases with metrics gathered here
     if eval_result_from_tests.metrics:
-        metrics_dict.update(
-            eval_result_from_tests.metrics
-        )  # eval_result_from_tests.metrics is Dict[str, MetricResult]
+        metrics_dict.update(eval_result_from_tests.metrics)
 
     overall_reason = (
         "All tests passed."
         if final_score == 1.0
         else "One or more tests failed or an error occurred."
     )
-    # If _run_test_cases had a top-level error, its reason might be more specific.
-    if (
-        eval_result_from_tests.reason and eval_result_from_tests.score == 0.0
-    ):  # Check if there was an overarching error reason
-        # Prefer the reason from _run_test_cases if it indicates a failure.
-        # This might happen if _run_test_cases itself had an "error" metric.
-        # The `overall_status` below will capture the pass/fail summary.
-        # overall_reason is already set based on final_score
+    if eval_result_from_tests.reason and eval_result_from_tests.score == 0.0:
         pass
     metrics_dict["overall_status"] = MetricResult(
         score=final_score, is_score_valid=(final_score == 1.0), reason=overall_reason
     )
 
-    # The main reason for EvaluateResult should reflect the overall outcome.
-    # If _run_test_cases provided a specific reason for failure, use that.
-    # Otherwise, use the general pass/fail reason.
     final_reason = overall_reason
     if eval_result_from_tests.score != 1.0 and eval_result_from_tests.reason:
-        final_reason = (
-            eval_result_from_tests.reason
-        )  # Use reason from test runner if it failed and provided one.
+        final_reason = eval_result_from_tests.reason
 
     return EvaluateResult(
         score=final_score,

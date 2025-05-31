@@ -12,16 +12,10 @@ __version__ = "0.2.0"
 
 import warnings
 
-# Import everything from models
 from .models import EvaluateResult, Message, MetricResult
-
-# Import from reward_function
 from .reward_function import RewardFunction
-
-# Import the decorator from typed_interface
 from .typed_interface import reward_function
 
-# Show deprecation warnings
 warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 
 __all__ = [

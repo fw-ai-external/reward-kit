@@ -2,16 +2,15 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from reward_kit.models import Message  # Import Message model
+from reward_kit.models import Message
 from reward_kit.models import EvaluateResult, MetricResult
 from reward_kit.reward_function import reward_function
 
 
 @reward_function
 def lean_prover_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
-    ground_truth: Optional[str],  # This is the expected_answer (proof string)
-    # statement is still expected via kwargs as per original logic
+    messages: List[Message],
+    ground_truth: Optional[str], # This is the expected_answer (proof string)
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -29,7 +28,6 @@ def lean_prover_reward(
         EvaluateResult with score and metrics
     """
     statement: Optional[str] = kwargs.get("statement")
-    # expected_answer is now the ground_truth parameter
     expected_answer: Optional[str] = ground_truth
     # lean_version: str = kwargs.get("lean_version", "4") # lean_version is not used in this function's logic
     check_partial_progress: bool = kwargs.get("check_partial_progress", True)
@@ -65,7 +63,7 @@ def lean_prover_reward(
         )
 
     response = messages[-1].content
-    if not response:  # Check if content is empty string
+    if not response:
         return EvaluateResult(
             score=0.0,
             reason="Assistant response content is empty.",
@@ -78,7 +76,6 @@ def lean_prover_reward(
             },
         )
 
-    # Define patterns for Lean syntax validation
     patterns = {
         "theorem_def": r"theorem\s+\w+(\s*\{[^}]*\})?(\s*\([^)]*\))?\s*:=?",
         "lemma_def": r"lemma\s+\w+(\s*\{[^}]*\})?(\s*\([^)]*\))?\s*:=?",
@@ -96,22 +93,16 @@ def lean_prover_reward(
         "calc_block": r"calc\s+",
     }
 
-    # Check if it's a valid Lean proof attempt
     has_theorem_def = (
         bool(re.search(patterns["theorem_def"], response))
         or bool(re.search(patterns["lemma_def"], response))
         or bool(re.search(patterns["example_def"], response))
     )
-
-    # Check for sorry/admitted (incomplete proof)
     has_sorry = bool(re.search(patterns["sorry"], response))
     has_admitted = bool(re.search(patterns["admitted"], response))
-
-    # Check for proof completion indicators
     has_end_marker = bool(re.search(patterns["end_of_proof"], response))
     has_by_tactic = bool(re.search(patterns["by_tactic"], response))
 
-    # Check for common proof tactics
     tactics_present = []
     tactics_count = 0
     for tactic_name in [
@@ -127,43 +118,33 @@ def lean_prover_reward(
             tactics_present.append(tactic_name)
             tactics_count += len(re.findall(patterns[tactic_name], response))
 
-    # Calculate basic score
     score = 0.0
     reason = "No valid Lean proof attempt"
 
-    # Score 0: No valid Lean proof attempt
     if not has_theorem_def and tactics_count == 0:
         score = 0.0
         reason = "No valid Lean proof attempt"
-    # Score 0.1-0.4: Has definition but incomplete or partial proof
     elif has_theorem_def and (has_sorry or has_admitted):
-        # Partial credit based on how much of the proof was completed
         if check_partial_progress:
-            # Scale score based on number of tactics used (up to 0.4)
             score = min(0.4, 0.1 + (tactics_count / 10) * 0.3)
             reason = f"Incomplete proof with {tactics_count} tactics"
         else:
-            score = 0.1  # Only give minimal credit for incomplete proofs
+            score = 0.1
             reason = "Incomplete proof (has sorry/admitted)"
-    # Score 0.5-0.9: Has complete proof
     elif has_theorem_def and not (has_sorry or has_admitted):
-        # Base score for complete proof
         score = 0.5
         reason = "Complete proof"
-
-        # Add up to 0.4 more based on tactics complexity
         if tactics_count >= 5:
             score += 0.4
             reason = f"Complete proof with good complexity ({tactics_count} tactics)"
         else:
             score += (tactics_count / 5) * 0.4
             reason = f"Complete proof with {tactics_count} tactics"
-    # Score 1.0: Perfect score when we have expected_answer to compare against
+
     if expected_answer and expected_answer.lower() in response.lower():
         score = 1.0
         reason = "Perfect match with expected proof"
 
-    # Prepare metrics
     metrics = {}
     if verbose:
         metrics = {
@@ -187,11 +168,10 @@ def lean_prover_reward(
             ),
             "tactics": MetricResult(
                 score=min(1.0, tactics_count / 10),
-                is_score_valid=tactics_count > 0,  # Basic success if any tactics used
+                is_score_valid=tactics_count > 0,
                 reason=f"Used {tactics_count} tactics",
             ),
         }
-
         if expected_answer:
             expected_match_bool = expected_answer.lower() in response.lower()
             metrics["expected_match"] = MetricResult(
@@ -204,19 +184,13 @@ def lean_prover_reward(
                 ),
             )
 
-    # Create and return result
-    return EvaluateResult(
-        score=score,
-        reason=reason,  # Use the existing reason variable
-        metrics=metrics,
-    )
+    return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
 
 @reward_function
 def deepseek_prover_v2_reward(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
-    ground_truth: Optional[str],  # This is the expected_proof
-    # statement is still expected via kwargs
+    messages: List[Message],
+    ground_truth: Optional[str], # This is the expected_proof
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -232,7 +206,6 @@ def deepseek_prover_v2_reward(
         EvaluateResult with score and metrics
     """
     statement: Optional[str] = kwargs.get("statement")
-    # expected_proof is now the ground_truth parameter
     expected_proof: Optional[str] = ground_truth
     check_subgoals: bool = kwargs.get("check_subgoals", True)
     verbose: bool = kwargs.get("verbose", False)
@@ -248,23 +221,11 @@ def deepseek_prover_v2_reward(
             },
         )
 
-    # The model's response is in messages[-1].content.
-    # lean_prover_reward will handle checking messages[-1].
-    # No need for a separate check here if lean_prover_reward does it.
-
-    # Prepare kwargs for lean_prover_reward.
-    # The `ground_truth` for lean_prover_reward is `expected_proof`.
     lean_prover_kwargs_for_call = {
         "statement": statement,
-        # "expected_answer" for lean_prover_reward is our expected_proof (now ground_truth for this func)
-        # This will be passed as the ground_truth argument to lean_prover_reward directly.
-        "check_partial_progress": True,  # Default from original call structure
+        "check_partial_progress": True,
         "verbose": verbose,
     }
-
-    # Call the refactored lean_prover_reward.
-    # messages (full convo) is passed as messages.
-    # expected_proof (this function's ground_truth) is passed as ground_truth to lean_prover_reward.
     base_evaluate_result: EvaluateResult = lean_prover_reward(
         messages=messages, ground_truth=expected_proof, **lean_prover_kwargs_for_call
     )
@@ -273,10 +234,8 @@ def deepseek_prover_v2_reward(
     base_reason = base_evaluate_result.reason or "Formal proof evaluation"
     base_metrics = base_evaluate_result.metrics or {}
     top_level_reason = base_reason
-
     metrics = base_metrics.copy()
 
-    # Specific patterns for DeepSeek-Prover-V2 subgoal approach
     subgoal_patterns = {
         "have_statement": r"have\s+(\w+)(\s*:\s*[^:=]+)?\s*:=",
         "suffices": r"suffices\s+(\w+)(\s*:\s*[^,]+)?\s*,",
@@ -285,10 +244,6 @@ def deepseek_prover_v2_reward(
         "recursion": r"(recursion|induction|structural|recursive)",
     }
 
-    # Analyze subgoal decomposition if requested
-    # Need `response_content` from messages[-1].content for this part.
-    # Ensure messages[-1] is valid before accessing content (already done by lean_prover_reward if it was called)
-    # If lean_prover_reward returned due to invalid messages, base_score would be 0 and this part might not run or matter.
     response_content = ""
     if (
         messages
@@ -297,66 +252,47 @@ def deepseek_prover_v2_reward(
         and messages[-1].content is not None
     ):
         response_content = messages[-1].content
-    # If response_content is empty here, subgoal checks will yield 0, which is fine.
 
     final_score = base_score
     subgoal_count = 0
-    hierarchy_depth: float = 0.0  # Initialize as float
-    subgoal_score: float = 0.0  # Initialize as float
-    hierarchy_score: float = 0.0  # Initialize as float
+    hierarchy_depth: float = 0.0
+    subgoal_score: float = 0.0
+    hierarchy_score: float = 0.0
 
-    if check_subgoals and response_content:  # Check response_content
-        # Count subgoal patterns
-        subgoal_count = 0
+    if check_subgoals and response_content:
         for pattern_name, pattern in subgoal_patterns.items():
             subgoal_count += len(re.findall(pattern, response_content))
 
-        # Detect hierarchical structure using indentation analysis
         lines = response_content.split("\n")
         max_indent = 0
         for line in lines:
             spaces = len(line) - len(line.lstrip(" "))
             if spaces > max_indent:
                 max_indent = spaces
-
-        # Calculate hierarchical depth (normalized to 0-1)
         hierarchy_depth = min(1.0, max_indent / 40) if max_indent > 0 else 0
-
-        # Adjust score based on subgoal decomposition quality
         subgoal_score = min(0.3, (subgoal_count / 10) * 0.3)
         hierarchy_score = hierarchy_depth * 0.2
 
-        # The DeepSeek-Prover-V2 approach should have good subgoal decomposition
-        # Only apply this bonus if the base score is already decent
         if base_score >= 0.5:
             final_score = min(1.0, base_score + subgoal_score + hierarchy_score)
-            # Update top_level_reason, as 'reason' might not be defined in this scope
-            # if base_reason was used for top_level_reason.
             top_level_reason = f"{top_level_reason} with good subgoal decomposition"
         else:
             final_score = base_score
 
-        # Add subgoal metrics
         subgoal_decomposition_score_normalized = (
             subgoal_score / 0.3 if subgoal_score > 0 else 0.0
         )
         metrics["subgoal_decomposition"] = MetricResult(
-            score=min(
-                1.0, subgoal_decomposition_score_normalized
-            ),  # Ensure score is <= 1.0
+            score=min(1.0, subgoal_decomposition_score_normalized),
             is_score_valid=subgoal_decomposition_score_normalized > 0.5,
             reason=f"Found {subgoal_count} subgoal patterns",
         )
-
         metrics["hierarchical_structure"] = MetricResult(
             score=hierarchy_depth,
-            is_score_valid=hierarchy_depth
-            > 0.5,  # Mark success if structure is reasonably deep
+            is_score_valid=hierarchy_depth > 0.5,
             reason=f"Hierarchical depth: {hierarchy_depth:.2f}",
         )
-        # top_level_reason is already updated if base_score >= 0.5
 
-    # Create and return result
     return EvaluateResult(
         score=final_score,
         reason=top_level_reason,
@@ -366,11 +302,8 @@ def deepseek_prover_v2_reward(
 
 @reward_function
 def deepseek_huggingface_prover_benchmark(
-    messages: List[Message],  # Full conversation, model's response is messages[-1]
-    ground_truth: Dict[
-        str, Any
-    ],  # Expected to contain 'statement', and optionally 'dataset_item' or its components
-    # Other specific args like dataset_name, check_for_answer, verbose can remain in kwargs
+    messages: List[Message],
+    ground_truth: Dict[str, Any],
     **kwargs: Any,
 ) -> EvaluateResult:
     """
@@ -392,7 +325,6 @@ def deepseek_huggingface_prover_benchmark(
     """
     statement: Optional[str] = ground_truth.get("statement")
     dataset_item: Optional[Dict[str, Any]] = ground_truth.get("dataset_item")
-    # Allow expected_proof and answer to be directly in ground_truth if dataset_item is not.
     expected_proof_from_gt: Optional[str] = ground_truth.get("expected_proof")
     answer_from_gt: Optional[str] = ground_truth.get("answer")
 
@@ -431,7 +363,7 @@ def deepseek_huggingface_prover_benchmark(
             },
         )
 
-    response = messages[-1].content  # This is the model's proof attempt
+    response = messages[-1].content
     if not response:
         return EvaluateResult(
             score=0.0,
@@ -453,15 +385,10 @@ def deepseek_huggingface_prover_benchmark(
             "Please install it with 'pip install datasets'."
         )
 
-    # Initial metrics
     metrics = {}
 
-    # Load dataset item if not provided
     if dataset_item is None:
-        # Load dataset from Hugging Face
         dataset = load_dataset(dataset_name)
-
-        # Find matching problem by statement (if exact match not found, we'll use fuzzy matching)
         matched_item = None
         for split in dataset.keys():
             for item in dataset[split]:
@@ -472,22 +399,18 @@ def deepseek_huggingface_prover_benchmark(
                 break
 
         if not matched_item:
-            # Try fuzzy matching if exact match not found
             from difflib import SequenceMatcher
-
-            best_ratio = 0.0  # Initialize as float
-            matched_ratio: float = 0.0  # Ensure float and explicitly type
-
+            best_ratio: float = 0.0
+            matched_ratio: float = 0.0
             for split in dataset.keys():
                 for item in dataset[split]:
                     ratio = SequenceMatcher(
                         None, statement.strip(), item.get("statement", "")
                     ).ratio()
-                    if ratio > best_ratio and ratio > 0.7:  # 70% similarity threshold
+                    if ratio > best_ratio and ratio > 0.7:
                         best_ratio = ratio
                         matched_item = item
                         matched_ratio = ratio
-
             if not matched_item:
                 return EvaluateResult(
                     score=0.0,
@@ -500,36 +423,26 @@ def deepseek_huggingface_prover_benchmark(
                         )
                     },
                 )
-
-            # Add fuzzy match info to metrics
             metrics["dataset_match"] = MetricResult(
                 score=matched_ratio,
-                is_score_valid=matched_ratio
-                > 0.7,  # Success if similarity is above threshold
+                is_score_valid=matched_ratio > 0.7,
                 reason=f"Found similar problem with {matched_ratio:.2f} similarity",
             )
         else:
-            # Add exact match info to metrics
             metrics["dataset_match"] = MetricResult(
                 score=1.0, is_score_valid=True, reason="Found exact match in dataset"
             )
-
         dataset_item = matched_item
 
-    # Extract expected proof if available from dataset_item or directly from ground_truth
-    expected_proof = expected_proof_from_gt  # Prioritize direct key from ground_truth
+    expected_proof = expected_proof_from_gt
     reference_solution = None
     if dataset_item:
-        if not expected_proof:  # If not in ground_truth directly, try from dataset_item
+        if not expected_proof:
             expected_proof = dataset_item.get("expected_proof", None)
         reference_solution = dataset_item.get("reference_solution", None)
-
-    # Use the expected proof or reference solution if available
     proof_reference = expected_proof or reference_solution
 
-    # Check for the answer/solution if required
     current_top_level_reason = "Evaluation against DeepSeek ProverBench dataset."
-    # Use answer_from_gt if available, otherwise try from dataset_item
     answer_to_check = answer_from_gt
     if not answer_to_check and dataset_item:
         answer_to_check = dataset_item.get("answer")
@@ -537,7 +450,6 @@ def deepseek_huggingface_prover_benchmark(
     if check_for_answer and answer_to_check:
         expected_answer_str = str(answer_to_check)
         answer_found = expected_answer_str in response
-
         if not answer_found:
             metrics["answer_match"] = MetricResult(
                 score=0.0,
@@ -557,14 +469,9 @@ def deepseek_huggingface_prover_benchmark(
             )
             current_top_level_reason += " Expected answer found."
 
-    # Use the deepseek_prover_v2_reward function for evaluation
-    # messages (full convo) is passed as messages.
-    # proof_reference (derived) is passed as ground_truth to deepseek_prover_v2_reward.
     deepseek_kwargs_for_call = {
         "statement": statement,
-        # "expected_proof" for deepseek_prover_v2_reward is our proof_reference
-        # This will be passed as the ground_truth argument to deepseek_prover_v2_reward.
-        "check_subgoals": True,  # Default from original call structure
+        "check_subgoals": True,
         "verbose": verbose,
     }
     eval_result_from_deepseek: EvaluateResult = deepseek_prover_v2_reward(
@@ -574,29 +481,25 @@ def deepseek_huggingface_prover_benchmark(
     result_score = eval_result_from_deepseek.score
     result_reason = eval_result_from_deepseek.reason
     result_metrics = eval_result_from_deepseek.metrics or {}
-
-    # Combine metrics
     combined_metrics = {**metrics, **result_metrics}
 
     if result_reason and result_reason not in current_top_level_reason:
         current_top_level_reason += f" Sub-evaluation: {result_reason}"
 
-    # Add dataset information as additional metrics
     if verbose:
         combined_metrics["dataset_info"] = MetricResult(
-            score=1.0,  # Not an evaluative score
-            is_score_valid=True,  # Informational metric
+            score=1.0,
+            is_score_valid=True,
             reason=json.dumps(
                 {
                     "id": dataset_item.get("id", ""),
                     "has_expected_proof": expected_proof is not None,
                     "has_reference_solution": reference_solution is not None,
-                    "has_answer": "answer" in dataset_item,
+                    "has_answer": "answer" in dataset_item if dataset_item else False,
                 }
             ),
         )
 
-    # Create and return final result
     return EvaluateResult(
         score=result_score, reason=current_top_level_reason, metrics=combined_metrics
     )

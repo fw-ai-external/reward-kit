@@ -118,7 +118,6 @@ def _load_module_from_string(module_name, code_string):
         exec(code_string, module.__dict__)
         # sys.modules[module_name] = module # Optional: if other parts of the code expect it in sys.modules
     except Exception as e:
-        # print(f"Error executing code in dynamic module {module_name}: {e}")
         raise
     return module
 
@@ -218,7 +217,6 @@ def run_test(in_outs, test=None, debug=False, timeout=15):
             # For now, a simpler heuristic: if `def main` is there, and no obvious `main()` call.
 
             user_code_lines = dedented_test_code.split("\n")
-            # processed_user_code_lines = [] # This variable was not used
 
             # Imports from user code should be top-level in the module `sol`
             # Other lines form the body of `def code():`
@@ -383,7 +381,6 @@ def run_test(in_outs, test=None, debug=False, timeout=15):
                 faulthandler.enable()
                 try:
                     output = method(*current_inputs)
-                    # raw_true_output = output # Keep original output for metadata if needed
 
                     # For comparison, ensure output format matches expected (e.g. list vs tuple)
                     # ground truth sequences are not tuples
@@ -477,7 +474,6 @@ def run_test(in_outs, test=None, debug=False, timeout=15):
                     signal.alarm(0)
                     error_traceback = traceback.format_exc()
                     faulthandler.disable()
-                    # print(f"Standard input runtime error or time limit exceeded error = {repr(e)}{e}")
                     results.append(-1)  # Indicate error
                     return results, {
                         "error": repr(e),
@@ -609,9 +605,10 @@ def reliability_guard(maximum_memory_bytes=None):
     # For a library, this can have wide-ranging effects.
     # Consider if this level of modification is truly necessary for reward_kit's use case
     # or if the multiprocessing wrapper in utils.py provides sufficient isolation.
-
-    # builtins.exit = None # Commenting out for now, multiprocessing should handle process termination
-    # builtins.quit = None # Commenting out for now
+    # Note: The original implementation had many builtins and os/shutil functions commented out.
+    # These have been removed for clarity, as the preferred method of sandboxing
+    # would be via process isolation (e.g. multiprocessing or a dedicated sandbox env).
+    # Modifying builtins directly in a library function can have unintended side effects.
 
     import os
 
@@ -621,49 +618,14 @@ def reliability_guard(maximum_memory_bytes=None):
     # This might be too aggressive if the generated code legitimately needs some safe os interactions.
     # The multiprocessing wrapper in utils.py already provides process isolation.
 
-    # Keep a minimal set of disabled functions if truly necessary, or rely on process isolation.
-    # For example, fork is dangerous. System calls are dangerous.
-    # os.kill = None # Covered by process isolation
-    # os.system = None # Dangerous
-    # os.putenv = None
-    # os.remove = None # Dangerous
-    # os.removedirs = None # Dangerous
-    # os.rmdir = None # Dangerous
-    # os.fchdir = None
-    # os.setuid = None # Dangerous
-    # os.fork = None # Dangerous
-    # os.forkpty = None # Dangerous
-    # os.killpg = None # Covered by process isolation
-    # os.rename = None # Dangerous
-    # os.renames = None # Dangerous
-    # os.truncate = None # Dangerous
-    # os.replace = None # Dangerous
-    # os.unlink = None # Dangerous
-    # os.fchmod = None
-    # os.fchown = None
-    # os.chmod = None # Potentially dangerous
-    # os.chown = None
-    # os.chroot = None # Dangerous
-    # os.lchflags = None
-    # os.lchmod = None
-    # os.lchown = None
-    # os.getcwd = None # Might be needed by some safe code
-    # os.chdir = None # Dangerous
+    # Example of functions that were previously considered for disabling:
+    # os.kill, os.system, os.remove, os.fork, etc.
+    # shutil.rmtree, shutil.move
+    # subprocess.Popen
+    # Modifying __builtins__ or sys.modules entries.
 
-    import shutil
-
-    # shutil.rmtree = None # Dangerous
-    # shutil.move = None # Dangerous
-    # shutil.chown = None
-    import subprocess
-
-    # subprocess.Popen = None  # type: ignore # Dangerous
-    # __builtins__["help"] = None # Modifying __builtins__ directly is generally discouraged
-    import sys
-
-    # Clearing sys.modules can break things if not done carefully.
-    # sys.modules["ipdb"] = None
-    # sys.modules["joblib"] = None
-    # sys.modules["resource"] = None # We use resource above, so this would break it.
-    # sys.modules["psutil"] = None
-    # sys.modules["tkinter"] = None
+    # For reward_kit, rely on higher-level sandboxing if untrusted code execution is a concern.
+    # The memory limits via `resource` are a good first step for resource exhaustion.
+    import shutil # Keep import if other shutil functions are used, or remove if not.
+    import subprocess # Keep import if other subprocess functions are used, or remove if not.
+    import sys # Keep import for sys.stdout, sys.stdin manipulations.

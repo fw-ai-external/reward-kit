@@ -1,5 +1,5 @@
 import json
-from typing import Union  # Added for StepOutput
+from typing import Union
 from typing import Any, Dict, List, Optional
 
 from openai.types.chat.chat_completion_message import (
@@ -119,7 +119,7 @@ class EvaluateResult(BaseModel):
     metrics: Dict[str, MetricResult] = Field(
         default_factory=dict,
         description="Dictionary of component metrics for detailed breakdown.",
-    )  # Added default_factory
+    )
 
     # New field for RL per-step base rewards
     step_outputs: Optional[List[StepOutput]] = Field(

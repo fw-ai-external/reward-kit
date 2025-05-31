@@ -57,7 +57,6 @@ OUTPUT_JSONL_FILE = "./development/CODING_DATASET.jsonl"
 # Note: This assumes "assets/tokenizer/gpt2" is accessible relative to the execution path.
 try:
     repobench_p_tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    # Placeholder
 except OSError:
     print(
         "Warning: Could not load gpt2 tokenizer for Repobench-P. "

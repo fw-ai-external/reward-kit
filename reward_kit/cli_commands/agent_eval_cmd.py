@@ -41,13 +41,11 @@ def agent_eval_command(args):
     """
     Run agent evaluation using the Orchestrator and ForkableResource framework.
     """
-    logger = logging.getLogger("agent_eval")  # Use a specific logger
+    logger = logging.getLogger("agent_eval")
     logger.info("Starting agent-eval command.")
 
-    # Create a new TaskManager instance
     task_manager = TaskManager()
 
-    # Handle task definition file or directory
     if not args.task_def:
         logger.error(
             "Error: --task-def (path to task definition YAML file or directory) is required."
@@ -56,10 +54,8 @@ def agent_eval_command(args):
 
     task_def_path = Path(args.task_def)
 
-    # Register tasks based on whether it's a file or directory
     registered_task_ids = []
     if task_def_path.is_file():
-        # Single task definition file
         task_def = task_manager._load_task_from_file(str(task_def_path))
         if task_def:
             task_id = task_manager.register_task(task_def)
@@ -68,7 +64,6 @@ def agent_eval_command(args):
             logger.error(f"Failed to load task definition from {task_def_path}")
             return 1
     elif task_def_path.is_dir():
-        # Directory of task definitions
         registered_task_ids = task_manager.register_tasks_from_directory(
             str(task_def_path)
         )
@@ -83,22 +78,18 @@ def agent_eval_command(args):
 
     logger.info(f"Registered {len(registered_task_ids)} tasks: {registered_task_ids}")
 
-    # Run tasks with asyncio
     try:
 
         async def main_flow():
-            # Handle model override
             if getattr(args, "model", None):
                 original_model = os.environ.get("MODEL_AGENT")
                 os.environ["MODEL_AGENT"] = args.model
                 logger.info(f"Model overridden to: {args.model}")
 
-            # Execute tasks based on CLI options
             parallel = getattr(args, "parallel", False)
             max_concurrency = getattr(args, "max_concurrency", 3)
             filter_tasks = getattr(args, "filter", None)
 
-            # Filter tasks if specified
             tasks_to_run = registered_task_ids
             if filter_tasks:
                 tasks_to_run = [
@@ -110,7 +101,6 @@ def agent_eval_command(args):
                     )
                     return
 
-            # Execute tasks (parallel or sequential)
             try:
                 results = await task_manager.execute_tasks(
                     task_ids=tasks_to_run,
@@ -118,7 +108,6 @@ def agent_eval_command(args):
                     max_concurrency=max_concurrency,
                 )
 
-                # Log results summary
                 logger.info(f"Execution completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
@@ -128,7 +117,6 @@ def agent_eval_command(args):
                     else:
                         logger.info(f"Task '{task_id}' completed")
             finally:
-                # Clean up resources regardless of execution outcome
                 await task_manager.cleanup()
 
         asyncio.run(main_flow())
@@ -150,24 +138,19 @@ def bfcl_eval_command(args):
     logger = logging.getLogger("bfcl_eval")
     logger.info("Starting BFCL evaluation command.")
 
-    # Create a TaskManager instance
     task_manager = TaskManager()
 
-    # Get task directory
     task_dir = Path(args.task_dir)
     if not task_dir.is_dir():
         logger.error(f"Task directory not found: {task_dir}")
         return 1
 
-    # Load all tasks from the directory
     logger.info(f"Registering BFCL tasks from {task_dir}")
 
     try:
         registered_task_ids = []
 
-        # Handle specific task_id vs. all tasks
         if args.task_id:
-            # Look for a specific task
             task_path = task_dir / f"{args.task_id}.yaml"
             if not task_path.exists():
                 logger.error(f"Task file not found: {task_path}")
@@ -182,7 +165,6 @@ def bfcl_eval_command(args):
                 logger.error(f"Failed to load task from {task_path}")
                 return 1
         else:
-            # Register all tasks in the directory
             registered_task_ids = task_manager.register_tasks_from_directory(
                 str(task_dir)
             )
@@ -191,21 +173,17 @@ def bfcl_eval_command(args):
                 return 1
             logger.info(f"Registered {len(registered_task_ids)} BFCL tasks")
 
-        # Run tasks with asyncio
         async def main_flow():
-            # Handle model override
             if args.model:
                 original_model = os.environ.get("MODEL_AGENT")
                 os.environ["MODEL_AGENT"] = args.model
                 logger.info(f"Model overridden to: {args.model}")
 
-            # Create output directory if needed
             if args.output_dir:
                 output_path = Path(args.output_dir)
                 output_path.mkdir(parents=True, exist_ok=True)
                 logger.info(f"Results will be saved to {output_path}")
 
-            # Execute tasks based on CLI options
             try:
                 results = await task_manager.execute_tasks(
                     task_ids=registered_task_ids,
@@ -213,7 +191,6 @@ def bfcl_eval_command(args):
                     max_concurrency=args.max_concurrency,
                 )
 
-                # Log results summary
                 logger.info(f"BFCL evaluation completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
@@ -233,7 +210,6 @@ def bfcl_eval_command(args):
                     else:
                         logger.info(f"Task '{task_id}' completed with result: {result}")
 
-                # Save results to output directory if specified
                 if args.output_dir:
                     results_file = Path(args.output_dir) / "bfcl_results.json"
 
@@ -263,7 +239,6 @@ def bfcl_eval_command(args):
                     logger.info(f"Results saved to {results_file}")
 
             finally:
-                # Clean up resources
                 await task_manager.cleanup()
 
         asyncio.run(main_flow())

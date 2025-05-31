@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 import yaml  # For saving config if save_config helper doesn't exist
 
-from reward_kit.auth import get_fireworks_account_id  # Added
+from reward_kit.auth import get_fireworks_account_id
 from reward_kit.config import GCPCloudRunConfig, RewardKitConfig
 from reward_kit.config import _config_file_path as global_loaded_config_path
 from reward_kit.config import get_config
@@ -24,7 +24,7 @@ from reward_kit.gcp_tools import (
     ensure_gcp_secret,
 )
 from reward_kit.packaging import generate_dockerfile_content
-from reward_kit.platform_api import create_or_update_fireworks_secret  # Added
+from reward_kit.platform_api import create_or_update_fireworks_secret
 from reward_kit.platform_api import (  # For catching errors from create_evaluation
     PlatformAPIError,
 )
@@ -193,9 +193,6 @@ def deploy_command(args):
                     print(
                         f"Warning: No rewardkit.yaml found to save API key for '{evaluator_id}'. Key will be ephemeral for this deployment."
                     )
-
-            # Instead of setting as direct env var, store in GCP Secret Manager and mount
-            # gcp_env_vars["RK_ENDPOINT_API_KEY"] = api_key
 
             # Store the API key in GCP Secret Manager
             # Use a consistent secret ID, e.g., based on evaluator ID

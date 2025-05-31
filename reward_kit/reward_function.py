@@ -368,9 +368,7 @@ class RewardFunction:
 
                 # Prepare kwargs for the underlying reward function call for this specific sample
                 call_kwargs: Dict[str, Any] = {}  # Initialize with Any type for values
-                current_solution = solutions[
-                    i
-                ]  # Get the solution for the current sample
+                current_solution = solutions[i]
 
                 debug_solution_val_str = (
                     str(current_solution) if current_solution is not None else "None"
@@ -378,7 +376,6 @@ class RewardFunction:
                 logger.debug(
                     f"Adapter loop i={i}, type(current_solution)={type(current_solution)}, value='{debug_solution_val_str[:100]}...'"
                 )
-                # --- END DEBUG PRINT ---
 
                 processed_solution_val: Optional[str] = None
                 if current_solution is not None:
@@ -386,7 +383,7 @@ class RewardFunction:
                         logger.warning(
                             f"Sample {i} solution is a list, attempting to use first element: {current_solution}"
                         )
-                        if current_solution:  # If list is not empty
+                        if current_solution:
                             processed_solution_val = str(current_solution[0])
                         # If current_solution is an empty list, processed_solution_val remains None
                     else:

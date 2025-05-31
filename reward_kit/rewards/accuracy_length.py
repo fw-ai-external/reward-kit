@@ -56,7 +56,6 @@ def cosine_scaled_accuracy_length_reward(
     Returns:
         EvaluateResult with score combining accuracy and length
     """
-    # Get last message (the model's response)
     if not messages or len(messages) == 0:
         return EvaluateResult(
             score=0.0,
@@ -68,9 +67,8 @@ def cosine_scaled_accuracy_length_reward(
             },
         )
 
-    response = messages[-1]  # response is a Message object
+    response = messages[-1]
 
-    # Extract response text
     if response.role != "assistant" or not response.content:
         return EvaluateResult(
             score=0.0,
@@ -86,8 +84,6 @@ def cosine_scaled_accuracy_length_reward(
     text: str = response.content
 
     # Step 1: Evaluate accuracy
-    # The accuracy_reward function is expected to be refactored to handle
-    # messages: List[Message] (prompt + generated) and ground_truth: Optional[List[Message]] (target)
     accuracy_eval_result = accuracy_reward(
         messages=messages,  # Pass the full messages list
         ground_truth=ground_truth,  # Pass the ground_truth list
@@ -95,7 +91,6 @@ def cosine_scaled_accuracy_length_reward(
         compare_fn=compare_fn,
     )
 
-    # Unpack the accuracy result (accuracy_reward returns EvaluateResult)
     accuracy_score = accuracy_eval_result.score
     # Ensure answer_accuracy metric exists, provide a default if not
     answer_accuracy_metric = accuracy_eval_result.metrics.get(

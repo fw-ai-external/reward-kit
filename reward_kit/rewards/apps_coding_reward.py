@@ -129,12 +129,7 @@ def evaluate_apps_solution(
     # Default score and reason
     score = 0.0
     reason_msg = "Evaluation did not complete successfully."
-    metrics: Dict[str, MetricResult] = {}  # Added type hint
-
-    # Redundant block removed
-    # score = 0.0
-    # reason_msg = "Evaluation did not complete successfully."
-    # metrics = {}
+    metrics: Dict[str, MetricResult] = {}
 
     in_outs: Optional[Dict[str, Any]] = None
     if isinstance(ground_truth, str):

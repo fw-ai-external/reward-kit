@@ -2,8 +2,6 @@
 
 from typing import Dict, Optional, Union
 
-# No TYPE_CHECKING block needed if using string literals consistently.
-
 
 class File:
     """A file in the Gorilla File System."""

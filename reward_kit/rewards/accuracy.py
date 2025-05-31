@@ -24,23 +24,14 @@ def normalize_text(text: str) -> str:
     Returns:
         Normalized text string
     """
-    # Convert to lowercase
     text = text.lower()
-
-    # Replace multiple spaces with single space
     text = re.sub(r"\s+", " ", text)
-
-    # Remove punctuation that doesn't change meaning
     text = re.sub(r'[,.;:!?"\']', "", text)
 
     # Remove parentheses, brackets, etc. that often appear in math expressions
     # but keep their contents
     text = re.sub(r"[\(\)\[\]\{\}]", "", text)
-
-    # Remove special characters
     text = re.sub(r"[^\w\s\d+-/*=]", "", text)
-
-    # Normalize mathematical operators
     text = text.replace("×", "*").replace("÷", "/")
 
     return text.strip()

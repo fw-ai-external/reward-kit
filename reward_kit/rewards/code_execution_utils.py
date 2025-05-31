@@ -23,18 +23,15 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
         - 'test_cases': A list of parsed test case dictionaries.
         - 'target_function': The target function name, if provided.
     """
-    # Extract prompt (user content)
     prompt_content = ""
     if isinstance(raw_sample.get("prompt"), list) and len(raw_sample["prompt"]) > 0:
         for msg in raw_sample["prompt"]:
             if msg.get("role") == "user" and msg.get("content"):
                 prompt_content = msg["content"]
                 break
-    if not prompt_content:  # Fallback if specific structure not found
-        # Attempt to convert to string in case it's not the expected list of dicts
+    if not prompt_content:
         prompt_content = str(raw_sample.get("prompt", ""))
 
-    # Extract the target function name for conditional instruction
     target_function = raw_sample.get("target_function")
 
     # Append instructions based on target_function
@@ -58,7 +55,6 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
 
     final_prompt = prompt_content + instruction
 
-    # Parse test cases from ground_truth JSON string
     test_cases_str = raw_sample.get("reward_model", {}).get("ground_truth", "[]")
     try:
         test_cases = json.loads(test_cases_str)
@@ -67,7 +63,7 @@ def prepare_deepcoder_sample_for_trl(raw_sample: Dict[str, Any]) -> Dict[str, An
         if isinstance(test_cases_str, list):
             test_cases = test_cases_str
         else:
-            test_cases = []  # Default to empty list if parsing fails
+            test_cases = []
 
     return {
         "prompt": final_prompt,

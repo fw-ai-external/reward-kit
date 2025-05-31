@@ -19,13 +19,9 @@ class ResponseCache:
         self.cache_dir = cache_config.get(
             "cache_dir", ".reward_kit_cache/generated_responses"
         )
-        # Ensure cache_dir is absolute or resolvable from a known root
-        # For now, assume it's relative to CWD or an absolute path.
-        # If used within a Hydra app, CWD is the output dir, so this might need adjustment
-        # or be made relative to hydra.utils.get_original_cwd().
+        # Resolve cache_dir relative to CWD if not an absolute path.
+        # Consider making this configurable to be relative to project root or Hydra's original CWD.
         if not os.path.isabs(self.cache_dir):
-            # Defaulting to make it under CWD/.reward_kit_cache if not absolute
-            # This might need to be configurable to be relative to project root.
             self.cache_dir = os.path.join(os.getcwd(), self.cache_dir)
 
         try:
@@ -49,7 +45,6 @@ class ResponseCache:
         min_p: float,
         max_tokens: int,
         reasoning_effort: Optional[str],  # Added reasoning_effort
-        # Potentially add other generation params like max_tokens, top_p if they affect output
     ) -> str:
         """Generates a cache key."""
         key_material = f"{sample_id}-{system_prompt}-{user_query}-{model_name}-{temperature}-{top_p}-{top_k}-{min_p}-{max_tokens}-{reasoning_effort}"
@@ -72,10 +67,7 @@ class ResponseCache:
         if not self.cache_dir:
             return None
 
-        if (
-            temperature != 0.0
-        ):  # Only cache deterministic (temp=0) generations by default
-            # Could add a config option to allow caching for non-zero temps if desired
+        if temperature != 0.0:  # Only cache deterministic (temp=0) generations by default
             return None
 
         cache_key = self._generate_key(
@@ -96,7 +88,6 @@ class ResponseCache:
             try:
                 with open(cache_file_path, "r", encoding="utf-8") as f:
                     cached_data = json.load(f)
-                    # Assuming cached data is stored like {"assistant_response": "..."}
                     response = cached_data.get("assistant_response")
                     if response is not None:
                         logger.debug(
@@ -153,7 +144,6 @@ class ResponseCache:
         cache_file_path = os.path.join(self.cache_dir, f"{cache_key}.json")
 
         try:
-            # Store as {"assistant_response": "..."} to match example main.py
             with open(cache_file_path, "w", encoding="utf-8") as f:
                 json.dump({"assistant_response": response}, f)
             logger.debug(f"Cached response for key {cache_key} (sample {sample_id})")

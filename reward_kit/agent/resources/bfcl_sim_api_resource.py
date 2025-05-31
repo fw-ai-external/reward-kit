@@ -11,7 +11,7 @@ BFCL_TYPES_AVAILABLE = True
 import gc
 import inspect
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union  # Import Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..resource_abc import ForkableResource
 

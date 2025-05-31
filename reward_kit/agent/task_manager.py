@@ -206,7 +206,6 @@ class TaskManager:
         Returns:
             results: Dictionary mapping task IDs to execution results
         """
-        # If task_ids is None, use all registered tasks
         task_ids_to_execute = (
             task_ids if task_ids is not None else list(self.tasks.keys())
         )
@@ -252,7 +251,6 @@ class TaskManager:
             execution_tasks = [execute_with_semaphore(tid) for tid in prepared_task_ids]
             execution_results = await asyncio.gather(*execution_tasks)
 
-            # Collect results
             results = {tid: result for tid, result in execution_results}
         else:
             # Execute tasks sequentially

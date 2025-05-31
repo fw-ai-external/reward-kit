@@ -127,27 +127,9 @@ def generate_dockerfile_content(
     # Handle user-specific requirements.txt, if provided
     # This should be relative to the build context root (copied by "COPY . .")
     if user_requirements_path:
-        user_req_file_in_context = Path(user_requirements_path)  # Path relative to CWD
-        # Check if the file exists in the context (it would have been copied by "COPY . .")
-        # For the RUN command, it will be at ./<user_requirements_path> if it was at the root of context
-        # Or, if user_requirements_path is just "requirements.txt", it's simpler.
-        # Let's assume user_requirements_path is the name of the file if it's in CWD.
-        # If it's a path like "sub/requirements.txt", COPY . . handles it.
-
-        # For simplicity, if user_requirements_path is e.g. "my_func_reqs.txt",
-        # it would be copied to /app/my_func_reqs.txt.
-        # The RUN pip install command needs to refer to it correctly.
-        # If user_requirements_path is just "requirements.txt", it's fine.
-        # If it's "path/to/requirements.txt", it will be at "/app/path/to/requirements.txt".
-
-        # To make it robust, we should copy the requirements file to a standard name like "user_requirements.txt"
-        # in the Dockerfile, or ensure the path is correctly referenced.
-        # For now, let's assume user_requirements_path is a path relative to the build context root.
-        # The COPY . . already copied it.
-
-        # Check if the file specified by user_requirements_path exists at the root of the project
-        # This check is done before Docker build by the CLI ideally.
-        # Here, we just add the lines if the path is provided.
+        # The user_requirements_path is relative to the build context root.
+        # "COPY . ." will have copied this file into the /app directory.
+        # The RUN command below will install these dependencies if the file exists.
         dockerfile_lines.extend(
             [
                 f"# Copy and install user-specific dependencies (if {user_requirements_path} exists in context)",

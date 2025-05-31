@@ -17,7 +17,7 @@ import multiprocessing
 import os
 import sys
 import traceback
-from typing import Any, Dict, List, Optional  # Added for type hints
+from typing import Any, Dict, List, Optional
 
 # Adapted import to point to our local apps_testing_util.py
 from .apps_testing_util import run_test
@@ -49,7 +49,7 @@ def _temp_run(
     # sys.stderr = open(os.devnull, "w")
     print(
         f"[_temp_run] Executing run_test for sample. Debug prints from run_test should be visible."
-    )  # Changed to print
+    )
 
     try:
         res, metadata = run_test(
@@ -63,7 +63,7 @@ def _temp_run(
         # run_test is designed to return error codes like -1 or -2 in `res` for failures.
         num_inputs = len(sample.get("inputs", []))
         tb_str = traceback.format_exc()
-        print(f"[_temp_run] Exception caught: {tb_str}")  # Print the traceback
+        print(f"[_temp_run] Exception caught: {tb_str}")
         result_list.append(
             [-1] * num_inputs if num_inputs > 0 else [-1]
         )  # Mark all as error

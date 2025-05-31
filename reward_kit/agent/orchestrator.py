@@ -7,11 +7,11 @@ Manages the lifecycle of a task using ForkableResources.
 import asyncio
 import importlib
 import inspect
-import json  # Add json import
+import json
 import logging
-import os  # Add os import
+import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, cast
-from unittest.mock import AsyncMock  # Add this import
+from unittest.mock import AsyncMock
 
 # Attempt to import OpenAI client
 try:
@@ -50,11 +50,11 @@ except ImportError:
 # Max steps for the inner loop within a single user turn
 MAX_STEPS_PER_USER_TURN = 10
 
-from ..models import Message, TaskDefinitionModel  # Import Message model
+from ..models import Message, TaskDefinitionModel
 from .resource_abc import ForkableResource
 
 # Import specific resource types for type checking if needed, or handle dynamically
-from .resources import (  # Import BFCLSimAPIResource
+from .resources import (
     BFCLSimAPIResource,
     DockerResource,
     FileSystemResource,
@@ -284,10 +284,10 @@ class Orchestrator:
             resource_tool_specs = await episode_resource.get_tools_spec()
             self.logger.debug(
                 f"Raw tool specs from resource.get_tools_spec(): {resource_tool_specs}"
-            )  # <-- ADDED DEBUG LOG
+            )
             for tool_spec in resource_tool_specs:
                 # Corrected logic based on BFCLSimAPIResource._infer_schema_from_method output
-                tool_name = tool_spec.get("name")  # Get name directly from spec root
+                tool_name = tool_spec.get("name")
                 if tool_name:
                     # Create an async adapter function that calls episode_resource.step
                     async def resource_tool_adapter(

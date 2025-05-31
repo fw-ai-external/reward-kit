@@ -45,7 +45,6 @@ class RLDataAligner:
 
         # Store final_score (for GiGPO A_E) - The caller will handle this.
         # This function's primary job is to populate base_rewards in StepData.
-        # final_score_for_rollout = current_eval_result.score
 
         if current_eval_result.step_outputs:
             # Create a dictionary for quick lookup of user-defined step rewards
@@ -66,24 +65,17 @@ class RLDataAligner:
                         s_data.base_reward = user_step_rewards_map[
                             user_defined_step_idx
                         ]
-                        # print(f"Rollout {rollout_id}, SystemStep {s_data.system_step_index}: "
-                        #       f"Aligned base_reward {s_data.base_reward} from UserStepIdx {user_defined_step_idx}")
                     else:
                         # No base reward provided by user for this specific system step.
                         # s_data.base_reward remains None (or could be a default).
-                        # print(f"Rollout {rollout_id}, SystemStep {s_data.system_step_index}: "
-                        #       f"No user base_reward for UserStepIdx {user_defined_step_idx}")
                         pass
                 else:
                     # RLRolloutWorker did not provide 'assistant_turn_index' for this StepData,
                     # or the mapping key in step_info is different.
                     # This indicates a potential issue in RLRolloutWorker or mapping strategy.
-                    # print(f"Warning: Rollout {rollout_id}, SystemStep {s_data.system_step_index}: "
-                    #       "Missing 'assistant_turn_index' in step_info for alignment.")
                     pass
         else:
             # No step_outputs provided by the user. Base rewards will remain None.
-            # print(f"Rollout {rollout_id}: No step_outputs in EvaluateResult. Base rewards not set.")
             pass
 
         return current_step_data_list

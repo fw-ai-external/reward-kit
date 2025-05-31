@@ -1,6 +1,6 @@
 # reward_kit/platform_api.py
 import logging
-import sys  # Added sys import
+import sys
 from typing import Any, Dict, Optional
 
 import requests

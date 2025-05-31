@@ -12,11 +12,11 @@ import traceback
 import uuid
 from pathlib import Path
 
-logger = logging.getLogger(__name__)  # Added logger initialization
+logger = logging.getLogger(__name__)
 
 from reward_kit.evaluation import create_evaluation, preview_evaluation
 
-from .cli_commands.agent_eval_cmd import (  # Now points to the V2 logic
+from .cli_commands.agent_eval_cmd import (
     agent_eval_command,
 )
 from .cli_commands.common import (
@@ -26,12 +26,7 @@ from .cli_commands.common import (
 )
 from .cli_commands.deploy import deploy_command
 from .cli_commands.preview import preview_command
-from .cli_commands.run_eval_cmd import hydra_cli_entry_point  # Import for run command
-
-# Note: validate_task_bundle, find_task_dataset, get_toolset_config, export_tool_specs
-# were helpers for the old agent_eval_command and are now moved into agent_eval_cmd.py
-# or will be part of the new agent_eval_v2_command logic.
-# For now, they are removed from cli.py as agent_eval_command is imported.
+from .cli_commands.run_eval_cmd import hydra_cli_entry_point
 
 
 def parse_args(args=None):
@@ -250,7 +245,6 @@ def parse_args(args=None):
     subparsers.add_parser(
         "run",
         help="Run an evaluation using a Hydra configuration. All arguments after 'run' are passed to Hydra.",
-        # add_help=False # Optionally disable help for this subparser if Hydra's help is preferred
     )
 
     # Use parse_known_args to allow Hydra to handle its own arguments
@@ -292,7 +286,7 @@ def main():
         while i < len(hydra_specific_args):
             arg = hydra_specific_args[i]
             if arg == "--config-path":
-                processed_hydra_args.append(arg)  # Add --config-path flag
+                processed_hydra_args.append(arg)
                 i += 1
                 if i < len(hydra_specific_args):
                     path_val = hydra_specific_args[i]
@@ -303,12 +297,10 @@ def main():
                     processed_hydra_args.append(abs_path)
                 else:
                     logger.error("--config-path specified without a value.")
-                    # Or raise an error: raise ValueError("--config-path specified without a value")
-                    # For now, let Hydra handle the missing value if it occurs.
                     pass
             elif arg.startswith("--config-path="):
                 flag_part, path_val = arg.split("=", 1)
-                processed_hydra_args.append(flag_part)  # Add --config-path flag
+                processed_hydra_args.append(flag_part)
                 abs_path = os.path.abspath(path_val)
                 logger.debug(
                     f"Converting relative --config-path '{path_val}' (equals separated) to absolute '{abs_path}'"

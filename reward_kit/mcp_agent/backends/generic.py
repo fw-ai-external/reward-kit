@@ -9,7 +9,7 @@ from reward_kit.mcp_agent.orchestration.base_client import (
     AbstractOrchestrationClient,
     ManagedInstanceInfo,
 )
-from reward_kit.mcp_agent.session import IntermediarySession
+from reward_kit.mcp_agent.session import IntermediarySessionData # Changed from IntermediarySession
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class GenericBackendHandler(AbstractBackendHandler):
 
     async def initialize_session_instances(
         self,
-        session: IntermediarySession,
+        session_data: IntermediarySessionData, # Changed from session: IntermediarySession
         init_request: BackendInitRequest,
         orchestration_client: AbstractOrchestrationClient,
     ) -> List[ManagedInstanceInfo]:
@@ -34,7 +34,7 @@ class GenericBackendHandler(AbstractBackendHandler):
         self.validate_init_request(init_request)
 
         logger.info(
-            f"Session {session.session_id}: Initializing instances for backend '{init_request.backend_name_ref}' "
+            f"Session {session_data.session_id}: Initializing instances for backend '{init_request.backend_name_ref}' " # Changed from session.session_id
             f"using generic handler. Num instances: {init_request.num_instances}."
         )
 
@@ -57,12 +57,12 @@ class GenericBackendHandler(AbstractBackendHandler):
         provisioned_instances = await orchestration_client.provision_instances(
             backend_config=self.server_config,
             num_instances=effective_num_instances,
-            session_id=session.session_id,
+            session_id=session_data.session_id, # Changed from session.session_id
             template_details=init_request.template_details, # Pass through
         )
 
         logger.info(
-            f"Session {session.session_id}: Provisioned {len(provisioned_instances)} instances "
+            f"Session {session_data.session_id}: Provisioned {len(provisioned_instances)} instances " # Changed from session.session_id
             f"for backend '{init_request.backend_name_ref}' via generic handler."
         )
         return provisioned_instances

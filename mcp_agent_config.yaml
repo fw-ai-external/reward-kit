@@ -1,0 +1,27 @@
+log_level: DEBUG
+global_docker_options: {}
+backends:
+  - backend_name_ref: "filesystem_test"
+    backend_type: "filesystem"
+    orchestration_mode: "local_docker"
+    instance_scoping: "session"
+    mcp_transport: "stdio"
+    docker_image: "mcp/filesystem"
+    container_command: ["/data"] # Command for the filesystem server inside the container
+    container_volumes:
+      "/tmp/reward_kit_fs_data": # HOST PATH: Ensure this directory exists on your machine
+        bind: "/data"             # CONTAINER PATH: Must match the command argument
+        mode: "rw"
+    # template_data_path_host: Optional[str] (For pre-seeding state)
+    # container_template_data_path: Optional[str] (Mount path for template data in setup container)
+    # docker_run_args: Optional[List[str]]
+
+  - backend_name_ref: "memory_test"
+    backend_type: "memory"
+    orchestration_mode: "local_docker"
+    instance_scoping: "session"
+    mcp_transport: "stdio"
+    docker_image: "mcp/memory"
+    # template_data_path_host: Optional[str]
+    # container_template_data_path: Optional[str]
+    # docker_run_args: Optional[List[str]]

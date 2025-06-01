@@ -9,7 +9,7 @@ from reward_kit.mcp_agent.orchestration.base_client import (
     AbstractOrchestrationClient,
     ManagedInstanceInfo,
 )
-from reward_kit.mcp_agent.session import IntermediarySession
+from reward_kit.mcp_agent.session import IntermediarySessionData # Changed from IntermediarySession
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class AbstractBackendHandler(abc.ABC):
     @abc.abstractmethod
     async def initialize_session_instances(
         self,
-        session: IntermediarySession,
+        session_data: IntermediarySessionData, # Changed from session: IntermediarySession
         init_request: BackendInitRequest,
         orchestration_client: AbstractOrchestrationClient,
     ) -> List[ManagedInstanceInfo]:
@@ -73,7 +73,7 @@ class AbstractBackendHandler(abc.ABC):
         It validates the request and then delegates to the orchestration_client.
 
         Args:
-            session: The current IntermediarySession.
+            session_data: The IntermediarySessionData object for the current session.
             init_request: The client's request for this backend.
             orchestration_client: The client (Docker or Remote HTTP) responsible for actual provisioning.
 
@@ -84,7 +84,7 @@ class AbstractBackendHandler(abc.ABC):
 
     async def cleanup_session_instances(
         self,
-        session: IntermediarySession,
+        session_data: IntermediarySessionData, # Changed from session: IntermediarySession
         orchestration_client: AbstractOrchestrationClient,
     ) -> None:
         """
@@ -92,29 +92,29 @@ class AbstractBackendHandler(abc.ABC):
         Delegates to the orchestration_client.
 
         Args:
-            session: The IntermediarySession being cleaned up.
+            session_data: The IntermediarySessionData object for the session being cleaned up.
             orchestration_client: The client responsible for actual deprovisioning.
         """
-        instances_to_cleanup = session.get_managed_instances(
+        instances_to_cleanup = session_data.get_managed_instances( # Changed from session.get_managed_instances
             backend_name_ref=self.server_config.backend_name_ref
         )
         if not instances_to_cleanup:
             logger.info(
-                f"Session {session.session_id}: No instances of backend '{self.server_config.backend_name_ref}' to cleanup."
+                f"Session {session_data.session_id}: No instances of backend '{self.server_config.backend_name_ref}' to cleanup." # Changed from session.session_id
             )
             return
 
         logger.info(
-            f"Session {session.session_id}: Cleaning up {len(instances_to_cleanup)} instances of backend '{self.server_config.backend_name_ref}'."
+            f"Session {session_data.session_id}: Cleaning up {len(instances_to_cleanup)} instances of backend '{self.server_config.backend_name_ref}'." # Changed from session.session_id
         )
         try:
             await orchestration_client.deprovision_instances(instances_to_cleanup)
             logger.info(
-                f"Session {session.session_id}: Successfully requested deprovisioning for instances of '{self.server_config.backend_name_ref}'."
+                f"Session {session_data.session_id}: Successfully requested deprovisioning for instances of '{self.server_config.backend_name_ref}'." # Changed from session.session_id
             )
         except Exception as e:
             logger.error(
-                f"Session {session.session_id}: Error during cleanup of instances for backend '{self.server_config.backend_name_ref}': {e}",
+                f"Session {session_data.session_id}: Error during cleanup of instances for backend '{self.server_config.backend_name_ref}': {e}", # Changed from session.session_id
                 exc_info=True
             )
             # Decide if to re-raise or just log. For cleanup, usually log and continue.

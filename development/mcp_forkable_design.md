@@ -45,18 +45,18 @@ sequenceDiagram
     participant RK_Intermediary_MCP as RewardKit Intermediary MCP Server
     participant Orchestration_Client as Intermediary's Orchestration Client <br/> (LocalDockerOrchestrator OR RemoteAPIClient)
     participant Target_System as Target System <br/> (Local Docker Daemon OR Remote Orchestration API)
-    participant Backend_Instance_X as Backend MCP Instance X <br/> (Local Container OR Remote Service Endpoint)
+    participant Backend_Instance_X as Backend MCP Instance X <br/> (Local Container: HTTP or Stdio OR Remote Service Endpoint)
 
     RKC_Orchestrator->>RK_Intermediary_MCP: MCP: tool_name='initialize_session', args={backends: [{backend_name_ref: "fs_env", ...}]}
     activate RK_Intermediary_MCP
     Note over RK_Intermediary_MCP, Orchestration_Client: Intermediary selects OrchestrationClient based on config for "fs_env".
     RK_Intermediary_MCP->>Orchestration_Client: request_instances(backend_config, num_instances, template_info)
     activate Orchestration_Client
-    Orchestration_Client->>Target_System: Provision N instances (e.g., docker run OR POST /create_instance)
+    Orchestration_Client->>Target_System: Provision N instances (e.g., docker run with port mapping for HTTP, or just run for Stdio; OR POST /create_instance for remote)
     activate Target_System
-    Target_System-->>Orchestration_Client: Instance_X_Details (e.g., ContainerID+HostPort OR RemoteEndpointURL+RemoteInstanceID)
+    Target_System-->>Orchestration_Client: Instance_X_Details (e.g., ContainerID+HostPort for HTTP, ContainerID for Stdio OR RemoteEndpointURL+RemoteInstanceID)
     deactivate Target_System
-    Orchestration_Client-->>RK_Intermediary_MCP: List of ManagedInstanceInfo (with Instance_X_Details)
+    Orchestration_Client-->>RK_Intermediary_MCP: List of ManagedInstanceInfo (with Instance_X_Details including transport type)
     deactivate Orchestration_Client
     Note over RK_Intermediary_MCP: Creates rkSessionId. <br/> Maps rkSessionId to backend instances. <br/> Stores in session state.
     RK_Intermediary_MCP-->>RKC_Orchestrator: Returns {session_id: rkSessionId, backend_details: [...]}
@@ -66,10 +66,10 @@ sequenceDiagram
 
     RLRolloutWorker->>RK_Intermediary_MCP: MCP: tool_name='call_backend_tool', args={backend_name_ref:"fs_env", tool_name:"read_file", ...} <br/> (HTTP Header: mcp-session-id: rkSessionId)
     activate RK_Intermediary_MCP
-    Note over RK_Intermediary_MCP: Extracts rkSessionId. <br/> Gets Backend_Instance_X info (local host_port OR remote_url).
+    Note over RK_Intermediary_MCP: Extracts rkSessionId. <br/> Gets Backend_Instance_X info (local host_port for HTTP, container_id for Stdio; OR remote_url).
     RK_Intermediary_MCP->>Orchestration_Client: forward_tool_call(instance_X_info, "read_file", args)
     activate Orchestration_Client
-    Orchestration_Client->>Backend_Instance_X: HTTP MCP call to target endpoint (tool: "read_file")
+    Orchestration_Client->>Backend_Instance_X: HTTP MCP call to target endpoint (tool: "read_file") OR Stdio MCP interaction (e.g. via docker attach)
     activate Backend_Instance_X
     Backend_Instance_X-->>Orchestration_Client: Tool result
     deactivate Backend_Instance_X
@@ -105,10 +105,11 @@ sequenceDiagram
     *   Consults `AppConfig` to get the `BackendServerConfig` (including `orchestration_mode`).
     *   Selects the appropriate `OrchestrationClient` (e.g., `LocalDockerOrchestrationClient` or `RemoteHttpOrchestrationClient`).
     *   Calls the `OrchestrationClient` to provision `num_instances`.
-        *   **Local Docker Mode (Stateful):** The client may trigger `docker commit` for template state, then `docker run` for instances, returning container info and mapped host ports.
-        *   **Remote API Mode (Stateful):** The client makes API calls to the customer's service to create instances, returning remote endpoint URLs and instance IDs.
-        *   **Stateless/Shared Mode (Local or Remote):** The client ensures a shared instance is running and returns its access details.
-3.  The `RK Intermediary Server` creates an `IntermediarySession`, stores `ManagedInstanceInfo` (which now accommodates both local container and remote instance details) for all provisioned backends, and associates this with a new `rkSessionId`.
+    *   **Local Docker Mode (Stateful, HTTP Transport):** The client may trigger `docker commit` for template state, then `docker run` for instances, returning container info and mapped host ports.
+    *   **Local Docker Mode (Stateful, Stdio Transport):** The client may trigger `docker commit` for template state, then `docker run` (without port mapping, but with `stdin_open=True`), returning container info. Interaction occurs via `docker attach` or similar.
+    *   **Remote API Mode (Stateful):** The client makes API calls to the customer's service to create instances, returning remote endpoint URLs and instance IDs.
+    *   **Stateless/Shared Mode (Local or Remote):** The client ensures a shared instance is running and returns its access details (URL for HTTP, container ID for local stdio).
+3.  The `RK Intermediary Server` creates an `IntermediarySession`, stores `ManagedInstanceInfo` (which now accommodates local container details for HTTP/stdio and remote instance details) for all provisioned backends, and associates this with a new `rkSessionId`.
 4.  Returns `rkSessionId` and instance details to the Orchestrator.
 
 ### 3.2. Rollout Interaction
@@ -116,7 +117,8 @@ sequenceDiagram
 2.  `RLRolloutWorker` calls `call_backend_tool` on the `RK Intermediary Server` (with `rkSessionId` in header).
 3.  `RK Intermediary Server` retrieves the `IntermediarySession`, identifies the target `ManagedInstanceInfo`.
 4.  It uses the `OrchestrationClient` associated with that instance to forward the tool call:
-    *   **Local Docker:** Makes an HTTP MCP call to `http://localhost:<host_port>/mcp`.
+    *   **Local Docker (HTTP Transport):** Makes an HTTP MCP call to `http://localhost:<host_port>/mcp`.
+    *   **Local Docker (Stdio Transport):** Interacts with the container's stdio (e.g., via `docker attach` to send/receive MCP messages).
     *   **Remote API:** Makes an HTTP MCP call to the `remote_endpoint_url`.
 5.  Result is returned to the `RLRolloutWorker`.
 
@@ -133,8 +135,10 @@ sequenceDiagram
 1.  **Common Requirement**: Access to backend MCP server definitions (e.g., executables, Docker images from sources like `/Users/bennychen/Documents/references/servers/`).
 2.  **For Local Docker Orchestration Mode**:
     *   A Docker environment where the `RK Intermediary Server` can run and has permissions to interact with the Docker daemon.
-    *   Backend MCP server Docker images should preferably expose an HTTP MCP transport.
+    *   Backend MCP server Docker images can expose either an **HTTP MCP transport** (listening on a port) or an **stdio MCP transport** (interacting via stdin/stdout). The orchestrator must handle both.
+    *   For HTTP transport, images should expose a port. For stdio, they should be configured to read MCP messages from stdin and write responses to stdout.
     *   Template data (optional) for stateful backends, either baked into images or mountable for `docker commit` workflows.
+    *   Startup checks for stdio servers might be simpler (e.g., container is running) compared to HTTP pings, unless a specific stdio health check tool is available.
 3.  **For Remote Orchestration Proxy Mode**:
     *   A customer-provided remote orchestration API (e.g., Kubernetes-based, custom HTTP API, or another MCP server for orchestration).
     *   A clear API contract (endpoints, request/response schemas, authentication methods) for this remote service.
@@ -176,12 +180,7 @@ reward_kit/
     ├── session.py              # Custom session class (IntermediarySession)
     ├── backends/
     │   ├── __init__.py
-    │   ├── base.py             # AbstractBackendHandler
-    │   ├── filesystem.py       # FileSystemBackendHandler
-    │   ├── duckdb.py           # DuckDBBackendHandler
-    │   ├── memory.py           # MemoryBackendHandler
-    │   ├── everything.py       # EverythingBackendHandler
-    │   └── proxy.py            # StatelessProxyBackendHandler (for fetch, time)
+    |   ├── generic backends that can handle different types of servers
     └── main.py                 # CLI entry point for running the server (optional)
 
 tests/
@@ -199,6 +198,17 @@ tests/
         └── mock_server.py # Generic mock MCP server for containerized testing
     └── mock_remote_orchestrator.py # Mock HTTP server for remote orchestration API
 ```
+
+Most servers are already docker based, and have persistence through file.
+
+for mcp main repo examples:
+- src/filesystem
+- src/memory
+
+they are already docker based.
+
+- https://github.com/motherduckdb/mcp-server-motherduck/tree/main
+this one is not docker based, so we will need to think about replicating the databse file to make sure we can actually fork the resources and have multiple rollouts
 
 ### 8.2. Core Components and Classes
 
@@ -221,10 +231,11 @@ tests/
     *   `backend_name_ref: str` (Unique name, e.g., "workspace_fs", "shared_fetch_service").
     *   `backend_type: Literal["filesystem", "duckdb", "memory", "everything", "fetch", "time"]`.
     *   `orchestration_mode: Literal["local_docker", "remote_http_api"]`.
-    *   `is_stateful_per_session: bool` (True for fs, duckdb, memory, everything. False for fetch, time - better: `instance_scoping: Literal["session", "shared_global"]`).
+    *   `instance_scoping: Literal["session", "shared_global"]`.
+    *   `mcp_transport: Literal["http", "stdio"] = "http"` (New field, defaults to "http". Determines interaction protocol).
     *   **Local Docker Specific (`if orchestration_mode == 'local_docker'`):**
         *   `docker_image: str`.
-        *   `container_port: int` (Internal port of MCP app in container, for HTTP).
+        *   `container_port: Optional[int]` (Internal port of MCP app in container. Required if `mcp_transport` is "http").
         *   `template_data_path_host: Optional[str]` (For pre-seeding state).
         *   `container_template_data_path: Optional[str]` (Mount path for template data in setup container).
         *   `docker_run_args: Optional[List[str]]`.
@@ -237,11 +248,13 @@ tests/
     *   Interface:
         *   `async def provision_instances(backend_config: BackendServerConfig, num_instances: int, session_id: str, template_details: Optional[Any]) -> List[ManagedInstanceInfo]`.
         *   `async def deprovision_instances(instances: List[ManagedInstanceInfo])`.
-        *   `async def call_tool_on_instance(instance: ManagedInstanceInfo, tool_name: str, tool_args: dict) -> dict`.
+        *   `async def call_tool_on_instance(instance: ManagedInstanceInfo, tool_name: str, tool_args: dict) -> dict`. (Implementation will differ based on `instance.mcp_transport`).
 
 5.  **`LocalDockerOrchestrationClient(AbstractOrchestrationClient)` (in `orchestration/local_docker_client.py`)**:
-    *   Uses Docker SDK for Python. Implements methods for `docker run`, `commit`, `stop`, `rm`, `rmi`, HTTP calls to container.
-    *   Manages host port allocation.
+    *   Uses Docker SDK for Python.
+    *   For HTTP transport: Implements methods for `docker run` with port mapping, `commit`, `stop`, `rm`, `rmi`, HTTP calls to container. Manages host port allocation.
+    *   For Stdio transport: Implements `docker run` (no port mapping, `stdin_open=True`), `commit`, `stop`, `rm`, `rmi`. Tool calls involve interacting with container's stdio (e.g., via `container.attach_socket()`).
+    *   Startup checks are transport-dependent.
 
 6.  **`RemoteHttpOrchestrationClient(AbstractOrchestrationClient)` (in `orchestration/remote_http_client.py`)**:
     *   Uses `httpx` or `aiohttp`. Implements methods by calling configured remote API endpoints.
@@ -251,24 +264,32 @@ tests/
     *   `instance_id: str` (Client-facing ID within a session).
     *   `backend_name_ref: str`.
     *   `orchestration_mode: Literal["local_docker", "remote_http_api"]`.
-    *   `mcp_endpoint_url: str` (e.g., `http://localhost:<host_port>/mcp` or remote service URL).
-    *   `internal_instance_details: Dict[str, Any]` (e.g., `{"container_id": "...", "host_port": ...}` or `{"remote_instance_id": "...", "access_token": "..."}`).
+    *   `mcp_transport: Literal["http", "stdio"]` (New field, indicates how to talk to the instance).
+    *   `mcp_endpoint_url: Optional[str]` (e.g., `http://localhost:<host_port>/mcp` for HTTP, `None` for stdio).
+    *   `internal_instance_details: Dict[str, Any]` (e.g., `{"container_id": "...", "host_port": ...}` for Docker/HTTP, or `{"container_id": "..."}` for Docker/stdio, or `{"remote_instance_id": "...", "access_token": "..."}`).
     *   `committed_image_tag: Optional[str]` (If local Docker and committed).
 
 8.  **`IntermediarySession(mcp.server.BaseSession)` (in `session.py`)**:
-    *   Stores `rk_session_id: str`.
+    *   `session_id: str` (This is the transport-level session ID).
     *   `managed_backends: Dict[str, List[ManagedInstanceInfo]]` (Keyed by `backend_name_ref`).
     *   `temporary_docker_images: List[str]` (For cleanup in local Docker mode).
+    *   **Note**: This class was changed to `IntermediarySessionData` (a Pydantic BaseModel/dataclass) as `FastMCP` does not allow specifying a custom session class for its internal `MCPServer`. The `RewardKitIntermediaryServer` now manages a dictionary `self.intermediary_session_data: Dict[str, IntermediarySessionData]`.
 
 9.  **`AbstractBackendHandler` (in `backends/base.py`)**:
-    *   Now simpler: primarily validates `BackendInitRequest` against `BackendServerConfig`. The core orchestration logic moves to `OrchestrationClient`s.
-    *   `async def initialize_session_instances(session: IntermediarySession, req: BackendInitRequest, server_cfg: BackendServerConfig, orch_client: AbstractOrchestrationClient) -> List[ManagedInstanceInfo]`.
-    *   `async def cleanup_session_instances(session: IntermediarySession, backend_name_ref: str, orch_client: AbstractOrchestrationClient)`.
+    *   `async def initialize_session_instances(session_data: IntermediarySessionData, req: BackendInitRequest, server_cfg: BackendServerConfig, orch_client: AbstractOrchestrationClient) -> List[ManagedInstanceInfo]`. (Changed `session` to `session_data`)
+    *   `async def cleanup_session_instances(session_data: IntermediarySessionData, backend_name_ref: str, orch_client: AbstractOrchestrationClient)`. (Changed `session` to `session_data`)
 
 10. **Concrete `BackendHandler`s** (in `backends/*.py`):
-    *   Their main role is to prepare any backend-specific template details for `OrchestrationClient.provision_instances` (e.g., for `docker commit` workflow if using local Docker) and handle any backend-specific interpretation of `ManagedInstanceInfo`.
+    *   (Largely as before, but interact with `IntermediarySessionData`).
 
-11. **`RewardKitIntermediaryServer(mcp.server.Server)` (in `intermediary_server.py`)**:
+11. **`RewardKitIntermediaryServer(mcp.server.fastmcp.server.FastMCP)` (in `intermediary_server.py`)**:
+    *   **Base Class Rationale**: Changed to `mcp.server.fastmcp.server.FastMCP`. While `FastMCP` does not allow specifying a custom session class for its internal `MCPServer`, it provides a more modern interface and handles its own `ToolManager`. Custom session state is managed externally in `self.intermediary_session_data`.
+    *   **Initialization**: The `__init__` method calls `super().__init__(name=..., instructions=...)`.
+    *   **Tool Registration**: Uses `FastMCP`'s `self.add_tool(handler_method, name="tool_name")`. A single proxy tool (`execute_proxied_tool`) is used to dispatch to internal handlers.
+    *   **Context in Tool Handlers**: The proxy tool handler receives `mcp_ctx: mcp.server.fastmcp.server.Context`.
+        *   `mcp_ctx.request_context` provides the `mcp.shared.context.RequestContext`.
+        *   `mcp_ctx.session` provides the `mcp.server.session.ServerSession`.
+    *   **Session ID Challenge**: Accessing the transport-level session ID from within the tool handler (via `mcp_ctx`) has proven problematic. Neither `mcp_ctx.session.session_id` (public inherited) nor `mcp_ctx.session._session_id` (internal) are reliably accessible. `mcp_ctx.request_context.request.path_params` has also been empty. This is a critical unresolved issue.
     *   Initializes `OrchestrationClient`s (one `LocalDockerOrchestrationClient`, and one `RemoteHttpOrchestrationClient` per unique remote API config).
     *   Initializes `BackendHandler`s.
     *   Manages global shared instances for stateless backends (using the appropriate `OrchestrationClient`).
@@ -279,11 +300,11 @@ tests/
 1.  **`initialize_session`**:
     *   Input: `backends: List[BackendInitRequest]` (as before, but `BackendInitRequest` might include `orchestration_preference: Optional[Literal["local_docker", "remote_http_api"]]` if a backend supports multiple modes).
     *   Output: `{ session_id: "<rk_session_id>", initialized_backends: List[BackendInitResult] }`.
-    *   Action: Creates `IntermediarySession`. For each request, determines `OrchestrationClient` and calls `BackendHandler.initialize_session_instances`.
+    *   Action: Creates `IntermediarySession`. For each request, determines `OrchestrationClient` and calls `BackendHandler.initialize_session_instances`. The `ManagedInstanceInfo` returned will include the `mcp_transport`.
 
 2.  **`call_backend_tool`**:
     *   Input: (as before).
-    *   Action: Retrieves `IntermediarySession`. Finds `ManagedInstanceInfo`. Calls `OrchestrationClient.call_tool_on_instance()`.
+    *   Action: Retrieves `IntermediarySession`. Finds `ManagedInstanceInfo`. Calls `OrchestrationClient.call_tool_on_instance()`, which will use the appropriate transport (HTTP or stdio) based on `instance.mcp_transport`.
 
 3.  **`cleanup_session`**:
     *   Input: (as before).
@@ -312,3 +333,88 @@ tests/
 *   **Authentication with Remote Orchestrators**: `RemoteApiConfig` needs robust auth handling.
 
 This revised plan incorporates the flexibility to use either local Docker orchestration or proxy to remote orchestration services, making the `RewardKit-Intermediary-MCP-Server` more adaptable.
+
+## 9. Current Status and Next Steps
+
+**Current Status (as of 2025-05-31):**
+
+The `RewardKit-Intermediary-MCP-Server` and its `LocalDockerOrchestrationClient` have been significantly refactored to introduce support for stdio-based MCP transports, alongside the existing HTTP transport. Key changes implemented include:
+
+1.  **Configuration Updates:**
+    *   `BackendServerConfig` (in `reward_kit/mcp_agent/config.py`) now includes an `mcp_transport: Literal["http", "stdio"]` field (defaulting to "http").
+    *   `container_port` and `startup_check_mcp_tool` (if HTTP-based) are now understood to be relevant only for `http` transport.
+    *   `mcp_agent_config.yaml` has been updated for `filesystem_test` and `memory_test` backends to specify `mcp_transport: "stdio"` and remove port/HTTP health check configurations.
+
+2.  **Orchestration Logic (`LocalDockerOrchestrationClient`):**
+    *   `provision_instances`:
+        *   Correctly launches stdio containers without port mappings and with `stdin_open=True`.
+        *   Skips HTTP-based startup checks for stdio containers, relying on the container remaining in a "running" state.
+    *   `call_tool_on_instance`:
+        *   Differentiates logic based on `instance.mcp_transport`.
+        *   For stdio, it now attempts to use `container.attach_socket(params={'stdin': True, 'stdout': True, 'stderr': False, 'stream': True, 'logs': False})` to get a raw socket to the container's stdio.
+        *   It sends a fully structured MCP `CallToolRequest` (including `protocol_version` and `message_type`), JSON-encoded and newline-terminated, to the container's stdin via the raw socket's `sendall()` method (accessed via `attached_socket._sock.sendall()`).
+        *   It then calls `raw_stdio_socket.shutdown(socket.SHUT_WR)` to signal EOF on the container's stdin.
+        *   A revised read loop attempts to read the response from the container's stdout, demultiplexing the Docker stream format (handling the 8-byte header for stream type and payload size) using `select.select` for non-blocking reads with a timeout.
+
+3.  **Testing (`test_docker_run.py` and `run_mcp_test.sh`):**
+    *   `test_docker_run.py` has been updated to test stdio servers (`mcp/filesystem` by default) by launching them with correct arguments/volumes and attempting an stdio MCP call (`list_tools`) using a similar `attach_socket` and stream demultiplexing logic.
+    *   Running `run_mcp_test.sh` (which executes `test_mcp_client.py` against the intermediary server) shows:
+        *   Stdio containers (`filesystem_test`, `memory_test`) are provisioned successfully by the intermediary.
+        *   The `initialize_session` tool call to the intermediary is successful.
+        *   However, subsequent `call_backend_tool` calls (e.g., `list_files` on `filesystem_test`) to the intermediary, which are then proxied to the stdio container, are still failing with: `RuntimeError: MCP stdio tool call failed: Unexpected error. Details: No response from stdio container ...`. This is preceded by a log: `WARNING:reward_kit.mcp_agent.orchestration.local_docker_client:Stdio socket header read returned no data (closed by container ...).`
+    *   This indicates that the Node.js MCP server process in the container is closing its stdout stream or exiting before sending any data back, even after its stdin has been written to and the write-half of the socket has been shut down.
+
+**Detailed Next Steps for Further Development:**
+
+The primary challenge remains establishing successful two-way communication with the stdio-based Node.js MCP servers (`mcp/filesystem`, `mcp/memory`). The current approach of directly managing the attached socket and MCP message framing in `LocalDockerOrchestrationClient` has not yet yielded a response from these servers.
+
+The next phase should focus on a more isolated and foundational approach to stdio MCP communication, leveraging the official MCP Python SDK more directly, before integrating this proven method back into the `LocalDockerOrchestrationClient`.
+
+0.  **Read all the files in python `mcp` library in .venv. We will not be able to make any good calls unless we read all the code, and luckily there isn't a lot of code for the whole mcp library.
+1.  **Develop a Standalone Stdio MCP Client Test Script (`standalone_stdio_mcp_client.py`):**
+    *   **Objective:** Create a new, simple Python script (e.g., `standalone_stdio_test.py`) that uses the official MCP Python SDK (`mcp.client.stdio.stdio_client` and `mcp.ClientSession`) to interact with a *single*, locally running Dockerized stdio MCP server (e.g., `mcp/filesystem`).
+    *   **Details:**
+        *   This script will *not* use the `RewardKit-Intermediary-MCP-Server` or `LocalDockerOrchestrationClient`.
+        *   It will manually run the target Docker container (e.g., `mcp/filesystem`) using `docker.from_env().containers.run(...)` with `stdin_open=True`, `detach=True`, and correct command/volumes.
+        *   **Crucial Part - Interfacing with `ClientSession`:**
+            *   After the container is running, obtain its raw stdio socket using `container.attach_socket(params={'stdin': True, 'stdout': True, 'stderr': False, 'stream': True, 'logs': False})._sock`.
+            *   The `mcp.client.ClientSession` expects `AsyncMessageReadStream` and `AsyncMessageWriteStream` objects (from `mcp.protocol.streams`). These normally wrap asyncio `StreamReader` and `StreamWriter`.
+            *   **Investigate and Implement Stream Adaptation:**
+                *   **Option A (Preferred if feasible):** Determine if a raw socket (like the one from `attach_socket()._sock`) can be converted or wrapped into asyncio `StreamReader` and `StreamWriter` objects. Python's `asyncio` library might offer utilities for this (e.g., `loop.connect_accepted_socket()` or `loop.create_connection()` with a pre-existing socket, though these are typically for server-side or client-side connection establishment, not for wrapping an already connected Docker-provided socket). This needs careful research within the `asyncio` and `docker-py` contexts.
+                *   **Option B (Custom Wrappers):** If Option A is not straightforward, create custom Python classes that:
+                    *   Implement the `AsyncMessageReadStream` protocol (primarily `async def read_message(self) -> Optional[Message]`) and `AsyncMessageWriteStream` protocol (primarily `async def write_message(self, message: Message)`).
+                    *   These wrappers will take the single duplex raw socket from `attach_socket()._sock`.
+                    *   `write_message`: Will serialize the MCP `Message` object to JSON, append a newline, encode to UTF-8, and send it over the raw socket using `socket.sendall()`. It must also handle `socket.shutdown(socket.SHUT_WR)` appropriately if the server requires it after each message or at the end of a logical request.
+                    *   `read_message`: Will read from the raw socket, handle Docker's 8-byte stream demultiplexing header (to isolate stdout), buffer incoming data, parse newline-terminated JSON from the stdout stream, and deserialize it into an MCP `Message` object. This needs to be robust against partial reads and handle potential timeouts.
+        *   **Perform Full MCP Lifecycle with `ClientSession`:**
+            1.  Instantiate `ClientSession` with the adapted read/write streams.
+            2.  `await client_session.initialize(capabilities=..., client_information=...)`: Send the `InitializeRequest` and process the `InitializeResult`. The exact `capabilities` and `client_information` to send should be minimal and compliant with what a basic client would offer. Refer to MCP Python SDK examples or the specification. This step is critical and currently missing from `LocalDockerOrchestrationClient`.
+            3.  `tools = await client_session.list_tools()`: Attempt to call the `list_tools` MCP tool.
+            4.  Log the `tools` response.
+            5.  If `list_tools` is successful, attempt `response = await client_session.call_tool("ping", {})` and log the response.
+            6.  (Optional, if `list_tools` reveals them) Attempt a filesystem-specific tool like `read_file` or `write_file` with appropriate arguments, ensuring the target path exists within the container's mounted volume.
+        *   **Logging:** Implement verbose logging of all raw data sent to and received from the socket, as well as the structured MCP messages, to aid debugging.
+    *   **Expected Outcome:** A clear, working example of how to use `ClientSession` with an existing Docker container's stdio streams. This will serve as the reference implementation.
+
+2.  **Analyze MCP SDK for Stdio Framing and `ClientSession` Internals:**
+    *   **Objective:** Fully understand the MCP message structures (especially `InitializeRequest`, `InitializeResult`, `CallToolRequest`, `CallToolResult`), expected stdio framing (newline-delimited JSON is assumed but verify), and any session management nuances handled by `ClientSession` and `AsyncMessageStream`.
+    *   **Action:** Thoroughly review the source code of `mcp.client.session.ClientSession`, `mcp.protocol.streams.AsyncMessageStream`, `mcp.protocol.messages`, and any relevant stdio transport examples within the MCP Python SDK provided at `/home/bchen/references/python-sdk/src/mcp/`.
+
+3.  **Bridge Standalone Test Learnings to `LocalDockerOrchestrationClient`:**
+    *   **Objective:** Apply the successful communication patterns and `ClientSession` usage (or its replicated logic) from `standalone_stdio_mcp_client.py` to the `call_tool_on_instance` method in `LocalDockerOrchestrationClient`.
+    *   **Details:**
+        *   If custom stream wrappers were needed for `ClientSession` in the standalone test, integrate these into `LocalDockerOrchestrationClient`.
+        *   Ensure that for each tool call to an stdio container, the equivalent of `session.initialize()` is performed if the MCP server expects it per "connection" (each `attach_socket` might be a new connection from the server's perspective). This might mean caching `ClientSession` objects per container if they can be reused, or performing a quick initialize + call_tool + close sequence.
+        *   Refine error handling and timeouts based on insights from the standalone test.
+
+4.  **Incremental Testing within `reward-kit`:**
+    *   Once `LocalDockerOrchestrationClient` is updated, re-run `test_docker_run.py` (which should ideally be simplified to use the now-working client if possible, or kept as a very low-level socket test).
+    *   Systematically run `bash run_mcp_test.sh` and debug any remaining issues in the context of the intermediary server.
+    *   Focus on getting `list_tools` working first, then `ping`, then other tools.
+
+5.  **Future Enhancements (Post-Core Functionality):**
+    *   Re-evaluate `startup_check_mcp_tool` for stdio: Can a simple `list_tools` call via the established stdio `ClientSession` serve as a health check?
+    *   Address the FastMCP session ID propagation issue within the intermediary server.
+    *   Handle template data paths and `docker commit` workflows for stateful stdio servers if their state management requires more than just volume mounts.
+
+This structured approach, starting with a focused standalone test using the MCP SDK's `ClientSession`, should provide a more reliable foundation for fixing the stdio communication.

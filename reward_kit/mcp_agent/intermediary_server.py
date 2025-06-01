@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Callable
 
 from reward_kit.mcp_agent.backends.base import (
     AbstractBackendHandler,
@@ -9,9 +9,6 @@ from reward_kit.mcp_agent.backends.base import (
     BackendInitResult,
 )
 from reward_kit.mcp_agent.backends.generic import GenericBackendHandler
-# Import specific handlers when they are created, e.g.:
-# from reward_kit.mcp_agent.backends.filesystem import FileSystemBackendHandler
-# from reward_kit.mcp_agent.backends.duckdb import DuckDBBackendHandler
 
 from reward_kit.mcp_agent.config import AppConfig, BackendServerConfig
 from reward_kit.mcp_agent.orchestration.base_client import (
@@ -24,105 +21,111 @@ from reward_kit.mcp_agent.orchestration.local_docker_client import (
 from reward_kit.mcp_agent.orchestration.remote_http_client import (
     RemoteHttpOrchestrationClient,
 )
-from reward_kit.mcp_agent.session import IntermediarySession # Uses placeholder BaseSession
+from reward_kit.mcp_agent.session import IntermediarySessionData
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-# Placeholders for MCP SDK components
-# from mcp.server import Server as BaseMcpServer, tool as mcp_tool
-# from mcp.server.models import SessionContext # or however session is passed
+from mcp.server.fastmcp.server import FastMCP
+from mcp.server.fastmcp.server import Context as FastMCPContext
+from mcp.shared.context import RequestContext 
 
-class SessionContext: # Placeholder
-    def __init__(self, session_id: str):
-        self.session_id = session_id
-
-def mcp_tool(name: Optional[str] = None): # Placeholder decorator
-    def decorator(func):
-        func._mcp_tool_name = name or func.__name__
-        return func
-    return decorator
-
-class BaseMcpServer: # Placeholder
-    def __init__(self, config: Optional[Dict[str, Any]] = None, session_class: Type[IntermediarySession] = IntermediarySession):
-        self.config = config or {}
-        self.sessions: Dict[str, IntermediarySession] = {}
-        self.session_class = session_class
-        self.app_config: Optional[AppConfig] = None # Will be loaded
-        self._local_docker_orchestrator: Optional[LocalDockerOrchestrationClient] = None
-        self._remote_http_orchestrators: Dict[str, RemoteHttpOrchestrationClient] = {} # Keyed by remote_api_config_ref
-        self._backend_handlers: Dict[str, AbstractBackendHandler] = {} # Keyed by backend_name_ref
-        self._shared_global_instances: Dict[str, ManagedInstanceInfo] = {} # Keyed by backend_name_ref
-
-        logger.info("BaseMcpServer (placeholder) initialized.")
-
-    def _get_or_create_session(self, session_id: str) -> IntermediarySession:
-        if session_id not in self.sessions:
-            self.sessions[session_id] = self.session_class(session_id, app=self)
-        return self.sessions[session_id]
-
-    async def startup(self): # Placeholder for server startup
-        logger.info("BaseMcpServer (placeholder) starting up...")
-        # Actual server would load config, init orchestrators, handlers etc.
-        await self._initialize_orchestrators()
-        await self._initialize_backend_handlers()
-        await self._provision_shared_global_instances()
-        logger.info("BaseMcpServer (placeholder) startup complete.")
-
-
-    async def shutdown(self): # Placeholder for server shutdown
-        logger.info("BaseMcpServer (placeholder) shutting down...")
-        # Cleanup sessions, orchestrators, shared instances
-        
-        # Deprovision all session-specific instances first
-        for session_id in list(self.sessions.keys()):
-            await self.cleanup_session_internal(session_id, self.sessions[session_id]) # Call internal cleanup
-
-        # Then deprovision shared global instances
-        shared_instances_to_deprovision = list(self._shared_global_instances.values())
-        if shared_instances_to_deprovision:
-            logger.info(f"Deprovisioning {len(shared_instances_to_deprovision)} shared global instances.")
-            # Need to group by orchestrator
-            # This is simplified; a real implementation would group by orchestrator
-            if self._local_docker_orchestrator and any(i.orchestration_mode == "local_docker" for i in shared_instances_to_deprovision):
-                 await self._local_docker_orchestrator.deprovision_instances([i for i in shared_instances_to_deprovision if i.orchestration_mode == "local_docker"])
-            for remote_ref, orch in self._remote_http_orchestrators.items():
-                remote_instances = [i for i in shared_instances_to_deprovision if i.orchestration_mode == "remote_http_api" and self.app_config.get_remote_api_config(next(b for b in self.app_config.backends if b.backend_name_ref == i.backend_name_ref)) == orch.app_config.global_remote_apis.get(remote_ref) ] # This condition is complex
-                if remote_instances: # Simplified: find correct remote orchestrator
-                    await orch.deprovision_instances(remote_instances)
-
-
-        if self._local_docker_orchestrator:
-            await self._local_docker_orchestrator.shutdown()
-        for orch in self._remote_http_orchestrators.values():
-            await orch.shutdown()
-        logger.info("BaseMcpServer (placeholder) shutdown complete.")
-
-    # These would be part of the actual BaseMcpServer or called by it
-    async def _initialize_orchestrators(self): pass
-    async def _initialize_backend_handlers(self): pass
-    async def _provision_shared_global_instances(self): pass
-    async def cleanup_session_internal(self, session_id: str, session: IntermediarySession): pass
-
-
-class RewardKitIntermediaryServer(BaseMcpServer):
+class RewardKitIntermediaryServer(FastMCP):
     """
-    The RewardKit Intermediary MCP Server.
+    The RewardKit Intermediary MCP Server, now based on FastMCP.
     Manages lifecycles of various backend MCP servers (local Docker or remote)
     and exposes them to clients (e.g., RL rollout workers) through a unified MCP interface.
     """
 
-    def __init__(self, app_config: AppConfig):
-        super().__init__(session_class=IntermediarySession)
-        self.app_config = app_config
-        self._local_docker_orchestrator: Optional[LocalDockerOrchestrationClient] = None
-        self._remote_http_orchestrators: Dict[str, RemoteHttpOrchestrationClient] = {} # Keyed by unique remote API base_url or a ref
-        self._backend_handlers: Dict[str, AbstractBackendHandler] = {} # Keyed by backend_name_ref
+    def __init__(self, app_config: AppConfig, **kwargs_for_fastmcp):
+        super().__init__(
+            name="RewardKitIntermediaryMCP",
+            instructions="Intermediary Server for managing backend MCP resources for RewardKit RL rollouts.",
+            **kwargs_for_fastmcp
+        )
         
-        # Cache for shared global instances. Keyed by backend_name_ref.
+        self.app_config = app_config
+        
+        self._local_docker_orchestrator: Optional[LocalDockerOrchestrationClient] = None
+        self._remote_http_orchestrators: Dict[str, RemoteHttpOrchestrationClient] = {}
+        self._backend_handlers: Dict[str, AbstractBackendHandler] = {}
+        
         self._shared_global_instances: Dict[str, ManagedInstanceInfo] = {}
-        self._shared_instance_locks: Dict[str, asyncio.Lock] = {} # For concurrent requests for shared instances
+        self._shared_instance_locks: Dict[str, asyncio.Lock] = {}
 
-        logger.info("RewardKitIntermediaryServer initialized with AppConfig.")
+        # Map to store our custom session data, keyed by the transport session_id
+        self.intermediary_session_data: Dict[str, IntermediarySessionData] = {} 
+        
+        logger.info("RewardKitIntermediaryServer (FastMCP based) initialized. AppConfig loaded.")
+
+        self._internal_tool_handlers: Dict[str, Callable] = {
+            "initialize_session": self._initialize_session_actual,
+            "call_backend_tool": self._call_backend_tool_actual,
+            "cleanup_session": self._cleanup_session_actual,
+            "ping": self._ping_actual,
+        }
+
+        # Register the single generic proxy tool handler using FastMCP's add_tool method
+        self.add_tool(
+            self._execute_proxied_tool_impl,
+            name="execute_proxied_tool"
+        )
+        
+        logger.info("Registered single proxy tool 'execute_proxied_tool' using self.add_tool().")
+
+    async def _execute_proxied_tool_impl(
+        self, 
+        mcp_ctx: FastMCPContext, # FastMCP should inject its Context here
+        actual_tool_name: str, 
+        actual_tool_args: Dict[str, Any]
+    ) -> Any:
+        """
+        Generic handler for all proxied tool calls.
+        Invoked by FastMCP's ToolManager.
+        `mcp_ctx` is the FastMCP.Context object.
+        `actual_tool_name` is the name of the tool the client *actually* wants to call.
+        `actual_tool_args` are the arguments for that tool.
+        """
+        logger.debug(
+            f"Proxy handler _execute_proxied_tool_impl called. "
+            f"FastMCPContext type: {type(mcp_ctx)}, "
+            f"mcp_ctx dir: {dir(mcp_ctx)}, "
+            f"Actual tool name: '{actual_tool_name}', "
+            f"Actual tool args: {actual_tool_args}"
+        )
+        if hasattr(mcp_ctx, 'session'):
+            logger.debug(f"mcp_ctx.session type: {type(mcp_ctx.session)}, mcp_ctx.session dir: {dir(mcp_ctx.session)}")
+            if hasattr(mcp_ctx.session, '_session_id'):
+                logger.debug(f"mcp_ctx.session._session_id: {mcp_ctx.session._session_id}")
+            else:
+                logger.debug("mcp_ctx.session does not have _session_id attribute.")
+        else:
+            logger.debug("mcp_ctx does not have session attribute.")
+
+
+        # Get the underlying MCPServer.RequestContext from FastMCPContext
+        low_level_ctx: RequestContext = mcp_ctx.request_context 
+        if not isinstance(low_level_ctx, RequestContext):
+            logger.error(f"CRITICAL: mcp_ctx.request_context is not of type RequestContext. Type: {type(low_level_ctx)}. Value: {low_level_ctx}")
+            raise TypeError(f"Expected RequestContext from mcp_ctx.request_context, got {type(low_level_ctx)}")
+
+        if not actual_tool_name:
+            logger.error(f"Call to execute_proxied_tool missing 'actual_tool_name'. Args received: actual_tool_name={actual_tool_name}, actual_tool_args={actual_tool_args}")
+            raise ValueError("Proxied tool call must contain 'actual_tool_name'.")
+        
+        if actual_tool_args is None:
+            actual_tool_args = {}
+
+        handler_method = self._internal_tool_handlers.get(actual_tool_name)
+        if not handler_method:
+            logger.error(f"Unknown actual_tool_name '{actual_tool_name}' requested via proxy. Args: {actual_tool_args}")
+            raise ValueError(f"Tool '{actual_tool_name}' not found (extracted from proxied call).")
+
+        logger.info(f"Proxying call to internal handler for '{actual_tool_name}' with args: {actual_tool_args}")
+        return await handler_method(low_level_ctx, actual_tool_args)
+
+
+    # _get_or_create_session (custom session logic) is handled within each tool handler method below.
 
     async def _initialize_orchestrators(self):
         """Initializes orchestration clients based on AppConfig."""
@@ -258,107 +261,119 @@ class RewardKitIntermediaryServer(BaseMcpServer):
                     await self._get_or_provision_shared_global_instance(backend_cfg.backend_name_ref)
                 except Exception as e:
                     logger.error(f"Failed to pre-provision shared global instance for '{backend_cfg.backend_name_ref}': {e}", exc_info=True)
-                    # Depending on policy, server startup might fail or continue with this backend unavailable.
         logger.info("Shared_global instances pre-provisioning complete.")
 
-
-    @mcp_tool(name="initialize_session")
-    async def initialize_session(
-        self, ctx: SessionContext, backends: List[BackendInitRequest]
+    async def _initialize_session_actual(
+        self, ctx: RequestContext, tool_args_dict: Dict[str, Any] # tool_args_dict contains 'backends'
     ) -> Dict[str, Any]:
         """
         Initializes a new session with the requested backend instances.
-        If a session_id is provided in ctx, it tries to reuse/verify it.
-        Otherwise, a new session_id is generated.
+        Generates a new rk_session_id.
         """
-        session_id = ctx.session_id if ctx and ctx.session_id else f"session-{uuid.uuid4().hex[:12]}"
-        session = self._get_or_create_session(session_id) # Ensures session object exists
+        logger.debug(f"_initialize_session_actual called. ctx type: {type(ctx)}, tool_args_dict: {tool_args_dict}")
+        if not isinstance(ctx, RequestContext):
+            logger.error(f"CRITICAL: ctx is not RequestContext in _initialize_session_actual. Type: {type(ctx)}.")
+            raise TypeError(f"Expected RequestContext for ctx, got {type(ctx)}")
+
+        backends: Optional[List[BackendInitRequest]] = tool_args_dict.get("backends")
+        if backends is None: # Or further type check if needed
+            logger.error("'_initialize_session_actual' called without 'backends' in tool_args_dict.")
+            raise ValueError("'backends' argument missing for initialize_session.")
+
+        rk_session_id = uuid.uuid4().hex
+        logger.info(f"Generated new rk_session_id: {rk_session_id}")
+
+        session_data = IntermediarySessionData(session_id=rk_session_id)
+        self.intermediary_session_data[rk_session_id] = session_data
         
-        logger.info(f"Initializing session '{session_id}' with {len(backends)} backend requests.")
+        logger.info(f"Initializing IntermediarySessionData for rk_session_id '{rk_session_id}' with {len(backends)} backend requests.")
         initialized_backends_results: List[BackendInitResult] = []
 
-        for backend_req in backends:
+        for backend_req_data in backends: # backend_req_data is a dict here
+            if isinstance(backend_req_data, dict):
+                backend_req = BackendInitRequest(**backend_req_data)
+            else:
+                backend_req = backend_req_data
+
             backend_cfg = next((b for b in self.app_config.backends if b.backend_name_ref == backend_req.backend_name_ref), None)
             if not backend_cfg:
-                logger.error(f"Session {session_id}: Backend config with ref_name '{backend_req.backend_name_ref}' not found.")
-                # Optionally return partial success or fail the whole request
-                # For now, skip this backend and continue. Client should check results.
-                # Or, more strictly: raise ValueError(f"Backend config '{backend_req.backend_name_ref}' not found.")
-                initialized_backends_results.append(BackendInitResult(backend_name_ref=backend_req.backend_name_ref, instances=[])) # Indicate failure for this one
+                logger.error(f"Session {rk_session_id}: Backend config with ref_name '{backend_req.backend_name_ref}' not found.")
+                initialized_backends_results.append(BackendInitResult(backend_name_ref=backend_req.backend_name_ref, instances=[]))
                 continue
 
             try:
                 if backend_cfg.instance_scoping == "shared_global":
-                    logger.info(f"Session {session_id}: Request for shared_global backend '{backend_req.backend_name_ref}'. Getting or ensuring shared instance.")
-                    # For shared_global, we provide a handle to the single shared instance.
-                    # num_instances in request is how many handles client wants.
+                    logger.info(f"Session {rk_session_id}: Request for shared_global backend '{backend_req.backend_name_ref}'.")
                     shared_instance_info = await self._get_or_provision_shared_global_instance(backend_req.backend_name_ref)
-                    # Client gets `num_instances` copies of the same ManagedInstanceInfo if they asked for more than 1.
-                    # This might be confusing. Better to always return 1 for shared_global.
-                    # Let's adjust: if shared_global, result always has 1 instance.
-                    instances_for_this_backend = [shared_instance_info] * backend_req.num_instances # Or just [shared_instance_info]
-                    logger.info(f"Session {session_id}: Provided {len(instances_for_this_backend)} handle(s) to shared instance for '{backend_req.backend_name_ref}'.")
-
-                else: # "session" scoped instances
+                    instances_for_this_backend = [shared_instance_info] * backend_req.num_instances
+                    logger.info(f"Session {rk_session_id}: Provided {len(instances_for_this_backend)} handle(s) to shared instance for '{backend_req.backend_name_ref}'.")
+                else: 
                     handler = self._backend_handlers.get(backend_req.backend_name_ref)
                     if not handler:
                         raise ValueError(f"No backend handler found for '{backend_req.backend_name_ref}'.")
                     
                     orchestration_client = self._get_orchestration_client(backend_cfg)
-                    
-                    logger.info(f"Session {session_id}: Delegating to handler for '{backend_req.backend_name_ref}'.")
+                    logger.info(f"Session {rk_session_id}: Delegating to handler for '{backend_req.backend_name_ref}'.")
                     instances_for_this_backend = await handler.initialize_session_instances(
-                        session=session,
+                        session_data=session_data, 
                         init_request=backend_req,
                         orchestration_client=orchestration_client,
                     )
-                    session.add_managed_instances(backend_req.backend_name_ref, instances_for_this_backend)
                 
+                # Store the provisioned instances in the session data
+                session_data.add_managed_instances(backend_req.backend_name_ref, instances_for_this_backend)
+
                 initialized_backends_results.append(
                     BackendInitResult(
                         backend_name_ref=backend_req.backend_name_ref,
                         instances=instances_for_this_backend,
                     )
                 )
-
             except Exception as e:
-                logger.error(f"Session {session_id}: Error initializing backend '{backend_req.backend_name_ref}': {e}", exc_info=True)
-                # Add a result indicating failure for this specific backend
-                initialized_backends_results.append(BackendInitResult(backend_name_ref=backend_req.backend_name_ref, instances=[]))
-
+                logger.error(f"Session {rk_session_id}: Error initializing backend '{backend_req.backend_name_ref}': {e}", exc_info=True)
+                initialized_backends_results.append(BackendInitResult(backend_name_ref=backend_req.backend_name_ref, instances=[], error_message=str(e)))
 
         return {
-            "session_id": session.session_id,
-            "initialized_backends": [res.model_dump() for res in initialized_backends_results],
+            "rk_session_id": rk_session_id, # Return the newly generated rk_session_id
+            "initialized_backends": [res.model_dump(exclude_none=True) for res in initialized_backends_results],
         }
 
-    @mcp_tool(name="call_backend_tool")
-    async def call_backend_tool(
+    async def _call_backend_tool_actual(
         self,
-        ctx: SessionContext, # MCP framework should provide this with session_id
-        backend_name_ref: str,
-        instance_id: str, # Client specifies which instance within the session
-        tool_name: str,
-        tool_args: Dict[str, Any],
+        ctx: RequestContext,
+        tool_args_dict: Dict[str, Any] 
     ) -> Dict[str, Any]:
-        if not ctx or not ctx.session_id:
-            raise ValueError("Session context with session_id is required.")
-        session = self.sessions.get(ctx.session_id)
-        if not session:
-            raise ValueError(f"Session '{ctx.session_id}' not found.")
+        logger.debug(f"_call_backend_tool_actual called. ctx type: {type(ctx)}, tool_args_dict: {tool_args_dict}")
+        if not isinstance(ctx, RequestContext):
+            logger.error(f"CRITICAL: ctx is not RequestContext in _call_backend_tool_actual. Type: {type(ctx)}.")
+            raise TypeError(f"Expected RequestContext for ctx, got {type(ctx)}")
 
-        logger.debug(f"Session {session.session_id}: Call tool '{tool_name}' on backend '{backend_name_ref}', instance '{instance_id}'.")
+        rk_session_id = tool_args_dict.get("rk_session_id")
+        backend_name_ref = tool_args_dict.get("backend_name_ref")
+        instance_id = tool_args_dict.get("instance_id")
+        tool_name = tool_args_dict.get("tool_name")
+        tool_args = tool_args_dict.get("tool_args")
+
+        if not all([rk_session_id, backend_name_ref, instance_id, tool_name]): # tool_args can be empty
+            missing_args = [k for k,v in {"rk_session_id":rk_session_id, "backend_name_ref":backend_name_ref, "instance_id":instance_id, "tool_name":tool_name}.items() if not v]
+            logger.error(f"'_call_backend_tool_actual' missing required arguments: {missing_args}. Received: {tool_args_dict}")
+            raise ValueError(f"Missing required arguments for call_backend_tool: {missing_args}")
+
+        session_data = self.intermediary_session_data.get(rk_session_id)
+        if not session_data: 
+            logger.error(f"IntermediarySessionData for rk_session_id '{rk_session_id}' not found.")
+            raise ValueError(f"IntermediarySessionData for rk_session_id '{rk_session_id}' not found.")
+        logger.debug(f"IntermediarySessionData for rk_session_id {rk_session_id}: Call tool '{tool_name}' on backend '{backend_name_ref}', instance '{instance_id}'.")
         
-        target_instances = session.get_managed_instances(backend_name_ref, instance_id)
+        target_instances = session_data.get_managed_instances(backend_name_ref, instance_id)
         if not target_instances:
-            raise ValueError(f"Instance '{instance_id}' for backend '{backend_name_ref}' not found in session '{session.session_id}'.")
+            raise ValueError(f"Instance '{instance_id}' for backend '{backend_name_ref}' not found in session '{rk_session_id}'.")
         
-        # Assuming instance_id is unique within a backend_name_ref for a session, so target_instances[0] is fine.
         managed_instance_info = target_instances[0]
 
         backend_cfg = next((b for b in self.app_config.backends if b.backend_name_ref == backend_name_ref), None)
         if not backend_cfg:
-             raise ValueError(f"Backend config '{backend_name_ref}' not found.") # Should not happen if instance exists
+             raise ValueError(f"Backend config '{backend_name_ref}' not found.")
 
         orchestration_client = self._get_orchestration_client(backend_cfg)
         
@@ -366,117 +381,153 @@ class RewardKitIntermediaryServer(BaseMcpServer):
             result = await orchestration_client.call_tool_on_instance(
                 instance=managed_instance_info, tool_name=tool_name, tool_args=tool_args
             )
-            logger.debug(f"Session {session.session_id}: Tool '{tool_name}' on instance '{instance_id}' successful.")
+            logger.debug(f"Session {rk_session_id}: Tool '{tool_name}' on instance '{instance_id}' successful.")
             return result
         except Exception as e:
-            logger.error(f"Session {session.session_id}: Error calling tool '{tool_name}' on instance '{instance_id}': {e}", exc_info=True)
-            # Re-raise to propagate error to client. Error structure might need to be MCP compliant.
-            raise # Or return a structured error: e.g., {"error": str(e), "details": ...}
+            logger.error(f"Session {rk_session_id}: Error calling tool '{tool_name}' on instance '{instance_id}': {e}", exc_info=True)
+            raise
 
 
-    async def cleanup_session_internal(self, session_id: str, session: IntermediarySession):
-        """Internal method to handle actual resource cleanup for a session."""
-        logger.info(f"Starting internal cleanup for session '{session_id}'.")
-        all_session_instances = session.get_all_managed_instances()
+    async def cleanup_session_internal(self, session_data_to_clean: IntermediarySessionData, rk_session_id: str):
+        """Internal method to handle actual resource cleanup for a session, using its rk_session_id and the direct session_data object."""
+        logger.info(f"Starting internal cleanup for IntermediarySessionData (rk_session_id: '{rk_session_id}').")
         
-        # Group instances by orchestrator to batch deprovisioning calls
-        # This is a simplified grouping; a more robust way would be to store orchestrator ref on ManagedInstanceInfo
-        # or re-derive it.
+        # session_data_to_clean is now passed directly, no need to fetch from self.intermediary_session_data
+        # if not session_data_to_clean: # This check is now done by the caller before pop
+        #     logger.warning(f"IntermediarySessionData for rk_session_id '{rk_session_id}' not found for internal cleanup. Already cleaned?")
+        #     return
+
+        all_session_instances = session_data_to_clean.get_all_managed_instances()
         
+        # Group instances by orchestrator
         local_docker_instances = [inst for inst in all_session_instances if inst.orchestration_mode == "local_docker"]
         if local_docker_instances and self._local_docker_orchestrator:
-            logger.info(f"Session {session_id}: Deprovisioning {len(local_docker_instances)} local Docker instances.")
+            logger.info(f"Session {rk_session_id}: Deprovisioning {len(local_docker_instances)} local Docker instances.")
             try:
                 await self._local_docker_orchestrator.deprovision_instances(local_docker_instances)
             except Exception as e:
-                logger.error(f"Session {session_id}: Error deprovisioning local Docker instances: {e}", exc_info=True)
+                logger.error(f"Session {rk_session_id}: Error deprovisioning local Docker instances: {e}", exc_info=True)
 
-        # For remote instances, group by the remote_api_config_ref or equivalent key
         remote_instances_by_orchestrator_key: Dict[str, List[ManagedInstanceInfo]] = {}
         for inst in all_session_instances:
             if inst.orchestration_mode == "remote_http_api":
-                backend_cfg = next((b for b in self.app_config.backends if b.backend_name_ref == inst.backend_name_ref), None)
-                if backend_cfg:
-                    key = backend_cfg.remote_api_config_ref or (backend_cfg.remote_api_config_inline.base_url if backend_cfg.remote_api_config_inline else None)
-                    if key:
-                        if key not in remote_instances_by_orchestrator_key:
-                            remote_instances_by_orchestrator_key[key] = []
-                        remote_instances_by_orchestrator_key[key].append(inst)
+                key = self._get_orchestration_client_key_for_instance(inst)
+                if key:
+                    if key not in remote_instances_by_orchestrator_key:
+                        remote_instances_by_orchestrator_key[key] = []
+                    remote_instances_by_orchestrator_key[key].append(inst)
         
         for key, remote_instances_list in remote_instances_by_orchestrator_key.items():
             orchestrator = self._remote_http_orchestrators.get(key)
             if orchestrator and remote_instances_list:
-                logger.info(f"Session {session_id}: Deprovisioning {len(remote_instances_list)} remote instances for orchestrator '{key}'.")
+                logger.info(f"Session {rk_session_id}: Deprovisioning {len(remote_instances_list)} remote instances for orchestrator '{key}'.")
                 try:
                     await orchestrator.deprovision_instances(remote_instances_list)
                 except Exception as e:
-                    logger.error(f"Session {session_id}: Error deprovisioning remote instances for '{key}': {e}", exc_info=True)
+                    logger.error(f"Session {rk_session_id}: Error deprovisioning remote instances for '{key}': {e}", exc_info=True)
         
-        # Cleanup temporary Docker images associated with the session (if using local Docker)
-        if session.temporary_docker_images and self._local_docker_orchestrator:
-            logger.info(f"Session {session_id}: Cleaning up {len(session.temporary_docker_images)} temporary Docker images.")
-            for image_tag in list(session.temporary_docker_images): # Iterate copy
-                try:
-                    # The LocalDockerOrchestrationClient's shutdown handles its _temporary_images set.
-                    # This ensures images are removed if the session is explicitly cleaned before server shutdown.
-                    # We need to ensure the orchestrator knows about these images if it didn't create them directly
-                    # (though it should have if it returned committed_image_tag).
-                    # For now, let LocalDockerOrchestrationClient.shutdown manage its own list.
-                    # If a session ends, its temporary images should be removed if no other session uses them.
-                    # This logic is tricky. A reference count on images or more careful management in LocalDockerClient is needed.
-                    # For now, we assume LocalDockerClient's _temporary_images set is the source of truth for its cleanup.
-                    # If session.temporary_docker_images contains tags, we can try to remove them.
-                    logger.info(f"Session {session_id}: Requesting removal of temporary image '{image_tag}'.")
-                    self._local_docker_orchestrator.docker_client.images.remove(image=image_tag, force=False) # Best effort
-                    session.temporary_docker_images.discard(image_tag)
-                    self._local_docker_orchestrator._temporary_images.discard(image_tag) # Also remove from orchestrator's list
-                except docker.errors.ImageNotFound:
-                     logger.warning(f"Session {session_id}: Temporary image {image_tag} not found for removal.")
-                except docker.errors.APIError as e:
-                    if e.response.status_code == 409: # Conflict
-                        logger.warning(f"Session {session_id}: Temporary image {image_tag} is in use, not removed.")
-                    else:
-                        logger.error(f"Session {session_id}: Failed to remove temporary image {image_tag}: {e}")
-        
-        logger.info(f"Internal cleanup for session '{session_id}' complete.")
+        # Cleanup temporary Docker images associated with the session data
+        if session_data_to_clean.temporary_docker_images and self._local_docker_orchestrator:
+            logger.info(f"Session {rk_session_id}: {len(session_data_to_clean.temporary_docker_images)} temporary Docker images were associated.")
+            logger.info(f"Session {rk_session_id}: Image cleanup relies on LocalDockerOrchestrationClient.shutdown() or manual cleanup.")
 
+        logger.info(f"Internal cleanup for session data (rk_session_id: '{rk_session_id}') complete.")
 
-    @mcp_tool(name="cleanup_session")
-    async def cleanup_session(self, ctx: SessionContext) -> Dict[str, str]:
+    async def _cleanup_session_actual(self, ctx: RequestContext, tool_args_dict: Dict[str, Any]) -> Dict[str, str]:
         """
-        Cleans up all resources associated with the given session_id.
-        This involves deprovisioning all backend instances created for the session.
+        Cleans up all resources associated with the session data identified by rk_session_id.
+        Called by the proxy handler. tool_args_dict should contain 'rk_session_id'.
         """
-        if not ctx or not ctx.session_id:
-            raise ValueError("Session context with session_id is required.")
+        rk_session_id = tool_args_dict.get("rk_session_id")
+        logger.debug(f"_cleanup_session_actual called. ctx type: {type(ctx)}, rk_session_id: {rk_session_id}")
+
+        if not isinstance(ctx, RequestContext):
+            logger.error(f"CRITICAL: ctx is not RequestContext in _cleanup_session_actual. Type: {type(ctx)}.")
+            raise TypeError(f"Expected RequestContext for ctx, got {type(ctx)}")
         
-        session_id_to_clean = ctx.session_id
-        session = self.sessions.pop(session_id_to_clean, None)
+        if not rk_session_id:
+            logger.error("'_cleanup_session_actual' called without 'rk_session_id' in tool_args_dict.")
+            raise ValueError("'rk_session_id' argument missing for cleanup_session.")
 
-        if not session:
-            logger.warning(f"Cleanup requested for non-existent or already cleaned session '{session_id_to_clean}'.")
-            return {"status": "session_not_found_or_already_cleaned", "session_id": session_id_to_clean}
+        logger.info(f"_cleanup_session_actual called for rk_session_id '{rk_session_id}'.")
 
-        logger.info(f"Cleaning up resources for session '{session_id_to_clean}'.")
-        await self.cleanup_session_internal(session_id_to_clean, session)
+        session_data_obj = self.intermediary_session_data.pop(rk_session_id, None)
+
+        if not session_data_obj:
+            logger.warning(f"IntermediarySessionData for rk_session_id '{rk_session_id}' not found or already cleaned up.")
+            return {"status": "custom_session_data_not_found_or_already_cleaned", "rk_session_id": rk_session_id}
+
+        await self.cleanup_session_internal(session_data_obj, rk_session_id)
         
-        # Call the session object's own cleanup hook (from BaseSession)
-        await session.cleanup()
+        logger.info(f"IntermediarySessionData for rk_session_id '{rk_session_id}' fully cleaned up.")
+        return {"status": "cleaned", "rk_session_id": rk_session_id} # Return rk_session_id
 
-        logger.info(f"Session '{session_id_to_clean}' fully cleaned up.")
-        return {"status": "cleaned", "session_id": session_id_to_clean}
+    async def startup(self):
+        """Override MCPServer's startup to initialize orchestrators, handlers, and shared instances."""
+        
+        logger.info("RewardKitIntermediaryServer performing custom startup tasks...")
+        try:
+            await self._initialize_orchestrators()
+            await self._initialize_backend_handlers()
+            await self._provision_shared_global_instances()
+            logger.info("RewardKitIntermediaryServer custom startup tasks complete.")
+        except Exception as e:
+            logger.error(f"Error during RewardKitIntermediaryServer custom startup: {e}", exc_info=True)
+            # Depending on policy, might want to re-raise to stop server launch
+            raise
 
-    # Actual server startup/shutdown would be handled by an ASGI server like Uvicorn
-    # For now, adding explicit methods that an external runner could call.
-    async def start(self):
-        """Complete server startup sequence."""
-        logging.basicConfig(level=self.app_config.log_level.upper())
-        logger.info("RewardKitIntermediaryServer starting...")
-        await self.startup() # Calls the placeholder BaseMcpServer startup
-        logger.info("RewardKitIntermediaryServer running.")
+    async def _ping_actual(self, ctx: RequestContext, transport_session_id: str) -> Dict[str, str]:
+        logger.debug(f"_ping_actual called. ctx type: {type(ctx)}, transport_session_id: {transport_session_id}")
+        if not isinstance(ctx, RequestContext):
+            logger.error(f"CRITICAL: ctx is not RequestContext in _ping_actual. Type: {type(ctx)}.")
+            raise TypeError(f"Expected RequestContext for ctx, got {type(ctx)}")
+            
+        logger.info(f"Ping received by _ping_actual for transport_session_id: {transport_session_id}.")
+        return {"reply": "pong", "session_id": transport_session_id}
 
-    async def stop(self):
-        """Complete server shutdown sequence."""
-        logger.info("RewardKitIntermediaryServer stopping...")
-        await self.shutdown() # Calls placeholder BaseMcpServer shutdown
-        logger.info("RewardKitIntermediaryServer stopped.")
+    async def shutdown(self):
+        """Custom shutdown logic for FastMCP based server."""
+        logger.info("RewardKitIntermediaryServer (FastMCP based) performing custom shutdown tasks...")
+        
+        logger.info(f"Cleaning up any remaining IntermediarySessionData ({len(self.intermediary_session_data)} found)...")
+        for session_id_key in list(self.intermediary_session_data.keys()): # Iterate over a copy of keys
+            logger.info(f"Force cleaning IntermediarySessionData for {session_id_key} during server shutdown.")
+            session_data_obj = self.intermediary_session_data.pop(session_id_key, None) # Pop the object
+            if session_data_obj:
+                await self.cleanup_session_internal(session_data_obj, session_id_key) # Pass object and key
+            # No need for another pop as it's already done.
+        
+        shared_instances_to_deprovision = list(self._shared_global_instances.values())
+        if shared_instances_to_deprovision:
+            logger.info(f"Deprovisioning {len(shared_instances_to_deprovision)} shared global instances.")
+            local_shared = [i for i in shared_instances_to_deprovision if i.orchestration_mode == "local_docker"]
+            if local_shared and self._local_docker_orchestrator:
+                 await self._local_docker_orchestrator.deprovision_instances(local_shared)
+            
+            remote_shared_by_key: Dict[str, List[ManagedInstanceInfo]] = {}
+            for inst_info in shared_instances_to_deprovision:
+                if inst_info.orchestration_mode == "remote_http_api":
+                    key = self._get_orchestration_client_key_for_instance(inst_info)
+                    if key:
+                        remote_shared_by_key.setdefault(key, []).append(inst_info)
+            
+            for key, instances_list in remote_shared_by_key.items():
+                orchestrator = self._remote_http_orchestrators.get(key)
+                if orchestrator:
+                    await orchestrator.deprovision_instances(instances_list)
+
+        if self._local_docker_orchestrator:
+            await self._local_docker_orchestrator.shutdown()
+        for orch in self._remote_http_orchestrators.values():
+            await orch.shutdown()
+        
+        logger.info("RewardKitIntermediaryServer custom shutdown tasks complete.")
+
+    def _get_orchestration_client_key_for_instance(self, instance_info: ManagedInstanceInfo) -> Optional[str]:
+        """Helper to find the orchestrator key for a remote instance."""
+        if instance_info.orchestration_mode == "remote_http_api":
+            backend_cfg = next((b for b in self.app_config.backends if b.backend_name_ref == instance_info.backend_name_ref), None)
+            if backend_cfg:
+                return backend_cfg.remote_api_config_ref or \
+                       (backend_cfg.remote_api_config_inline.base_url if backend_cfg.remote_api_config_inline else None)
+        return None

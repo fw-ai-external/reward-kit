@@ -44,6 +44,10 @@ class BackendServerConfig(BaseModel):
         "session",
         description="Defines if instances are per-session or shared globally. 'session' implies stateful, 'shared_global' implies stateless.",
     )
+    mcp_transport: Literal["http", "stdio"] = Field(
+        "http",
+        description="MCP transport protocol used by the backend server. Defaults to 'http'. If 'stdio', container_port and http-based startup_check_mcp_tool are ignored.",
+    )
 
     # Local Docker Specific Fields
     docker_image: Optional[str] = Field(
@@ -67,6 +71,15 @@ class BackendServerConfig(BaseModel):
     startup_check_mcp_tool: Optional[Dict[str, Any]] = Field(
         None,
         description="An MCP tool call (e.g., {'tool_name': 'ping', 'arguments': {}}) to verify container startup.",
+    )
+    # Renamed from container_command_args for clarity with docker-py's 'command' kwarg
+    container_command: Optional[List[str]] = Field(
+        None,
+        description="Command to run in the container. Overrides Docker image's CMD or passed as args to ENTRYPOINT.",
+    )
+    container_volumes: Optional[Dict[str, Dict[str, str]]] = Field(
+        None,
+        description="Volume mounts for the container, e.g., {'/host/path': {'bind': '/container/path', 'mode': 'rw'}}.",
     )
 
     # Remote API Specific Fields
@@ -92,9 +105,10 @@ class BackendServerConfig(BaseModel):
                 raise ValueError(
                     "docker_image must be set for local_docker orchestration mode."
                 )
-            if not self.container_port:
+            # container_port is only required for http transport in local_docker mode
+            if self.mcp_transport == "http" and not self.container_port:
                 raise ValueError(
-                    "container_port must be set for local_docker orchestration mode."
+                    "container_port must be set for local_docker orchestration mode with http transport."
                 )
         elif self.orchestration_mode == "remote_http_api":
             if not self.remote_resource_type_identifier:

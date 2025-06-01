@@ -9,7 +9,7 @@ source .venv/bin/activate
 SERVER_COMMAND=".venv/bin/python reward_kit/mcp_agent/main.py --config mcp_agent_config.yaml --host localhost --port 8001"
 
 # Define client command
-CLIENT_COMMAND=".venv/bin/python test_mcp_client.py"
+CLIENT_COMMAND=".venv/bin/python tests/mcp_agent/test_rl_filesystem_scenario.py" # Updated client script
 
 echo "Starting MCP Intermediary Server in the background..."
 $SERVER_COMMAND &
@@ -20,12 +20,12 @@ echo "Server PID: $SERVER_PID"
 echo "Waiting for server to initialize (5 seconds)..."
 sleep 5
 
-echo "Running MCP Test Client..."
+echo "Running RL Filesystem Scenario Test Client..." # Updated echo message
 $CLIENT_COMMAND
 
 CLIENT_EXIT_CODE=$?
 
-echo "Test Client finished with exit code: $CLIENT_EXIT_CODE"
+echo "RL Filesystem Scenario Test Client finished with exit code: $CLIENT_EXIT_CODE" # Updated echo message
 
 echo "Shutting down MCP Intermediary Server (PID: $SERVER_PID)..."
 kill $SERVER_PID

@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import uuid
+import shutil # Added for directory copying
 from pathlib import Path 
-from typing import Any, Dict, List, Optional, Set, Tuple, AsyncIterator # Keep AsyncIterator for now, might not be needed
+from typing import Any, Dict, List, Optional, Set, Tuple, AsyncIterator 
 
 import docker
 import docker.errors
@@ -11,9 +12,12 @@ import httpx
 
 from reward_kit.mcp_agent.config import AppConfig, BackendServerConfig
 import mcp.types as types 
-from mcp.client.session import ClientSession, DEFAULT_CLIENT_INFO, SessionMessage
+# ListToolsResult is not in mcp.client.session, likely in mcp.types or mcp.shared.message
+from mcp.client.session import ClientSession, DEFAULT_CLIENT_INFO, SessionMessage 
+# Assuming ListToolsResult is in mcp.types, which is imported as types
+# If not, this will need further correction. For now, we'll use types.ListToolsResult
 from mcp.client.stdio import StdioServerParameters, stdio_client
-from anyio.abc import ObjectReceiveStream, ObjectSendStream # For type hints if needed directly
+from anyio.abc import ObjectReceiveStream, ObjectSendStream 
 
 from reward_kit.mcp_agent.orchestration.base_client import (
     AbstractOrchestrationClient,
@@ -22,6 +26,8 @@ from reward_kit.mcp_agent.orchestration.base_client import (
 
 logger = logging.getLogger(__name__)
 ENCODING = "utf-8"
+DEFAULT_INSTANCE_DATA_BASE_PATH = Path("/tmp/rk_mcp_instance_data")
+
 
 class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
     def __init__(self, app_config: AppConfig):
@@ -30,15 +36,15 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
         self.http_client: Optional[httpx.AsyncClient] = None
         self._used_host_ports: Set[int] = set()
         self._temporary_images: Set[str] = set()
+        self.instance_data_base_path = DEFAULT_INSTANCE_DATA_BASE_PATH
         
-        # For managing dedicated tasks for stdio instances
         self._stdio_instance_tasks: Dict[str, asyncio.Task] = {}
-        # To store ClientSession objects created by the dedicated tasks
         self._stdio_client_sessions: Dict[str, ClientSession] = {}
-        # To store shutdown events for each stdio instance task
         self._stdio_shutdown_events: Dict[str, asyncio.Event] = {}
 
     async def startup(self) -> None:
+        self.instance_data_base_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Instance data base path for host-copied templates: {self.instance_data_base_path.resolve()}")
         try:
             self.docker_client = docker.from_env() 
             if not self.docker_client.ping(): # type: ignore
@@ -66,7 +72,6 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
         initialization_complete_event: asyncio.Event,
         shutdown_event: asyncio.Event
     ):
-        """Dedicated task to manage a single stdio_client's lifecycle."""
         client_session_stdio: Optional[ClientSession] = None
         try:
             logger.info(f"[{container_name}] Lifecycle task started.")
@@ -78,62 +83,45 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                     client_info=DEFAULT_CLIENT_INFO
                 )
                 
-                # Start the client session without using the context manager to avoid cancel scope conflicts
-                await client_session_stdio.__aenter__()
-                try:
+                async with client_session_stdio: 
                     logger.info(f"[{container_name}] Attempting to initialize ClientSession...")
                     await asyncio.wait_for(client_session_stdio.initialize(), timeout=15.0)
                     logger.info(f"[{container_name}] ClientSession initialized successfully.")
                     
-                    # Log the tools reported by the backend server by calling list_tools
                     try:
-                        # list_tools() should be called on the session, it returns ListToolsResult
-                        # ListToolsResult has a 'tools' attribute which is List[Tool]
-                        # Tool has a 'name' attribute.
-                        list_tools_response = await asyncio.wait_for(client_session_stdio.list_tools(), timeout=5.0)
+                        # Corrected type hint assuming ListToolsResult is in mcp.types
+                        list_tools_response: types.ListToolsResult = await asyncio.wait_for(client_session_stdio.list_tools(), timeout=5.0)
                         if hasattr(list_tools_response, 'tools') and list_tools_response.tools is not None:
-                            reported_tools = [tool.name for tool in list_tools_response.tools]
+                            reported_tools = [tool.name for tool in list_tools_response.tools] # Assuming tool object has a .name
                             logger.info(f"[{container_name}] Backend server reported tools: {reported_tools}")
                         else:
-                            # This case implies list_tools_response is not as expected or tools list is empty/None
                             logger.warning(f"[{container_name}] Backend server list_tools response did not contain 'tools' attribute or it was None. Response: {list_tools_response}")
                     except AttributeError as e_attr:
-                        # This handles cases where list_tools_response itself might be an error object without 'tools'
-                        logger.warning(f"[{container_name}] AttributeError accessing tools from list_tools response: {e_attr}. Response: {list_tools_response}")
+                        logger.warning(f"[{container_name}] AttributeError accessing tools from list_tools response: {e_attr}. Response: {getattr(list_tools_response, '__dict__', list_tools_response)}")
                     except Exception as e_list_tools:
                         logger.warning(f"[{container_name}] Error calling/processing list_tools on backend server: {e_list_tools}")
 
-                    # Store the session and signal that initialization is complete
                     self._stdio_client_sessions[instance_uuid] = client_session_stdio
                     initialization_complete_event.set()
                     
-                    # Keep running until shutdown is signaled
                     await shutdown_event.wait()
                     logger.info(f"[{container_name}] Shutdown event received.")
-                
-                finally:
-                    # Properly close the client session
-                    try:
-                        await client_session_stdio.__aexit__(None, None, None)
-                    except Exception as e_close:
-                        logger.warning(f"[{container_name}] Error during ClientSession close: {e_close}")
 
             logger.info(f"[{container_name}] stdio_client context exited cleanly.")
 
         except asyncio.TimeoutError:
             logger.error(f"[{container_name}] Timeout during ClientSession initialization.")
-            initialization_complete_event.set() # Signal to unblock provision_instances, even on failure
+            initialization_complete_event.set() 
         except Exception as e:
             logger.error(f"[{container_name}] Error in stdio instance lifecycle: {e}", exc_info=True)
-            initialization_complete_event.set() # Ensure provision_instances is unblocked
+            initialization_complete_event.set() 
         finally:
             logger.debug(f"[{container_name}] In _manage_stdio_instance_lifecycle finally block.")
             if client_session_stdio is None:
-                logger.info(f"[{container_name}] ClientSession was not created or assigned.")
-
-            # Clean up references
+                logger.info(f"[{container_name}] ClientSession was not created or assigned in lifecycle task.")
+            
             self._stdio_client_sessions.pop(instance_uuid, None)
-            self._stdio_shutdown_events.pop(instance_uuid, None)
+            self._stdio_shutdown_events.pop(instance_uuid, None) # Ensure event is removed
             logger.info(f"[{container_name}] Lifecycle task finished.")
 
 
@@ -141,17 +129,19 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
         if self.http_client: await self.http_client.aclose()
         
         logger.info(f"Shutting down LocalDockerOrchestrationClient. Cleaning up {len(self._stdio_instance_tasks)} stdio instance tasks.")
-        # Signal all active stdio instance tasks to shut down
-        for instance_uuid, event in list(self._stdio_shutdown_events.items()): # Iterate on copy
+        for instance_uuid, event in list(self._stdio_shutdown_events.items()): 
             logger.info(f"Signaling shutdown for stdio instance task {instance_uuid}.")
             event.set()
         
-        # Wait for all tasks to complete
         tasks_to_wait_for = list(self._stdio_instance_tasks.values())
         if tasks_to_wait_for:
-            await asyncio.gather(*tasks_to_wait_for, return_exceptions=True)
+            results = await asyncio.gather(*tasks_to_wait_for, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    task_name = tasks_to_wait_for[i].get_name() if hasattr(tasks_to_wait_for[i], 'get_name') else f"Task-{i}"
+                    logger.error(f"Stdio lifecycle task {task_name} raised an exception during shutdown: {result}", exc_info=result)
         logger.info("All stdio instance tasks awaited.")
-        self._stdio_instance_tasks.clear() # Should be empty if tasks removed themselves
+        self._stdio_instance_tasks.clear()
 
         if self.docker_client:
             for image_tag in list(self._temporary_images):
@@ -166,6 +156,7 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
         logger.info("LocalDockerOrchestrationClient shut down.")
 
     async def _perform_startup_check(self, url: str, check: Dict[str, Any]) -> bool:
+        # ... (content remains the same) ...
         if not self.http_client: return False
         name, args = check.get("tool_name"), check.get("arguments", {})
         if not name: return True
@@ -180,27 +171,44 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
 
     async def provision_instances(
         self, backend_config: BackendServerConfig, num_instances: int,
-        session_id: str, template_details: Optional[Any] = None
+        session_id: str, template_details: Optional[Any] = None # template_details is generic, could be path for fs
     ) -> List[ManagedInstanceInfo]:
         if not self.docker_client: raise RuntimeError("Docker client not initialized.")
+        
         image_to_run_from = backend_config.docker_image
         committed_img_tag: Optional[str] = None
         managed_instances: List[ManagedInstanceInfo] = []
 
-        template_host_path = template_details or backend_config.template_data_path_host
-        if backend_config.instance_scoping == "session" and template_host_path:
-            # ... (template commit logic remains the same) ...
-            if not backend_config.container_template_data_path:
-                raise ValueError("container_template_data_path required for stateful session with template.")
+        # Determine if we are using host copy for filesystem template
+        use_host_copy_template = (
+            backend_config.backend_type == "filesystem" and 
+            backend_config.template_data_path_host and
+            Path(backend_config.template_data_path_host).is_dir()
+        )
+
+        # Image templating via docker commit (original logic)
+        # This might be mutually exclusive with host_copy_template for filesystem, or could be combined if needed.
+        # For now, assume host_copy_template takes precedence for filesystem if specified.
+        if not use_host_copy_template and backend_config.instance_scoping == "session" and \
+           (template_details or backend_config.template_data_path_host) and \
+           backend_config.container_template_data_path:
+            
+            host_path_for_commit = template_details or backend_config.template_data_path_host
+            if not host_path_for_commit or not backend_config.container_template_data_path:
+                 raise ValueError("template_data_path_host and container_template_data_path required for stateful session with image template.")
+
             temp_cont_name = f"rk-mcp-template-{session_id}-{backend_config.backend_name_ref}-{uuid.uuid4().hex[:4]}"
             try:
-                logger.info(f"Creating template container: {temp_cont_name} from {backend_config.docker_image}")
+                logger.info(f"Creating template container for commit: {temp_cont_name} from {backend_config.docker_image}")
                 temp_c = self.docker_client.containers.run( # type: ignore
                     image=backend_config.docker_image, name=temp_cont_name,
-                    volumes={template_host_path: {"bind": backend_config.container_template_data_path, "mode": "rw"}},
+                    volumes={str(Path(host_path_for_commit).resolve()): {"bind": backend_config.container_template_data_path, "mode": "rw"}},
                     detach=True
                 )
-                await asyncio.sleep(5) 
+                # Allow time for potential init scripts in container to modify state from template
+                # This duration might need to be configurable or based on a health check.
+                await asyncio.sleep(self.app_config.global_docker_options.get("template_commit_delay_s", 5) if self.app_config.global_docker_options else 5)
+                
                 committed_img_tag = f"rk-mcp-templateimg-{session_id}-{backend_config.backend_name_ref}:{uuid.uuid4().hex[:6]}"
                 logger.info(f"Committing {temp_c.id} to {committed_img_tag}") # type: ignore
                 temp_c.commit(repository=committed_img_tag.split(':')[0], tag=committed_img_tag.split(':')[1]) # type: ignore
@@ -209,7 +217,7 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
             finally:
                 if 'temp_c' in locals() and temp_c: 
                     try: temp_c.stop(timeout=5); temp_c.remove() # type: ignore
-                    except Exception as e: logger.warning(f"Could not cleanup template container: {e}")
+                    except Exception as e: logger.warning(f"Could not cleanup template container for commit: {e}")
         
         for i in range(num_instances):
             instance_uuid = uuid.uuid4().hex[:8]
@@ -217,60 +225,77 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
             mcp_endpoint_url: Optional[str] = None
             host_port: Optional[int] = None
             instance_internal_details: Dict[str, Any] = {"container_name": container_name, "instance_uuid": instance_uuid}
-            
+            current_container_volumes = dict(backend_config.container_volumes or {}) # Start with configured volumes
+
             try:
-                logger.info(f"Provisioning instance {container_name} (transport: {backend_config.mcp_transport})")
+                if use_host_copy_template and backend_config.template_data_path_host:
+                    instance_host_data_path = self.instance_data_base_path / session_id / backend_config.backend_name_ref / instance_uuid
+                    instance_host_data_path.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Copying template from {backend_config.template_data_path_host} to {instance_host_data_path} for instance {container_name}")
+                    shutil.copytree(backend_config.template_data_path_host, instance_host_data_path, dirs_exist_ok=True)
+                    
+                    instance_internal_details["instance_host_data_path"] = str(instance_host_data_path.resolve())
+                    # Override/set the volume for /data (assuming /data is the target for mcp/filesystem)
+                    # The container_command for mcp/filesystem is often ["/data"], so it serves what's at /data.
+                    container_data_path_target = "/data" # This should ideally come from config or be standard for "filesystem" type
+                    current_container_volumes = {str(instance_host_data_path.resolve()): {"bind": container_data_path_target, "mode": "rw"}}
+                    logger.info(f"Using dynamic volume for {container_name}: {current_container_volumes}")
+
+
+                logger.info(f"Provisioning instance {container_name} (transport: {backend_config.mcp_transport}) from image {image_to_run_from}")
                 if backend_config.mcp_transport == "http":
-                    # ... (HTTP provisioning logic remains the same) ...
+                    # ... (HTTP provisioning logic, ensure it uses current_container_volumes) ...
                     if not self.docker_client: raise RuntimeError("Docker client not initialized for HTTP provisioning.")
                     if not backend_config.container_port: raise ValueError("container_port required for http.")
                     port_bindings = {f"{backend_config.container_port}/tcp": 0} 
                     run_kwargs: Dict[str, Any] = {
                         "image": image_to_run_from, "name": container_name, "detach": True,
-                        "command": backend_config.container_command, "volumes": backend_config.container_volumes,
+                        "command": backend_config.container_command, "volumes": current_container_volumes, # Use potentially modified volumes
                         "labels": {"rewardkit-mcp-session-id": session_id, "rewardkit-mcp-backend-name": backend_config.backend_name_ref, "rewardkit-mcp-instance-id": instance_uuid, "rewardkit-mcp-managed": "true"},
                         "ports": port_bindings, 
-                        **(self.app_config.global_docker_options or {}), # type: ignore
+                        **(self.app_config.global_docker_options or {}), 
                     }
-                    container = self.docker_client.containers.run(**run_kwargs) # type: ignore
-                    container.reload() # type: ignore
-                    bindings = container.attrs.get('NetworkSettings', {}).get('Ports', {}).get(f"{backend_config.container_port}/tcp") # type: ignore
+                    container = self.docker_client.containers.run(**run_kwargs) 
+                    container.reload() 
+                    bindings = container.attrs.get('NetworkSettings', {}).get('Ports', {}).get(f"{backend_config.container_port}/tcp") 
                     if not (bindings and bindings[0].get('HostPort')):
-                        # ... (error handling for port binding) ...
                         logs = "N/A"; 
-                        try: logs = container.logs(stdout=True, stderr=True).decode(ENCODING, 'replace') # type: ignore
+                        try: logs = container.logs(stdout=True, stderr=True).decode(ENCODING, 'replace') 
                         except Exception: pass
                         logger.error(f"Failed to get host port for {container_name}. Logs:\n{logs}")
-                        try: container.stop(timeout=5); container.remove() # type: ignore
+                        try: container.stop(timeout=5); container.remove() 
                         except Exception: pass
                         raise RuntimeError(f"Failed to get host port for {container_name}")
                     host_port = int(bindings[0]['HostPort'])
                     self._used_host_ports.add(host_port)
                     mcp_endpoint_url = f"http://localhost:{host_port}/mcp"
                     if backend_config.startup_check_mcp_tool and not await self._perform_startup_check(mcp_endpoint_url, backend_config.startup_check_mcp_tool):
-                        # ... (error handling for startup check) ...
                         logs = "N/A"; 
-                        try: logs = container.logs(stdout=True, stderr=True).decode(ENCODING, 'replace') # type: ignore
+                        try: logs = container.logs(stdout=True, stderr=True).decode(ENCODING, 'replace') 
                         except Exception: pass
                         logger.error(f"HTTP Startup check failed for {container_name}. Logs:\n{logs}")
-                        try: container.stop(timeout=5); container.remove(); # type: ignore
+                        try: container.stop(timeout=5); container.remove(); 
                         except Exception: pass
                         self._used_host_ports.discard(host_port)
                         raise RuntimeError(f"Startup check failed for {container_name}")
-                    logger.info(f"HTTP Instance {container_name} (ID: {container.id}) on port {host_port}") # type: ignore
-                    instance_internal_details.update({"container_id": container.id, "host_port": host_port}) # type: ignore
+                    logger.info(f"HTTP Instance {container_name} (ID: {container.id}) on port {host_port}") 
+                    instance_internal_details.update({"container_id": container.id, "host_port": host_port}) 
 
                 elif backend_config.mcp_transport == "stdio":
                     docker_run_args = ["run", "--rm", "-i", "--name", container_name]
-                    if backend_config.container_volumes:
-                        for h_path, c_path_dict in backend_config.container_volumes.items():
+                    # Use current_container_volumes which might have been dynamically set by host-copy template logic
+                    if current_container_volumes:
+                        for h_path, c_path_dict in current_container_volumes.items():
                             bind_path, mode = c_path_dict.get("bind"), c_path_dict.get("mode", "rw")
-                            if bind_path: docker_run_args.extend(["-v", f"{Path(h_path).resolve()}:{bind_path}:{mode}"])
+                            if bind_path: docker_run_args.extend(["-v", f"{h_path}:{bind_path}:{mode}"]) # h_path is already resolved if from instance_host_data_path
+                    
                     docker_run_args.append(image_to_run_from)
                     if backend_config.container_command: docker_run_args.extend(backend_config.container_command)
                     
-                    server_params = StdioServerParameters(command="docker", args=docker_run_args, env=dict(os.environ))
-                    logger.info(f"Preparing to launch stdio container {container_name} via dedicated task.")
+                    server_params = StdioServerParameters(command="docker", args=docker_run_args, env=dict(os.environ)) # type: ignore
+                    logger.info(f"Preparing to launch stdio container {container_name} via dedicated task with command: {' '.join(server_params.args)}")
+
 
                     initialization_complete_event = asyncio.Event()
                     shutdown_event = asyncio.Event()
@@ -284,27 +309,23 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                     )
                     self._stdio_instance_tasks[instance_uuid] = lifecycle_task
                     
-                    # Wait for the lifecycle task to initialize the ClientSession
                     logger.info(f"Waiting for stdio instance {container_name} (task) to complete initialization...")
-                    await asyncio.wait_for(initialization_complete_event.wait(), timeout=30.0) # Increased timeout
+                    await asyncio.wait_for(initialization_complete_event.wait(), timeout=30.0) 
                     
                     client_session_stdio = self._stdio_client_sessions.get(instance_uuid)
                     if not client_session_stdio:
-                        # Task might have failed before setting the session
-                        # Check if task is done and had an exception
                         if lifecycle_task.done() and lifecycle_task.exception():
                             raise RuntimeError(f"Stdio instance task for {container_name} failed during initialization.") from lifecycle_task.exception()
                         raise RuntimeError(f"ClientSession not established by lifecycle task for {container_name}.")
                     
                     logger.info(f"Stdio instance {container_name} (task) initialization complete. ClientSession ready.")
-                    # No need to store client_session_stdio in instance_internal_details, it's in self._stdio_client_sessions
 
                     if backend_config.startup_check_mcp_tool:
                          logger.info(f"Performing startup check for stdio instance {container_name}...")
                          startup_tool_name = backend_config.startup_check_mcp_tool.get("tool_name", "ping")
                          startup_tool_args = backend_config.startup_check_mcp_tool.get("arguments", {})
-                         # Use the retrieved session for the check (session is already started by lifecycle task)
-                         await asyncio.wait_for(client_session_stdio.call_tool(startup_tool_name, startup_tool_args), timeout=10.0)
+                         async with client_session_stdio: 
+                            await asyncio.wait_for(client_session_stdio.call_tool(startup_tool_name, startup_tool_args), timeout=10.0)
                          logger.info(f"Stdio startup check for {container_name} successful.")
                 else:
                     raise ValueError(f"Unsupported mcp_transport: {backend_config.mcp_transport}")
@@ -317,10 +338,9 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                 ))
             except Exception as e:
                 logger.error(f"Failed to provision instance {container_name}: {e}", exc_info=True)
-                # Ensure cleanup if task was started
                 if backend_config.mcp_transport == "stdio":
                     if instance_uuid in self._stdio_shutdown_events:
-                        self._stdio_shutdown_events[instance_uuid].set() # Signal task to stop
+                        self._stdio_shutdown_events[instance_uuid].set() 
                     task_to_clean = self._stdio_instance_tasks.pop(instance_uuid, None)
                     if task_to_clean and not task_to_clean.done():
                         try:
@@ -330,6 +350,10 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                             task_to_clean.cancel()
                         except Exception as task_e:
                              logger.error(f"Exception during stdio task cleanup for {instance_uuid}: {task_e}")
+                # Cleanup copied host directory if provisioning failed mid-way
+                if "instance_host_data_path" in instance_internal_details:
+                    shutil.rmtree(instance_internal_details["instance_host_data_path"], ignore_errors=True)
+                    logger.info(f"Cleaned up instance data directory {instance_internal_details['instance_host_data_path']} due to provisioning error.")
                 raise
         return managed_instances
 
@@ -340,15 +364,14 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
             if instance.orchestration_mode != "local_docker": continue
             
             details = instance.internal_instance_details
-            instance_uuid = details.get("instance_uuid", instance.instance_id) # Use instance_uuid if stored
+            instance_uuid = details.get("instance_uuid", instance.instance_id) 
 
             if instance.mcp_transport == "http":
-                # ... (HTTP deprovisioning remains the same) ...
                 container_id = details.get("container_id")
                 if not container_id or not self.docker_client: continue
                 try:
-                    container = self.docker_client.containers.get(container_id) # type: ignore
-                    container.stop(timeout=10); container.remove() # type: ignore
+                    container = self.docker_client.containers.get(container_id) 
+                    container.stop(timeout=10); container.remove() 
                     logger.info(f"HTTP Container {container_id} deprovisioned.")
                     if details.get("host_port"): self._used_host_ports.discard(details["host_port"])
                 except Exception as e: logger.error(f"Error deprovisioning HTTP container {container_id}: {e}")
@@ -367,37 +390,39 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                 if task:
                     logger.info(f"Waiting for stdio instance task {instance_uuid} to complete...")
                     try:
-                        await asyncio.wait_for(task, timeout=10.0) # Wait for task to finish
+                        await asyncio.wait_for(task, timeout=10.0) 
                         logger.info(f"Stdio instance task {instance_uuid} completed.")
                     except asyncio.TimeoutError:
                         logger.error(f"Timeout waiting for stdio instance task {instance_uuid} to complete. Cancelling.")
                         task.cancel()
-                        try:
-                            await task # Await cancellation
-                        except asyncio.CancelledError:
-                            logger.info(f"Stdio instance task {instance_uuid} cancelled.")
-                        except Exception as e_task_cancel:
-                             logger.error(f"Exception during cancellation of stdio task {instance_uuid}: {e_task_cancel}")
+                        try: await task 
+                        except asyncio.CancelledError: logger.info(f"Stdio instance task {instance_uuid} cancelled.")
+                        except Exception as e_task_cancel: logger.error(f"Exception during cancellation of stdio task {instance_uuid}: {e_task_cancel}")
                     except Exception as e_task_wait:
-                        logger.error(f"Exception waiting for stdio instance task {instance_uuid}: {e_task_wait}")
+                        logger.error(f"Exception waiting for stdio instance task {instance_uuid}: {e_task_wait}", exc_info=True)
                 else:
                     logger.warning(f"No lifecycle task found for stdio instance {instance_uuid} during deprovision.")
                 
-                # ClientSession is managed by the task, _stdio_client_sessions should be cleaned by task
                 if instance_uuid in self._stdio_client_sessions:
                     logger.warning(f"ClientSession for {instance_uuid} still in _stdio_client_sessions after task handling. Popping.")
                     self._stdio_client_sessions.pop(instance_uuid, None)
-
                 logger.info(f"Stdio instance {instance_uuid} deprovisioning process complete.")
+
+            # Cleanup copied host directory if it exists
+            instance_host_data_path_str = details.get("instance_host_data_path")
+            if instance_host_data_path_str:
+                logger.info(f"Cleaning up instance data directory: {instance_host_data_path_str}")
+                shutil.rmtree(instance_host_data_path_str, ignore_errors=True)
+
 
     async def call_tool_on_instance(
         self, instance: ManagedInstanceInfo, tool_name: str, tool_args: Dict[str, Any]
     ) -> Dict[str, Any]:
+        # ... (content remains the same) ...
         if instance.orchestration_mode != "local_docker":
             raise ValueError("Only handles local_docker instances.")
 
         if instance.mcp_transport == "http":
-            # ... (HTTP call logic remains the same) ...
             if not self.http_client: raise RuntimeError("HTTP client not initialized.")
             if not instance.mcp_endpoint_url: raise ValueError(f"mcp_endpoint_url required for HTTP {instance.instance_id}")
             payload = {"tool_name": tool_name, "arguments": tool_args}
@@ -408,22 +433,31 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
 
         elif instance.mcp_transport == "stdio":
             instance_uuid = instance.internal_instance_details.get("instance_uuid", instance.instance_id)
-            cs = self._stdio_client_sessions.get(instance_uuid) # Get from central dict
+            cs = self._stdio_client_sessions.get(instance_uuid) 
             
             if not cs or not isinstance(cs, ClientSession):
                 raise RuntimeError(f"Valid ClientSession not found for stdio instance {instance_uuid}.")
             
-            # Call the tool directly on the session without using async with
-            # The session is already managed by the lifecycle task
+            # Do NOT use 'async with cs:' here again, as the session is already managed
+            # by the _manage_stdio_instance_lifecycle task's 'async with client_session_stdio:'.
+            # Re-entering the context manager on an already-managed session can lead to issues
+            # like closing streams prematurely.
             try:
-                logger.debug(f"Calling tool {tool_name} via stdio ClientSession for {instance_uuid}")
+                logger.debug(f"Calling tool {tool_name} via stdio ClientSession for {instance_uuid} (session already active in lifecycle task)")
                 tool_result = await cs.call_tool(tool_name, tool_args)
+                
+                # Process tool_result
                 if hasattr(tool_result, 'model_dump'): 
                     dumped = tool_result.model_dump(exclude_none=True)
-                    if isinstance(dumped, dict): return dumped
-                    return {"error": "Tool result model_dump was not a dict", "details": str(dumped)}
-                if isinstance(tool_result, dict): return tool_result
-                return {"error": "Tool result unexpected format", "details": str(tool_result)}
+                    if isinstance(dumped, dict):
+                        return dumped
+                    # If model_dump didn't return a dict, or if it's not a Pydantic model
+                    return {"error": "Tool result model_dump was not a dict or not a Pydantic model", "details": str(dumped)}
+                elif isinstance(tool_result, dict): # Handle if it's already a dict
+                    return tool_result
+                else: # Fallback for other unexpected formats
+                    return {"error": "Tool result unexpected format", "details": str(tool_result)}
+
             except Exception as e:
                 logger.error(f"MCP stdio tool call for {tool_name} on instance {instance_uuid} failed: {e}", exc_info=True)
                 raise RuntimeError(f"MCP stdio tool call for {tool_name} failed: {e}") from e

@@ -106,11 +106,24 @@ sequenceDiagram
     *   Selects the appropriate `OrchestrationClient` (e.g., `LocalDockerOrchestrationClient` or `RemoteHttpOrchestrationClient`).
     *   Calls the `OrchestrationClient` to provision `num_instances`.
     *   **Local Docker Mode (Stateful, HTTP Transport):** The client may trigger `docker commit` for template state, then `docker run` for instances, returning container info and mapped host ports.
-    *   **Local Docker Mode (Stateful, Stdio Transport):** The client may trigger `docker commit` for template state, then `docker run` (without port mapping, but with `stdin_open=True`), returning container info. Interaction occurs via `docker attach` or similar.
+    *   **Local Docker Mode (Stateful, Stdio Transport):** The client may trigger `docker commit` for template state, then `docker run` (without port mapping, but with `stdin_open=True`), returning container info. Interaction occurs via `docker attach` or similar. For backends like `mcp/filesystem` where state is primarily volume-based, an alternative "host directory copy" strategy can be used: a template directory on the host is copied to a unique location for each instance, which is then mounted into the container.
     *   **Remote API Mode (Stateful):** The client makes API calls to the customer's service to create instances, returning remote endpoint URLs and instance IDs.
     *   **Stateless/Shared Mode (Local or Remote):** The client ensures a shared instance is running and returns its access details (URL for HTTP, container ID for local stdio).
 3.  The `RK Intermediary Server` creates an `IntermediarySession`, stores `ManagedInstanceInfo` (which now accommodates local container details for HTTP/stdio and remote instance details) for all provisioned backends, and associates this with a new `rkSessionId`.
 4.  Returns `rkSessionId` and instance details to the Orchestrator.
+
+### 3.1.1. Forking Strategies for Local Docker Mode
+Two primary strategies can be employed for creating "forkable" stateful instances in Local Docker Mode:
+1.  **Image-based Forking (via `docker commit`):**
+    *   Suitable for applications where the initial state is complex or involves changes within the container's filesystem beyond a simple volume mount (e.g., installed packages, internal databases initialized).
+    *   Workflow: A base image is run with `template_data_path_host` mounted to `container_template_data_path`. After initialization scripts run or data is loaded, the container is committed to a new, session-specific image. Instances are then run from this committed image.
+    *   The `template_data_path_host` and `container_template_data_path` fields in `BackendServerConfig` support this.
+2.  **Volume-based Forking (via Host Directory Copy):**
+    *   Ideal for backends like `mcp/filesystem` where the application itself is stateless, and all state is managed on a mounted Docker volume.
+    *   Workflow: A `template_data_path_host` (pointing to a directory on the host) provides the initial file structure. For each instance, the orchestrator creates a unique directory on the host, copies the template contents into it, and then mounts this unique directory to the container's data volume (e.g., `/data`).
+    *   This avoids `docker commit` overhead and is efficient for file-based state. The `template_data_path_host` field is used to specify the source template directory for this strategy.
+
+The choice of strategy can depend on the backend server's nature and configuration.
 
 ### 3.2. Rollout Interaction
 1.  Orchestrator assigns `rkSessionId` and client-facing `instance_id`(s) to an `RLRolloutWorker`.
@@ -137,7 +150,9 @@ sequenceDiagram
     *   A Docker environment where the `RK Intermediary Server` can run and has permissions to interact with the Docker daemon.
     *   Backend MCP server Docker images can expose either an **HTTP MCP transport** (listening on a port) or an **stdio MCP transport** (interacting via stdin/stdout). The orchestrator must handle both.
     *   For HTTP transport, images should expose a port. For stdio, they should be configured to read MCP messages from stdin and write responses to stdout.
-    *   Template data (optional) for stateful backends, either baked into images or mountable for `docker commit` workflows.
+    *   Template data (optional) for stateful backends can be provided in two main ways:
+        *   Baked into images or mounted into a temporary container for a `docker commit` workflow (image-based forking).
+        *   As a host directory whose contents are copied to unique per-instance host directories, which are then mounted into containers (volume-based forking, suitable for filesystem-like backends). The `template_data_path_host` configuration field supports this.
     *   Startup checks for stdio servers might be simpler (e.g., container is running) compared to HTTP pings, unless a specific stdio health check tool is available.
 3.  **For Remote Orchestration Proxy Mode**:
     *   A customer-provided remote orchestration API (e.g., Kubernetes-based, custom HTTP API, or another MCP server for orchestration).
@@ -236,8 +251,8 @@ this one is not docker based, so we will need to think about replicating the dat
     *   **Local Docker Specific (`if orchestration_mode == 'local_docker'`):**
         *   `docker_image: str`.
         *   `container_port: Optional[int]` (Internal port of MCP app in container. Required if `mcp_transport` is "http").
-        *   `template_data_path_host: Optional[str]` (For pre-seeding state).
-        *   `container_template_data_path: Optional[str]` (Mount path for template data in setup container).
+        *   `template_data_path_host: Optional[str]` (Path on the host machine to data used for pre-seeding state. For 'docker commit' workflows, this is mounted into a temporary container. For filesystem-like backends using host-copy forking, this is the source directory to copy for each instance.)
+        *   `container_template_data_path: Optional[str]` (Mount path inside the template container where 'template_data_path_host' will be mounted, relevant for 'docker commit' workflows).
         *   `docker_run_args: Optional[List[str]]`.
         *   `startup_check_mcp_tool: Optional[Dict[str, Any]]`.
     *   **Remote API Specific (`if orchestration_mode == 'remote_http_api'`):**
@@ -253,7 +268,8 @@ this one is not docker based, so we will need to think about replicating the dat
 5.  **`LocalDockerOrchestrationClient(AbstractOrchestrationClient)` (in `orchestration/local_docker_client.py`)**:
     *   Uses Docker SDK for Python.
     *   For HTTP transport: Implements methods for `docker run` with port mapping, `commit`, `stop`, `rm`, `rmi`, HTTP calls to container. Manages host port allocation.
-    *   For Stdio transport: Implements `docker run` (no port mapping, `stdin_open=True`), `commit`, `stop`, `rm`, `rmi`. Tool calls involve interacting with container's stdio (e.g., via `container.attach_socket()`).
+    *   For Stdio transport: Implements `docker run` (no port mapping, `stdin_open=True`), `commit`, `stop`, `rm`, `rmi`. Tool calls involve interacting with container's stdio.
+    *   For filesystem-like backends, it can also manage forking by copying a host template directory (specified by `template_data_path_host`) to unique instance-specific directories on the host and mounting those into the containers. It also handles cleanup of these directories.
     *   Startup checks are transport-dependent.
 
 6.  **`RemoteHttpOrchestrationClient(AbstractOrchestrationClient)` (in `orchestration/remote_http_client.py`)**:

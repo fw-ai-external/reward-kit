@@ -1,0 +1,3 @@
+{"id": "fs_move_1", "user_query": "Move the file 'file_to_move.txt' from the source_dir to the target_dir", "ground_truth_for_eval": "move file_to_move.txt to target_dir"}
+{"id": "fs_copy_1", "user_query": "Copy all .txt files from source_dir to backup_dir", "ground_truth_for_eval": "copy all .txt files to backup_dir"}
+{"id": "fs_create_1", "user_query": "Create a new file called 'report.txt' with content 'Task completed successfully'", "ground_truth_for_eval": "create report.txt with specified content"}

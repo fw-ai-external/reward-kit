@@ -76,141 +76,124 @@ async def main():
             # Server logs confirm a session ID is created and used.
             logger.info(f"ClientSession handshake successful.") # Removed problematic log
 
-            # 1. Call initialize_session on the Intermediary Server via the proxy tool
-            proxied_init_payload = {
-                "actual_tool_name": "initialize_session",
-                "actual_tool_args": init_session_payload
-            }
-            logger.info(f"Calling 'execute_proxied_tool' for 'initialize_session' with payload: {proxied_init_payload}")
-            # The result from execute_proxied_tool will be the result from initialize_session_actual
-            init_result_proxied = await mcp_client_session.call_tool("execute_proxied_tool", proxied_init_payload)
-            logger.info(f"Raw 'execute_proxied_tool' for 'initialize_session' result: {init_result_proxied}")
+            # 1. Call initialize_session directly on the Intermediary Server
+            # Wrap payload under "args" key to match Pydantic model parameter name in server
+            wrapped_init_payload = {"args": init_session_payload}
+            logger.info(f"Calling 'initialize_session' with wrapped payload: {wrapped_init_payload}")
+            init_session_result = await mcp_client_session.call_tool("initialize_session", wrapped_init_payload)
+            logger.info(f"Raw 'initialize_session' result: {init_session_result}")
 
-            if init_result_proxied.isError or not init_result_proxied.content or not hasattr(init_result_proxied.content[0], "text"):
+            if init_session_result.isError or not init_session_result.content or not hasattr(init_session_result.content[0], "text"):
                 error_message = "Unknown error or non-text content"
-                if init_result_proxied.content and hasattr(init_result_proxied.content[0], "text"):
-                    error_message = init_result_proxied.content[0].text
-                elif init_result_proxied.isError:
-                    error_message = "Tool call returned an error, but no text content part found."
+                if init_session_result.content and hasattr(init_session_result.content[0], "text"):
+                    error_message = init_session_result.content[0].text
+                elif init_session_result.isError:
+                    error_message = "Tool call 'initialize_session' returned an error, but no text content part found."
+                logger.error(f"Error from 'initialize_session': {error_message}")
+                raise ValueError(f"Error from 'initialize_session': {error_message}")
 
-                logger.error(f"Error from 'initialize_session' proxy: {error_message}")
-                raise ValueError(f"Error from 'initialize_session' proxy: {error_message}")
+            actual_init_result_dict = json.loads(init_session_result.content[0].text)
+            logger.info(f"Parsed 'initialize_session' result: {actual_init_result_dict}")
 
-            actual_init_result_dict = json.loads(init_result_proxied.content[0].text)
-            logger.info(f"Parsed actual 'initialize_session' result: {actual_init_result_dict}")
-
-            # Extract session_id and instance details from the result (which is the actual init_result)
-            # The key in the JSON response is "rk_session_id" as per server logs and design intent.
+            # Extract session_id and instance details from the result
             rk_session_id = actual_init_result_dict.get("rk_session_id")
             if not rk_session_id:
-                raise ValueError("'initialize_session' (proxied) did not return a 'rk_session_id' in its actual result")
+                raise ValueError("'initialize_session' did not return a 'rk_session_id'")
             
-            logger.info(f"RewardKit Intermediary rk_session_id (from proxied call): {rk_session_id}")
+            logger.info(f"RewardKit Intermediary rk_session_id: {rk_session_id}")
 
             initialized_backends = actual_init_result_dict.get("initialized_backends", [])
             fs_instance_id = None
             for backend_res in initialized_backends:
-                # Accessing dictionary keys directly now
                 if backend_res.get("backend_name_ref") == "filesystem_test" and backend_res.get("instances"):
                     fs_instance_id = backend_res["instances"][0].get("instance_id")
                     break
             
             if not fs_instance_id:
-                raise ValueError("Could not find instance_id for 'filesystem_test' in 'initialize_session' (proxied) result.")
+                raise ValueError("Could not find instance_id for 'filesystem_test' in 'initialize_session' result.")
             logger.info(f"Filesystem_test instance_id: {fs_instance_id}")
 
-            # 2. Call call_backend_tool (e.g., list_files on filesystem_test) via proxy
+            # 2. Call 'call_backend_tool' directly (e.g., list_files on filesystem_test)
             list_files_args = {
-                "rk_session_id": rk_session_id, # Pass the session ID
+                "rk_session_id": rk_session_id,
                 "backend_name_ref": "filesystem_test",
                 "instance_id": fs_instance_id,
-                "tool_name": "list_files", 
-                "tool_args": {"path": "/"}, 
+                "tool_name": "list_directory",  # Corrected tool name based on server logs
+                "tool_args": {"path": "/data"}, # Explicitly list the served directory root
             }
-            proxied_list_files_payload = {
-                "actual_tool_name": "call_backend_tool",
-                "actual_tool_args": list_files_args
-            }
-            logger.info(f"Calling 'execute_proxied_tool' for 'call_backend_tool' (list_files) with payload: {proxied_list_files_payload}")
-            list_files_call_result = await mcp_client_session.call_tool("execute_proxied_tool", proxied_list_files_payload)
-            logger.info(f"Raw 'execute_proxied_tool' for 'call_backend_tool' (list_files) result: {list_files_call_result}")
+            wrapped_list_files_payload = {"args": list_files_args}
+            logger.info(f"Calling 'call_backend_tool' (list_directory) with wrapped payload: {wrapped_list_files_payload}")
+            list_files_call_result = await mcp_client_session.call_tool("call_backend_tool", wrapped_list_files_payload)
+            logger.info(f"Raw 'call_backend_tool' (list_directory) result: {list_files_call_result}")
 
             if list_files_call_result.isError or not list_files_call_result.content or not hasattr(list_files_call_result.content[0], "text"):
                 error_message = "Unknown error or non-text content"
                 if list_files_call_result.content and hasattr(list_files_call_result.content[0], "text"):
                     error_message = list_files_call_result.content[0].text
                 elif list_files_call_result.isError:
-                    error_message = "Tool call (list_files) returned an error, but no text content part found."
-                logger.error(f"Error from 'call_backend_tool' (list_files) proxy: {error_message}")
-                raise ValueError(f"Error from 'call_backend_tool' (list_files) proxy: {error_message}")
+                    error_message = "Tool call 'call_backend_tool' (list_directory) returned an error, but no text content part found."
+                logger.error(f"Error from 'call_backend_tool' (list_directory): {error_message}")
+                raise ValueError(f"Error from 'call_backend_tool' (list_directory): {error_message}")
             
             actual_list_files_result_dict = json.loads(list_files_call_result.content[0].text)
-            logger.info(f"Parsed actual 'call_backend_tool' (list_files) result: {actual_list_files_result_dict}")
+            logger.info(f"Parsed 'call_backend_tool' (list_directory) result: {actual_list_files_result_dict}")
             
-            # Example: Ping the memory_test backend via proxy
+            # Example: Call 'read_graph' on memory_test backend
             mem_instance_id = None
             for backend_res in initialized_backends:
                 if backend_res.get("backend_name_ref") == "memory_test" and backend_res.get("instances"):
                     mem_instance_id = backend_res["instances"][0].get("instance_id")
                     break
             if mem_instance_id:
-                ping_mem_args = {
-                    "rk_session_id": rk_session_id, # Pass the session ID
+                read_graph_args = { # Changed from ping_mem_args
+                    "rk_session_id": rk_session_id,
                     "backend_name_ref": "memory_test",
                     "instance_id": mem_instance_id,
-                    "tool_name": "ping", 
-                    "tool_args": {},
+                    "tool_name": "read_graph", # Changed from "ping"
+                    "tool_args": {}, # read_graph might take args, but empty for a basic test
                 }
-                proxied_ping_mem_payload = {
-                    "actual_tool_name": "call_backend_tool",
-                    "actual_tool_args": ping_mem_args
-                }
-                logger.info(f"Calling 'execute_proxied_tool' for 'call_backend_tool' (ping memory_test) with payload: {proxied_ping_mem_payload}")
-                ping_call_result = await mcp_client_session.call_tool("execute_proxied_tool", proxied_ping_mem_payload)
-                logger.info(f"Raw 'execute_proxied_tool' for 'call_backend_tool' (ping memory_test) result: {ping_call_result}")
+                wrapped_read_graph_payload = {"args": read_graph_args} # Changed variable name
+                logger.info(f"Calling 'call_backend_tool' (read_graph memory_test) with wrapped payload: {wrapped_read_graph_payload}")
+                read_graph_call_result = await mcp_client_session.call_tool("call_backend_tool", wrapped_read_graph_payload) # Changed variable name
+                logger.info(f"Raw 'call_backend_tool' (read_graph memory_test) result: {read_graph_call_result}")
 
-                if ping_call_result.isError or not ping_call_result.content or not hasattr(ping_call_result.content[0], "text"):
+                if read_graph_call_result.isError or not read_graph_call_result.content or not hasattr(read_graph_call_result.content[0], "text"):
                     error_message = "Unknown error or non-text content"
-                    if ping_call_result.content and hasattr(ping_call_result.content[0], "text"):
-                        error_message = ping_call_result.content[0].text
-                    elif ping_call_result.isError:
-                        error_message = "Tool call (ping memory_test) returned an error, but no text content part found."
-                    logger.error(f"Error from 'call_backend_tool' (ping memory_test) proxy: {error_message}")
-                    raise ValueError(f"Error from 'call_backend_tool' (ping memory_test) proxy: {error_message}")
+                    if read_graph_call_result.content and hasattr(read_graph_call_result.content[0], "text"):
+                        error_message = read_graph_call_result.content[0].text
+                    elif read_graph_call_result.isError:
+                        error_message = "Tool call 'call_backend_tool' (read_graph memory_test) returned an error, but no text content part found."
+                    logger.error(f"Error from 'call_backend_tool' (read_graph memory_test): {error_message}")
+                    raise ValueError(f"Error from 'call_backend_tool' (read_graph memory_test): {error_message}")
 
-                actual_ping_result_dict = json.loads(ping_call_result.content[0].text)
-                logger.info(f"Parsed actual 'call_backend_tool' (ping memory_test) result: {actual_ping_result_dict}")
+                actual_read_graph_result_dict = json.loads(read_graph_call_result.content[0].text) # Changed variable name
+                logger.info(f"Parsed 'call_backend_tool' (read_graph memory_test) result: {actual_read_graph_result_dict}")
 
-
-            # 3. Call cleanup_session on the Intermediary Server via proxy
+            # 3. Call 'cleanup_session' directly
             cleanup_session_args = {
-                "rk_session_id": rk_session_id # Pass the session ID
+                "rk_session_id": rk_session_id
             }
-            proxied_cleanup_payload = {
-                "actual_tool_name": "cleanup_session",
-                "actual_tool_args": cleanup_session_args 
-            }
-            # Note: mcp_client_session.session_id is the transport session_id.
-            # The rk_session_id is the one returned by our initialize_session logic and now passed to cleanup_session.
-            logger.info(f"Calling 'execute_proxied_tool' for 'cleanup_session' with rk_session_id: {rk_session_id} (transport session: {mcp_client_session.session_id})")
-            cleanup_call_result = await mcp_client_session.call_tool("execute_proxied_tool", proxied_cleanup_payload)
-            logger.info(f"Raw 'execute_proxied_tool' for 'cleanup_session' result: {cleanup_call_result}")
+            wrapped_cleanup_payload = {"args": cleanup_session_args}
+            # Removed mcp_client_session.session_id from log as it's not a public attribute
+            logger.info(f"Calling 'cleanup_session' with rk_session_id: {rk_session_id}, wrapped payload: {wrapped_cleanup_payload}")
+            cleanup_call_result = await mcp_client_session.call_tool("cleanup_session", wrapped_cleanup_payload)
+            logger.info(f"Raw 'cleanup_session' result: {cleanup_call_result}")
 
             if cleanup_call_result.isError or not cleanup_call_result.content or not hasattr(cleanup_call_result.content[0], "text"):
                 error_message = "Unknown error or non-text content"
                 if cleanup_call_result.content and hasattr(cleanup_call_result.content[0], "text"):
                     error_message = cleanup_call_result.content[0].text
                 elif cleanup_call_result.isError:
-                    error_message = "Tool call (cleanup_session) returned an error, but no text content part found."
-                logger.error(f"Error from 'cleanup_session' proxy: {error_message}")
-                raise ValueError(f"Error from 'cleanup_session' proxy: {error_message}")
+                    error_message = "Tool call 'cleanup_session' returned an error, but no text content part found."
+                logger.error(f"Error from 'cleanup_session': {error_message}")
+                raise ValueError(f"Error from 'cleanup_session': {error_message}")
 
             actual_cleanup_result_dict = json.loads(cleanup_call_result.content[0].text)
-            logger.info(f"Parsed actual 'cleanup_session' result: {actual_cleanup_result_dict}")
+            logger.info(f"Parsed 'cleanup_session' result: {actual_cleanup_result_dict}")
             
-            # The session_id returned by cleanup_session_actual is the transport_session_id it operated on.
-            if actual_cleanup_result_dict.get("session_id") != mcp_client_session.session_id:
-                logger.warning(f"Cleanup session ID mismatch: Expected transport session {mcp_client_session.session_id}, Got {actual_cleanup_result_dict.get('session_id')} from cleanup tool")
+            # The server's cleanup_session returns the rk_session_id it operated on.
+            if actual_cleanup_result_dict.get("rk_session_id") != rk_session_id: # Check against the rk_session_id we sent
+                logger.warning(f"Cleanup rk_session_id mismatch: Expected {rk_session_id}, Got {actual_cleanup_result_dict.get('rk_session_id')} from cleanup tool")
 
 
         except Exception as e:

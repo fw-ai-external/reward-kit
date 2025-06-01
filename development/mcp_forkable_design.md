@@ -366,55 +366,60 @@ The `RewardKit-Intermediary-MCP-Server` and its `LocalDockerOrchestrationClient`
 
 **Detailed Next Steps for Further Development:**
 
-The primary challenge remains establishing successful two-way communication with the stdio-based Node.js MCP servers (`mcp/filesystem`, `mcp/memory`). The current approach of directly managing the attached socket and MCP message framing in `LocalDockerOrchestrationClient` has not yet yielded a response from these servers.
+Development of `standalone_stdio_mcp_client.py` has been completed and successfully demonstrated communication with an `mcp/filesystem` server via stdio. The `LocalDockerOrchestrationClient` was subsequently refactored to incorporate these learnings. However, end-to-end tests (`run_mcp_test.sh`) revealed a `TypeError: ClientSession.__init__() got an unexpected keyword argument 'anyio_tg'`, indicating an issue with how the `ClientSession`'s read loop was being managed for stdio instances within `LocalDockerOrchestrationClient`.
 
-The next phase should focus on a more isolated and foundational approach to stdio MCP communication, leveraging the official MCP Python SDK more directly, before integrating this proven method back into the `LocalDockerOrchestrationClient`.
+**Key Learnings from `standalone_stdio_mcp_client.py` and Initial Refactoring:**
+*   **Server Output:** Stdio MCP servers (e.g., `mcp/filesystem`) print initial banner/status messages to `stderr`. `stdout` provides clean JSON-RPC messages from the beginning. Bridge logic must account for this by reading from `process.stdout` and logging `process.stderr` separately.
+*   **Path Handling (`mcp/filesystem`):** This server expects tool paths (e.g., for `list_directory`, `read_file`) to be absolute paths from the container's root that fall within its configured allowed directory (e.g., `/data/somefile.txt` if `/data` is the served root in the container).
+*   **Process Management:** Directly launching `docker run ...` with `asyncio.create_subprocess_exec` provides necessary control over the process and its stdio streams.
+*   **Stream Bridging:** Custom asynchronous bridge tasks (`_stdout_bridge`, `_stdin_bridge`) are required to connect the Docker process's `asyncio.StreamReader/Writer` to `anyio.MemoryObjectStream`s compatible with `ClientSession`.
+*   **`ClientSession` Lifecycle (Corrected Understanding):**
+    *   `ClientSession` is instantiated with memory streams.
+    *   Its internal read loop (from `BaseSession`) is activated by using `ClientSession` as an async context manager (`async with client_session:`), which internally calls `BaseSession.run()`. The `BaseSession.run()` method itself starts the read loop within the task group it's executed in.
+    *   `await client_session.initialize()` must occur within this active session context.
+*   **Task Management:** Each stdio instance requires its own `anyio.TaskGroup` to manage its bridge tasks and stderr logging. This task group's lifecycle must be tied to the instance's lifecycle.
 
-0.  **Read all the files in python `mcp` library in .venv. We will not be able to make any good calls unless we read all the code, and luckily there isn't a lot of code for the whole mcp library.
-1.  **Develop a Standalone Stdio MCP Client Test Script (`standalone_stdio_mcp_client.py`):**
-    *   **Objective:** Create a new, simple Python script (e.g., `standalone_stdio_test.py`) that uses the official MCP Python SDK (`mcp.client.stdio.stdio_client` and `mcp.ClientSession`) to interact with a *single*, locally running Dockerized stdio MCP server (e.g., `mcp/filesystem`).
+**Revised Detailed Next Steps for `LocalDockerOrchestrationClient`:**
+
+The immediate issue is the `TypeError: ClientSession.__init__() got an unexpected keyword argument 'anyio_tg'`. This means `ClientSession` (or its parent `BaseSession`) does not accept `anyio_tg` in its constructor as previously attempted in `LocalDockerOrchestrationClient`. The correct way to manage the `ClientSession`'s read loop is by using it as an async context manager (`async with client_session:`), which will invoke its `run()` method (inherited from `BaseSession`).
+
+1.  **Correct `ClientSession` Lifecycle Management in `provision_instances` (Stdio):**
+    *   **Objective:** Ensure the `ClientSession` for stdio instances is correctly initialized and its read loop is active.
     *   **Details:**
-        *   This script will *not* use the `RewardKit-Intermediary-MCP-Server` or `LocalDockerOrchestrationClient`.
-        *   It will manually run the target Docker container (e.g., `mcp/filesystem`) using `docker.from_env().containers.run(...)` with `stdin_open=True`, `detach=True`, and correct command/volumes.
-        *   **Crucial Part - Interfacing with `ClientSession`:**
-            *   After the container is running, obtain its raw stdio socket using `container.attach_socket(params={'stdin': True, 'stdout': True, 'stderr': False, 'stream': True, 'logs': False})._sock`.
-            *   The `mcp.client.ClientSession` expects `AsyncMessageReadStream` and `AsyncMessageWriteStream` objects (from `mcp.protocol.streams`). These normally wrap asyncio `StreamReader` and `StreamWriter`.
-            *   **Investigate and Implement Stream Adaptation:**
-                *   **Option A (Preferred if feasible):** Determine if a raw socket (like the one from `attach_socket()._sock`) can be converted or wrapped into asyncio `StreamReader` and `StreamWriter` objects. Python's `asyncio` library might offer utilities for this (e.g., `loop.connect_accepted_socket()` or `loop.create_connection()` with a pre-existing socket, though these are typically for server-side or client-side connection establishment, not for wrapping an already connected Docker-provided socket). This needs careful research within the `asyncio` and `docker-py` contexts.
-                *   **Option B (Custom Wrappers):** If Option A is not straightforward, create custom Python classes that:
-                    *   Implement the `AsyncMessageReadStream` protocol (primarily `async def read_message(self) -> Optional[Message]`) and `AsyncMessageWriteStream` protocol (primarily `async def write_message(self, message: Message)`).
-                    *   These wrappers will take the single duplex raw socket from `attach_socket()._sock`.
-                    *   `write_message`: Will serialize the MCP `Message` object to JSON, append a newline, encode to UTF-8, and send it over the raw socket using `socket.sendall()`. It must also handle `socket.shutdown(socket.SHUT_WR)` appropriately if the server requires it after each message or at the end of a logical request.
-                    *   `read_message`: Will read from the raw socket, handle Docker's 8-byte stream demultiplexing header (to isolate stdout), buffer incoming data, parse newline-terminated JSON from the stdout stream, and deserialize it into an MCP `Message` object. This needs to be robust against partial reads and handle potential timeouts.
-        *   **Perform Full MCP Lifecycle with `ClientSession`:**
-            1.  Instantiate `ClientSession` with the adapted read/write streams.
-            2.  `await client_session.initialize(capabilities=..., client_information=...)`: Send the `InitializeRequest` and process the `InitializeResult`. The exact `capabilities` and `client_information` to send should be minimal and compliant with what a basic client would offer. Refer to MCP Python SDK examples or the specification. This step is critical and currently missing from `LocalDockerOrchestrationClient`.
-            3.  `tools = await client_session.list_tools()`: Attempt to call the `list_tools` MCP tool.
-            4.  Log the `tools` response.
-            5.  If `list_tools` is successful, attempt `response = await client_session.call_tool("ping", {})` and log the response.
-            6.  (Optional, if `list_tools` reveals them) Attempt a filesystem-specific tool like `read_file` or `write_file` with appropriate arguments, ensuring the target path exists within the container's mounted volume.
-        *   **Logging:** Implement verbose logging of all raw data sent to and received from the socket, as well as the structured MCP messages, to aid debugging.
-    *   **Expected Outcome:** A clear, working example of how to use `ClientSession` with an existing Docker container's stdio streams. This will serve as the reference implementation.
+        *   When a `ClientSession` is created for an stdio instance (after setting up bridges and the per-instance task group `instance_tg`):
+            *   Do **not** pass `anyio_tg` to the `ClientSession` constructor.
+            *   The `await client_session.initialize()` call **must** occur within an `async with client_session:` block. This block should be executed within the `instance_tg` to ensure the read loop started by `client_session.run()` (called by `async with`) operates in the correct task group.
+            *   **Crucial Decision:** The `async with client_session:` block used for initialization will exit, stopping the read loop. For subsequent tool calls, the read loop needs to be active again. This means `call_tool_on_instance` will also need to use `async with client_session_stdio:`.
+        *   Store in `ManagedInstanceInfo.internal_instance_details`:
+            *   `"process_handle"`: The `asyncio.subprocess.Process` object.
+            *   `"client_session_stdio"`: The initialized `ClientSession` object (it's okay if its read loop is not "continuously" running outside of a context manager, as each operation will re-enter the context).
+            *   `"instance_task_group_stdio"`: The `anyio.TaskGroup` managing the bridge tasks. This task group remains active.
+            *   `"container_name"`, `"process_pid"`.
+            *   The memory streams (`server_to_client_reader`, `client_to_server_writer`) for potential debugging or re-construction, though `ClientSession` manages its ends.
 
-2.  **Analyze MCP SDK for Stdio Framing and `ClientSession` Internals:**
-    *   **Objective:** Fully understand the MCP message structures (especially `InitializeRequest`, `InitializeResult`, `CallToolRequest`, `CallToolResult`), expected stdio framing (newline-delimited JSON is assumed but verify), and any session management nuances handled by `ClientSession` and `AsyncMessageStream`.
-    *   **Action:** Thoroughly review the source code of `mcp.client.session.ClientSession`, `mcp.protocol.streams.AsyncMessageStream`, `mcp.protocol.messages`, and any relevant stdio transport examples within the MCP Python SDK provided at `/home/bchen/references/python-sdk/src/mcp/`.
-
-3.  **Bridge Standalone Test Learnings to `LocalDockerOrchestrationClient`:**
-    *   **Objective:** Apply the successful communication patterns and `ClientSession` usage (or its replicated logic) from `standalone_stdio_mcp_client.py` to the `call_tool_on_instance` method in `LocalDockerOrchestrationClient`.
+2.  **Refactor `call_tool_on_instance` for Stdio Transport (Revisited):**
+    *   **Objective:** Ensure tool calls use an active `ClientSession` context.
     *   **Details:**
-        *   If custom stream wrappers were needed for `ClientSession` in the standalone test, integrate these into `LocalDockerOrchestrationClient`.
-        *   Ensure that for each tool call to an stdio container, the equivalent of `session.initialize()` is performed if the MCP server expects it per "connection" (each `attach_socket` might be a new connection from the server's perspective). This might mean caching `ClientSession` objects per container if they can be reused, or performing a quick initialize + call_tool + close sequence.
-        *   Refine error handling and timeouts based on insights from the standalone test.
+        *   Retrieve the stored `client_session_stdio` object.
+        *   Wrap the `await client_session_stdio.call_tool(tool_name, tool_args)` call within an `async with client_session_stdio:` block. This ensures the session's read loop is active for the duration of the tool call.
 
-4.  **Incremental Testing within `reward-kit`:**
-    *   Once `LocalDockerOrchestrationClient` is updated, re-run `test_docker_run.py` (which should ideally be simplified to use the now-working client if possible, or kept as a very low-level socket test).
-    *   Systematically run `bash run_mcp_test.sh` and debug any remaining issues in the context of the intermediary server.
-    *   Focus on getting `list_tools` working first, then `ping`, then other tools.
+3.  **Refactor `deprovision_instances` for Stdio Transport (Revisited):**
+    *   **Objective:** Ensure clean shutdown of all components.
+    *   **Details:**
+        *   Retrieve `client_session_stdio`, `instance_task_group_stdio`, and `process_handle`.
+        *   Call `await client_session_stdio.aclose()` first. This closes the `ClientSession`'s ends of the memory streams, which should signal the bridge tasks (running in `instance_task_group_stdio`) to terminate gracefully.
+        *   Then, explicitly cancel the `instance_task_group_stdio`: `instance_task_group_stdio.cancel_scope.cancel()`. Wait for the task group to fully exit using `await instance_task_group_stdio.__aexit__(None, None, None)`.
+        *   Finally, terminate the Docker subprocess (`process_handle.terminate()` etc.).
+
+4.  **Testing and Verification:**
+    *   Execute `bash run_mcp_test.sh`.
+    *   Verify that stdio instances (e.g., `filesystem_test`, `memory_test`) are provisioned, tools can be called on them, and they are deprovisioned cleanly.
+    *   Pay close attention to logs for any errors related to task group cancellations, stream closures, or process terminations.
+    *   Confirm that `docker ps` shows no orphaned containers after tests.
 
 5.  **Future Enhancements (Post-Core Functionality):**
-    *   Re-evaluate `startup_check_mcp_tool` for stdio: Can a simple `list_tools` call via the established stdio `ClientSession` serve as a health check?
-    *   Address the FastMCP session ID propagation issue within the intermediary server.
-    *   Handle template data paths and `docker commit` workflows for stateful stdio servers if their state management requires more than just volume mounts.
+    *   Re-evaluate `startup_check_mcp_tool` for stdio: If `client_session.initialize()` is successful, this might be a sufficient health check. A subsequent `ping` or `list_tools` within the provisioning step (inside the initial `async with client_session:`) could serve as a more explicit check if needed.
+    *   Address the FastMCP session ID propagation issue (as noted in original plan).
+    *   Confirm template data paths and `docker commit` workflows for stateful stdio servers.
 
-This structured approach, starting with a focused standalone test using the MCP SDK's `ClientSession`, should provide a more reliable foundation for fixing the stdio communication.
+This refined plan addresses the `anyio_tg` issue and clarifies the `ClientSession` lifecycle management for stdio instances within `LocalDockerOrchestrationClient`.

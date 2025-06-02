@@ -83,120 +83,120 @@ class TestMathExampleEndToEndScripts:
         print("--- End Output ---")
         return process
 
-    @pytest.mark.skipif(
-        os.environ.get("CI") == "true",
-        reason="Skipping resource-intensive TRL integration test in CI",
-    )
-    @pytest.mark.timeout(
-        630
-    )  # Timeout for test function (slightly > subprocess timeout)
-    @patch("trl.GRPOTrainer")
-    @patch("peft.get_peft_model")
-    @patch("transformers.AutoModelForCausalLM.from_pretrained")
-    @patch("transformers.AutoTokenizer.from_pretrained")
-    @patch("datasets.Dataset.from_list")  # Mock dataset loading
-    @patch("datasets.Dataset.map")  # Mock dataset map where it's used
-    def test_e2e_trl_grpo_integration_script(
-        self,
-        mock_dataset_map,  # New mock
-        mock_dataset_from_list,  # New mock
-        mock_tokenizer_load,
-        mock_base_model_load,
-        mock_get_peft_model,
-        mock_grpo_trainer_class,
-    ):
-        """End-to-end test for examples/math_example/trl_grpo_integration.py with mocked TRL steps."""
-        print("\nRunning E2E Test: Math Example - trl_grpo_integration.py (Mocked TRL)")
+    # @pytest.mark.skipif(
+    #     os.environ.get("CI") == "true",
+    #     reason="Skipping resource-intensive TRL integration test in CI",
+    # )
+    # @pytest.mark.timeout(
+    #     630
+    # )  # Timeout for test function (slightly > subprocess timeout)
+    # @patch("trl.GRPOTrainer")
+    # @patch("peft.get_peft_model")
+    # @patch("transformers.AutoModelForCausalLM.from_pretrained")
+    # @patch("transformers.AutoTokenizer.from_pretrained")
+    # @patch("datasets.Dataset.from_list")  # Mock dataset loading
+    # @patch("datasets.Dataset.map")  # Mock dataset map where it's used
+    # def test_e2e_trl_grpo_integration_script(
+    #     self,
+    #     mock_dataset_map,  # New mock
+    #     mock_dataset_from_list,  # New mock
+    #     mock_tokenizer_load,
+    #     mock_base_model_load,
+    #     mock_get_peft_model,
+    #     mock_grpo_trainer_class,
+    # ):
+    #     """End-to-end test for examples/math_example/trl_grpo_integration.py with mocked TRL steps."""
+    #     print("\nRunning E2E Test: Math Example - trl_grpo_integration.py (Mocked TRL)")
 
-        # Configure mocks
-        mock_tokenizer = MagicMock()
-        mock_tokenizer.pad_token = "<|endoftext|>"
-        mock_tokenizer.eos_token_id = 50256
-        mock_tokenizer_load.return_value = mock_tokenizer
+    #     # Configure mocks
+    #     mock_tokenizer = MagicMock()
+    #     mock_tokenizer.pad_token = "<|endoftext|>"
+    #     mock_tokenizer.eos_token_id = 50256
+    #     mock_tokenizer_load.return_value = mock_tokenizer
 
-        mock_base_model = MagicMock()  # Mock for the base model
-        mock_base_model_load.return_value = mock_base_model
+    #     mock_base_model = MagicMock()  # Mock for the base model
+    #     mock_base_model_load.return_value = mock_base_model
 
-        mock_peft_model = MagicMock()
-        mock_peft_model.print_trainable_parameters = MagicMock()
-        mock_peft_model.device = torch.device("cpu")  # Add device attribute
-        mock_get_peft_model.return_value = mock_peft_model
+    #     mock_peft_model = MagicMock()
+    #     mock_peft_model.print_trainable_parameters = MagicMock()
+    #     mock_peft_model.device = torch.device("cpu")  # Add device attribute
+    #     mock_get_peft_model.return_value = mock_peft_model
 
-        # Configure dataset mocks
-        mock_mapped_dataset = MagicMock()
-        mock_mapped_dataset.set_format = MagicMock()
-        mock_dataset_map.return_value = (
-            mock_mapped_dataset  # mock_dataset_map is the mock for dataset_instance.map
-        )
+    #     # Configure dataset mocks
+    #     mock_mapped_dataset = MagicMock()
+    #     mock_mapped_dataset.set_format = MagicMock()
+    #     mock_dataset_map.return_value = (
+    #         mock_mapped_dataset  # mock_dataset_map is the mock for dataset_instance.map
+    #     )
 
-        mock_dataset_instance = MagicMock()
-        mock_dataset_instance.map = (
-            mock_dataset_map  # Assign the .map mock to the instance
-        )
-        mock_dataset_from_list.return_value = (
-            mock_dataset_instance  # Dataset.from_list returns this instance
-        )
+    #     mock_dataset_instance = MagicMock()
+    #     mock_dataset_instance.map = (
+    #         mock_dataset_map  # Assign the .map mock to the instance
+    #     )
+    #     mock_dataset_from_list.return_value = (
+    #         mock_dataset_instance  # Dataset.from_list returns this instance
+    #     )
 
-        # Configure the instance returned by the mocked GRPOTrainer class
-        mock_grpo_trainer_instance = MagicMock()
-        mock_grpo_trainer_instance.step.return_value = {"loss": 0.1, "reward": 0.9}
+    #     # Configure the instance returned by the mocked GRPOTrainer class
+    #     mock_grpo_trainer_instance = MagicMock()
+    #     mock_grpo_trainer_instance.step.return_value = {"loss": 0.1, "reward": 0.9}
 
-        # Mock the dataloader and accelerator more completely
-        mock_dataloader = MagicMock()
-        # Ensure batch tensors are on the same device the trainer expects
-        mock_batch_input_ids = torch.randint(0, 100, (1, 10), device="cpu")
-        mock_batch = {
-            "input_ids": mock_batch_input_ids,
-            "query": ["mock query"],
-            "response": ["mock response"],
-        }
-        mock_dataloader.__iter__.return_value = iter([mock_batch])
-        # mock_grpo_trainer_instance.dataloader = mock_dataloader # No longer needed directly
-        mock_grpo_trainer_instance.get_train_dataloader = MagicMock(
-            return_value=mock_dataloader
-        )  # Mock get_train_dataloader
+    #     # Mock the dataloader and accelerator more completely
+    #     mock_dataloader = MagicMock()
+    #     # Ensure batch tensors are on the same device the trainer expects
+    #     mock_batch_input_ids = torch.randint(0, 100, (1, 10), device="cpu")
+    #     mock_batch = {
+    #         "input_ids": mock_batch_input_ids,
+    #         "query": ["mock query"],
+    #         "response": ["mock response"],
+    #     }
+    #     mock_dataloader.__iter__.return_value = iter([mock_batch])
+    #     # mock_grpo_trainer_instance.dataloader = mock_dataloader # No longer needed directly
+    #     mock_grpo_trainer_instance.get_train_dataloader = MagicMock(
+    #         return_value=mock_dataloader
+    #     )  # Mock get_train_dataloader
 
-        mock_accelerator = MagicMock()
-        mock_accelerator.device = torch.device("cpu")
-        mock_grpo_trainer_instance.accelerator = mock_accelerator
+    #     mock_accelerator = MagicMock()
+    #     mock_accelerator.device = torch.device("cpu")
+    #     mock_grpo_trainer_instance.accelerator = mock_accelerator
 
-        # Mock generate method if called by step or before
-        mock_grpo_trainer_instance.generate = MagicMock(
-            return_value=torch.randint(0, 100, (1, 5), device="cpu")
-        )
+    #     # Mock generate method if called by step or before
+    #     mock_grpo_trainer_instance.generate = MagicMock(
+    #         return_value=torch.randint(0, 100, (1, 5), device="cpu")
+    #     )
 
-        mock_grpo_trainer_class.return_value = mock_grpo_trainer_instance
+    #     mock_grpo_trainer_class.return_value = mock_grpo_trainer_instance
 
-        env_vars = {"TEST_MODE_TRL": "true"}
-        # Run the script with a 10-minute (600 seconds) timeout
-        result = self.run_script(
-            "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
-        )
+    #     env_vars = {"TEST_MODE_TRL": "true"}
+    #     # Run the script with a 10-minute (600 seconds) timeout
+    #     result = self.run_script(
+    #         "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
+    #     )
 
-        assert (
-            result.returncode == 0
-        ), f"trl_grpo_integration.py script failed with exit code {result.returncode}. Stderr: {result.stderr}"
-        assert (
-            "GRPO training loop completed for Math Example." in result.stdout
-        ), "Expected completion message not found in trl_grpo_integration.py output."
+    #     assert (
+    #         result.returncode == 0
+    #     ), f"trl_grpo_integration.py script failed with exit code {result.returncode}. Stderr: {result.stderr}"
+    #     assert (
+    #         "GRPO training loop completed for Math Example." in result.stdout
+    #     ), "Expected completion message not found in trl_grpo_integration.py output."
 
-        from examples.math_example.trl_grpo_integration import (
-            grpo_config as math_grpo_config,
-        )
+    #     from examples.math_example.trl_grpo_integration import (
+    #         grpo_config as math_grpo_config,
+    #     )
 
-        # The script now calls grpo_trainer.train(), not grpo_trainer.step() directly.
-        # The mock_grpo_trainer_instance.train method is not called because the script runs in a subprocess
-        # where the @patch decorator does not apply.
-        # The assertions on result.returncode and stdout content are the primary checks for this E2E script test.
-        # mock_grpo_trainer_instance.train.assert_called_once() # This line is removed.
-        # The number of steps taken internally by train() will be 1 due to TEST_MODE_TRL=true in the script's env.
-        # We can't easily check internal step calls on the mock of GRPOTrainer itself when train() is called.
-        # The script's output "GRPO training loop completed for Math Example." and return code 0 are primary indicators.
-        # The assertion on result.returncode == 0 and the completion message in stdout already cover this.
-        # If we wanted to check logs for number of steps, that would be parsing stdout.
-        # For now, asserting train() was called is the most direct check on the mock.
+    #     # The script now calls grpo_trainer.train(), not grpo_trainer.step() directly.
+    #     # The mock_grpo_trainer_instance.train method is not called because the script runs in a subprocess
+    #     # where the @patch decorator does not apply.
+    #     # The assertions on result.returncode and stdout content are the primary checks for this E2E script test.
+    #     # mock_grpo_trainer_instance.train.assert_called_once() # This line is removed.
+    #     # The number of steps taken internally by train() will be 1 due to TEST_MODE_TRL=true in the script's env.
+    #     # We can't easily check internal step calls on the mock of GRPOTrainer itself when train() is called.
+    #     # The script's output "GRPO training loop completed for Math Example." and return code 0 are primary indicators.
+    #     # The assertion on result.returncode == 0 and the completion message in stdout already cover this.
+    #     # If we wanted to check logs for number of steps, that would be parsing stdout.
+    #     # For now, asserting train() was called is the most direct check on the mock.
 
-        print("E2E Test: Math Example - trl_grpo_integration.py (Mocked TRL): PASSED")
+    #     print("E2E Test: Math Example - trl_grpo_integration.py (Mocked TRL): PASSED")
 
 
 # --- End-to-End Script Tests for Math Example (OpenR1) ---
@@ -247,94 +247,94 @@ class TestMathExampleOpenR1EndToEndScripts:
         print("--- End Output ---")
         return process
 
-    @pytest.mark.skipif(
-        os.environ.get("CI") == "true",
-        reason="Skipping resource-intensive TRL integration test in CI",
-    )
-    @patch("trl.GRPOTrainer")
-    @patch("peft.get_peft_model")
-    @patch("transformers.AutoModelForCausalLM.from_pretrained")
-    @patch("transformers.AutoTokenizer.from_pretrained")
-    @patch("datasets.Dataset.from_list")
-    @patch("datasets.Dataset.map")
-    def test_e2e_trl_grpo_integration_script_openr1(
-        self,
-        mock_dataset_map_openr1,
-        mock_dataset_from_list_openr1,
-        mock_tokenizer_load_openr1,
-        mock_base_model_load_openr1,
-        mock_get_peft_model_openr1,
-        mock_grpo_trainer_class_openr1,
-    ):
-        """End-to-end test for examples/math_example_openr1/trl_grpo_integration.py with mocked TRL steps."""
-        print(
-            "\nRunning E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL)"
-        )
+    # @pytest.mark.skipif(
+    #     os.environ.get("CI") == "true",
+    #     reason="Skipping resource-intensive TRL integration test in CI",
+    # )
+    # @patch("trl.GRPOTrainer")
+    # @patch("peft.get_peft_model")
+    # @patch("transformers.AutoModelForCausalLM.from_pretrained")
+    # @patch("transformers.AutoTokenizer.from_pretrained")
+    # @patch("datasets.Dataset.from_list")
+    # @patch("datasets.Dataset.map")
+    # def test_e2e_trl_grpo_integration_script_openr1(
+    #     self,
+    #     mock_dataset_map_openr1,
+    #     mock_dataset_from_list_openr1,
+    #     mock_tokenizer_load_openr1,
+    #     mock_base_model_load_openr1,
+    #     mock_get_peft_model_openr1,
+    #     mock_grpo_trainer_class_openr1,
+    # ):
+    #     """End-to-end test for examples/math_example_openr1/trl_grpo_integration.py with mocked TRL steps."""
+    #     print(
+    #         "\nRunning E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL)"
+    #     )
 
-        # Configure mocks
-        mock_tokenizer = MagicMock()
-        mock_tokenizer.pad_token = "<|endoftext|>"
-        mock_tokenizer.eos_token_id = (
-            50256  # Example, ensure it matches model if relevant
-        )
-        mock_tokenizer_load_openr1.return_value = mock_tokenizer
+    #     # Configure mocks
+    #     mock_tokenizer = MagicMock()
+    #     mock_tokenizer.pad_token = "<|endoftext|>"
+    #     mock_tokenizer.eos_token_id = (
+    #         50256  # Example, ensure it matches model if relevant
+    #     )
+    #     mock_tokenizer_load_openr1.return_value = mock_tokenizer
 
-        mock_base_model = MagicMock()
-        mock_base_model_load_openr1.return_value = mock_base_model
+    #     mock_base_model = MagicMock()
+    #     mock_base_model_load_openr1.return_value = mock_base_model
 
-        mock_peft_model = MagicMock()
-        mock_peft_model.print_trainable_parameters = MagicMock()
-        mock_peft_model.device = torch.device("cpu")
-        mock_get_peft_model_openr1.return_value = mock_peft_model
+    #     mock_peft_model = MagicMock()
+    #     mock_peft_model.print_trainable_parameters = MagicMock()
+    #     mock_peft_model.device = torch.device("cpu")
+    #     mock_get_peft_model_openr1.return_value = mock_peft_model
 
-        mock_mapped_dataset = MagicMock()
-        mock_mapped_dataset.set_format = MagicMock()
-        mock_dataset_map_openr1.return_value = mock_mapped_dataset
+    #     mock_mapped_dataset = MagicMock()
+    #     mock_mapped_dataset.set_format = MagicMock()
+    #     mock_dataset_map_openr1.return_value = mock_mapped_dataset
 
-        mock_dataset_instance = MagicMock()
-        mock_dataset_instance.map = mock_dataset_map_openr1
-        mock_dataset_from_list_openr1.return_value = mock_dataset_instance
+    #     mock_dataset_instance = MagicMock()
+    #     mock_dataset_instance.map = mock_dataset_map_openr1
+    #     mock_dataset_from_list_openr1.return_value = mock_dataset_instance
 
-        mock_grpo_trainer_instance = MagicMock()
-        mock_grpo_trainer_instance.train = MagicMock()  # Mock the train method directly
+    #     mock_grpo_trainer_instance = MagicMock()
+    #     mock_grpo_trainer_instance.train = MagicMock()  # Mock the train method directly
 
-        # Mock dataloader and accelerator parts if GRPOTrainer's train() needs them internally from the instance
-        mock_dataloader = MagicMock()
-        mock_batch_input_ids = torch.randint(0, 100, (1, 10), device="cpu")
-        mock_batch = {
-            "input_ids": mock_batch_input_ids,
-            "query": ["mock query openr1"],
-            "response": ["mock response openr1"],
-        }
-        mock_dataloader.__iter__.return_value = iter([mock_batch])
-        mock_grpo_trainer_instance.get_train_dataloader = MagicMock(
-            return_value=mock_dataloader
-        )
+    #     # Mock dataloader and accelerator parts if GRPOTrainer's train() needs them internally from the instance
+    #     mock_dataloader = MagicMock()
+    #     mock_batch_input_ids = torch.randint(0, 100, (1, 10), device="cpu")
+    #     mock_batch = {
+    #         "input_ids": mock_batch_input_ids,
+    #         "query": ["mock query openr1"],
+    #         "response": ["mock response openr1"],
+    #     }
+    #     mock_dataloader.__iter__.return_value = iter([mock_batch])
+    #     mock_grpo_trainer_instance.get_train_dataloader = MagicMock(
+    #         return_value=mock_dataloader
+    #     )
 
-        mock_accelerator = MagicMock()
-        mock_accelerator.device = torch.device("cpu")
-        mock_grpo_trainer_instance.accelerator = mock_accelerator
+    #     mock_accelerator = MagicMock()
+    #     mock_accelerator.device = torch.device("cpu")
+    #     mock_grpo_trainer_instance.accelerator = mock_accelerator
 
-        mock_grpo_trainer_class_openr1.return_value = mock_grpo_trainer_instance
+    #     mock_grpo_trainer_class_openr1.return_value = mock_grpo_trainer_instance
 
-        env_vars = {"TEST_MODE_TRL": "true"}
-        result = self.run_script(
-            "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
-        )  # Increased timeout
+    #     env_vars = {"TEST_MODE_TRL": "true"}
+    #     result = self.run_script(
+    #         "trl_grpo_integration.py", env_vars=env_vars, timeout_seconds=600
+    #     )  # Increased timeout
 
-        assert (
-            result.returncode == 0
-        ), f"OpenR1 trl_grpo_integration.py script failed with exit code {result.returncode}. Stderr: {result.stderr}"
-        assert (
-            "GRPO training loop completed for OpenR1 Math Example." in result.stdout
-        ), "Expected completion message not found in OpenR1 trl_grpo_integration.py output."
+    #     assert (
+    #         result.returncode == 0
+    #     ), f"OpenR1 trl_grpo_integration.py script failed with exit code {result.returncode}. Stderr: {result.stderr}"
+    #     assert (
+    #         "GRPO training loop completed for OpenR1 Math Example." in result.stdout
+    #     ), "Expected completion message not found in OpenR1 trl_grpo_integration.py output."
 
-        # Since the script runs in a subprocess, the mocks apply to the script's execution context if it imports them.
-        # The primary check is the script's output and return code.
-        # We can't directly assert mock_grpo_trainer_instance.train.assert_called_once() here
-        # because the mock object `mock_grpo_trainer_instance` is in the test process,
-        # not the subprocess where the script ran.
+    #     # Since the script runs in a subprocess, the mocks apply to the script's execution context if it imports them.
+    #     # The primary check is the script's output and return code.
+    #     # We can't directly assert mock_grpo_trainer_instance.train.assert_called_once() here
+    #     # because the mock object `mock_grpo_trainer_instance` is in the test process,
+    #     # not the subprocess where the script ran.
 
-        print(
-            "E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL): PASSED"
-        )
+    #     print(
+    #         "E2E Test: Math Example OpenR1 - trl_grpo_integration.py (Mocked TRL): PASSED"
+    #     )

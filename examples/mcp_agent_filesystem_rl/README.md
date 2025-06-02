@@ -73,7 +73,7 @@ cat outputs/YYYY-MM-DD/HH-MM-SS/preview_input_output_pairs.jsonl
 The example evaluates the model on three filesystem tasks:
 
 1. **File Move**: Move 'file_to_move.txt' from source_dir to target_dir
-2. **File Copy**: Copy all .txt files from source_dir to backup_dir  
+2. **File Copy**: Copy all .txt files from source_dir to backup_dir
 3. **File Create**: Create 'report.txt' with specified content
 
 ### Evaluation Process
@@ -87,7 +87,7 @@ The example evaluates the model on three filesystem tasks:
 
 ```
 [INFO] Sample ID: fs_move_1, Score: 0.30, Reason: Filesystem match: 0.00, Task completion: 0.30
-[INFO] Sample ID: fs_copy_1, Score: 0.70, Reason: Filesystem match: 0.00, Task completion: 0.70  
+[INFO] Sample ID: fs_copy_1, Score: 0.70, Reason: Filesystem match: 0.00, Task completion: 0.70
 [INFO] Sample ID: fs_create_1, Score: 1.00, Reason: Filesystem match: 0.00, Task completion: 1.00
 ```
 
@@ -100,8 +100,8 @@ Follows the standard reward-kit pattern:
 ```python
 @reward_function
 def evaluate(
-    messages: List[Message], 
-    ground_truth: str, 
+    messages: List[Message],
+    ground_truth: str,
     final_filesystem_state: Optional[Dict[str, Any]] = None,
     task_description: Optional[str] = None
 ) -> EvaluateResult:
@@ -134,7 +134,7 @@ Functions ready for future MCP integration:
 
 ### Future MCP Integration
 - 🔄 **Actual Execution**: LLM will interact with real filesystem tools via MCP
-- 🔄 **State Verification**: Compare actual filesystem changes vs. expected outcomes  
+- 🔄 **State Verification**: Compare actual filesystem changes vs. expected outcomes
 - 🔄 **Isolated Environments**: Each rollout in separate Docker containers
 - 🔄 **Tool Usage**: Evaluate proper use of MCP filesystem tools
 
@@ -181,7 +181,7 @@ dataset:
   source_type: "jsonl"
   path_or_name: "dataset.jsonl"
 
-# Model configuration  
+# Model configuration
 generation:
   model_name: "accounts/fireworks/models/llama-v3p3-70b-instruct"
   temperature: 0.1

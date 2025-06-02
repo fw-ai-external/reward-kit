@@ -9,8 +9,26 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 from omegaconf import DictConfig
+from pydantic import BaseModel, Field  # Added for new models
 
 logger = logging.getLogger(__name__)
+
+
+# Pydantic models for structured tool calls and generation results
+class ToolCallFunction(BaseModel):
+    name: str
+    arguments: str  # Should be a JSON string
+
+
+class ToolCall(BaseModel):
+    id: str
+    type: str = "function"  # OpenAI default
+    function: ToolCallFunction
+
+
+class GenerationResult(BaseModel):
+    content: Optional[str] = None
+    tool_calls: Optional[List[ToolCall]] = None
 
 
 class ModelClient(abc.ABC):
@@ -29,8 +47,11 @@ class ModelClient(abc.ABC):
 
     @abc.abstractmethod
     async def generate(
-        self, messages: List[Dict[str, str]], session: aiohttp.ClientSession
-    ) -> Optional[str]:
+        self,
+        messages: List[Dict[str, str]],
+        session: aiohttp.ClientSession,
+        tools: Optional[List[Dict[str, Any]]] = None,  # Added tools parameter
+    ) -> GenerationResult:  # Changed return type
         """Generates a response from the model given a list of messages."""
         pass
 
@@ -47,16 +68,27 @@ class FireworksModelClient(ModelClient):
         # TODO: Initialize rate limiter, retry policy from client_config.api_params
 
     async def generate(
-        self, messages: List[Dict[str, str]], session: aiohttp.ClientSession
-    ) -> Optional[str]:
+        self,
+        messages: List[Dict[str, str]],
+        session: aiohttp.ClientSession,
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> GenerationResult:
         url = f"{self.api_base}/chat/completions"
-        # TEMPORARY FIX: Use minimal parameters to avoid API issues
-        payload = {
+
+        payload: Dict[str, Any] = {
             "model": self.model_name,
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            # Assuming top_p, etc., might be supported; add if confirmed by Fireworks API
         }
+        if self.top_p is not None:
+            payload["top_p"] = self.top_p
+        # Add other parameters like top_k, min_p if supported and configured
+
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"  # Common default, adjust if API differs
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -86,12 +118,43 @@ class FireworksModelClient(ModelClient):
                         data = await response.json()
                         if data.get("choices") and len(data["choices"]) > 0:
                             choice = data["choices"][0]
-                            if choice.get("message") and choice["message"].get(
-                                "content"
-                            ):
-                                return choice["message"]["content"].strip()
-                        logger.warning(f"Fireworks API response malformed: {data}")
-                        return None
+                            message = choice.get("message", {})
+
+                            if message.get("tool_calls"):
+                                tool_calls_data = message["tool_calls"]
+                                parsed_tool_calls = []
+                                for tc_data in tool_calls_data:
+                                    # Assuming tc_data matches OpenAI's tool_call structure
+                                    # {'id': '...', 'type': 'function', 'function': {'name': '...', 'arguments': '...'}}
+                                    if tc_data.get(
+                                        "type"
+                                    ) == "function" and tc_data.get("function"):
+                                        parsed_tool_calls.append(
+                                            ToolCall(
+                                                id=tc_data["id"],
+                                                type="function",
+                                                function=ToolCallFunction(
+                                                    name=tc_data["function"]["name"],
+                                                    arguments=tc_data["function"][
+                                                        "arguments"
+                                                    ],  # This is a string
+                                                ),
+                                            )
+                                        )
+                                if parsed_tool_calls:
+                                    return GenerationResult(
+                                        tool_calls=parsed_tool_calls
+                                    )
+
+                            if message.get("content"):
+                                return GenerationResult(
+                                    content=message["content"].strip()
+                                )
+
+                        logger.warning(
+                            f"Fireworks API response malformed or no content/tool_calls: {data}"
+                        )
+                        return GenerationResult()  # Empty result
                     elif response.status == 429:  # Rate limit
                         retry_after = int(response.headers.get("Retry-After", "5"))
                         logger.warning(
@@ -103,8 +166,7 @@ class FireworksModelClient(ModelClient):
                         logger.error(
                             f"Fireworks API Auth Error ({response.status}): {error_text}"
                         )
-                        # raise ModelAuthError(f"Fireworks API Auth Error ({response.status}): {error_text}")
-                        return None  # Or raise specific error
+                        return GenerationResult()  # Empty result on auth error
                     elif response.status >= 500:  # Server errors
                         logger.warning(
                             f"Fireworks API Server Error ({response.status}). Retrying (attempt {attempt+1})."
@@ -115,16 +177,14 @@ class FireworksModelClient(ModelClient):
                         logger.error(
                             f"Fireworks API request failed ({response.status}): {error_text}"
                         )
-                        return None
+                        return GenerationResult()  # Empty result
             logger.error("Max retries reached for Fireworks API call.")
-            return None
+            return GenerationResult()  # Empty result
         except aiohttp.ClientError as e:
             logger.error(f"AIOHTTP client error: {e}")
-            # raise ModelGenerationError(f"AIOHTTP client error: {e}") from e
-            return None
+            return GenerationResult()  # Empty result
         except Exception as e:
             logger.error(
                 f"Unexpected error in FireworksModelClient: {e}", exc_info=True
             )
-            # raise ModelGenerationError(f"Unexpected error: {e}") from e
-            return None
+            return GenerationResult()  # Empty result

@@ -14,15 +14,18 @@ if SDK_SRC_PATH.is_dir() and str(SDK_SRC_PATH) not in sys.path:
 
 # Now try to import mcp components
 try:
-    from mcp.client.session import ClientSession, DEFAULT_CLIENT_INFO
-    from mcp.client.stdio import StdioServerParameters, stdio_client
     import mcp.types as types
+    from mcp.client.session import DEFAULT_CLIENT_INFO, ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
 except ImportError as e:
     print(f"Failed to import MCP components after modifying sys.path: {e}")
-    print("Please ensure the MCP SDK is correctly placed at /home/bchen/references/python-sdk/src/")
+    print(
+        "Please ensure the MCP SDK is correctly placed at /home/bchen/references/python-sdk/src/"
+    )
     sys.exit(1)
 
 import shutil
+
 # Path is already imported above
 
 # Configure logging
@@ -64,18 +67,20 @@ async def main():
             "--rm",  # Remove container on exit
             "-i",  # Keep STDIN open even if not attached
             "-v",
-            f"{HOST_DATA_PATH.resolve()}:{CONTAINER_DATA_PATH}", # Mount host data path
+            f"{HOST_DATA_PATH.resolve()}:{CONTAINER_DATA_PATH}",  # Mount host data path
             "mcp/filesystem",  # The Docker image for the filesystem server
             # The "stdio" argument was causing the server to look for a "stdio" directory.
             # The mcp/filesystem server likely uses /data as its main argument (from mcp_agent_config.yaml)
             # and might default to stdio or use an env var. For now, let's pass only /data.
-            CONTAINER_DATA_PATH # Argument to the mcp/filesystem server: the path to serve
+            CONTAINER_DATA_PATH,  # Argument to the mcp/filesystem server: the path to serve
         ],
         # cwd=str(Path.home()), # Optional: if the command needs a specific CWD
-        env=os.environ.copy(), # Pass current environment
+        env=os.environ.copy(),  # Pass current environment
     )
 
-    logger.info(f"StdioServerParameters configured: command='{server_params.command}', args='{' '.join(server_params.args)}'")
+    logger.info(
+        f"StdioServerParameters configured: command='{server_params.command}', args='{' '.join(server_params.args)}'"
+    )
 
     try:
         async with stdio_client(server_params) as (read_stream, write_stream):
@@ -84,7 +89,7 @@ async def main():
             client_session = ClientSession(
                 read_stream=read_stream,
                 write_stream=write_stream,
-                client_info=DEFAULT_CLIENT_INFO, # Use default client info
+                client_info=DEFAULT_CLIENT_INFO,  # Use default client info
             )
             logger.info("ClientSession instantiated.")
 
@@ -104,8 +109,12 @@ async def main():
             logger.info(f"Ping successful: {ping_result}")
 
             # 4. Call a filesystem-specific tool: list_files
-            list_files_path = "/" # List root directory inside the container's data mount
-            logger.info(f"Attempting to call 'filesystem/list_files' with path: '{list_files_path}'...")
+            list_files_path = (
+                "/"  # List root directory inside the container's data mount
+            )
+            logger.info(
+                f"Attempting to call 'filesystem/list_files' with path: '{list_files_path}'..."
+            )
             list_files_args = {"path": list_files_path}
             list_files_result = await client_session.call_tool(
                 name="filesystem/list_files", arguments=list_files_args
@@ -118,35 +127,51 @@ async def main():
                 for file_info in list_files_result.root.files:
                     if file_info.name == dummy_file_name:
                         found_dummy_file = True
-                        logger.info(f"Successfully found '{dummy_file_name}' in list_files result.")
+                        logger.info(
+                            f"Successfully found '{dummy_file_name}' in list_files result."
+                        )
                         break
             if not found_dummy_file:
-                logger.warning(f"Could not find '{dummy_file_name}' in list_files result.")
-
+                logger.warning(
+                    f"Could not find '{dummy_file_name}' in list_files result."
+                )
 
             # 5. Call filesystem/read_file for the dummy file
-            read_file_path = f"/{dummy_file_name}" # Path inside the container
-            logger.info(f"Attempting to call 'filesystem/read_file' with path: '{read_file_path}'...")
+            read_file_path = f"/{dummy_file_name}"  # Path inside the container
+            logger.info(
+                f"Attempting to call 'filesystem/read_file' with path: '{read_file_path}'..."
+            )
             read_file_args = {"path": read_file_path, "encoding": "utf-8"}
             read_file_result = await client_session.call_tool(
                 name="filesystem/read_file", arguments=read_file_args
             )
             logger.info(f"'filesystem/read_file' successful.")
-            
+
             if read_file_result.root and read_file_result.root.content:
                 if read_file_result.root.content == dummy_file_content:
-                    logger.info(f"Successfully read content of '{dummy_file_name}': MATCHES expected.")
+                    logger.info(
+                        f"Successfully read content of '{dummy_file_name}': MATCHES expected."
+                    )
                 else:
-                    logger.error(f"Content mismatch for '{dummy_file_name}'. Expected: '{dummy_file_content}', Got: '{read_file_result.root.content}'")
+                    logger.error(
+                        f"Content mismatch for '{dummy_file_name}'. Expected: '{dummy_file_content}', Got: '{read_file_result.root.content}'"
+                    )
             else:
-                logger.error(f"Failed to get content from read_file_result for '{dummy_file_name}'.")
-
+                logger.error(
+                    f"Failed to get content from read_file_result for '{dummy_file_name}'."
+                )
 
             # 6. Call filesystem/write_file to create a new file
             write_file_path = "/newly_created_file.txt"
             write_file_content = "This file was written by the standalone client."
-            logger.info(f"Attempting to call 'filesystem/write_file' with path: '{write_file_path}'...")
-            write_file_args = {"path": write_file_path, "content": write_file_content, "encoding": "utf-8"}
+            logger.info(
+                f"Attempting to call 'filesystem/write_file' with path: '{write_file_path}'..."
+            )
+            write_file_args = {
+                "path": write_file_path,
+                "content": write_file_content,
+                "encoding": "utf-8",
+            }
             write_file_result = await client_session.call_tool(
                 name="filesystem/write_file", arguments=write_file_args
             )
@@ -154,16 +179,23 @@ async def main():
 
             # Verify the new file exists on the host
             if (HOST_DATA_PATH / "newly_created_file.txt").exists():
-                logger.info(f"Successfully verified '{write_file_path}' was created on the host: {HOST_DATA_PATH / 'newly_created_file.txt'}")
+                logger.info(
+                    f"Successfully verified '{write_file_path}' was created on the host: {HOST_DATA_PATH / 'newly_created_file.txt'}"
+                )
                 with open(HOST_DATA_PATH / "newly_created_file.txt", "r") as f_host:
                     host_content = f_host.read()
                     if host_content == write_file_content:
-                        logger.info("Content of newly created file matches expected content.")
+                        logger.info(
+                            "Content of newly created file matches expected content."
+                        )
                     else:
-                        logger.error(f"Content mismatch for newly created file. Expected: '{write_file_content}', Got on host: '{host_content}'")
+                        logger.error(
+                            f"Content mismatch for newly created file. Expected: '{write_file_content}', Got on host: '{host_content}'"
+                        )
             else:
-                logger.error(f"Failed to verify '{write_file_path}' was created on the host.")
-
+                logger.error(
+                    f"Failed to verify '{write_file_path}' was created on the host."
+                )
 
             logger.info("All tests passed successfully!")
 

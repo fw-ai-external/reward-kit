@@ -21,7 +21,7 @@ Each line defines a task with setup instructions:
 ```jsonl
 {
   "id": "move_file_task",
-  "prompt": "Move important_document.txt from /data/source/ to /data/archive/", 
+  "prompt": "Move important_document.txt from /data/source/ to /data/archive/",
   "rollout_count": 4,
   "setup": {
     "mcp_server": "docker:mcp/filesystem",
@@ -45,20 +45,20 @@ How to prepare the MCP environment for each rollout:
 def setup_environment(sample):
     """Set up MCP environment for this task."""
     setup_config = sample['setup']
-    
+
     if setup_config['mcp_server'] == 'docker:mcp/filesystem':
         # Create temp directory with template files
         temp_dir = create_temp_directory()
         for file_path, content in setup_config['template_files'].items():
             write_file(temp_dir + file_path, content)
-        
+
         # Start Docker container
         container = docker.run(
             'mcp/filesystem',
             volumes={temp_dir: '/data'},
             remove=True
         )
-        
+
         return MCPEnvironment(
             container=container,
             tools=['list_directory', 'read_file', 'write_file', 'move_file'],
@@ -73,7 +73,7 @@ What to extract after the LLM runs:
 ```python
 def capture_final_state(mcp_env, llm_response):
     """Capture the final state of the environment."""
-    
+
     # Extract file listings from key directories
     state = {}
     for directory in ['/data/source', '/data/archive']:
@@ -82,7 +82,7 @@ def capture_final_state(mcp_env, llm_response):
             state[f'files_in_{directory.split("/")[-1]}'] = parse_files(result)
         except:
             state[f'files_in_{directory.split("/")[-1]}'] = []
-    
+
     return state
 ```
 
@@ -100,17 +100,17 @@ def evaluate_file_move(
     llm_response: str
 ) -> EvaluateResult:
     """Evaluate if the file was moved correctly."""
-    
+
     # Simple comparison
     success = (expected_outcome == actual_outcome)
-    
+
     if success:
         score = 1.0
         reason = "File moved successfully"
     else:
-        score = 0.0 
+        score = 0.0
         reason = f"Expected {expected_outcome}, got {actual_outcome}"
-    
+
     return EvaluateResult(
         score=score,
         reason=reason,
@@ -132,7 +132,7 @@ def cleanup_environment(mcp_env):
     """Clean up the environment."""
     if hasattr(mcp_env, 'container'):
         mcp_env.container.stop()
-    
+
     if hasattr(mcp_env, 'temp_dir'):
         shutil.rmtree(mcp_env.temp_dir)
 ```
@@ -151,7 +151,7 @@ max_tokens: 512
 dataset: "dataset.jsonl"
 functions:
   setup: "setup.setup_environment"
-  capture: "capture.capture_final_state" 
+  capture: "capture.capture_final_state"
   reward: "reward.evaluate_file_move"
   cleanup: "cleanup.cleanup_environment"
 
@@ -196,7 +196,7 @@ This will:
 ```
 my_filesystem_eval/
 ├── config.yaml           # Main configuration
-├── dataset.jsonl         # Tasks and expected outcomes  
+├── dataset.jsonl         # Tasks and expected outcomes
 ├── setup.py              # Environment setup logic
 ├── capture.py            # State extraction logic
 ├── reward.py             # Evaluation logic

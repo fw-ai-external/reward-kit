@@ -9,7 +9,7 @@ hydra:
 dataset:
   _target_: reward_kit.datasets.loader.load_and_process_dataset
   source_type: "jsonl"
-  path_or_name: "dataset.jsonl"
+  path_or_name: "examples/mcp_agent_filesystem_rl/dataset.jsonl" # Path relative to repo root
 
 generation:
   enabled: true
@@ -24,6 +24,14 @@ generation:
   cache:
     enabled: true
     cache_dir: "generated_responses_cache"
+
+agent:
+  type: mcp_agent
+  config_path: "../../../mcp_agent_config.yaml" # Relative path from this config to root mcp_agent_config.yaml
+  intermediary_server_url: "http://localhost:8001/mcp"
+  mcp_backend_ref: "filesystem_rl_example" # Must match a backend_name_ref in mcp_agent_config.yaml
+  state_capture_tool: "directory_tree" # Tool to get the final state (removed namespace)
+  state_capture_args: {"path": "/data"} # Args for the state capture tool
 
 # Reward function configuration
 reward:

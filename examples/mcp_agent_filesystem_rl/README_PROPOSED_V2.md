@@ -4,7 +4,7 @@ This example demonstrates a minimal framework approach where users define everyt
 
 ## Architecture Principle
 
-**Framework does the minimum**: Provision MCP → Execute LLM → Capture state → Call reward function  
+**Framework does the minimum**: Provision MCP → Execute LLM → Capture state → Call reward function
 **User defines everything else**: MCP setup, rollout count, environment initialization, evaluation logic
 
 ## What the Framework Provides
@@ -17,16 +17,16 @@ class MCPAgentRunner:
             for rollout_idx in range(sample.get('rollout_count', 1)):
                 # 1. Call user's setup function
                 mcp_session = user_setup_function(sample)
-                
+
                 # 2. Execute LLM with tools
                 response = llm_client.generate(sample['prompt'], tools=mcp_session.tools)
-                
-                # 3. Call user's state capture function  
+
+                # 3. Call user's state capture function
                 final_state = user_state_capture_function(mcp_session, response)
-                
+
                 # 4. Call user's reward function
                 result = user_reward_function(sample['expected'], final_state, response)
-                
+
                 # 5. Call user's cleanup function
                 user_cleanup_function(mcp_session)
 ```
@@ -62,7 +62,7 @@ class MCPAgentRunner:
 def setup_mcp_environment(sample_config):
     """User-defined function to set up MCP environment for this sample."""
     setup = sample_config['setup']
-    
+
     if setup['mcp_server'].startswith('docker:'):
         # User's Docker setup logic
         container = docker.run(
@@ -70,7 +70,7 @@ def setup_mcp_environment(sample_config):
             volumes={create_temp_dir_with_files(setup['template_files']): '/data'}
         )
         return MCPSession(container, setup['tools'])
-    
+
     elif setup['mcp_server'] == 'local':
         # User's local process setup logic
         return MCPSession(local_process, setup['tools'])
@@ -82,7 +82,7 @@ def setup_mcp_environment(sample_config):
 def capture_final_state(mcp_session, llm_response):
     """User-defined function to capture environment state after LLM interaction."""
     final_state = {}
-    
+
     # User decides what state to capture and how
     for directory in ['/data/source_files', '/data/archive']:
         try:
@@ -90,7 +90,7 @@ def capture_final_state(mcp_session, llm_response):
             final_state[directory] = parse_file_list(result)
         except:
             final_state[directory] = []
-    
+
     return final_state
 ```
 
@@ -100,14 +100,14 @@ def capture_final_state(mcp_session, llm_response):
 @reward_function
 def evaluate_filesystem_task(
     expected_final_state: Dict[str, List[str]],
-    actual_final_state: Dict[str, List[str]], 
+    actual_final_state: Dict[str, List[str]],
     llm_response: str,
     **kwargs
 ) -> EvaluateResult:
     """Pure evaluation - no MCP calls, just state comparison."""
-    
+
     score = 1.0 if expected_final_state == actual_final_state else 0.0
-    
+
     return EvaluateResult(
         score=score,
         reason=f"Expected: {expected_final_state}, Got: {actual_final_state}",
@@ -136,7 +136,7 @@ dataset: "dataset.jsonl"
 # User-defined functions
 user_functions:
   setup: "user_functions.setup_mcp_environment"
-  state_capture: "user_functions.capture_final_state" 
+  state_capture: "user_functions.capture_final_state"
   reward: "user_functions.evaluate_filesystem_task"
   cleanup: "user_functions.cleanup_mcp_environment"
 
@@ -159,55 +159,55 @@ reward-kit mcp-agent run --config config.yaml
 # reward_kit/cli_commands/mcp_agent_cmd.py
 def mcp_agent_command(args):
     config = load_config(args.config)
-    
+
     # Load user-defined functions
     setup_fn = load_function(config.user_functions.setup)
     capture_fn = load_function(config.user_functions.state_capture)
     reward_fn = load_function(config.user_functions.reward)
     cleanup_fn = load_function(config.user_functions.cleanup)
-    
+
     dataset = load_dataset(config.dataset)
     llm_client = create_llm_client(config)
-    
+
     results = []
-    
+
     for sample in dataset:
         rollout_count = sample.get('rollout_count', 1)
-        
+
         for rollout_idx in range(rollout_count):
             mcp_session = None
             try:
                 # 1. User sets up environment
                 mcp_session = setup_fn(sample)
-                
+
                 # 2. Framework executes LLM
                 response = llm_client.generate(
-                    sample['prompt'], 
+                    sample['prompt'],
                     tools=mcp_session.available_tools
                 )
-                
+
                 # 3. User captures state
                 final_state = capture_fn(mcp_session, response)
-                
+
                 # 4. User evaluates
                 result = reward_fn(
                     expected_final_state=sample['expected_final_state'],
                     actual_final_state=final_state,
                     llm_response=response
                 )
-                
+
                 results.append({
                     'sample_id': sample['id'],
                     'rollout_idx': rollout_idx,
                     'score': result.score,
                     'reason': result.reason
                 })
-                
+
             finally:
                 # 5. User cleans up
                 if mcp_session:
                     cleanup_fn(mcp_session)
-    
+
     save_results(results)
 ```
 

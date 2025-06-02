@@ -1,6 +1,7 @@
 import abc
 from typing import Any, Dict, List, Literal, Optional
 
+from mcp import types as mcp_types  # Added import
 from pydantic import BaseModel, Field
 
 from reward_kit.mcp_agent.config import BackendServerConfig
@@ -106,6 +107,21 @@ class AbstractOrchestrationClient(abc.ABC):
 
         Returns:
             A dictionary representing the JSON response from the tool call.
+        """
+        pass
+
+    @abc.abstractmethod
+    async def list_tools_on_instance(
+        self, instance: ManagedInstanceInfo
+    ) -> mcp_types.ListToolsResult:
+        """
+        Lists all available tools on a given backend instance.
+
+        Args:
+            instance: The ManagedInstanceInfo for the target backend instance.
+
+        Returns:
+            A ListToolsResult object containing the tools available on the instance.
         """
         pass
 

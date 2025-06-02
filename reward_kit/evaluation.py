@@ -315,8 +315,8 @@ class Evaluator:
         if not samples:
             raise ValueError(f"No valid samples found in {sample_file}")
 
-        account_id = get_fireworks_account_id()
-        auth_token = get_fireworks_api_key()
+        account_id = self.account_id or get_fireworks_account_id()
+        auth_token = self.api_key or get_fireworks_api_key()
         logger.debug(f"Preview using account_id: {account_id}")
 
         if not account_id or not auth_token:
@@ -767,6 +767,8 @@ def preview_evaluation(
     huggingface_response_key: str = "response",
     huggingface_prompt_key: str = "prompt",
     reward_function_mode: EvaluationMode = "pointwise",  # Added for consistency
+    account_id: Optional[str] = None,
+    api_key: Optional[str] = None,
 ):
     ts_mode_config = None
     if python_code_to_evaluate:
@@ -789,10 +791,15 @@ def preview_evaluation(
             multi_metrics=multi_metrics,
             ts_mode_config=ts_mode_config,
             reward_function_mode=reward_function_mode,
+            account_id=account_id,
+            api_key=api_key,
         )
     else:
         evaluator = Evaluator(
-            multi_metrics=multi_metrics, reward_function_mode=reward_function_mode
+            multi_metrics=multi_metrics,
+            reward_function_mode=reward_function_mode,
+            account_id=account_id,
+            api_key=api_key,
         )  # Pass mode to Evaluator
         if multi_metrics:
             if not folder:

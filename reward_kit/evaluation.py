@@ -166,6 +166,8 @@ class Evaluator:
         remote_url: Optional[str] = None,
         ts_mode_config: Optional[Dict[str, Any]] = None,
         reward_function_mode: EvaluationMode = "pointwise",  # New parameter for input processing mode
+        account_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         self.multi_metrics = multi_metrics
         self.remote_url = remote_url
@@ -173,6 +175,8 @@ class Evaluator:
         self.reward_function_mode = reward_function_mode
         self.code_files = {}
         self.metric_folders: Dict[str, Any] = {}
+        self.account_id = account_id
+        self.api_key = api_key
         self.description = ""
         self.display_name = ""
         self.api_base = os.environ.get("FIREWORKS_API_BASE", "https://api.fireworks.ai")
@@ -447,8 +451,8 @@ class Evaluator:
                 "No code files loaded. Load metric folder(s) or provide ts_mode_config/remote_url first."
             )
 
-        account_id = get_fireworks_account_id()
-        auth_token = get_fireworks_api_key()
+        account_id = self.account_id or get_fireworks_account_id()
+        auth_token = self.api_key or get_fireworks_api_key()
         if not auth_token or not account_id:
             logger.error(
                 "Authentication error: API credentials appear to be invalid or incomplete."
@@ -891,6 +895,8 @@ def create_evaluation(
     huggingface_prompt_key: str = "prompt",
     remote_url: Optional[str] = None,
     reward_function_mode: EvaluationMode = "pointwise",  # Added
+    account_id: Optional[str] = None,
+    api_key: Optional[str] = None,
 ):
     ts_mode_config = None
     if python_code_to_evaluate:
@@ -910,6 +916,8 @@ def create_evaluation(
         remote_url=remote_url,
         ts_mode_config=ts_mode_config,
         reward_function_mode=reward_function_mode,
+        account_id=account_id,
+        api_key=api_key,
     )
 
     if remote_url:

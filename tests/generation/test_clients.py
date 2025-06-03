@@ -12,9 +12,8 @@ from reward_kit.generation.clients import FireworksModelClient
 def mock_session():
     """Fixture for a mocked aiohttp.ClientSession."""
     session = AsyncMock(spec=aiohttp.ClientSession)
-    session.post = AsyncMock()
 
-    # Default successful response
+    # Configure the mock response object that __aenter__ will return
     mock_response = AsyncMock(spec=aiohttp.ClientResponse)
     mock_response.status = 200
     mock_response.json = AsyncMock(
@@ -23,8 +22,16 @@ def mock_session():
     mock_response.text = AsyncMock(
         return_value='{"choices": [{"message": {"content": "Test response content"}}]}'
     )
-    session.post.return_value.__aenter__.return_value = mock_response  # For async with
-    session.post.return_value.__aexit__.return_value = None
+
+    # Configure session.post to be an AsyncMock that returns a context manager
+    # The context manager itself is also an AsyncMock
+    context_manager_mock = AsyncMock()
+    context_manager_mock.__aenter__.return_value = mock_response
+    context_manager_mock.__aexit__.return_value = (
+        None  # Or AsyncMock(return_value=None)
+    )
+
+    session.post = AsyncMock(return_value=context_manager_mock)
     return session
 
 
@@ -106,8 +113,8 @@ async def test_fireworks_client_generate_payload_structure(mock_session: AsyncMo
 
     assert "json" in called_kwargs
     payload = called_kwargs["json"]
-    # Verify the current minimal payload structure (no optional params)
-    expected_keys = {"model", "messages", "temperature", "max_tokens"}
+    # Verify the current minimal payload structure (now includes top_p by default)
+    expected_keys = {"model", "messages", "temperature", "max_tokens", "top_p"}
     assert set(payload.keys()) == expected_keys
 
 
@@ -134,8 +141,15 @@ async def test_fireworks_client_generate_default_params(mock_session: AsyncMock)
     assert payload["model"] == "test-model"
     assert payload["temperature"] == 0.0  # Default from ModelClient
     assert payload["max_tokens"] == 1024  # Default from ModelClient
-    # Verify optional parameters are NOT in the payload (minimal approach)
-    assert "top_p" not in payload
-    assert "top_k" not in payload
-    assert "min_p" not in payload
-    assert "reasoning_effort" not in payload
+    # Verify optional parameters
+    assert "top_p" in payload  # top_p is included by default
+    assert payload["top_p"] == 0.95  # Default from ModelClient
+    assert (
+        "top_k" not in payload
+    )  # top_k is not included by default in payload by FireworksModelClient
+    assert (
+        "min_p" not in payload
+    )  # min_p is not included by default in payload by FireworksModelClient
+    assert (
+        "reasoning_effort" not in payload
+    )  # reasoning_effort is not included by default in payload by FireworksModelClient

@@ -256,14 +256,34 @@ class TestDeepCoderReward(unittest.TestCase):
                     self.skipTest("Skipping due to E2B connection issues")
 
             self.assertIsInstance(result, EvaluateResult)
-            self.assertEqual(result.score, 1.0)
-            self.assertIn("test_results", result.metrics)
-            if (
-                "test_results" in result.metrics
-                and result.metrics["test_results"].reason
-            ):
-                details = json.loads(result.metrics["test_results"].reason)
-                self.assertTrue(all(tc.get("passed") for tc in details))
+            try:
+                self.assertEqual(result.score, 1.0)
+                self.assertIn("test_results", result.metrics)
+                if (
+                    "test_results" in result.metrics
+                    and result.metrics["test_results"].reason
+                ):
+                    details = json.loads(result.metrics["test_results"].reason)
+                    self.assertTrue(all(tc.get("passed") for tc in details))
+            except AssertionError as ae:
+                print(f"AssertionError in test_python_all_tests_pass_e2b: {ae}")
+                print(f"result.score: {result.score}")
+                print(f"result.reason: {result.reason}")
+                if hasattr(result, "metrics") and result.metrics:
+                    print(f"result.metrics: {result.metrics}")
+                    if "test_results" in result.metrics and hasattr(
+                        result.metrics["test_results"], "reason"
+                    ):
+                        print(
+                            f"result.metrics['test_results'].reason: {result.metrics['test_results'].reason}"
+                        )
+                    if "error" in result.metrics and hasattr(
+                        result.metrics["error"], "reason"
+                    ):
+                        print(
+                            f"result.metrics['error'].reason: {result.metrics['error'].reason}"
+                        )
+                raise  # Re-raise the assertion error
         except Exception as e:
             if (
                 "502 Bad Gateway" in str(e)

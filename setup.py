@@ -43,6 +43,8 @@ setup(
             "peft>=0.7.0",
             # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
+            "mcp==1.9.2",
+            "e2b>=0.15.0",  # Added e2b for E2B environment tests
         ],
         "deepseek": [
             "difflib>=3.0.0",

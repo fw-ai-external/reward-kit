@@ -44,8 +44,86 @@ def run_evaluation_command_logic(cfg: DictConfig) -> None:
 
     try:
         pipeline = EvaluationPipeline(pipeline_cfg=cfg)
-        asyncio.run(pipeline.run())
+        all_results = asyncio.run(pipeline.run())  # Store the results
         logger.info("'run-evaluation' command finished successfully.")
+
+        # --- Add Summary Report ---
+        if all_results:
+            total_samples = len(all_results)
+            errors = [r for r in all_results if "error" in r and r["error"]]
+            # Consider a result successful for summary if it has a score and no critical error string
+            successful_evals = [
+                r
+                for r in all_results
+                if r.get("evaluation_score") is not None
+                and not ("error" in r and r["error"])
+            ]
+
+            num_errors = len(errors)
+            num_successful = len(successful_evals)
+
+            summary_lines = [
+                "\n--- Evaluation Summary ---",
+                f"Total samples processed: {total_samples}",
+                f"Successful evaluations: {num_successful}",
+                f"Evaluation errors: {num_errors}",
+            ]
+
+            if num_successful > 0:
+                scores = [
+                    r["evaluation_score"]
+                    for r in successful_evals
+                    if isinstance(r.get("evaluation_score"), (int, float))
+                ]
+                if scores:
+                    avg_score = sum(scores) / len(scores)
+                    min_score = min(scores)
+                    max_score = max(scores)
+                    summary_lines.append(f"Average score: {avg_score:.2f}")
+                    summary_lines.append(f"Min score: {min_score:.2f}")
+                    summary_lines.append(f"Max score: {max_score:.2f}")
+
+                    # Score distribution (example: 5 bins)
+                    bins = [
+                        0.0,
+                        0.2,
+                        0.4,
+                        0.6,
+                        0.8,
+                        1.01,
+                    ]  # 1.01 to include 1.0 in last bin
+                    score_counts = [0] * (len(bins) - 1)
+                    for score in scores:
+                        for i in range(len(bins) - 1):
+                            if bins[i] <= score < bins[i + 1]:
+                                score_counts[i] += 1
+                                break
+                    summary_lines.append("Score distribution:")
+                    for i in range(len(bins) - 1):
+                        # Ensure bin upper bound is displayed correctly as 1.0 for the last bin
+                        upper_bin_display = 1.0 if bins[i + 1] > 1.0 else bins[i + 1]
+                        summary_lines.append(
+                            f"  [{bins[i]:.1f} - {upper_bin_display:.1f}): {score_counts[i]}"
+                        )
+
+            if num_errors > 0:
+                summary_lines.append("\nError details (first 5):")
+                for i, err_item in enumerate(errors[:5]):
+                    err_id = err_item.get("id", "N/A")
+                    err_msg = err_item.get("error", "Unknown error")
+                    # Truncate long error messages for summary
+                    if len(err_msg) > 100:
+                        err_msg = err_msg[:100] + "..."
+                    summary_lines.append(f"  Sample ID {err_id}: {err_msg}")
+
+            summary_lines.append("--- End of Summary ---")
+
+            # Use logger.info for summary to respect overall logging settings
+            for line in summary_lines:
+                logger.info(line)
+        else:
+            logger.info("No results to summarize.")
+
     except ValueError as ve:
         logger.error(f"Configuration or Value error in pipeline: {ve}", exc_info=True)
         sys.exit(1)  # Exit with error code for critical failures

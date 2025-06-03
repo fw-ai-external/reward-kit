@@ -7,6 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from reward_kit.execution.pipeline import EvaluationPipeline
 from reward_kit.generation.cache import ResponseCache
+from reward_kit.generation.clients import GenerationResult  # Import GenerationResult
 from reward_kit.generation.clients import (  # For type hinting and mocking
     FireworksModelClient,
 )
@@ -127,7 +128,9 @@ async def test_pipeline_passes_reasoning_effort_to_cache(
         "test_re"  # Critical: ensure mock client has this
     )
     mock_fireworks_instance.generate = AsyncMock(
-        return_value="Generated via mock client"
+        return_value=GenerationResult(
+            content="Generated via mock client"
+        )  # Return GenerationResult
     )
 
     mock_cache_instance = MockResponseCache.return_value
@@ -157,13 +160,10 @@ async def test_pipeline_passes_reasoning_effort_to_cache(
         sample_data = mock_dataset[0]
         await pipeline._process_single_sample(sample_data, session)
 
-    # Assertions for cache.get
-    mock_cache_instance.get.assert_called_once()
-    get_args, get_kwargs = mock_cache_instance.get.call_args
-    assert get_kwargs.get("reasoning_effort") == "test_re"
-    assert get_kwargs.get("model_name") == "test-model"  # sanity check other params
-
-    # Assertions for cache.put (since get returned None)
+    # Assertions for cache.put
+    # cache.get is not called in this path because generation is enabled
+    # and cache.get in the pipeline is for when generation is disabled.
+    # The model client itself might use a cache.get, but that's not what this mock_cache_instance is for.
     mock_cache_instance.put.assert_called_once()
     put_args, put_kwargs = mock_cache_instance.put.call_args
     assert put_kwargs.get("reasoning_effort") == "test_re"

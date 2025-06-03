@@ -781,10 +781,22 @@ class LocalDockerOrchestrationClient(AbstractOrchestrationClient):
                 )
             target_base_url = instance.mcp_endpoint_url.rstrip("/")
             try:
-                async with streamablehttp_client(
-                    base_url=target_base_url
-                ) as session:  # type: ClientSession
-                    list_tools_result = await session.list_tools()
+                async with streamablehttp_client(base_url=target_base_url) as (
+                    read_s,
+                    write_s,
+                    _,  # get_session_id_func usually not needed for a single call
+                ):
+                    # Create a ClientSession with these streams
+                    mcp_session_for_list_tools = ClientSession(
+                        read_stream=read_s,
+                        write_stream=write_s,
+                        client_info=DEFAULT_CLIENT_INFO,  # Added default client info
+                    )
+                    # Initialize the session (MCP handshake)
+                    await mcp_session_for_list_tools.initialize()
+                    list_tools_result = await mcp_session_for_list_tools.list_tools()
+                    # ClientSession does not need to be explicitly closed here if not used further,
+                    # as the underlying streams from streamablehttp_client will be closed by its context manager.
                     logger.info(
                         f"Successfully listed {len(list_tools_result.tools)} tools from {target_base_url} for HTTP instance {instance.instance_id}"
                     )

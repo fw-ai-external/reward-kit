@@ -9,7 +9,7 @@ This script verifies that the example setup is working correctly by:
 """
 
 import asyncio
-import json
+import json  # Ensure json is imported
 import os
 import sys
 from pathlib import Path
@@ -17,7 +17,10 @@ from pathlib import Path
 # Add the reward-kit package to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from reward_kit.models import Message
+from reward_kit.models import (  # Ensure EvaluateResult is imported
+    EvaluateResult,
+    Message,
+)
 
 
 def test_template_structure():
@@ -76,29 +79,74 @@ def test_reward_function_import():
     """Test that the reward function can be imported and has correct signature."""
     print("Testing reward function import...")
 
-    # Import the reward function
-    import reward_function
+    # Import EvaluateResult specifically within this function's scope
+    from examples.mcp_agent_filesystem_rl import main as filesystem_rl_main
+    from reward_kit.models import EvaluateResult
 
     assert hasattr(
-        reward_function, "mcp_filesystem_move_reward"
-    ), "Reward function not found"
+        filesystem_rl_main, "evaluate"
+    ), "Reward function 'evaluate' not found in main.py"
 
-    # Test with mock data (without MCP server)
-    messages = [
-        {"role": "user", "content": "Move the file"},
-        {"role": "assistant", "content": "I'll help you move the file"},
+    # Test with mock data
+    # The 'evaluate' function expects: messages, ground_truth, final_filesystem_state, task_description
+    mock_messages = [
+        Message(
+            role="user",
+            content="Move the file /data/source_dir/file_to_move.txt to /data/target_dir/file_to_move.txt",
+        ),
+        Message(role="assistant", content="Okay, I will move the file."),
     ]
-
-    result = reward_function.mcp_filesystem_move_reward(
-        messages=messages,
-        rk_session_id=None,  # This should trigger the early return
-        instance_id=None,
+    mock_ground_truth = (
+        "move file_to_move.txt to target_dir"  # Matched to main.py's parse_ground_truth
     )
 
-    assert result.score == 0.0, "Expected 0.0 score for missing session ID"
-    assert not result.is_score_valid, "Expected invalid score for missing session ID"
+    # Mock a final_filesystem_state that indicates success for the move operation
+    # This structure should match what the 'directory_tree' tool (or similar) would output,
+    # and what the 'evaluate' function in main.py expects after parsing.
+    mock_final_fs_state_success = {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    [  # Simulating output of directory_tree tool for /data
+                        {
+                            "name": "source_dir",
+                            "type": "directory",
+                            "children": [],
+                        },  # file_to_move.txt is gone
+                        {
+                            "name": "target_dir",
+                            "type": "directory",
+                            "children": [
+                                {
+                                    "name": "file_to_move.txt",
+                                    "type": "file",
+                                }  # file_to_move.txt is here
+                            ],
+                        },
+                    ]
+                ),
+            }
+        ]
+    }
 
-    print("✓ Reward function import and basic validation works")
+    result_success = filesystem_rl_main.evaluate(
+        messages=mock_messages,
+        ground_truth=mock_ground_truth,
+        final_filesystem_state=mock_final_fs_state_success,
+        task_description="Test move success",
+    )
+
+    assert isinstance(
+        result_success, EvaluateResult
+    ), "evaluate function did not return an EvaluateResult"
+    # Based on main.py logic, a perfect move should result in score 1.0
+    assert (
+        result_success.score == 1.0
+    ), f"Expected score 1.0 for mock success, got {result_success.score}. Reason: {result_success.reason}"
+    assert result_success.is_score_valid
+
+    print("✓ Reward function 'evaluate' import and basic validation works")
 
 
 async def test_mcp_server_connectivity():

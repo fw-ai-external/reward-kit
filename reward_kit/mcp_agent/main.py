@@ -52,11 +52,50 @@ async def main_async(config_path: str, host: str, port: int):
         return
 
     # Configure logging early
+    server_root_log_level_str = app_config.log_level.upper()
+    server_root_log_level = getattr(logging, server_root_log_level_str, logging.INFO)
+
     logging.basicConfig(
-        level=app_config.log_level.upper(),
+        level=server_root_log_level,  # Root logger for the server process
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",  # Added datefmt for consistency
     )
-    logger.info(f"Configuration loaded from {config_path}")
+    logger.info(
+        f"Configuration loaded from {config_path}. Server root log level set to {server_root_log_level_str}."
+    )
+
+    # Ensure reward_kit.mcp_agent namespace respects this level
+    rk_mcp_agent_logger = logging.getLogger("reward_kit.mcp_agent")
+    rk_mcp_agent_logger.setLevel(server_root_log_level)
+
+    # Be very explicit for the intermediary_server logger as well
+    intermediary_server_logger = logging.getLogger(
+        "reward_kit.mcp_agent.intermediary_server"
+    )
+    intermediary_server_logger.setLevel(server_root_log_level)
+    # Also ensure its handlers respect this level
+    for handler in intermediary_server_logger.handlers:
+        handler.setLevel(server_root_log_level)
+    # If it's propagating to the 'reward_kit.mcp_agent' parent, ensure that parent's handlers are also correct.
+    # The parent rk_mcp_agent_logger already had its level set.
+
+    # Quiet down other noisy libraries for the server unless server itself is in DEBUG mode
+    if server_root_log_level > logging.DEBUG:  # e.g. if INFO or WARNING
+        libraries_to_quiet = [
+            "httpx",
+            "mcp",
+            "uvicorn",
+            "starlette",
+            "asyncio",
+            "hpack",
+            "httpcore",
+        ]
+        for lib_name in libraries_to_quiet:
+            logging.getLogger(lib_name).setLevel(logging.WARNING)
+
+    logger.info(
+        f"Log level for 'reward_kit.mcp_agent' namespace set to {logging.getLevelName(logging.getLogger('reward_kit.mcp_agent').getEffectiveLevel())}"
+    )
 
     # 1. Instantiate RewardKitIntermediaryServer
     _mcp_server_instance_ref = RewardKitIntermediaryServer(
@@ -85,7 +124,6 @@ async def main_async(config_path: str, host: str, port: int):
     @asynccontextmanager
     async def mcp_server_lifespan_only(app_for_lifespan: Starlette):
         # This lifespan only manages the _mcp_server_instance_ref
-        global _mcp_server_instance_ref
         if _mcp_server_instance_ref:
             logger.info(
                 "MCP Server Lifespan: Starting up RewardKitIntermediaryServer..."
@@ -115,6 +153,7 @@ async def main_async(config_path: str, host: str, port: int):
         host=host,
         port=port,
         log_level=app_config.log_level.lower(),
+        log_config=None,  # Prevent Uvicorn from overriding our basicConfig for app loggers
     )
     uvicorn_server = uvicorn.Server(config)
     _uvicorn_server_instance_ref = uvicorn_server

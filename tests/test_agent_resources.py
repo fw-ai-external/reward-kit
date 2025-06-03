@@ -13,6 +13,7 @@ from typing import Any, Dict  # Added Dict, Any
 from unittest.mock import AsyncMock  # For mocking async methods if needed later
 
 import pytest
+import pytest_asyncio  # Import pytest_asyncio
 
 from reward_kit.agent.resources.docker_resource import (
     DOCKER_SDK_AVAILABLE,
@@ -353,7 +354,7 @@ class TestDockerResource:
 
     TEST_IMAGE = "alpine:latest"
 
-    @pytest.fixture(scope="function")
+    @pytest_asyncio.fixture(scope="function")  # Changed to pytest_asyncio.fixture
     async def docker_resource(self):  # Made async fixture
         resource = DockerResource()
         try:
@@ -370,7 +371,10 @@ class TestDockerResource:
         await resource.close()
 
     async def test_setup_docker_container(self, docker_resource: DockerResource):
-        config = {"image_name": self.TEST_IMAGE}
+        config = {
+            "image_name": self.TEST_IMAGE,
+            "docker_run_options": {"command": ["tail", "-f", "/dev/null"]},
+        }
         await docker_resource.setup(config)
         assert docker_resource._container is not None
         # Docker SDK calls are blocking, wrap in to_thread for async tests
@@ -382,7 +386,12 @@ class TestDockerResource:
         assert result["exit_code"] == 0 and "hello" in result["output"]
 
     async def test_fork_docker_container(self, docker_resource: DockerResource):
-        await docker_resource.setup({"image_name": self.TEST_IMAGE})
+        await docker_resource.setup(
+            {
+                "image_name": self.TEST_IMAGE,
+                "docker_run_options": {"command": ["tail", "-f", "/dev/null"]},
+            }
+        )
         await docker_resource.step(
             "exec_command", {"command": "touch /tmp/original_file.txt"}
         )
@@ -397,11 +406,30 @@ class TestDockerResource:
             await forked_resource.close()
 
     async def test_checkpoint_and_restore_docker(self, docker_resource: DockerResource):
-        config = {"image_name": self.TEST_IMAGE}
+        config = {
+            "image_name": self.TEST_IMAGE,
+            "docker_run_options": {"command": ["tail", "-f", "/dev/null"]},
+        }
         await docker_resource.setup(config)
-        await docker_resource.step(
-            "exec_command", {"command": "echo 'initial_data' > /data.txt"}
+        create_file_command = "sh -c \"echo 'initial_data' > /data.txt\""
+        create_file_result = await docker_resource.step(
+            "exec_command", {"command": create_file_command}
         )
+        assert (
+            create_file_result["exit_code"] == 0
+        ), f"Failed to create /data.txt with '{create_file_command}': {create_file_result['output']}"
+
+        # Optionally, verify file content immediately after creation in the source container
+        verify_result = await docker_resource.step(
+            "exec_command", {"command": "cat /data.txt"}
+        )
+        assert (
+            verify_result["exit_code"] == 0
+        ), f"Failed to cat /data.txt after creation: {verify_result['output']}"
+        assert (
+            "initial_data" in verify_result["output"]
+        ), f"/data.txt content mismatch after creation: {verify_result['output']}"
+
         checkpoint_info = await docker_resource.checkpoint()
         checkpoint_image_id = checkpoint_info["image_id"]
         restored_resource = DockerResource()
@@ -414,28 +442,35 @@ class TestDockerResource:
             assert "initial_data" in result["output"]
         finally:
             await restored_resource.close()
-            if (
-                checkpoint_image_id
-                and checkpoint_image_id
-                != (
-                    await asyncio.to_thread(
+            # Note: The original image_name from config is self.TEST_IMAGE.
+            # The committed image (checkpoint_image_id) will be different.
+            # We should always try to clean up the checkpoint_image_id if it exists.
+            if checkpoint_image_id:
+                try:
+                    # Check if it's the base image to avoid removing it if tests are re-run without pulling
+                    base_image_obj = await asyncio.to_thread(
                         docker_resource._client.images.get, self.TEST_IMAGE
                     )
-                ).id
-            ):
-                try:
-                    await asyncio.to_thread(
-                        docker_resource._client.images.remove,
-                        image=checkpoint_image_id,
-                        force=True,
-                    )
-                except Exception as e:
+                    if base_image_obj.id != checkpoint_image_id:
+                        await asyncio.to_thread(
+                            docker_resource._client.images.remove,
+                            image=checkpoint_image_id,
+                            force=True,
+                        )
+                except (
+                    Exception
+                ) as e:  # Catch NotFound from get or APIError from remove
                     print(
                         f"Warning: failed to cleanup checkpoint image {checkpoint_image_id}: {e}"
                     )
 
     async def test_close_docker_resource(self, docker_resource: DockerResource):
-        await docker_resource.setup({"image_name": self.TEST_IMAGE})
+        await docker_resource.setup(
+            {
+                "image_name": self.TEST_IMAGE,
+                "docker_run_options": {"command": ["tail", "-f", "/dev/null"]},
+            }
+        )
         assert (
             docker_resource._container is not None
         )  # Ensure container exists before accessing id

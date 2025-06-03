@@ -1,3 +1,4 @@
+import json  # Moved import to top of file
 from typing import Any, Dict, List, Optional
 
 from reward_kit.models import EvaluateResult, Message, MetricResult
@@ -29,20 +30,80 @@ def evaluate(
     completion = messages[-1].content if messages and messages[-1].content else ""
 
     # Use provided arguments directly
-    final_state = final_filesystem_state if final_filesystem_state is not None else {}
+    # final_filesystem_state is the raw output from the directory_tree tool
+    # which is like: {"content": [{"type": "text", "text": "[...json array...]"}]}
+    # We need to parse the JSON string within it.
+
+    actual_root_items = []
+    raw_state_capture = final_filesystem_state
+
+    if (
+        isinstance(raw_state_capture, dict)
+        and raw_state_capture.get("content")
+        and isinstance(raw_state_capture["content"], list)
+        and len(raw_state_capture["content"]) > 0
+        and isinstance(raw_state_capture["content"][0], dict)
+        and raw_state_capture["content"][0].get("type") == "text"
+        and isinstance(raw_state_capture["content"][0].get("text"), str)
+    ):
+        try:
+            # The 'text' field contains the JSON string of the directory tree
+            parsed_fs_tree = json.loads(raw_state_capture["content"][0]["text"])
+            if isinstance(parsed_fs_tree, list):  # Ensure it's a list after parsing
+                actual_root_items = parsed_fs_tree
+            else:
+                print(
+                    f"Warning: Parsed directory_tree output is not a list: {type(parsed_fs_tree)}"
+                )
+        except json.JSONDecodeError as e:
+            print(f"Warning: Failed to parse JSON from directory_tree output: {e}")
+            actual_root_items = []  # Default to empty list on error
+    elif isinstance(
+        raw_state_capture, list
+    ):  # If it's already a parsed list (e.g. from older direct passing)
+        actual_root_items = raw_state_capture
+    else:
+        print(
+            f"Warning: final_filesystem_state is not in expected format. Type: {type(raw_state_capture)}"
+        )
+
     current_task_description = task_description if task_description is not None else ""
 
     # Parse ground truth expectation
     expected_state = parse_ground_truth(ground_truth)
 
     # Compare actual vs expected filesystem state
-    filesystem_score = calculate_filesystem_match_score(final_state, expected_state)
+    filesystem_score = calculate_filesystem_match_score(
+        actual_root_items, expected_state
+    )
 
     # Analyze the conversation for task completion indicators
     completion_score = analyze_task_completion(completion, current_task_description)
 
     # Combined score
-    final_score = min(filesystem_score * completion_score, 1.0)
+    # For now, let's simplify: if filesystem match is perfect, score is 1, otherwise it's completion_score * fs_score
+    # This gives more weight to actual filesystem changes.
+    if filesystem_score == 1.0:
+        final_score = 1.0  # Prioritize perfect filesystem match
+    else:
+        # If fs match is not perfect, weigh it with completion.
+        # If list operation, completion score is less critical than actual list content.
+        # Let's make fs_score dominant for now if it's not 0.
+        if (
+            expected_state.get("expected_operations") == ["list"]
+            and filesystem_score > 0
+        ):
+            final_score = filesystem_score  # For list, fs_score is primary
+        else:
+            final_score = min(filesystem_score * 0.7 + completion_score * 0.3, 1.0)
+
+    # Add logging for scores
+    print(
+        f"[INFO] Sample ID from reward_function: (not available here, but for task: {current_task_description or ground_truth})"
+    )
+    print(f"[INFO] Filesystem Score: {filesystem_score:.2f}")
+    print(f"[INFO] Completion Score: {completion_score:.2f}")
+    print(f"[INFO] Final Score: {final_score:.2f}")
 
     return EvaluateResult(
         score=final_score,
@@ -71,11 +132,11 @@ def parse_ground_truth(ground_truth: str) -> Dict[str, Any]:
             "source_files": ["file_to_move.txt"],
             "target_location": "target_dir/file_to_move.txt",
         }
-    elif "copy all .txt files to backup_dir" in ground_truth:
+    elif "list contents of /data/source_dir" in ground_truth:
         return {
-            "expected_operations": ["copy"],
-            "source_pattern": "*.txt",
-            "target_location": "backup_dir/",
+            "expected_operations": ["list"],
+            "path_to_list": "/data/source_dir",
+            "expected_files": ["file_to_move.txt", "sample.txt"],
         }
     elif "create report.txt with specified content" in ground_truth:
         return {
@@ -86,75 +147,150 @@ def parse_ground_truth(ground_truth: str) -> Dict[str, Any]:
     return {"expected_operations": []}
 
 
-def calculate_filesystem_match_score(actual_state: Dict, expected_state: Dict) -> float:
-    """Calculate how well the actual filesystem state matches expectations."""
+def calculate_filesystem_match_score(
+    actual_root_items: List[Dict], expected_state: Dict
+) -> float:
+    """
+    Calculate how well the actual filesystem state matches expectations.
+    actual_root_items is a list of dicts representing items in /data.
+    """
     if not expected_state.get("expected_operations"):
-        return 1.0
+        return 1.0  # No specific operation to check, assume success if no error by this point.
 
-    workspace_tree = actual_state.get("workspace_tree", {})
     operations = expected_state.get("expected_operations", [])
 
     if "move" in operations:
-        return check_move_operation(workspace_tree, expected_state)
-    elif "copy" in operations:
-        return check_copy_operation(workspace_tree, expected_state)
+        return check_move_operation(actual_root_items, expected_state)
+    elif "list" in operations:
+        return check_list_operation(actual_root_items, expected_state)
     elif "create" in operations:
-        return check_create_operation(workspace_tree, expected_state)
+        return check_create_operation(actual_root_items, expected_state)
 
     return 0.0
 
 
-def check_move_operation(workspace_tree: Dict, expected_state: Dict) -> float:
-    """Check if file was moved correctly."""
-    target_path = expected_state.get("target_location", "")
-    path_parts = target_path.split("/")
+def find_node_by_path(
+    root_items: List[Dict], relative_path_parts: List[str]
+) -> Optional[Dict]:
+    """Helper to find a node (file or dir) by its relative path parts from root_items."""
+    current_level_items = root_items
+    node = None
+    for i, part_name in enumerate(relative_path_parts):
+        found_part_node = None
+        for item in current_level_items:
+            if item.get("name") == part_name:
+                # If it's the last part, it can be a file or dir.
+                # If not last part, must be a dir to continue.
+                if i == len(relative_path_parts) - 1:  # Last part
+                    found_part_node = item
+                    break
+                elif item.get("type") == "directory":  # Intermediate part must be dir
+                    found_part_node = item
+                    break
 
-    # Navigate to target location
-    current = workspace_tree
-    for part in path_parts[:-1]:
-        if current.get("type") == "directory":
-            current = current.get("children", {}).get(part, {})
+        if found_part_node:
+            node = found_part_node
+            if node.get("type") == "directory" and i < len(relative_path_parts) - 1:
+                current_level_items = node.get("children", [])
+            elif i < len(relative_path_parts) - 1:  # Intermediate part is not a dir
+                return None
         else:
-            return 0.0
+            return None  # Path part not found
+    return node
 
-    # Check if file exists at target
-    filename = path_parts[-1]
+
+def check_move_operation(actual_root_items: List[Dict], expected_state: Dict) -> float:
+    """Check if file was moved correctly. target_location is relative to /data."""
+    target_location_rel = expected_state.get(
+        "target_location", ""
+    )  # e.g., "target_dir/file_to_move.txt"
+
+    target_path_parts = [part for part in target_location_rel.split("/") if part]
+
+    if not target_path_parts:
+        return 0.0
+
+    moved_file_node = find_node_by_path(actual_root_items, target_path_parts)
+
+    if moved_file_node and moved_file_node.get("type") == "file":
+        # Optionally, also check if the file is GONE from the source.
+        # This requires knowing the original source path.
+        # For now, just checking existence at target.
+        return 1.0
+    return 0.0
+
+
+def check_list_operation(actual_root_items: List[Dict], expected_state: Dict) -> float:
+    """Check if directory listing is correct. path_to_list is absolute from container root."""
+    path_to_list_abs = expected_state.get(
+        "path_to_list", ""
+    )  # e.g., "/data/source_dir"
+
+    # Convert absolute path to list of parts relative to /data
+    # e.g., "/data/source_dir" -> ["source_dir"]
+    # e.g., "/data" -> [] (listing root of /data)
+    relative_path_parts = [
+        part for part in path_to_list_abs.split("/") if part and part != "data"
+    ]
+
+    listed_dir_node = None
+    if not relative_path_parts:
+        # This case means we are listing the root of what was captured (e.g. /data itself)
+        # So, the children are actual_root_items directly.
+        # This path is not taken by current dataset.jsonl which has /data/source_dir
+        # If it were /data, actual_files would be [item.get("name") for item in actual_root_items if item.get("type") == "file"]
+        # For now, if this path is hit, it's an unexpected configuration for this function's design.
+        # However, if path_to_list is "/data", then actual_root_items are its children.
+        # This logic could be expanded if listing the root of the capture path is a valid scenario.
+        # For this example, we assume path_to_list targets a named directory within the capture_path.
+        # If path_to_list was intended to be the root of capture, expected_files would be checked against actual_root_items.
+        # Given current dataset, this branch implies an issue or a need for more robust path handling for root.
+        return 0.0
+    else:
+        listed_dir_node = find_node_by_path(actual_root_items, relative_path_parts)
+
+    if not listed_dir_node or listed_dir_node.get("type") != "directory":
+        return 0.0
+
+    actual_files = [
+        child.get("name")
+        for child in listed_dir_node.get("children", [])
+        if child.get("type") == "file"
+    ]
+    expected_files = expected_state.get("expected_files", [])
+
     if (
-        current.get("type") == "directory"
-        and filename in current.get("children", {})
-        and current["children"][filename].get("type") == "file"
-    ):
+        not expected_files
+    ):  # If ground truth doesn't specify files, any successful list is 1.0
         return 1.0
 
-    return 0.0
+    match_count = 0
+    for ef in expected_files:
+        if ef in actual_files:
+            match_count += 1
+
+    score = float(match_count) / len(expected_files) if expected_files else 1.0
+    return score
 
 
-def check_copy_operation(workspace_tree: Dict, expected_state: Dict) -> float:
-    """Check if files were copied correctly."""
-    # Simplified check - look for files in target directory
-    target_dir = expected_state.get("target_location", "").rstrip("/")
+def check_create_operation(
+    actual_root_items: List[Dict], expected_state: Dict
+) -> float:
+    """Check if file was created. target_file is relative to /data."""
+    target_filename_rel = expected_state.get("target_file", "")  # e.g., "report.txt"
+    # expected_content = expected_state.get("expected_content", "") # Content check not possible with directory_tree
 
-    if workspace_tree.get("type") == "directory":
-        children = workspace_tree.get("children", {})
-        if target_dir in children and children[target_dir].get("type") == "directory":
-            target_children = children[target_dir].get("children", {})
-            # Check if any .txt files exist in target
-            txt_files = [f for f in target_children.keys() if f.endswith(".txt")]
-            return 1.0 if txt_files else 0.0
+    target_path_parts = [part for part in target_filename_rel.split("/") if part]
 
-    return 0.0
+    if not target_path_parts:
+        return 0.0
 
+    created_file_node = find_node_by_path(actual_root_items, target_path_parts)
 
-def check_create_operation(workspace_tree: Dict, expected_state: Dict) -> float:
-    """Check if file was created with correct content."""
-    target_file = expected_state.get("target_file", "")
-    expected_content = expected_state.get("expected_content", "")
-
-    if workspace_tree.get("type") == "directory":
-        children = workspace_tree.get("children", {})
-        if target_file in children and children[target_file].get("type") == "file":
-            actual_content = children[target_file].get("content", "")
-            return 1.0 if expected_content in actual_content else 0.5
+    if created_file_node and created_file_node.get("type") == "file":
+        # Content check is not feasible with directory_tree output as it doesn't include content.
+        # If content check was required, reward function would need to use 'read_file' tool.
+        return 1.0  # File exists
 
     return 0.0
 

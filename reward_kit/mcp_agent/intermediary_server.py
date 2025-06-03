@@ -27,7 +27,7 @@ from reward_kit.mcp_agent.orchestration.remote_http_client import (
 from reward_kit.mcp_agent.session import IntermediarySessionData
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Keep debug for now
+# logger.setLevel(logging.DEBUG)  # Removed: Let level be set by main config
 
 from mcp.server.fastmcp.server import Context as FastMCPContext
 from mcp.server.fastmcp.server import FastMCP
@@ -111,6 +111,29 @@ class RewardKitIntermediaryServer(FastMCP):
         self.add_tool(self._ping_actual, name="ping")
 
         logger.info("Registered tools directly with FastMCP.")
+
+        # Explicitly set this module's logger level based on app_config
+        # This is to ensure it overrides any prior default or hardcoded DEBUG level
+        # if external configuration in main.py isn't fully effective.
+        try:
+            config_log_level_str = app_config.log_level.upper()
+            config_log_level_int = getattr(logging, config_log_level_str, logging.INFO)
+            if logger.getEffectiveLevel() != config_log_level_int:
+                logger.info(
+                    f"Overriding intermediary_server logger level from {logging.getLevelName(logger.getEffectiveLevel())} to {config_log_level_str}"
+                )
+                logger.setLevel(config_log_level_int)
+                # Also ensure handlers attached directly to this logger respect it (if any)
+                for handler in logger.handlers:
+                    handler.setLevel(config_log_level_int)
+            logger.info(
+                f"IntermediaryServer logger effective level: {logging.getLevelName(logger.getEffectiveLevel())}"
+            )
+
+        except Exception as e_log:
+            logger.error(
+                f"Error trying to set intermediary_server logger level: {e_log}"
+            )
 
     # Removed _execute_proxied_tool_impl and _internal_tool_handlers
 

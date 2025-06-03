@@ -24,7 +24,9 @@ def test_template_structure():
     """Test that the template directory has the correct structure."""
     print("Testing template directory structure...")
 
-    template_path = Path("../../mcp_agent_test_templates/fs_rl_example_scenario")
+    # Construct path relative to this test file, then go to project root and find the template
+    base_path = Path(__file__).parent.parent.parent
+    template_path = base_path / "mcp_agent_test_templates" / "fs_rl_example_scenario"
 
     # Check directories exist
     assert template_path.exists(), f"Template directory not found: {template_path}"
@@ -42,18 +44,30 @@ def test_dataset_format():
     """Test that the dataset file is correctly formatted."""
     print("Testing dataset format...")
 
-    with open("dataset.jsonl", "r") as f:
+    dataset_file_path = Path(__file__).parent / "dataset.jsonl"
+    assert dataset_file_path.exists(), f"Dataset file not found: {dataset_file_path}"
+    with open(dataset_file_path, "r") as f:
         line = f.readline().strip()
         data = json.loads(line)
 
-    assert "prompt" in data, "Dataset missing 'prompt' field"
+    assert "user_query" in data, "Dataset missing 'user_query' field"
     assert (
-        "important_document.txt" in data["prompt"]
-    ), "Prompt doesn't mention target file"
+        "ground_truth_for_eval" in data
+    ), "Dataset missing 'ground_truth_for_eval' field"
+    # Specific checks for this example's dataset content
     assert (
-        "/data/source_files/" in data["prompt"]
-    ), "Prompt doesn't mention source directory"
-    assert "/data/archive/" in data["prompt"], "Prompt doesn't mention target directory"
+        "file_to_move.txt" in data["user_query"]
+    ), "User query doesn't mention target file"
+    assert (
+        "/data/source_dir/" in data["user_query"]
+    ), "User query doesn't mention source directory"
+    assert (
+        "/data/target_dir/" in data["user_query"]
+    ), "User query doesn't mention target directory"
+    assert (
+        "move /data/source_dir/file_to_move.txt to /data/target_dir/file_to_move.txt"
+        in data["ground_truth_for_eval"]
+    )
 
     print("✓ Dataset format is correct")
 
@@ -118,19 +132,29 @@ def test_config_file():
 
     import yaml
 
-    with open("config.yaml", "r") as f:
+    config_file_path = Path(__file__).parent / "config.yaml"
+    assert config_file_path.exists(), f"Config file not found: {config_file_path}"
+    with open(config_file_path, "r") as f:
         config = yaml.safe_load(f)
 
-    assert "model" in config, "Config missing 'model' field"
-    assert "rollout_settings" in config, "Config missing 'rollout_settings' field"
+    assert "generation" in config, "Config missing 'generation' field"
+    assert (
+        "model_name" in config["generation"]
+    ), "Config missing 'generation.model_name' field"
     assert "dataset" in config, "Config missing 'dataset' field"
-    assert "reward_function" in config, "Config missing 'reward_function' field"
-    assert "agent_config" in config, "Config missing 'agent_config' field"
+    assert (
+        "reward" in config
+    ), "Config missing 'reward' field"  # Changed from reward_function
+    assert (
+        "agent" in config
+    ), "Config missing 'agent' field"  # Changed from agent_config
 
     # Check agent config specifics
-    agent_config = config["agent_config"]
+    agent_config = config["agent"]
     assert agent_config["type"] == "mcp_agent", "Agent type should be 'mcp_agent'"
-    assert "backend_name_ref" in agent_config, "Agent config missing 'backend_name_ref'"
+    assert (
+        "mcp_backend_ref" in agent_config
+    ), "Agent config missing 'mcp_backend_ref'"  # Key name changed
 
     print("✓ Config file is valid")
 

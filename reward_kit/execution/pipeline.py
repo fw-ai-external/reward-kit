@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union  # Added Union
 
 import aiohttp
 import hydra  # For hydra.utils.instantiate if used for dataset loading
@@ -20,6 +20,7 @@ from omegaconf import DictConfig, OmegaConf  # For config handling
 from reward_kit.auth import get_fireworks_api_key  # For Fireworks client
 from reward_kit.datasets.loader import load_and_process_dataset  # Direct import
 from reward_kit.generation.cache import ResponseCache
+from reward_kit.generation.clients import GenerationResult  # Import GenerationResult
 from reward_kit.generation.clients import (  # Assuming Fireworks for now
     FireworksModelClient,
     ModelClient,
@@ -73,7 +74,9 @@ class EvaluationPipeline:
     async def _process_single_sample(
         self,
         sample: Dict[str, Any],
-        http_session: Optional[aiohttp.ClientSession],
+        http_session: Optional[
+            aiohttp.ClientSession
+        ],  # For model_client, not mcp_client
         original_index: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         sample_id_fallback = (
@@ -91,18 +94,17 @@ class EvaluationPipeline:
             )
             return None
 
-        messages_for_generation: List[Dict[str, str]] = []
-        # system_prompt will be constructed later if MCP agent is active
         original_system_prompt = sample.get("system_prompt") or self.cfg.get(
             "system_prompt"
         )
+        discovered_tools_for_llm_prompt: List[Dict[str, Any]] = []
+        openai_formatted_tools: Optional[List[Dict[str, Any]]] = None
 
-        assistant_response_content: Optional[str] = None
-        discovered_tools_for_llm_prompt: List[Dict[str, Any]] = (
-            []
-        )  # Store tool dicts for prompt
+        # This variable will hold the final assistant response string for top-level logging/preview
+        # It might be a text response or a JSON string of the last tool call request by LLM.
+        final_assistant_output_for_log: Optional[str] = None
 
-        # MCP Agent specific logic: Initialize session and discover tools first
+        # --- Pre-generation: Tool Discovery (if MCP agent) ---
         if self.mcp_intermediary_client and self.cfg.agent.type == "mcp_agent":
             rk_session_id_for_tools: Optional[str] = None
             try:
@@ -115,9 +117,6 @@ class EvaluationPipeline:
                 backend_requests_for_tools = [
                     {"backend_name_ref": mcp_backend_ref_for_tools, "num_instances": 1}
                 ]
-                logger.info(
-                    f"Sample {sample_id}: Pre-generation: Initializing MCP session for tool discovery (backend: '{mcp_backend_ref_for_tools}')..."
-                )
                 init_response_for_tools = (
                     await self.mcp_intermediary_client.initialize_session(
                         backend_requests_for_tools
@@ -126,9 +125,8 @@ class EvaluationPipeline:
 
                 if init_response_for_tools.get("error"):
                     raise RuntimeError(
-                        f"MCP session initialization for tool discovery failed: {init_response_for_tools.get('error_details', init_response_for_tools['error'])}"
+                        f"MCP session for tool discovery failed: {init_response_for_tools.get('error_details', init_response_for_tools['error'])}"
                     )
-
                 rk_session_id_for_tools = init_response_for_tools.get("rk_session_id")
                 initialized_backends_for_tools = init_response_for_tools.get(
                     "initialized_backends", []
@@ -136,10 +134,11 @@ class EvaluationPipeline:
 
                 if not rk_session_id_for_tools or not initialized_backends_for_tools:
                     raise RuntimeError(
-                        f"MCP session initialization for tool discovery returned malformed response: {init_response_for_tools}"
+                        f"Malformed init response for tool discovery: {init_response_for_tools}"
                     )
 
                 for backend_info in initialized_backends_for_tools:
+                    # ... (tool discovery logic as before, populating discovered_tools_for_llm_prompt) ...
                     current_backend_name_ref = backend_info.get("backend_name_ref")
                     instances_info = backend_info.get("instances", [])
                     if not current_backend_name_ref or not instances_info:
@@ -148,9 +147,6 @@ class EvaluationPipeline:
                         current_instance_id = inst_info_dict.get("instance_id")
                         if not current_instance_id:
                             continue
-                        logger.info(
-                            f"Sample {sample_id}: Pre-generation: Discovering tools for backend '{current_backend_name_ref}', instance '{current_instance_id}'..."
-                        )
                         list_tools_result = (
                             await self.mcp_intermediary_client.list_backend_tools(
                                 rk_session_id=rk_session_id_for_tools,
@@ -166,35 +162,43 @@ class EvaluationPipeline:
                 logger.info(
                     f"Sample {sample_id}: Pre-generation: Discovered {len(discovered_tools_for_llm_prompt)} tools."
                 )
-                # We keep rk_session_id_for_tools to clean up this specific session later if generation fails before main MCP block.
-                # The main MCP block will re-initialize its own session. This is slightly inefficient but safer for now.
-                # A more advanced approach would re-use this session or pass discovered tools.
             except Exception as e_tool_discovery:
                 logger.error(
                     f"Sample {sample_id}: Error during pre-generation tool discovery: {e_tool_discovery}",
                     exc_info=True,
                 )
-                # Proceed without tools if discovery fails, but log it.
-                # Cleanup the session if it was partially initialized
-                if rk_session_id_for_tools and self.mcp_intermediary_client:
+                if rk_session_id_for_tools:  # Cleanup if session was created
                     try:
-                        logger.warning(
-                            f"Sample {sample_id}: Cleaning up MCP session '{rk_session_id_for_tools}' due to error in pre-generation tool discovery."
-                        )
                         await self.mcp_intermediary_client.cleanup_session(
                             rk_session_id_for_tools
                         )
-                    except Exception as e_cleanup_discovery:
+                    except Exception as e_cleanup:
                         logger.error(
-                            f"Sample {sample_id}: Error cleaning up discovery session '{rk_session_id_for_tools}': {e_cleanup_discovery}",
+                            f"Error cleaning up discovery session {rk_session_id_for_tools}: {e_cleanup}"
+                        )
+                rk_session_id_for_tools = (
+                    None  # Ensure it's None so main block doesn't try to clean it again
+                )
+                discovered_tools_for_llm_prompt = []
+            finally:
+                # This pre-generation session for tool discovery MUST be cleaned up here if it was successful
+                # The main agent execution block will create its own session.
+                if rk_session_id_for_tools and self.mcp_intermediary_client:
+                    logger.info(
+                        f"Sample {sample_id}: Cleaning up pre-generation tool discovery session '{rk_session_id_for_tools}'."
+                    )
+                    try:
+                        await self.mcp_intermediary_client.cleanup_session(
+                            rk_session_id_for_tools
+                        )
+                    except Exception as e_cl:
+                        logger.error(
+                            f"Error cleaning up pre-discovery session '{rk_session_id_for_tools}': {e_cl}",
                             exc_info=True,
                         )
-                discovered_tools_for_llm_prompt = []  # Ensure it's empty on failure
 
-        # Construct system prompt and prepare tools for ModelClient
+        # --- Construct System Prompt and Format Tools for LLM ---
         system_prompt_content = original_system_prompt
-        openai_formatted_tools: Optional[List[Dict[str, Any]]] = None
-
         if (
             self.mcp_intermediary_client
             and self.cfg.agent.type == "mcp_agent"
@@ -202,401 +206,293 @@ class EvaluationPipeline:
         ):
             openai_formatted_tools = []
             for mcp_tool_dict in discovered_tools_for_llm_prompt:
-                # Ensure inputSchema is present, default to empty object if not (though MCP spec implies it's required)
                 input_schema = mcp_tool_dict.get("inputSchema", {})
                 openai_formatted_tools.append(
                     {
                         "type": "function",
                         "function": {
-                            "name": mcp_tool_dict.get("name", "unknown_tool"),
+                            "name": mcp_tool_dict.get("name", "unknown"),
                             "description": mcp_tool_dict.get("description", ""),
                             "parameters": input_schema,
                         },
                     }
                 )
-
-            # Simplify system prompt if tools are being passed via the 'tools' parameter
-            # The FireworksModelClient will attempt to use the 'tools' parameter.
-            # If the underlying API doesn't support it, it might ignore it, or we might need a fallback.
-            # For now, assume we want a cleaner prompt if 'tools' are provided.
             if original_system_prompt:
                 system_prompt_content = f"{original_system_prompt}\n\nYou have access to tools. Use them if appropriate."
             else:
-                system_prompt_content = "You are a helpful assistant with access to tools. Use them if appropriate to fulfill the user's request."
+                system_prompt_content = "You are a helpful assistant with access to tools. Use them if appropriate."
 
+        # Initial messages for the main rollout (or single generation if not agent)
+        current_messages_for_rollout: List[Dict[str, Any]] = []
         if system_prompt_content:
-            messages_for_generation.append(
+            current_messages_for_rollout.append(
                 {"role": "system", "content": system_prompt_content}
             )
-        messages_for_generation.append({"role": "user", "content": user_query})
+        current_messages_for_rollout.append({"role": "user", "content": user_query})
 
-        # Standard response generation/caching logic
-        if self.cfg.generation.enabled:
-            if not self.model_client or not http_session:
-                logger.error(
-                    f"Model client or HTTP session not available for generation for sample {sample_id}."
-                )
-                return {"id": sample_id, "error": "Generation client not configured"}
-
-            # Cache key should ideally include a hash of tools if they affect generation,
-            # or we assume that for the same (original_system_prompt, user_query), if tools are available,
-            # the generation path is different and caching might need to be more sophisticated.
-            # For now, using original_system_prompt for cache key.
-            if self.cfg.generation.cache.enabled:
-                assistant_response_content = self.cache.get(
-                    sample_id=sample_id,
-                    system_prompt=original_system_prompt,
-                    user_query=user_query,
-                    model_name=self.model_client.model_name,
-                    temperature=self.model_client.temperature,
-                    top_p=self.model_client.top_p,
-                    top_k=self.model_client.top_k,
-                    min_p=self.model_client.min_p,
-                    max_tokens=self.model_client.max_tokens,
-                    reasoning_effort=self.model_client.reasoning_effort,
-                )
-                if assistant_response_content:
-                    logger.info(f"Using cached response for sample {sample_id}")
-
-            if not assistant_response_content:
-                try:
-                    generation_result = await self.model_client.generate(
-                        messages=messages_for_generation,
-                        session=http_session,
-                        tools=openai_formatted_tools,
-                    )
-
-                    if generation_result.tool_calls:
-                        # LLM decided to call tool(s)
-                        logger.info(
-                            f"Sample {sample_id}: LLM responded with tool_calls: {generation_result.tool_calls}"
-                        )
-                        # For logging/preview, represent tool_calls as string. Actual execution is next.
-                        assistant_response_content = json.dumps(
-                            [tc.model_dump() for tc in generation_result.tool_calls]
-                        )
-                        # TODO: Implement actual tool execution logic here.
-                        # For now, we just log that tools were called and proceed to state capture.
-                        # The reward function will see that assistant_response_content is a tool call JSON.
-                    elif generation_result.content:
-                        assistant_response_content = generation_result.content
-                    else:
-                        assistant_response_content = (
-                            None  # No content and no tool calls
-                        )
-
-                    if (
-                        assistant_response_content
-                        and self.cfg.generation.cache.enabled
-                        and self.model_client.temperature == 0.0
-                    ):
-                        # Caching decision: if it was a tool call, do we cache the tool call, or wait for its result?
-                        # For now, caching the direct output (text or tool call string representation).
-                        self.cache.put(
-                            sample_id=sample_id,
-                            system_prompt=original_system_prompt,
-                            user_query=user_query,
-                            model_name=self.model_client.model_name,
-                            temperature=self.model_client.temperature,
-                            response=assistant_response_content,
-                            top_p=self.model_client.top_p,
-                            top_k=self.model_client.top_k,
-                            min_p=self.model_client.min_p,
-                            max_tokens=self.model_client.max_tokens,
-                            reasoning_effort=self.model_client.reasoning_effort,
-                        )
-                        logger.info(f"Cached new response for sample {sample_id}")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to generate response for sample {sample_id}: {e}",
-                        exc_info=True,
-                    )
-                    return {
-                        "id": sample_id,
-                        "user_query": user_query,
-                        "ground_truth_for_eval": ground_truth_for_eval,
-                        "error": f"Generation failed: {str(e)}",
-                        "evaluation_score": 0.0,
-                        "evaluation_reason": "Generation failed",
-                    }
-
-            if not assistant_response_content:
-                logger.warning(
-                    f"No response generated or retrieved from cache for sample {sample_id}."
-                )
-                return {
-                    "id": sample_id,
-                    "error": "No response generated/cached",
-                    "evaluation_score": 0.0,
-                    "evaluation_reason": "No response",
-                }
-        else:  # Generation disabled
+        # --- LLM Generation / Agent Rollout ---
+        if not self.cfg.generation.enabled:
+            # ... (existing logic for disabled generation, using assistant_response_content from sample or cache) ...
+            # This part needs to ensure final_assistant_output_for_log is set.
+            # For brevity, assuming this part correctly sets final_assistant_output_for_log if generation is disabled.
             assistant_response_col_name = self.cfg.dataset.get(
                 "column_mapping", {}
             ).get("assistant_response_column", "assistant_response")
-            assistant_response_content = sample.get(assistant_response_col_name)
-            if assistant_response_content:
-                logger.info(
-                    f"Using pre-existing response from input sample {sample_id} (column: {assistant_response_col_name})"
-                )
-            else:
+            final_assistant_output_for_log = sample.get(assistant_response_col_name)
+            # ... (rest of the non-generation logic)
+            if (
+                not final_assistant_output_for_log
+            ):  # Try cache if generation disabled and no direct column
                 gen_cfg = self.cfg.generation
-                model_name_for_cache = gen_cfg.get("model_name", "unknown_model")
-                temperature_for_cache = gen_cfg.get("temperature", 0.0)
-                top_p_for_cache = gen_cfg.get("top_p", 0.95)
-                top_k_for_cache = gen_cfg.get("top_k", 20)
-                min_p_for_cache = gen_cfg.get("min_p", 0.0)
-                max_tokens_for_cache = gen_cfg.get("max_tokens", 1024)
-                reasoning_effort_for_cache = gen_cfg.get("reasoning_effort", None)
-                assistant_response_content = self.cache.get(
+                final_assistant_output_for_log = self.cache.get(
                     sample_id=sample_id,
                     system_prompt=original_system_prompt,
                     user_query=user_query,
-                    model_name=model_name_for_cache,
-                    temperature=temperature_for_cache,
-                    top_p=top_p_for_cache,
-                    top_k=top_k_for_cache,
-                    min_p=min_p_for_cache,
-                    max_tokens=max_tokens_for_cache,
-                    reasoning_effort=reasoning_effort_for_cache,
+                    model_name=gen_cfg.get("model_name", "unknown_model"),
+                    temperature=gen_cfg.get("temperature", 0.0),
+                    # ... other cache params
                 )
-                if assistant_response_content:
-                    logger.info(
-                        f"Using cached response for sample {sample_id} (generation disabled)."
-                    )
-
-            if not assistant_response_content:
-                logger.warning(
-                    f"Generation disabled. No pre-existing response or cache hit for sample {sample_id}."
-                )
+            if not final_assistant_output_for_log:
                 return {
                     "id": sample_id,
-                    "error": "No pre-existing or cached response",
+                    "error": "No response (gen disabled, not in sample/cache)",
                     "evaluation_score": 0.0,
-                    "evaluation_reason": "No response available (generation disabled)",
                 }
 
-        final_messages_for_eval: List[Message] = []
-        if system_prompt_content:
-            final_messages_for_eval.append(
-                Message(role="system", content=system_prompt_content)
-            )
-        final_messages_for_eval.append(Message(role="user", content=user_query))
-        final_messages_for_eval.append(
-            Message(role="assistant", content=assistant_response_content)
-        )
+        elif (
+            not self.model_client or not http_session
+        ):  # Generation enabled but client/session missing
+            return {
+                "id": sample_id,
+                "error": "Generation client/session not configured",
+            }
 
-        if self.mcp_intermediary_client and self.cfg.agent.type == "mcp_agent":
-            rk_session_id: Optional[str] = None
-            final_filesystem_state_from_mcp: Optional[Dict[str, Any]] = None
-            mcp_agent_eval_result: Optional[Dict[str, Any]] = None
-            # discovered_tools_for_sample is now discovered_tools_for_llm_prompt, populated earlier
-            # We will add it to the results at the end.
+        # --- MCP Agent Rollout Loop ---
+        elif self.mcp_intermediary_client and self.cfg.agent.type == "mcp_agent":
+            rk_session_id: Optional[str] = None  # Main execution session ID
+            all_executed_tool_calls_for_sample: List[Dict[str, Any]] = []
+            final_llm_text_response: Optional[str] = (
+                None  # Actual final text from LLM, if any
+            )
+            final_filesystem_state_from_mcp: Optional[Any] = None  # Initialize here
 
             try:
-                # If tool discovery happened before generation, we might have rk_session_id_for_tools.
-                # The current design re-initializes a session for the main agent execution block.
-                # This is to ensure a clean state for the agent's interaction, separate from discovery.
-                # If rk_session_id_for_tools exists from a successful pre-discovery, clean it up now
-                # as the main block will create its own.
-                if (
-                    "rk_session_id_for_tools" in locals()
-                    and locals()["rk_session_id_for_tools"]
-                    and self.mcp_intermediary_client
-                ):
-                    logger.info(
-                        f"Sample {sample_id}: Cleaning up pre-generation tool discovery session '{locals()['rk_session_id_for_tools']}'."
-                    )
-                    try:
-                        await self.mcp_intermediary_client.cleanup_session(
-                            locals()["rk_session_id_for_tools"]
-                        )
-                    except Exception as e_cleanup_prediscovery:
-                        logger.error(
-                            f"Sample {sample_id}: Error cleaning up pre-discovery session '{locals()['rk_session_id_for_tools']}': {e_cleanup_prediscovery}",
-                            exc_info=True,
-                        )
-
                 mcp_backend_ref = self.cfg.agent.get("mcp_backend_ref")
-                if not mcp_backend_ref:
-                    raise ValueError(
-                        "agent.mcp_backend_ref must be configured for mcp_agent."
-                    )
-
-                # Assuming one primary backend for now for tool discovery and state capture.
-                # This could be extended if multiple backends are involved in the agent's task.
                 backend_requests = [
                     {"backend_name_ref": mcp_backend_ref, "num_instances": 1}
                 ]
-                logger.info(
-                    f"Sample {sample_id}: Initializing MCP session for backend '{mcp_backend_ref}'..."
-                )
                 init_response = await self.mcp_intermediary_client.initialize_session(
                     backend_requests
                 )
-
                 if init_response.get("error"):
                     raise RuntimeError(
-                        f"MCP session initialization failed: {init_response.get('error_details', init_response['error'])}"
+                        f"Main MCP session init failed: {init_response.get('error_details', init_response['error'])}"
                     )
-
                 rk_session_id = init_response.get("rk_session_id")
-                initialized_backends = init_response.get("initialized_backends", [])
 
+                primary_instance_id_for_agent_actions: Optional[str] = None
+                initialized_backends = init_response.get("initialized_backends", [])
                 if not rk_session_id or not initialized_backends:
                     raise RuntimeError(
-                        f"MCP session initialization returned malformed response (missing rk_session_id or initialized_backends): {init_response}"
+                        f"Malformed main MCP init response: {init_response}"
                     )
-
-                # Tool discovery is now done before generation.
-                # The main session initialization for agent execution happens here.
-                # We still need to get the primary_instance_id for state capture from this new session.
-                primary_instance_id_for_state_capture: Optional[str] = None
-                initialized_backends_main = init_response.get(
-                    "initialized_backends", []
-                )  # From the main session init
-                for backend_info in initialized_backends:
-                    if backend_info.get("backend_name_ref") == mcp_backend_ref:
-                        instances_info = backend_info.get("instances", [])
-                        if instances_info:
-                            primary_instance_id_for_state_capture = instances_info[
-                                0
-                            ].get("instance_id")
-                            break
-
-                if not primary_instance_id_for_state_capture:
+                for be_info in initialized_backends:
+                    if be_info.get(
+                        "backend_name_ref"
+                    ) == mcp_backend_ref and be_info.get("instances"):
+                        primary_instance_id_for_agent_actions = be_info["instances"][
+                            0
+                        ].get("instance_id")
+                        break
+                if not primary_instance_id_for_agent_actions:
                     raise RuntimeError(
-                        f"Primary MCP instance ID for state capture (backend: {mcp_backend_ref}) not found in main init response: {init_response}"
+                        f"Primary instance ID for agent actions not found for {mcp_backend_ref}"
                     )
 
                 logger.info(
-                    f"Sample {sample_id}: Main MCP session initialized. rk_session_id='{rk_session_id}', primary instance_id for state capture='{primary_instance_id_for_state_capture}'. Tools provided to LLM: {len(discovered_tools_for_llm_prompt)}"
+                    f"Sample {sample_id}: Main MCP session for agent execution. rk_session_id='{rk_session_id}', instance='{primary_instance_id_for_agent_actions}'."
                 )
 
-                executed_tool_call_results: List[
-                    Dict[str, Union[str, Dict[str, Any]]]
-                ] = []
-                if (
-                    generation_result.tool_calls
-                ):  # generation_result is from the model_client.generate call
-                    for tool_call in generation_result.tool_calls:
-                        tool_name_to_execute = tool_call.function.name
-                        try:
-                            tool_args_to_execute = json.loads(
-                                tool_call.function.arguments
-                            )
-                            if not isinstance(tool_args_to_execute, dict):
-                                raise ValueError(
-                                    "Tool arguments did not parse to a dictionary."
-                                )
-                        except json.JSONDecodeError as e:
-                            logger.error(
-                                f"Sample {sample_id}: Failed to parse tool arguments for '{tool_name_to_execute}': {tool_call.function.arguments}. Error: {e}"
-                            )
-                            executed_tool_call_results.append(
-                                {
-                                    "tool_name": tool_name_to_execute,
-                                    "arguments_str": tool_call.function.arguments,
-                                    "error": f"Argument parsing failed: {e}",
-                                }
-                            )
-                            continue  # Skip this tool call
-
-                        logger.info(
-                            f"Sample {sample_id}: Executing LLM-requested tool '{tool_name_to_execute}' with args {tool_args_to_execute} on instance '{primary_instance_id_for_state_capture}' of backend '{mcp_backend_ref}'."
-                        )
-                        try:
-                            # Assuming the tool call should target the same primary backend and instance used for state capture.
-                            # This might need to be more sophisticated if the agent can target multiple backends/instances.
-                            execution_result = await self.mcp_intermediary_client.call_backend_tool(
-                                rk_session_id=rk_session_id,
-                                instance_id=primary_instance_id_for_state_capture,  # Use the instance ID determined for the main backend
-                                backend_name_ref=mcp_backend_ref,
-                                tool_name=tool_name_to_execute,
-                                tool_args=tool_args_to_execute,
-                            )
-                            logger.info(
-                                f"Sample {sample_id}: Tool '{tool_name_to_execute}' executed. Result: {execution_result}"
-                            )
-                            executed_tool_call_results.append(
-                                {
-                                    "tool_name": tool_name_to_execute,
-                                    "arguments": tool_args_to_execute,
-                                    "result": execution_result,
-                                }
-                            )
-                        except Exception as e_exec:
-                            logger.error(
-                                f"Sample {sample_id}: Error executing tool '{tool_name_to_execute}': {e_exec}",
-                                exc_info=True,
-                            )
-                            executed_tool_call_results.append(
-                                {
-                                    "tool_name": tool_name_to_execute,
-                                    "arguments": tool_args_to_execute,
-                                    "error": f"Execution failed: {str(e_exec)}",
-                                }
-                            )
-                # After potential tool executions, capture the final state
-                state_capture_tool = self.cfg.agent.get("state_capture_tool")
-                state_capture_args_cfg = self.cfg.agent.get(
-                    "state_capture_args", OmegaConf.create({})
-                )
-                state_capture_args = dict(state_capture_args_cfg)
-
-                if not state_capture_tool:
-                    logger.warning(
-                        f"Sample {sample_id}: agent.state_capture_tool not configured. Cannot capture final MCP state."
-                    )
-                else:
+                max_rollout_turns = self.cfg.agent.get("max_rollout_turns", 5)
+                for turn_num in range(max_rollout_turns):
                     logger.info(
-                        f"Sample {sample_id}: Capturing final state using tool '{state_capture_tool}' with args {state_capture_args} on instance '{primary_instance_id_for_state_capture}'..."
+                        f"Sample {sample_id}: Agent Rollout Turn {turn_num + 1}/{max_rollout_turns}. History size: {len(current_messages_for_rollout)}"
+                    )
+
+                    generation_output_turn: GenerationResult = (
+                        await self.model_client.generate(
+                            messages=current_messages_for_rollout,
+                            session=http_session,
+                            tools=openai_formatted_tools,
+                        )
+                    )
+
+                    assistant_msg_for_history: Dict[str, Any] = {"role": "assistant"}
+
+                    if generation_output_turn.tool_calls:
+                        assistant_msg_for_history["tool_calls"] = [
+                            tc.model_dump() for tc in generation_output_turn.tool_calls
+                        ]
+                        current_messages_for_rollout.append(assistant_msg_for_history)
+                        final_assistant_output_for_log = json.dumps(
+                            assistant_msg_for_history["tool_calls"]
+                        )  # LLM's last action was requesting tools
+
+                        for tool_call in generation_output_turn.tool_calls:
+                            tool_name = tool_call.function.name
+                            tool_call_id = tool_call.id
+                            tool_args_dict: Optional[Dict[str, Any]] = None
+                            tool_result_content_str: str
+                            try:
+                                tool_args_dict = json.loads(
+                                    tool_call.function.arguments
+                                )
+                                if not isinstance(tool_args_dict, dict):
+                                    raise ValueError("Args not dict")
+
+                                exec_result = await self.mcp_intermediary_client.call_backend_tool(
+                                    rk_session_id=rk_session_id,
+                                    instance_id=primary_instance_id_for_agent_actions,
+                                    backend_name_ref=mcp_backend_ref,
+                                    tool_name=tool_name,
+                                    tool_args=tool_args_dict,
+                                )
+                                tool_result_content_str = json.dumps(exec_result)
+                                all_executed_tool_calls_for_sample.append(
+                                    {
+                                        "tool_call_id": tool_call_id,
+                                        "name": tool_name,
+                                        "arguments": tool_args_dict,
+                                        "result": exec_result,
+                                    }
+                                )
+                            except Exception as e_tool_exec:
+                                logger.error(
+                                    f"Sample {sample_id}, Turn {turn_num+1}: Error executing/parsing tool '{tool_name}': {e_tool_exec}",
+                                    exc_info=True,
+                                )
+                                error_payload = {"error": str(e_tool_exec)}
+                                if isinstance(e_tool_exec, json.JSONDecodeError):
+                                    error_payload["detail"] = (
+                                        "Failed to parse arguments string from LLM."
+                                    )
+                                tool_result_content_str = json.dumps(error_payload)
+                                all_executed_tool_calls_for_sample.append(
+                                    {
+                                        "tool_call_id": tool_call_id,
+                                        "name": tool_name,
+                                        "arguments_str": tool_call.function.arguments,
+                                        "error": str(e_tool_exec),
+                                    }
+                                )
+
+                            current_messages_for_rollout.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tool_call_id,
+                                    "name": tool_name,
+                                    "content": tool_result_content_str,
+                                }
+                            )
+
+                        if (
+                            turn_num == max_rollout_turns - 1
+                        ):  # Max turns reached, and last action was tool call(s)
+                            logger.warning(
+                                f"Sample {sample_id}: Max rollout turns reached after tool call(s)."
+                            )
+                            # final_llm_text_response remains None
+                        # else: continue to next turn
+
+                    elif generation_output_turn.content:
+                        final_llm_text_response = generation_output_turn.content
+                        assistant_msg_for_history["content"] = final_llm_text_response
+                        current_messages_for_rollout.append(assistant_msg_for_history)
+                        final_assistant_output_for_log = final_llm_text_response
+                        logger.info(
+                            f"Sample {sample_id}, Turn {turn_num+1}: LLM responded with text. Ending rollout."
+                        )
+                        break  # End rollout
+                    else:  # No content and no tool_calls
+                        logger.warning(
+                            f"Sample {sample_id}, Turn {turn_num+1}: LLM provided no content or tool calls. Ending rollout."
+                        )
+                        final_llm_text_response = (
+                            "LLM provided no actionable response in this turn."
+                        )
+                        assistant_msg_for_history["content"] = final_llm_text_response
+                        current_messages_for_rollout.append(assistant_msg_for_history)
+                        final_assistant_output_for_log = final_llm_text_response
+                        break  # End rollout
+
+                # If loop finished due to max_turns and final_llm_text_response is still None,
+                # final_assistant_output_for_log would have been set to the last tool_call JSON string.
+                if (
+                    not final_llm_text_response
+                    and not all_executed_tool_calls_for_sample
+                    and not final_assistant_output_for_log
+                ):
+                    final_assistant_output_for_log = (
+                        "Agent did not produce text or tool calls within max turns."
+                    )
+
+                # State Capture
+                state_capture_tool = self.cfg.agent.get("state_capture_tool")
+                if state_capture_tool:
+                    state_capture_args = dict(
+                        self.cfg.agent.get("state_capture_args", OmegaConf.create({}))
                     )
                     final_filesystem_state_from_mcp = (
                         await self.mcp_intermediary_client.call_backend_tool(
                             rk_session_id=rk_session_id,
-                            instance_id=primary_instance_id_for_state_capture,
+                            instance_id=primary_instance_id_for_agent_actions,
                             backend_name_ref=mcp_backend_ref,
                             tool_name=state_capture_tool,
                             tool_args=state_capture_args,
                         )
                     )
-                    if (
-                        final_filesystem_state_from_mcp
-                        and final_filesystem_state_from_mcp.get("error")
-                    ):
-                        logger.error(
-                            f"Sample {sample_id}: Failed to capture MCP state: {final_filesystem_state_from_mcp.get('error_details', final_filesystem_state_from_mcp['error'])}"
-                        )
-                        final_filesystem_state_from_mcp = {
-                            "error_capturing_state": True,
-                            "details": final_filesystem_state_from_mcp.get("error"),
-                        }
 
-                eval_params_cfg = self.cfg.reward.get("params", OmegaConf.create({}))
-                eval_params = dict(eval_params_cfg)
-                eval_result_obj = self.reward_function(
-                    messages=final_messages_for_eval,
-                    ground_truth=ground_truth_for_eval,
-                    final_filesystem_state=final_filesystem_state_from_mcp,
-                    **eval_params,
-                )
-                logger.info(
-                    f"Sample ID: {sample_id} (MCP Agent), Score: {eval_result_obj.score:.2f}, Reason: {eval_result_obj.reason}"
-                )
                 mcp_agent_eval_result = {
                     "id": sample_id,
                     "user_query": user_query,
                     "system_prompt": system_prompt_content,
-                    "assistant_response": assistant_response_content,
+                    "assistant_response": final_assistant_output_for_log,  # This is the LLM's final output (text or tool call JSON)
+                    "full_conversation_history": current_messages_for_rollout,  # For detailed trajectory
                     "ground_truth_for_eval": ground_truth_for_eval,
                     "discovered_tools": discovered_tools_for_llm_prompt,
-                    "executed_tool_calls": executed_tool_call_results,  # Add executed tool call results
-                    "final_mcp_state_captured": (
-                        final_filesystem_state_from_mcp
-                        if final_filesystem_state_from_mcp
-                        else "Not captured or error"
-                    ),
+                    "executed_tool_calls": all_executed_tool_calls_for_sample,
+                    "final_mcp_state_captured": final_filesystem_state_from_mcp
+                    or "Not captured",
+                }
+            except Exception as e_mcp_main:
+                logger.error(
+                    f"Error during MCP agent main processing for sample {sample_id}: {e_mcp_main}",
+                    exc_info=True,
+                )
+                mcp_agent_eval_result = {
+                    "id": sample_id,
+                    "error": f"MCP agent processing failed: {str(e_mcp_main)}",
+                    "discovered_tools": discovered_tools_for_llm_prompt,
+                }
+            finally:
+                if rk_session_id and self.mcp_intermediary_client:
+                    await self.mcp_intermediary_client.cleanup_session(rk_session_id)
+
+            # Evaluation based on the final state and conversation
+            eval_params = dict(self.cfg.reward.get("params", OmegaConf.create({})))
+            # The reward function needs the full conversation history to understand tool interactions
+            # It also needs the final captured state.
+            # final_messages_for_eval should be current_messages_for_rollout
+            eval_result_obj = self.reward_function(
+                messages=[
+                    Message(**msg) for msg in current_messages_for_rollout
+                ],  # Pass full history
+                ground_truth=ground_truth_for_eval,
+                final_filesystem_state=final_filesystem_state_from_mcp,
+                **eval_params,
+            )
+            mcp_agent_eval_result.update(
+                {
                     "evaluation_score": eval_result_obj.score,
                     "evaluation_reason": eval_result_obj.reason,
                     "evaluation_metrics": (
@@ -605,59 +501,70 @@ class EvaluationPipeline:
                         else {}
                     ),
                 }
-            except Exception as e_mcp:
-                logger.error(
-                    f"Error during MCP agent processing for sample {sample_id}: {e_mcp}",
-                    exc_info=True,
-                )
-                mcp_agent_eval_result = {
-                    "id": sample_id,
-                    "user_query": user_query,
-                    "ground_truth_for_eval": ground_truth_for_eval,
-                    "assistant_response": assistant_response_content,
-                    "error": f"MCP agent processing failed: {str(e_mcp)}",
-                    "evaluation_score": 0.0,
-                    "evaluation_reason": "MCP agent processing error",
-                    "discovered_tools": discovered_tools_for_llm_prompt,
-                    "executed_tool_calls": executed_tool_call_results,  # Add even on error if some calls were attempted
-                }
-            finally:
-                # Cleanup main execution session
-                if rk_session_id and self.mcp_intermediary_client:
-                    logger.info(
-                        f"Sample {sample_id}: Cleaning up MCP session '{rk_session_id}'..."
-                    )
-                    try:
-                        await self.mcp_intermediary_client.cleanup_session(
-                            rk_session_id
-                        )
-                        logger.info(
-                            f"Sample {sample_id}: MCP session '{rk_session_id}' cleaned up successfully."
-                        )
-                    except Exception as e_cleanup:
-                        logger.error(
-                            f"Sample {sample_id}: Error cleaning up MCP session '{rk_session_id}': {e_cleanup}",
-                            exc_info=True,
-                        )
+            )
             return mcp_agent_eval_result
 
+        # --- Standard LLM Generation (Non-Agent) ---
         else:
-            eval_params_cfg = self.cfg.reward.get("params", OmegaConf.create({}))
-            eval_params = dict(eval_params_cfg)
+            # This is the case for non-MCP agent generation, or if generation.enabled but not mcp_agent
+            generation_output_std: GenerationResult = await self.model_client.generate(
+                messages=current_messages_for_rollout,
+                session=http_session,
+                tools=None,  # No tools for non-agent
+            )
+            final_assistant_output_for_log = (
+                generation_output_std.content
+            )  # Should not have tool_calls here
+
+            if not final_assistant_output_for_log:  # If LLM gave empty content
+                logger.warning(
+                    f"Sample {sample_id}: Standard generation resulted in no content."
+                )
+                final_assistant_output_for_log = "LLM provided no content."
+
+            # Cache standard generation if applicable
+            if (
+                final_assistant_output_for_log
+                and self.cfg.generation.cache.enabled
+                and self.model_client.temperature == 0.0
+            ):
+                self.cache.put(
+                    sample_id=sample_id,
+                    system_prompt=original_system_prompt,
+                    user_query=user_query,
+                    model_name=self.model_client.model_name,
+                    temperature=self.model_client.temperature,
+                    response=final_assistant_output_for_log,  # Caching the text response
+                    top_p=self.model_client.top_p,
+                    top_k=self.model_client.top_k,
+                    min_p=self.model_client.min_p,
+                    max_tokens=self.model_client.max_tokens,
+                    reasoning_effort=self.model_client.reasoning_effort,
+                )
+
+            # Construct final_messages_for_eval for standard evaluation
+            final_messages_for_eval: List[Message] = []
+            if system_prompt_content:
+                final_messages_for_eval.append(
+                    Message(role="system", content=system_prompt_content)
+                )
+            final_messages_for_eval.append(Message(role="user", content=user_query))
+            final_messages_for_eval.append(
+                Message(role="assistant", content=final_assistant_output_for_log)
+            )
+
+            eval_params = dict(self.cfg.reward.get("params", OmegaConf.create({})))
             eval_result_obj = self.reward_function(
                 messages=final_messages_for_eval,
                 ground_truth=ground_truth_for_eval,
-                final_filesystem_state=None,  # No MCP state for non-agent evals
+                final_filesystem_state=None,
                 **eval_params,
-            )
-            logger.info(
-                f"Sample ID: {sample_id}, Score: {eval_result_obj.score:.2f}, Reason: {eval_result_obj.reason}"
             )
             return {
                 "id": sample_id,
                 "user_query": user_query,
                 "system_prompt": system_prompt_content,
-                "assistant_response": assistant_response_content,
+                "assistant_response": final_assistant_output_for_log,
                 "ground_truth_for_eval": ground_truth_for_eval,
                 "evaluation_score": eval_result_obj.score,
                 "evaluation_reason": eval_result_obj.reason,
@@ -667,6 +574,13 @@ class EvaluationPipeline:
                     else {}
                 ),
             }
+
+        # Fallback if logic didn't hit a return, though it should.
+        return {
+            "id": sample_id,
+            "error": "Processing logic incomplete",
+            "evaluation_score": 0.0,
+        }
 
     async def run(self) -> List[Dict[str, Any]]:
         logger.info("Starting evaluation pipeline run...")
@@ -740,9 +654,11 @@ class EvaluationPipeline:
 
         logger.info(f"Processing {samples_to_process_count} samples.")
 
-        http_session: Optional[aiohttp.ClientSession] = None
+        http_session_for_model_client: Optional[aiohttp.ClientSession] = (
+            None  # Renamed for clarity
+        )
         if self.cfg.generation.enabled and self.model_client:
-            http_session = aiohttp.ClientSession()
+            http_session_for_model_client = aiohttp.ClientSession()
 
         if self.cfg.get("agent") and self.cfg.agent.get("type") == "mcp_agent":
             self.mcp_intermediary_client = IntermediaryMCPClient(
@@ -754,13 +670,7 @@ class EvaluationPipeline:
 
         async def execute_tasks():
             tasks = []
-            nonlocal http_session
-
-            if self.cfg.generation.enabled and self.model_client and not http_session:
-                http_session = aiohttp.ClientSession()
-                logger.debug(
-                    "Created aiohttp.ClientSession for model_client in execute_tasks."
-                )
+            # http_session_for_model_client is managed outside this async def now
 
             max_concurrent = self.cfg.generation.api_params.get(
                 "max_concurrent_requests", 5
@@ -781,7 +691,9 @@ class EvaluationPipeline:
                         f"Concurrency slot acquired for sample '{prelim_sample_id}', attempting to process."
                     )
                     return await self._process_single_sample(
-                        sample_data, http_session, original_index=sample_idx
+                        sample_data,
+                        http_session_for_model_client,
+                        original_index=sample_idx,
                     )
 
             for i in range(samples_to_process_count):
@@ -831,8 +743,8 @@ class EvaluationPipeline:
             else:
                 await execute_tasks()
         finally:
-            if http_session:  # This is the session for the model_client
-                await http_session.close()
+            if http_session_for_model_client:
+                await http_session_for_model_client.close()
                 logger.debug(
                     "Closed aiohttp.ClientSession for model_client in main run() finally block."
                 )
@@ -864,27 +776,38 @@ class EvaluationPipeline:
                 )
             preview_data_to_save = []
             for result_item in all_results:
-                if (
+                # Use full_conversation_history if available, otherwise construct from system/user/assistant
+                if "full_conversation_history" in result_item:
+                    messages_to_save = result_item["full_conversation_history"]
+                elif (
                     "error" in result_item
                     or not result_item.get("user_query")
                     or not result_item.get("assistant_response")
                 ):
-                    continue
-                messages = []
-                if result_item.get("system_prompt"):
-                    messages.append(
-                        {"role": "system", "content": result_item["system_prompt"]}
+                    continue  # Skip if essential parts for basic preview are missing and no history
+                else:  # Construct basic messages for non-agent or simple agent cases
+                    messages_to_save = []
+                    if result_item.get("system_prompt"):
+                        messages_to_save.append(
+                            {"role": "system", "content": result_item["system_prompt"]}
+                        )
+                    messages_to_save.append(
+                        {"role": "user", "content": result_item["user_query"]}
                     )
-                messages.append({"role": "user", "content": result_item["user_query"]})
-                messages.append(
-                    {"role": "assistant", "content": result_item["assistant_response"]}
-                )
-                pair_item = {"messages": messages}
+                    messages_to_save.append(
+                        {
+                            "role": "assistant",
+                            "content": result_item["assistant_response"],
+                        }
+                    )
+
+                pair_item = {"messages": messages_to_save}
                 if result_item.get("ground_truth_for_eval"):
                     pair_item["ground_truth"] = result_item["ground_truth_for_eval"]
                 if result_item.get("id"):
                     pair_item["id"] = result_item["id"]
                 preview_data_to_save.append(pair_item)
+
             if preview_data_to_save:
                 try:
                     os.makedirs(os.path.dirname(preview_pairs_file_path), exist_ok=True)

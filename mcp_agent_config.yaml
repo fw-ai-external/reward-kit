@@ -1,4 +1,4 @@
-log_level: DEBUG
+log_level: INFO
 global_docker_options: {}
 backends:
   - backend_name_ref: "filesystem_test"

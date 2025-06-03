@@ -14,14 +14,31 @@ def setup_logging(verbose=False, debug=False):
     """Setup logging configuration"""
     if debug:
         log_level = logging.DEBUG
-        format_str = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-    elif verbose:
+        # More detailed format for debug
+        format_str = "[%(asctime)s][%(name)s][%(levelname)s] - %(pathname)s:%(lineno)d - %(message)s"
+    elif verbose:  # --verbose flag
         log_level = logging.INFO
-        format_str = "%(levelname)s:%(name)s:%(message)s"
-    else:
-        log_level = logging.WARNING
-        format_str = "%(levelname)s:%(message)s"
-    logging.basicConfig(level=log_level, format=format_str)
+        # Consistent format, similar to user's logs but with name
+        format_str = "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"
+    else:  # Default (neither --verbose nor --debug)
+        log_level = logging.INFO  # Changed from WARNING to INFO
+        # Use the same format as verbose for default INFO level
+        format_str = "[%(asctime)s][%(name)s][%(levelname)s] - %(message)s"
+
+    logging.basicConfig(level=log_level, format=format_str, datefmt="%Y-%m-%d %H:%M:%S")
+
+    # Set higher levels for noisy libraries unless in full debug mode
+    if not debug:
+        noisy_loggers = ["httpx", "mcp", "urllib3", "asyncio", "hpack", "httpcore"]
+        for logger_name in noisy_loggers:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    # Ensure reward_kit's own loggers respect the overall log_level,
+    # overriding any specific DEBUG settings in submodules unless --debug is used.
+    # If log_level is WARNING (default), reward_kit INFO and DEBUG logs will be suppressed.
+    # If log_level is INFO (--verbose), reward_kit DEBUG logs will be suppressed.
+    # If log_level is DEBUG (--debug), all reward_kit logs show.
+    logging.getLogger("reward_kit").setLevel(log_level)
 
 
 def check_environment():

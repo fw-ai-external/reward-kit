@@ -17,6 +17,7 @@ setup(
         "openai==1.78.1",
         "aiosqlite",
         "aiohttp",
+        "mcp==1.9.2",
         "PyYAML>=5.0",  # Added PyYAML
         "datasets==3.6.0",  # For dataset loading functionality
         "fsspec==2025.3.0",  # For filesystem interactions, pinned for dataset compatibility
@@ -44,7 +45,6 @@ setup(
             "peft>=0.7.0",
             # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
-            "mcp==1.9.2",
             "e2b>=0.15.0",  # Added e2b for E2B environment tests
             "docker==7.1.0",
         ],
@@ -68,5 +68,5 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )

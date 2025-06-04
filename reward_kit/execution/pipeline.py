@@ -28,6 +28,7 @@ from reward_kit.generation.clients import (  # Assuming Fireworks for now
 from reward_kit.mcp.clients import IntermediaryMCPClient  # Added import
 from reward_kit.models import Message  # For constructing messages for reward function
 from reward_kit.utils.module_loader import load_function as load_reward_function
+from reward_kit.utils.packaging_utils import install_requirements  # Added
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,34 @@ class EvaluationPipeline:
 
         self.reward_function = load_reward_function(self.cfg.reward.function_path)
         logger.info(f"Loaded reward function from: {self.cfg.reward.function_path}")
+
+        # Install requirements if specified by the decorator
+        if hasattr(self.reward_function, "_reward_function_requirements"):
+            requirements = getattr(
+                self.reward_function, "_reward_function_requirements"
+            )
+            if isinstance(requirements, list) and requirements:
+                logger.info(
+                    f"Found requirements for reward function {self.cfg.reward.function_path}: {requirements}"
+                )
+                try:
+                    # Assuming install_requirements uses the current environment's pip by default
+                    install_requirements(requirements_list=requirements)
+                    logger.info(
+                        f"Successfully processed requirements for {self.cfg.reward.function_path}."
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to install requirements for {self.cfg.reward.function_path}: {e}",
+                        exc_info=True,
+                    )
+                    # Depending on policy, might re-raise or allow continuation if some are optional
+                    # For now, log error and continue; pip install errors are already logged by the utility.
+                    # If strict, could raise RuntimeError here.
+            elif requirements:  # Not a list or empty
+                logger.warning(
+                    f"_reward_function_requirements for {self.cfg.reward.function_path} is not a non-empty list: {requirements}"
+                )
 
         self.mcp_intermediary_client: Optional[IntermediaryMCPClient] = None
         if self.cfg.get("agent") and self.cfg.agent.get("type") == "mcp_agent":

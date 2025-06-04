@@ -35,7 +35,11 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def reward_function(
-    _func: Optional[F] = None, *, mode: EvaluationMode = "pointwise"
+    _func: Optional[F] = None,
+    *,
+    mode: EvaluationMode = "pointwise",
+    id: Optional[str] = None,
+    requirements: Optional[List[str]] = None,
 ) -> Union[F, Callable[[F], F]]:
     """
     Decorator for user-defined reward and evaluation functions.
@@ -51,6 +55,8 @@ def reward_function(
         mode: Specifies the operational mode. Defaults to "pointwise".
               - "pointwise": Function processes one rollout. Expected output: `EvaluateResult`.
               - "batch": Function processes a batch of rollouts. Expected output: `List[EvaluateResult]`.
+        id: Optional identifier for the reward function, used for deployment
+        requirements: Optional list of dependency requirements for deployment
 
     Returns:
         A decorator if `_func` is None, or the decorated function.
@@ -257,6 +263,10 @@ def reward_function(
                 raise ValueError(
                     f"Return value from function '{func.__name__}' failed Pydantic validation for mode '{mode}':\n{err}"
                 ) from None
+
+        # Set id and requirements attributes
+        wrapper._reward_function_id = id
+        wrapper._reward_function_requirements = requirements
 
         return cast(F, wrapper)
 

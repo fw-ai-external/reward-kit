@@ -149,20 +149,35 @@ def parse_args(args=None):
         help="URL of a pre-deployed remote reward function. If provided, deploys by registering this URL with Fireworks AI.",
     )
 
+    # Deployment target options
+    target_group = deploy_parser.add_argument_group("Deployment Target Options")
+    target_group.add_argument(
+        "--target",
+        choices=["fireworks", "gcp-cloud-run", "local-serve"],
+        default="fireworks",
+        help="Deployment target. 'fireworks' for standard Fireworks platform deployment, 'gcp-cloud-run' for Google Cloud Run, 'local-serve' for local serving with Serveo tunneling.",
+    )
+    target_group.add_argument(
+        "--function-ref",
+        help="Reference to the reward function to deploy (e.g., 'my_module.reward_func'). Required for 'gcp-cloud-run' and 'local-serve' targets.",
+    )
+
+    # Local serving options (relevant if --target is local-serve)
+    local_serve_group = deploy_parser.add_argument_group(
+        "Local Serving Options (used if --target is local-serve)"
+    )
+    local_serve_group.add_argument(
+        "--local-port",
+        type=int,
+        default=8001,
+        help="Port for the local reward function server to listen on (default: 8001). Used with --target local-serve.",
+    )
+
     # GCP deployment options
     gcp_group = deploy_parser.add_argument_group(
         "GCP Cloud Run Deployment Options (used if --target is gcp-cloud-run)"
     )
-    gcp_group.add_argument(
-        "--target",
-        choices=["fireworks", "gcp-cloud-run"],
-        default="fireworks",
-        help="Deployment target. 'fireworks' for standard deployment, 'gcp-cloud-run' for deploying to Google Cloud Run.",
-    )
-    gcp_group.add_argument(
-        "--function-ref",
-        help="Reference to the reward function to deploy (e.g., 'examples.gcp_cloud_run_deployment_example.dummy_rewards.hello_world_reward'). Required for gcp-cloud-run target.",
-    )
+    # --function-ref is now in target_group
     gcp_group.add_argument(
         "--gcp-project",
         required=False,

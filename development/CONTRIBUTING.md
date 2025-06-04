@@ -470,7 +470,36 @@ Use the Reward Kit CLI for common operations during development. Ensure your vir
 # Deploy an evaluator
 .venv/bin/reward-kit deploy --id my-test-evaluator \
 --metrics-folders "word_count=./examples/metrics/word_count" --force
+
+# Deploy as local development server with tunnel (ideal for development/testing)
+.venv/bin/reward-kit deploy --id test-local-serve-eval --target local-serve \
+--function-ref dummy_rewards.simple_echo_reward --verbose --force
 ```
+
+### Local Development Server
+
+For local development and testing, you can use the `--target local-serve` option to run a reward function server locally with external tunnel access:
+
+```bash
+.venv/bin/reward-kit deploy --id test-local-serve-eval --target local-serve \
+--function-ref dummy_rewards.simple_echo_reward --verbose --force
+```
+
+**What this does:**
+- Starts a local HTTP server on port 8001 serving your reward function
+- Creates an external tunnel (using ngrok or serveo.net) to make the server publicly accessible
+- Registers the tunnel URL with Fireworks AI for remote evaluation
+- Returns to command prompt but keeps server running in background
+
+**Important Notes:**
+- The CLI returns control to you, but the server processes continue running in the background
+- Check running processes: `ps aux | grep -E "(generic_server|ngrok)"`
+- Test locally: `curl -X POST http://localhost:8001/evaluate -H "Content-Type: application/json" -d '{"messages": [{"role": "user", "content": "test"}]}'`
+- Monitor server logs: `tail -f logs/reward-kit-local/generic_server_*.log`
+- Monitor tunnel logs: `tail -f logs/reward-kit-local/ngrok_*.log`
+- Stop when done: Kill the background processes manually
+
+This is perfect for development, webhook testing, or making your reward function accessible to remote services without deploying to cloud infrastructure.
 
 ## Debugging Tips
 

@@ -19,7 +19,7 @@ managed_processes: Dict[int, Dict[str, Any]] = (
     {}
 )  # pid -> {process, command, log_file, log_file_path, env}
 
-# NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels" # Deprecated
+NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels"
 
 
 def start_process(
@@ -83,76 +83,125 @@ def start_process(
         return None
 
 
-# --- Ngrok functions (Deprecated in favor of Serveo) ---
-# def get_ngrok_public_url(retries=5, delay=3) -> str | None:
-#     """
-#     DEPRECATED: Use Serveo.net instead.
-#     Queries the local ngrok API to get the public HTTPS URL.
-#     """
-#     print("WARNING: get_ngrok_public_url is deprecated. Use Serveo.net based functions.")
-#     if not REQUESTS_AVAILABLE:
-#         print("ERROR: 'requests' library is not installed. Cannot fetch ngrok URL automatically.")
-#         return None
-#     global NGROK_API_URL # Ensure it's defined if this function were to be uncommented
-#     NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels"
+# --- Ngrok functions ---
+def get_ngrok_public_url(retries: int = 5, delay: int = 3) -> Optional[str]:
+    """
+    Queries the local ngrok API to get the public HTTPS URL.
+    """
+    if not REQUESTS_AVAILABLE:
+        print(
+            "ERROR: 'requests' library is not installed. Cannot fetch ngrok URL automatically."
+        )
+        print("Please install it, e.g., pip install requests")
+        return None
+
+    # NGROK_API_URL is now a module-level constant
+    for attempt in range(retries):
+        try:
+            response = requests.get(NGROK_API_URL, timeout=5)
+            response.raise_for_status()
+            tunnels_data = response.json()
+            for tunnel in tunnels_data.get("tunnels", []):
+                if tunnel.get("proto") == "https" and tunnel.get(
+                    "public_url", ""
+                ).startswith("https://"):
+                    print(f"Found ngrok public URL: {tunnel['public_url']}")
+                    return tunnel["public_url"]
+            print(
+                f"Attempt {attempt + 1}/{retries}: HTTPS tunnel not found yet in ngrok API response. Retrying in {delay}s..."
+            )
+        except requests.exceptions.ConnectionError:
+            print(
+                f"Attempt {attempt + 1}/{retries}: ngrok API not yet available at {NGROK_API_URL}. Retrying in {delay}s..."
+            )
+        except Exception as e:
+            print(
+                f"Attempt {attempt + 1}/{retries}: Error fetching ngrok URL: {e}. Retrying in {delay}s..."
+            )
+        time.sleep(delay)
+    print("ERROR: Failed to get ngrok public URL after multiple retries.")
+    return None
 
 
-#     for attempt in range(retries):
-#         try:
-#             response = requests.get(NGROK_API_URL, timeout=5)
-#             response.raise_for_status()
-#             tunnels_data = response.json()
-#             for tunnel in tunnels_data.get("tunnels", []):
-#                 if tunnel.get("proto") == "https" and tunnel.get("public_url", "").startswith("https://"):
-#                     print(f"Found ngrok public URL: {tunnel['public_url']}")
-#                     return tunnel["public_url"]
-#             print(f"Attempt {attempt + 1}/{retries}: HTTPS tunnel not found yet in ngrok API response. Retrying in {delay}s...")
-#         except requests.exceptions.ConnectionError:
-#             print(f"Attempt {attempt + 1}/{retries}: ngrok API not yet available at {NGROK_API_URL}. Retrying in {delay}s...")
-#         except Exception as e:
-#             print(f"Attempt {attempt + 1}/{retries}: Error fetching ngrok URL: {e}. Retrying in {delay}s...")
-#         time.sleep(delay)
-#     print("ERROR: Failed to get ngrok public URL after multiple retries.")
-#     return None
+def start_ngrok_and_get_url(
+    local_port: int, ngrok_log_file: str, authtoken: Optional[str] = None
+) -> tuple[Optional[subprocess.Popen], Optional[str]]:
+    """
+    Starts ngrok to expose a local port and retrieves its public HTTPS URL.
+    """
+    ngrok_command = [
+        "ngrok",
+        "http",
+        str(local_port),
+        "--log=stdout",
+    ]  # Using --log=stdout to simplify log capture by start_process
 
-# def start_ngrok_and_get_url(local_port: int, ngrok_log_file: str, authtoken: str = None) -> tuple[subprocess.Popen | None, str | None]:
-#     """
-#     DEPRECATED: Use Serveo.net instead.
-#     Starts ngrok to expose a local port and retrieves its public HTTPS URL.
-#     """
-#     print("WARNING: start_ngrok_and_get_url is deprecated. Use Serveo.net based functions.")
-#     ngrok_command = ["ngrok", "http", str(local_port), "--log=stdout"]
+    try:
+        # Check if ngrok command is available
+        ngrok_version_process = subprocess.run(
+            ["ngrok", "--version"], capture_output=True, text=True, check=True
+        )
+        print(f"Found ngrok version: {ngrok_version_process.stdout.strip()}")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print(
+            "ERROR: ngrok command not found or not executable. Please ensure ngrok is installed and in your PATH."
+        )
+        return None, None
 
-#     try:
-#         subprocess.run(["ngrok", "--version"], capture_output=True, check=True)
-#     except (subprocess.CalledProcessError, FileNotFoundError):
-#         print("ERROR: ngrok command not found or not executable. Please ensure ngrok is installed and in your PATH.")
-#         return None, None
+    if authtoken:
+        # This is usually done by the user beforehand with `ngrok config add-authtoken <token>`
+        # Or by setting NGROK_AUTHTOKEN environment variable.
+        # Forcing it via command line is also an option but less common for persistent setup.
+        print(
+            f"Note: Ngrok authtoken should be pre-configured by the user (e.g., 'ngrok config add-authtoken <token>') or via NGROK_AUTHTOKEN env var."
+        )
+        # Example if passing via env for the subprocess:
+        # ngrok_env = os.environ.copy()
+        # ngrok_env["NGROK_AUTHTOKEN"] = authtoken
+        # ngrok_process = start_process(ngrok_command, ngrok_log_file, new_process_group=False, env=ngrok_env)
 
-#     if authtoken:
-#         print(f"Note: Ngrok authtoken should be pre-configured by the user via 'ngrok config add-authtoken <token>'.")
+    print(f"Attempting to start ngrok for port {local_port}...")
+    # ngrok typically doesn't need to be in a new process group for simple start/stop.
+    # Its logs will go to ngrok_log_file via start_process.
+    ngrok_process = start_process(
+        ngrok_command, ngrok_log_file, new_process_group=False
+    )
 
-#     print(f"Attempting to start ngrok for port {local_port}...")
-#     ngrok_process = start_process(ngrok_command, ngrok_log_file, new_process_group=False)
+    if not ngrok_process or ngrok_process.poll() is not None:
+        print(f"ERROR: Failed to start ngrok. Check log: {ngrok_log_file}")
+        # managed_processes should handle cleanup if start_process added it and it failed.
+        # However, if ngrok_process is None, it wasn't added.
+        # If it's not None but poll() is not None, it means it started and exited quickly.
+        if ngrok_process and ngrok_process.pid in managed_processes:
+            # This might be redundant if start_process failed and didn't add it,
+            # or if it was added and then stop_process is called later.
+            # For safety, ensure it's stopped if it was ever in managed_processes.
+            pass  # stop_process will be called by the caller if needed
+        return None, None
 
-#     if not ngrok_process or ngrok_process.poll() is not None:
-#         print(f"ERROR: Failed to start ngrok. Check log: {ngrok_log_file}")
-#         if ngrok_process and ngrok_process.pid in managed_processes:
-#             stop_process(ngrok_process.pid)
-#         return None, None
+    print(
+        f"ngrok process started with PID {ngrok_process.pid}. Waiting for tunnel URL..."
+    )
+    # Increased sleep time as ngrok can take a moment to establish tunnel and API to update
+    time.sleep(8)
 
-#     print(f"ngrok process started with PID {ngrok_process.pid}. Waiting for tunnel...")
-#     time.sleep(8)
+    public_url = get_ngrok_public_url()
 
-#     public_url = get_ngrok_public_url()
+    if not public_url:
+        print(
+            f"ERROR: Could not retrieve public URL from ngrok API. Check log: {ngrok_log_file}"
+        )
+        # If URL fetch fails, stop the ngrok process we started.
+        stop_process(
+            ngrok_process.pid
+        )  # stop_process will remove it from managed_processes
+        return None, None
 
-#     if not public_url:
-#         print("ERROR: Could not retrieve public URL from ngrok.")
-#         stop_process(ngrok_process.pid)
-#         return None, None
+    print(f"Successfully started ngrok and retrieved public URL: {public_url}")
+    return ngrok_process, public_url
 
-#     return ngrok_process, public_url
-# --- End of Deprecated Ngrok functions ---
+
+# --- End of Ngrok functions ---
 
 
 def start_serveo_and_get_url(

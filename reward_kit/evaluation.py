@@ -471,7 +471,7 @@ class Evaluator:
                 "displayName": self.display_name,
                 "description": self.description,
                 "multiMetrics": payload_multi_metrics,  # How results are structured
-                "rewardFunctionMode": self.reward_function_mode,  # How input is processed by user func
+                # "rewardFunctionMode": self.reward_function_mode,  # How input is processed by user func
                 "criteria": self._construct_criteria(criteria_data={}),
                 "requirements": "",
                 "rollupSettings": payload_rollup_settings,

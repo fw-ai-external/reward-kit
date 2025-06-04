@@ -283,6 +283,30 @@ Deploy your reward function to use in training workflows:
 reward-kit deploy --id my-evaluator --metrics-folders "word_count=./path/to/metrics" --force
 ```
 
+#### Local Development Server
+
+For local development and testing, you can deploy a reward function as a local server with external tunnel access:
+
+```bash
+# Deploy as local server with automatic tunnel (ngrok/serveo)
+reward-kit deploy --id test-local-serve-eval --target local-serve --function-ref dummy_rewards.simple_echo_reward --verbose --force
+```
+
+**What this does:**
+- Starts a local HTTP server on port 8001 serving your reward function
+- Creates an external tunnel (using ngrok or serveo.net) to make the server publicly accessible
+- Registers the tunnel URL with Fireworks AI for remote evaluation
+- Keeps the server running indefinitely in the background
+
+**Key points:**
+- The CLI returns to prompt after deployment, but the server continues running in background
+- Check running processes: `ps aux | grep -E "(generic_server|ngrok)"`
+- Test locally: `curl -X POST http://localhost:8001/evaluate -H "Content-Type: application/json" -d '{"messages": [{"role": "user", "content": "test"}]}'`
+- Monitor logs: `tail -f logs/reward-kit-local/generic_server_*.log`
+- Stop server: Kill the background processes manually when done
+
+This is ideal for development, testing webhook integrations, or accessing your reward function from remote services without full cloud deployment.
+
 Or deploy programmatically:
 
 ```python

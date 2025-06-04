@@ -265,6 +265,7 @@ def test_integration_cli_commands(
             args.huggingface_response_key = "response"
             args.huggingface_key_map = None
             args.remote_url = None  # Explicitly set for local path
+            args.target = "fireworks"  # Explicitly set target for this test path
 
             result = deploy_command(args)
             assert result == 0

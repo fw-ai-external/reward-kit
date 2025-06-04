@@ -1,43 +1,48 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from reward_kit.models import EvaluateResult, MetricResult
-from reward_kit.reward_function import (  # Assuming @reward_function is available
-    reward_function,
-)
+from reward_kit.models import EvaluateResult, Message, MetricResult
+from reward_kit.typed_interface import reward_function
 
 
 @reward_function
-def hello_world_reward(
-    messages: List[Dict[str, Any]], ground_truth: Optional[str] = None, **kwargs: Any
+def simple_echo_reward(
+    messages: Union[List[Dict[str, Any]], List[Message]],
+    ground_truth: Optional[str] = None,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
-    A simple dummy reward function that always returns a fixed score.
+    A simple reward function that returns a fixed score and echoes some input.
     """
-    print(f"Dummy hello_world_reward called with messages: {messages}")
-    print(f"Ground truth: {ground_truth}")
-    print(f"Additional kwargs: {kwargs}")
+    last_message_content = ""
+    if messages:
+        if isinstance(messages[-1], Message):
+            last_message_content = messages[-1].content
+        elif isinstance(messages[-1], dict) and "content" in messages[-1]:
+            last_message_content = messages[-1].get("content", "")
+
+    reason_str = f"Evaluated based on simple echo. Last message: '{last_message_content}'. Ground truth: '{ground_truth}'. Kwargs: {kwargs}"
 
     return EvaluateResult(
         score=0.75,
-        reason="This is a dummy reward from hello_world_reward.",
+        reason=reason_str,
         is_score_valid=True,
         metrics={
-            "dummy_metric": MetricResult(
-                score=1.0, is_score_valid=True, reason="Dummy metric always passes."
+            "echo_check": MetricResult(
+                score=1.0,
+                is_score_valid=True,
+                reason="Echo check always passes for this dummy function.",
             )
         },
     )
 
 
-if __name__ == "__main__":
-    # Example of how it might be called (for local testing of the function itself)
-    test_messages = [
-        {"role": "user", "content": "Hello there!"},
-        {"role": "assistant", "content": "General Kenobi!"},
-    ]
-    result = hello_world_reward(
-        messages=test_messages,
-        ground_truth="Some expected answer",
-        extra_param="test_value",
-    )
-    print(result)
+@reward_function
+def error_reward(
+    messages: Union[List[Dict[str, Any]], List[Message]],
+    ground_truth: Optional[str] = None,
+    **kwargs: Any,
+) -> EvaluateResult:
+    """
+    A dummy reward function that always raises an error.
+    """
+    raise ValueError("This is a deliberate error from error_reward function.")

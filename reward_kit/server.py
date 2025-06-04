@@ -178,34 +178,29 @@ def serve(func_path: str, host: str = "0.0.0.0", port: int = 8000):
     server.run()
 
 
-def serve_tunnel(func_path: str, port: int = 8000):
-    """
-    Serve a reward function with an ngrok tunnel.
-
-    This function starts a reward server and creates a tunnel to make it accessible
-    from the internet.
-
-    Args:
-        func_path: Path to the reward function to serve
-        port: Port to bind the server to
-    """
-    try:
-        import pyngrok.ngrok as ngrok  # type: ignore
-    except ImportError:
-        raise ImportError(
-            "The 'pyngrok' package is required to use serve_tunnel. "
-            "Please install it with 'pip install pyngrok'."
-        )
-
-    # Open the tunnel
-    tunnel = ngrok.connect(port)
-    public_url = tunnel.public_url
-
-    # Print the tunnel URL
-    logger.info(f"Reward function available at: {public_url}/reward")
-
-    # Start the server
-    serve(func_path=func_path, host="0.0.0.0", port=port)
+# ngrok-based serve_tunnel is deprecated in favor of Serveo via subprocess_manager.
+# def serve_tunnel(func_path: str, port: int = 8000):
+#     """
+#     Serve a reward function with an ngrok tunnel.
+#     DEPRECATED.
+#     """
+#     try:
+#         import pyngrok.ngrok as ngrok  # type: ignore
+#     except ImportError:
+#         raise ImportError(
+#             "The 'pyngrok' package is required to use serve_tunnel. "
+#             "Please install it with 'pip install pyngrok'."
+#         )
+#
+#     # Open the tunnel
+#     tunnel = ngrok.connect(port)
+#     public_url = tunnel.public_url
+#
+#     # Print the tunnel URL
+#     logger.info(f"Reward function available at: {public_url}/reward")
+#
+#     # Start the server
+#     serve(func_path=func_path, host="0.0.0.0", port=port)
 
 
 def create_app(reward_func: Callable[..., EvaluateResult]) -> FastAPI:

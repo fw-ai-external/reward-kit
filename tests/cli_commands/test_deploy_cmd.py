@@ -24,7 +24,7 @@ class MockArgs:
         self.huggingface_key_map = None
         self.remote_url = None
         # For GCP
-        self.target = "fireworks"
+        self.target = "fireworks"  # Default target
         self.function_ref = None
         self.gcp_project = None
         self.gcp_region = None
@@ -32,7 +32,7 @@ class MockArgs:
         self.service_account = None
         self.entry_point = "reward_function"
         self.runtime = "python311"
-        self.gcp_auth_mode = None  # Added gcp_auth_mode
+        self.gcp_auth_mode = None
         self.__dict__.update(kwargs)
 
 
@@ -46,8 +46,6 @@ def mock_check_environment():
 
 @pytest.fixture
 def mock_gcp_tools():
-    # Note: Removed trailing backslashes from the with statement lines
-    # Patching where the functions are looked up (in cli_commands.deploy module)
     with patch(
         "reward_kit.cli_commands.deploy.ensure_artifact_registry_repo_exists"
     ) as mock_ensure_repo, patch(
@@ -65,14 +63,14 @@ def mock_gcp_tools():
         mock_build_push.return_value = True
         mock_deploy_run.return_value = "http://mock-cloud-run-url.com/service"
         mock_ensure_gcp_secret.return_value = (
-            "projects/test-proj/secrets/mocksecret/versions/1"  # Mock success
+            "projects/test-proj/secrets/mocksecret/versions/1"
         )
         yield {
             "ensure_repo": mock_ensure_repo,
             "gen_dockerfile": mock_gen_dockerfile,
             "build_push": mock_build_push,
             "deploy_run": mock_deploy_run,
-            "ensure_gcp_secret": mock_ensure_gcp_secret,  # Add to yielded dict
+            "ensure_gcp_secret": mock_ensure_gcp_secret,
         }
 
 
@@ -88,11 +86,11 @@ class TestDeployCommandRemoteUrl:
             remote_url="http://my-evaluator.com/evaluate",
             display_name="My Remote Eval",
             description="A cool remote evaluator.",
+            target="fireworks",  # Explicitly set target for this path
         )
         mock_create_evaluation_call.return_value = {
-            "name": args.id,
-            "id": args.id,
-            "config": {"remote_url": args.remote_url},
+            "name": args.id,  # Simulate platform API returning full name
+            "id": args.id,  # Simulate platform API returning id
         }
 
         return_code = deploy_command(args)
@@ -103,7 +101,7 @@ class TestDeployCommandRemoteUrl:
             remote_url=args.remote_url,
             display_name=args.display_name or args.id,
             description=args.description
-            or f"Remote proxy evaluator for {args.id} at {args.remote_url}",
+            or f"Evaluator for {args.id} at {args.remote_url}",  # Updated description format
             force=args.force,
             huggingface_dataset=args.huggingface_dataset,
             huggingface_split=args.huggingface_split,
@@ -114,11 +112,11 @@ class TestDeployCommandRemoteUrl:
 
         captured = capsys.readouterr()
         assert (
-            f"Deploying evaluator '{args.id}' configured to proxy to remote URL: {args.remote_url}"
+            f"Registering remote URL: {args.remote_url} for evaluator '{args.id}'"  # Updated initial message
             in captured.out
         )
         assert (
-            f"Successfully created/updated evaluator '{args.id}' to proxy to {args.remote_url}"
+            f"Successfully registered evaluator '{args.id}' on Fireworks AI, pointing to '{args.remote_url}'."  # Updated success message
             in captured.out
         )
 
@@ -130,17 +128,20 @@ class TestDeployCommandRemoteUrl:
             id="my-remote-eval",
             remote_url="http://my-evaluator.com/evaluate",
             metrics_folders=["mf=path"],
+            target="fireworks",  # Explicitly set target
         )
         mock_create_eval.return_value = {"name": args.id}
         deploy_command(args)
         captured = capsys.readouterr()
         assert (
-            "Info: --metrics-folders are not packaged when deploying with --remote-url."
+            "Info: --metrics-folders are ignored when deploying with --remote-url."  # Updated "not packaged" to "ignored"
             in captured.out
         )
 
     def test_deploy_remote_url_invalid_url_format(self, mock_check_environment, capsys):
-        args = MockArgs(id="my-eval", remote_url="ftp://invalid.com")
+        args = MockArgs(
+            id="my-eval", remote_url="ftp://invalid.com", target="fireworks"
+        )
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
@@ -151,19 +152,23 @@ class TestDeployCommandRemoteUrl:
         self, mock_create_eval, mock_check_environment, capsys
     ):
         args = MockArgs(
-            id="my-remote-eval-fail", remote_url="http://my-evaluator.com/evaluate"
+            id="my-remote-eval-fail",
+            remote_url="http://my-evaluator.com/evaluate",
+            target="fireworks",
         )
+        # Simulate the full error string from PlatformAPIError's __str__
+        error_message = "Platform connection failed (Status: 500, Response: N/A)"
         mock_create_eval.side_effect = PlatformAPIError(
-            "Platform connection failed", status_code=500
+            "Platform connection failed", status_code=500, response_text="N/A"
         )
 
         return_code = deploy_command(args)
         assert return_code == 1
 
         captured = capsys.readouterr()
+        # Updated error message to match common registration block
         assert (
-            f"Error deploying remote proxy evaluator '{args.id}': Platform connection failed (Status: 500"
-            in captured.out
+            f"Error registering URL with Fireworks AI: {error_message}" in captured.out
         )
 
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
@@ -173,6 +178,7 @@ class TestDeployCommandRemoteUrl:
         args = MockArgs(
             id="my-remote-eval-generic-fail",
             remote_url="http://my-evaluator.com/evaluate",
+            target="fireworks",
         )
         mock_create_eval.side_effect = Exception("Something broke")
 
@@ -180,24 +186,28 @@ class TestDeployCommandRemoteUrl:
         assert return_code == 1
 
         captured = capsys.readouterr()
+        # Updated error message to match common registration block
         assert (
-            f"An unexpected error occurred while deploying remote proxy evaluator '{args.id}': Something broke"
+            f"An unexpected error occurred during Fireworks AI registration: Something broke"
             in captured.out
         )
 
 
-class TestDeployCommandLocalMode:
+class TestDeployCommandLocalMode:  # This class tests the "fireworks" target (packaging metrics)
 
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
-    def test_deploy_local_mode_success(
+    def test_deploy_local_mode_success(  # Renaming to reflect it tests "fireworks" target
         self, mock_create_eval, mock_check_environment, capsys
     ):
-        mock_create_eval.return_value = {"name": "my-local-eval", "id": "my-local-eval"}
+        mock_create_eval.return_value = {
+            "name": "my-fireworks-eval"
+        }  # Adjusted for clarity
         args = MockArgs(
-            id="my-local-eval",
+            id="my-fireworks-eval",
             metrics_folders=["mf=./path"],
-            display_name="My Local Eval",
-            description="A local one.",
+            display_name="My Fireworks Eval",
+            description="A packaged one.",
+            target="fireworks",  # Explicitly "fireworks" target
         )
         return_code = deploy_command(args)
         assert return_code == 0
@@ -215,47 +225,61 @@ class TestDeployCommandLocalMode:
             huggingface_response_key=args.huggingface_response_key,
         )
         captured = capsys.readouterr()
-        assert "Successfully created/updated evaluator: my-local-eval" in captured.out
+        assert (
+            "Packaging and deploying metrics for evaluator 'my-fireworks-eval' to Fireworks AI..."
+            in captured.out
+        )
+        assert (
+            "Successfully created/updated evaluator: my-fireworks-eval" in captured.out
+        )
 
-    def test_deploy_local_mode_missing_metrics_folders(
+    def test_deploy_local_mode_missing_metrics_folders(  # Renaming to reflect "fireworks" target
         self, mock_check_environment, capsys
     ):
-        args = MockArgs(id="my-local-eval")
+        args = MockArgs(
+            id="my-fireworks-eval-fail", target="fireworks", remote_url=None
+        )  # Explicit target, no remote_url
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
+        # Updated error message to be specific to "fireworks" target
         assert (
-            "Error: --metrics-folders are required if not using --remote-url and target is not gcp-cloud-run."
+            "Error: --metrics-folders are required for 'fireworks' target if --remote-url is not provided."
             in captured.out
         )
 
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
-    def test_deploy_local_mode_create_evaluation_fails(
+    def test_deploy_local_mode_create_evaluation_fails(  # Renaming
         self, mock_create_eval, mock_check_environment, capsys
     ):
+        error_message = "Platform API error (Status: 503, Response: N/A)"
         mock_create_eval.side_effect = PlatformAPIError(
-            "Platform API error", status_code=503
+            "Platform API error", status_code=503, response_text="N/A"
         )
-        args = MockArgs(id="my-local-eval", metrics_folders=["mf=./path"])
+        args = MockArgs(
+            id="my-fireworks-eval", metrics_folders=["mf=./path"], target="fireworks"
+        )
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
         assert (
-            "Error creating/updating evaluator 'my-local-eval': Platform API error (Status: 503"
+            f"Error creating/updating evaluator 'my-fireworks-eval': {error_message}"
             in captured.out
         )
 
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
-    def test_deploy_local_mode_create_evaluation_fails_generic_exception(
+    def test_deploy_local_mode_create_evaluation_fails_generic_exception(  # Renaming
         self, mock_create_eval, mock_check_environment, capsys
     ):
         mock_create_eval.side_effect = Exception("Generic error")
-        args = MockArgs(id="my-local-eval", metrics_folders=["mf=./path"])
+        args = MockArgs(
+            id="my-fireworks-eval", metrics_folders=["mf=./path"], target="fireworks"
+        )
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
         assert (
-            "Error creating/updating evaluator 'my-local-eval': Generic error"
+            "Error creating/updating evaluator 'my-fireworks-eval': Generic error"
             in captured.out
         )
 
@@ -277,9 +301,11 @@ class TestDeployCommandGCPMode:
             gcp_region="us-central1",
             gcp_ar_repo="test-repo",
             runtime="python310",
-            gcp_auth_mode="api-key",  # Explicitly test api-key mode
+            gcp_auth_mode="api-key",
         )
-        mock_create_evaluation_final_step.return_value = {"name": args.id}
+        mock_create_evaluation_final_step.return_value = {
+            "name": args.id
+        }  # Simulate platform API returning full name
 
         return_code = deploy_command(args)
         assert return_code == 0
@@ -287,31 +313,61 @@ class TestDeployCommandGCPMode:
         mock_gcp_tools["ensure_repo"].assert_called_once()
         mock_gcp_tools["gen_dockerfile"].assert_called_once()
         mock_gcp_tools["build_push"].assert_called_once()
-        mock_gcp_tools["ensure_gcp_secret"].assert_called_once()  # Assert it was called
+        mock_gcp_tools["ensure_gcp_secret"].assert_called_once()
         mock_gcp_tools["deploy_run"].assert_called_once()
         mock_create_evaluation_final_step.assert_called_once()
 
         captured = capsys.readouterr()
-        assert f"Deploying evaluator '{args.id}' to GCP Cloud Run..." in captured.out
-        assert f"Successfully built and pushed Docker image" in captured.out
+        # Check initial message from helper
         assert (
-            f"Successfully deployed to Cloud Run. Service URL: http://mock-cloud-run-url.com/service"
+            f"Starting GCP Cloud Run deployment for evaluator '{args.id}'..."
             in captured.out
         )
+        assert f"Successfully built and pushed Docker image" in captured.out
         assert (
-            f"Successfully registered GCP Cloud Run service as evaluator '{args.id}' on Fireworks AI."
+            f"Successfully deployed to Cloud Run. Service URL: {mock_gcp_tools['deploy_run'].return_value}"
+            in captured.out
+        )
+        # Check common registration success message
+        assert (
+            f"Successfully registered evaluator '{args.id}' on Fireworks AI, pointing to '{mock_gcp_tools['deploy_run'].return_value}'."
             in captured.out
         )
 
     def test_deploy_gcp_mode_missing_args(self, mock_check_environment, capsys):
         args = MockArgs(target="gcp-cloud-run", id="gcp-eval-incomplete")
-        return_code = deploy_command(args)
+        # function_ref is missing, gcp_project, gcp_region also
+
+        # Test missing function_ref
+        temp_args_dict = args.__dict__.copy()
+        temp_args_dict.pop("function_ref", None)
+        current_args = MockArgs(**temp_args_dict)
+        return_code = deploy_command(current_args)
         assert return_code == 1
         captured = capsys.readouterr()
         assert (
             "Error: --function-ref is required for GCP Cloud Run deployment."
             in captured.out
         )
+
+        # Test missing gcp_project
+        temp_args_dict = args.__dict__.copy()
+        temp_args_dict["function_ref"] = "a.b"
+        temp_args_dict.pop("gcp_project", None)
+        current_args = MockArgs(**temp_args_dict)
+        return_code = deploy_command(current_args)
+        assert return_code == 1
+        captured = capsys.readouterr()
+        assert "Error: GCP Project ID must be provided" in captured.out
+
+        # Test missing gcp_region
+        temp_args_dict["gcp_project"] = "proj"
+        temp_args_dict.pop("gcp_region", None)
+        current_args = MockArgs(**temp_args_dict)
+        return_code = deploy_command(current_args)
+        assert return_code == 1
+        captured = capsys.readouterr()
+        assert "Error: GCP Region must be provided" in captured.out
 
     @patch(
         "reward_kit.cli_commands.deploy.ensure_artifact_registry_repo_exists",
@@ -425,7 +481,7 @@ class TestDeployCommandGCPMode:
             gcp_project="p",
             gcp_region="r",
             gcp_ar_repo="repo",
-            gcp_auth_mode="api-key",  # Ensure auth mode is set to trigger ensure_gcp_secret path
+            gcp_auth_mode="api-key",
         )
         return_code = deploy_command(args)
         assert return_code == 1
@@ -455,17 +511,18 @@ class TestDeployCommandGCPMode:
             gcp_project="p",
             gcp_region="r",
             gcp_ar_repo="repo",
-            gcp_auth_mode="api-key",  # Ensure auth mode is set
+            gcp_auth_mode="api-key",
         )
+        error_message = "Registration failed (Status: 400, Response: N/A)"
         mock_create_evaluation_final_step.side_effect = PlatformAPIError(
-            "Registration failed", status_code=400
+            "Registration failed", status_code=400, response_text="N/A"
         )
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
+        # Updated error message to match common registration block
         assert (
-            "Error registering GCP Cloud Run service URL with Fireworks AI: Registration failed (Status: 400"
-            in captured.out
+            f"Error registering URL with Fireworks AI: {error_message}" in captured.out
         )
 
     @patch("reward_kit.cli_commands.deploy.create_evaluation")
@@ -488,7 +545,7 @@ class TestDeployCommandGCPMode:
             gcp_project="p",
             gcp_region="r",
             gcp_ar_repo="repo",
-            gcp_auth_mode="api-key",  # Ensure auth mode is set
+            gcp_auth_mode="api-key",
         )
         mock_create_evaluation_final_step.side_effect = Exception(
             "Unexpected registration issue"
@@ -496,6 +553,7 @@ class TestDeployCommandGCPMode:
         return_code = deploy_command(args)
         assert return_code == 1
         captured = capsys.readouterr()
+        # Updated error message to match common registration block
         assert (
             "An unexpected error occurred during Fireworks AI registration: Unexpected registration issue"
             in captured.out

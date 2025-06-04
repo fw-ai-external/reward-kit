@@ -1,6 +1,9 @@
+import ast  # Added for AST parsing
+import importlib.util  # Added for dynamic module loading
 import json
 import logging
 import os
+import sys  # Added for path manipulation
 import time
 import types
 from pathlib import Path
@@ -174,7 +177,9 @@ class Evaluator:
         self.ts_mode_config = ts_mode_config
         self.reward_function_mode = reward_function_mode
         self.code_files = {}
-        self.metric_folders: Dict[str, Any] = {}
+        self.metric_folders: Dict[str, Dict[str, Any]] = (
+            {}
+        )  # Changed to store path and requirements
         self.account_id = account_id
         self.api_key = api_key
         self.description = ""
@@ -246,9 +251,74 @@ class Evaluator:
             Dict mapping filenames to their contents
         """
         folder_path = os.path.abspath(folder_path)
-        files = self._load_python_files_from_folder(folder_path)
+        files = self._load_python_files_from_folder(
+            folder_path
+        )  # Reads all .py files into a dict
+        metric_requirements_list: Optional[List[str]] = None
 
-        self.metric_folders[metric_name] = folder_path
+        main_py_content = files.get("main.py")
+        if main_py_content:
+            try:
+                tree = ast.parse(main_py_content)
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == "evaluate":
+                        for decorator_node in node.decorator_list:
+                            if (
+                                isinstance(decorator_node, ast.Call)
+                                and isinstance(decorator_node.func, ast.Name)
+                                and decorator_node.func.id == "reward_function"
+                            ):
+                                for keyword in decorator_node.keywords:
+                                    if keyword.arg == "requirements":
+                                        if isinstance(keyword.value, ast.List):
+                                            reqs = []
+                                            for elt in keyword.value.elts:
+                                                if isinstance(
+                                                    elt, ast.Constant
+                                                ) and isinstance(
+                                                    elt.value, str
+                                                ):  # Python 3.8+
+                                                    reqs.append(elt.value)
+                                                elif isinstance(
+                                                    elt, ast.Str
+                                                ):  # Python < 3.8
+                                                    reqs.append(elt.s)
+                                            if reqs:
+                                                metric_requirements_list = reqs
+                                        elif isinstance(
+                                            keyword.value, ast.Constant
+                                        ) and isinstance(
+                                            keyword.value.value, str
+                                        ):  # Python 3.8+ (single req string)
+                                            metric_requirements_list = [
+                                                keyword.value.value
+                                            ]
+                                        elif isinstance(
+                                            keyword.value, ast.Str
+                                        ):  # Python < 3.8 (single req string)
+                                            metric_requirements_list = [keyword.value.s]
+                                        break
+                                if metric_requirements_list:
+                                    break
+                        if metric_requirements_list:
+                            logger.info(
+                                f"Found requirements for metric '{metric_name}' via AST: {metric_requirements_list}"
+                            )
+                            break
+            except SyntaxError as e:
+                logger.error(
+                    f"Syntax error parsing main.py for metric '{metric_name}' to find requirements: {e}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error parsing main.py AST for metric '{metric_name}': {e}"
+                )
+
+        self.metric_folders[metric_name] = {
+            "path": folder_path,
+            "requirements": metric_requirements_list,  # This is now a list of strings or None
+        }
+
         for filename, content in files.items():
             self.code_files[f"{metric_name}/{filename}"] = content
 
@@ -337,7 +407,7 @@ class Evaluator:
             "description": self.description or "Preview Evaluator",
             "multiMetrics": payload_multi_metrics,
             "criteria": self._construct_criteria(criteria_data={}),
-            "requirements": "",
+            "requirements": self._get_combined_requirements(),  # Changed to use combined requirements
             "rollupSettings": payload_rollup_settings,
         }
 
@@ -390,6 +460,47 @@ class Evaluator:
             used_preview_api = False
             logger.warning("Falling back to simulated preview mode")
             return self._simulated_preview(samples)
+
+    def _get_combined_requirements(self) -> str:
+        """Combines requirements from all loaded metrics."""
+        all_requirements_set = set()
+        for metric_data in self.metric_folders.values():
+            req_list_or_str = metric_data.get("requirements")
+            if req_list_or_str:
+                if isinstance(req_list_or_str, list):
+                    for req_item in req_list_or_str:
+                        if isinstance(req_item, str):
+                            all_requirements_set.add(req_item.strip())
+                elif isinstance(
+                    req_list_or_str, str
+                ):  # Fallback if somehow a string is still passed
+                    items = [
+                        r.strip() for r in req_list_or_str.splitlines() if r.strip()
+                    ]
+                    for item in items:
+                        all_requirements_set.add(item)
+
+        # For multi_metrics loaded directly into self.code_files (not via metric_folders)
+        # This part is more complex as it requires loading the 'main.py' from self.code_files
+        # if self.multi_metrics and not self.metric_folders and "main.py" in self.code_files:
+        # We would need a temporary way to load this main.py to get its requirements.
+        # For now, focusing on metric_folders which is the primary path for --metrics-folders.
+        # If a multi_metrics folder is loaded via load_multi_metrics_folder, it also needs a similar
+        # dynamic import logic to fetch requirements from its main 'evaluate' function.
+        # This part is NOT YET IMPLEMENTED for multi_metrics folders.
+
+        if not all_requirements_set and hasattr(
+            self, "_loaded_multi_metric_requirements_str"
+        ):
+            # Fallback for multi_metrics if requirements were loaded differently (hypothetical)
+            # This attribute doesn't exist yet, placeholder for future enhancement if needed.
+            if self._loaded_multi_metric_requirements_str:  # type: ignore
+                requirements_list = [r.strip() for r in self._loaded_multi_metric_requirements_str.splitlines() if r.strip()]  # type: ignore
+                for req_item in requirements_list:
+                    all_requirements_set.add(req_item)
+
+        logger.info(f"Combined unique requirements: {all_requirements_set}")
+        return "\n".join(sorted(list(all_requirements_set)))
 
     def _simulated_preview(self, samples):
         preview_result = EvaluatorPreviewResult()

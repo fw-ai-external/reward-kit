@@ -39,7 +39,7 @@ def reward_function(
     *,
     mode: EvaluationMode = "pointwise",
     id: Optional[str] = None,
-    requirements: Optional[List[str]] = None,
+    requirements: Optional[List[str]] = None,  # Changed to List[str]
 ) -> Union[F, Callable[[F], F]]:
     """
     Decorator for user-defined reward and evaluation functions.
@@ -56,7 +56,7 @@ def reward_function(
               - "pointwise": Function processes one rollout. Expected output: `EvaluateResult`.
               - "batch": Function processes a batch of rollouts. Expected output: `List[EvaluateResult]`.
         id: Optional identifier for the reward function, used for deployment
-        requirements: Optional list of dependency requirements for deployment
+        requirements: Optional string content for requirements.txt for deployment
 
     Returns:
         A decorator if `_func` is None, or the decorated function.

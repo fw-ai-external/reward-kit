@@ -71,6 +71,9 @@ def generate_dockerfile_content(
     python_version: str = DEFAULT_PYTHON_VERSION,
     reward_kit_install_source: str = "reward-kit",  # e.g., "reward-kit", "reward-kit[dev]", or path to local wheel/sdist
     user_requirements_path: Optional[str] = None,  # Path relative to CWD or absolute
+    inline_requirements_content: Optional[
+        str
+    ] = None,  # Direct content for requirements.txt
     service_port: int = 8080,
 ) -> Optional[str]:
     """
@@ -81,6 +84,7 @@ def generate_dockerfile_content(
         python_version: The Python version for the base image (e.g., "3.10").
         reward_kit_install_source: Pip install string for reward-kit.
         user_requirements_path: Optional path to a requirements.txt for user dependencies.
+        inline_requirements_content: Optional string containing the content of requirements.txt.
         service_port: Port the service inside the container will listen on.
 
     Returns:
@@ -136,6 +140,21 @@ def generate_dockerfile_content(
                 # The file is already copied by "COPY . .". We just need to run pip install.
                 # The path inside the container will be user_requirements_path relative to /app
                 f'RUN if [ -f {user_requirements_path} ]; then pip install --no-cache-dir -r {user_requirements_path}; else echo "User requirements file {user_requirements_path} not found in /app, skipping."; fi',
+                "",
+            ]
+        )
+
+    # Handle inline requirements content, if provided
+    if inline_requirements_content and inline_requirements_content.strip():
+        # Escape backslashes and quotes for the echo command
+        escaped_requirements = inline_requirements_content.replace(
+            "\\", "\\\\"
+        ).replace("'", "'\\''")
+        dockerfile_lines.extend(
+            [
+                "# Create and install dependencies from inline requirements content",
+                f"RUN echo '{escaped_requirements}' > /app/generated_requirements.txt",
+                "RUN pip install --no-cache-dir -r /app/generated_requirements.txt",
                 "",
             ]
         )

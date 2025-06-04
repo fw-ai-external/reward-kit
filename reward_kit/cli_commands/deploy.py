@@ -3,6 +3,7 @@ CLI command for creating and deploying an evaluator,
 or registering a pre-deployed remote evaluator.
 """
 
+import importlib  # For dynamically importing modules
 import json
 import os  # For os.path.join, os.makedirs, os.getcwd (already imported but good to be explicit if used extensively)
 import secrets  # For API key generation (already imported but good to be explicit)
@@ -146,6 +147,22 @@ def _deploy_to_gcp_cloud_run(args, current_config, gcp_config_from_yaml):
         print("Error: --function-ref is required for GCP Cloud Run deployment.")
         return None
 
+    # Dynamically import the reward function to get its requirements
+    inline_requirements_content = None
+    try:
+        module_name, func_name = args.function_ref.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        reward_func = getattr(module, func_name)
+        if hasattr(reward_func, "_reward_function_requirements"):
+            inline_requirements_content = reward_func._reward_function_requirements
+            if inline_requirements_content:
+                print(f"Found inline requirements for {args.function_ref}")
+    except Exception as e:
+        print(
+            f"Warning: Could not load reward function {args.function_ref} to check for inline requirements: {e}"
+        )
+        # Continue without inline requirements if loading fails
+
     # Resolve GCP project_id
     gcp_project_id = args.gcp_project
     if not gcp_project_id and gcp_config_from_yaml:
@@ -193,7 +210,8 @@ def _deploy_to_gcp_cloud_run(args, current_config, gcp_config_from_yaml):
             else args.runtime.replace("python", "")
         ),
         reward_kit_install_source=".",
-        user_requirements_path=None,
+        user_requirements_path=None,  # Explicitly None, inline_requirements_content will be used
+        inline_requirements_content=inline_requirements_content,
         service_port=8080,
     )
     if not dockerfile_content:
@@ -367,7 +385,8 @@ def deploy_command(args):
 
     # PIDs for cleanup if registration fails for local-serve
     local_server_pid_to_clean = None
-    serveo_pid_to_clean = None
+    # serveo_pid_to_clean = None # This was old, replaced by local_tunnel_pid_to_clean
+    local_tunnel_pid_to_clean = None  # Initialize here
 
     if args.target == "gcp-cloud-run":
         current_config = get_config()  # Needed by the helper

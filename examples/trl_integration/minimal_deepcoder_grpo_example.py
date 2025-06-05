@@ -32,7 +32,7 @@ except ImportError as e:
     HAS_TRL_AND_TRANSFORMERS = False
 
 # from reward_kit.models import Message # No longer directly needed here
-from reward_kit.adapters.trl import create_trl_adapter  # Import the new adapter
+from reward_kit.integrations.trl import create_trl_adapter  # Import the new adapter
 
 # Import reward-kit components
 # from reward_kit.reward_function import RewardFunction # No longer strictly needed here

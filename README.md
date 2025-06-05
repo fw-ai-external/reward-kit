@@ -465,6 +465,23 @@ result = exact_match_reward(
 print(result.score)
 ```
 
+The [deepeval](https://github.com/confident-ai/deepeval) project also offers a
+variety of metrics. The helper `reward_kit.integrations.deepeval.adapt_metric`
+converts a deepeval metric instance into a reward function returning an
+`EvaluateResult`.
+
+```python
+from deepeval.metrics import FaithfulnessMetric
+from reward_kit.integrations.deepeval import adapt_metric
+
+faithfulness_reward = adapt_metric(FaithfulnessMetric())
+result = faithfulness_reward(
+    messages=[{"role": "assistant", "content": "hello"}],
+    ground_truth="hello",
+)
+print(result.score)
+```
+
 ## Command Line Interface
 
 The Reward Kit includes a CLI for common operations:

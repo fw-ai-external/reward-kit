@@ -7,6 +7,16 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     DEEPEVAL_AVAILABLE = False
 
+if not DEEPEVAL_AVAILABLE:  # Provide dummy classes so the module imports
+    class BaseMetric:  # type: ignore
+        pass
+
+    class LLMTestCase:  # type: ignore[too-many-instance-attributes]
+        def __init__(self, input: str = "", actual_output: str = "", expected_output: str = "") -> None:
+            self.input = input
+            self.actual_output = actual_output
+            self.expected_output = expected_output
+
 from reward_kit.integrations.deepeval import adapt_metric
 from reward_kit.models import EvaluateResult
 

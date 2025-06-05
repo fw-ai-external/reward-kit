@@ -532,19 +532,19 @@ reward-kit deploy --id my-evaluator --metrics-folders "metric=./path" --force
 
 ## Development
 
-### Type Checking
+### Code Quality
 
-The codebase uses mypy for static type checking. To run type checking:
+The project uses ruff for linting. To run it:
 
 ```bash
 # Install development dependencies
 pip install -e ".[dev]"
 
-# Run mypy
-mypy reward_kit
+# Run ruff
+ruff reward_kit
 ```
 
-Our CI pipeline enforces type checking, so please ensure your code passes mypy checks before submitting PRs.
+Our CI pipeline enforces linting, so please ensure your code passes ruff checks before submitting PRs.
 
 ### Running Tests
 

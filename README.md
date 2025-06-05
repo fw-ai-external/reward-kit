@@ -514,6 +514,9 @@ Our CI pipeline enforces type checking, so please ensure your code passes mypy c
 # Install test dependencies
 pip install -e ".[dev]"
 
+# If you see import errors when running tests, verify the dev
+# dependencies were installed correctly.
+
 # Run tests
 pytest
 ```

@@ -264,9 +264,10 @@ def reward_function(
                     f"Return value from function '{func.__name__}' failed Pydantic validation for mode '{mode}':\n{err}"
                 ) from None
 
-        # Set id and requirements attributes
+        # Set id, requirements, and mode attributes
         wrapper._reward_function_id = id
         wrapper._reward_function_requirements = requirements
+        wrapper._reward_function_mode = mode
 
         return cast(F, wrapper)
 

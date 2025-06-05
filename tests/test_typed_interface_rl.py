@@ -101,8 +101,12 @@ class TestTypedInterfaceRL:
         assert result.score == 0.5
         assert result.step_outputs is not None
         assert len(result.step_outputs) == 1
-        assert result.step_outputs[0].step_index == 1  # assistant message index
-        assert result.step_outputs[0].base_reward == 0.1 * 1
+        # Type assertion to help the linter understand step_outputs is not None
+        step_outputs = result.step_outputs
+        assert step_outputs is not None
+        step_output = step_outputs[0]
+        assert step_output.step_index == 1  # assistant message index
+        assert step_output.base_reward == 0.1 * 1
 
     def test_pointwise_rl_rewards_with_pydantic_messages(self):
         """Test pointwise RL reward function with Pydantic Message objects."""

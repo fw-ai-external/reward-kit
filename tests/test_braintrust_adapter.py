@@ -1,7 +1,7 @@
 import pytest
 
-from reward_kit.integrations.braintrust import scorer_to_reward_fn, reward_fn_to_scorer
-from reward_kit.models import Message, EvaluateResult
+from reward_kit.adapters.braintrust import reward_fn_to_scorer, scorer_to_reward_fn
+from reward_kit.models import EvaluateResult, Message
 from reward_kit.typed_interface import reward_function
 
 
@@ -11,7 +11,10 @@ def simple_scorer(input, output, expected):
 
 def test_scorer_to_reward_fn():
     reward_fn = scorer_to_reward_fn(simple_scorer)
-    messages = [Message(role="user", content="hi"), Message(role="assistant", content="hi")]
+    messages = [
+        Message(role="user", content="hi"),
+        Message(role="assistant", content="hi"),
+    ]
     ground_truth = [Message(role="assistant", content="hi")]
     result = reward_fn(messages=messages, ground_truth=ground_truth)
     assert isinstance(result, EvaluateResult)

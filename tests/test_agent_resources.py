@@ -16,8 +16,8 @@ import pytest
 import pytest_asyncio  # Import pytest_asyncio
 
 from reward_kit.agent.resources.docker_resource import (
-    DOCKER_SDK_AVAILABLE,
     DOCKER_DAEMON_AVAILABLE,
+    DOCKER_SDK_AVAILABLE,
     DockerResource,
 )
 from reward_kit.agent.resources.filesystem_resource import FileSystemResource

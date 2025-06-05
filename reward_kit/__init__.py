@@ -10,10 +10,10 @@ tool-augmented models using self-contained task bundles.
 
 import warnings
 
+from .adapters.braintrust import reward_fn_to_scorer, scorer_to_reward_fn
 from .models import EvaluateResult, Message, MetricResult
 from .reward_function import RewardFunction
 from .typed_interface import reward_function
-from .integrations.braintrust import scorer_to_reward_fn, reward_fn_to_scorer
 
 warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 

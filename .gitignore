@@ -215,3 +215,4 @@ outputs/
 
 # Gitleaks reports
 gitleaks-report*.json
+.deepeval/

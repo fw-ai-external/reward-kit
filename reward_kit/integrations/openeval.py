@@ -10,15 +10,11 @@ def _convert_result(res: Dict[str, Any]) -> EvaluateResult:
     score = float(res.get("score", 0.0))
     reason = res.get("comment")
     key = res.get("key", "openeval")
-    metrics = {
-        key: MetricResult(score=score, reason=reason or "", is_score_valid=True)
-    }
+    metrics = {key: MetricResult(score=score, reason=reason or "", is_score_valid=True)}
     return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
 
-def adapt(
-    openeval_fn: Callable[..., Union[Dict[str, Any], List[Dict[str, Any]]]]
-):
+def adapt(openeval_fn: Callable[..., Union[Dict[str, Any], List[Dict[str, Any]]]]):
     """Adapt an OpenEvals evaluator into a reward-kit reward function."""
 
     @reward_function

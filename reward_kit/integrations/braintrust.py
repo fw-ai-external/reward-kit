@@ -56,4 +56,3 @@ def reward_fn_to_scorer(
         return result.score
 
     return scorer
-

@@ -14,7 +14,7 @@ build: clean
 dist: build
 
 upload:
-	twine upload --repository reward-kit dist/* 
+	twine upload --repository reward-kit dist/*
 
 test:
 	pytest

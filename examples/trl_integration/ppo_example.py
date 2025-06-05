@@ -38,7 +38,7 @@ try:
     HAS_TRL = True
 except ImportError:
     print(
-        "TRL or related packages not installed. Install with: pip install trl datasets"
+        "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
     )
     HAS_TRL = False
 
@@ -179,7 +179,7 @@ def prepare_dataset_for_ppo(dataset_name, split="train", max_samples=None):
     """
     if not HAS_TRL:
         print(
-            "TRL or related packages not installed. Install with: pip install trl datasets"
+            "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
         )
         return None
 
@@ -214,7 +214,7 @@ def train_with_ppo_example():
     """
     if not HAS_TRL:
         print(
-            "TRL or related packages not installed. Install with: pip install trl datasets"
+            "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
         )
         return
 

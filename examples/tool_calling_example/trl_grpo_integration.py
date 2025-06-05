@@ -26,7 +26,7 @@ try:
 except ImportError:
     # This print will be replaced by logger if Hydra initializes logging first
     print(
-        "Please install transformers and trl: pip install transformers trl peft bitsandbytes"
+        "Please install transformers and TRL dependencies: pip install 'reward-kit[trl]' transformers bitsandbytes"
     )
     sys.exit(1)
 
@@ -405,8 +405,6 @@ if __name__ == "__main__":
         print(
             f"Import error: {e}. Some libraries missing for Tool Calling TRL example."
         )
-        print(
-            "Install: pip install torch transformers trl datasets peft bitsandbytes accelerate"
-        )
+        print("Install: pip install 'reward-kit[trl]' transformers bitsandbytes")
         sys.exit(1)
     main()

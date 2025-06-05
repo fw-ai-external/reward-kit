@@ -27,7 +27,7 @@ try:
     HAS_TRL_AND_TRANSFORMERS = True
 except ImportError as e:
     print(
-        f"TRL/Transformers/PEFT/Datasets not installed. Install with: pip install trl transformers torch peft datasets accelerate. Error: {e}"
+        f"TRL/Transformers/PEFT/Datasets not installed. Install with: pip install 'reward-kit[trl]' transformers bitsandbytes. Error: {e}"
     )
     HAS_TRL_AND_TRANSFORMERS = False
 
@@ -289,5 +289,5 @@ if __name__ == "__main__":
         main()
     else:
         print(
-            "TRL/Transformers/PEFT/Datasets not found. Please install them to run this example: pip install trl transformers torch peft datasets accelerate"
+            "TRL/Transformers/PEFT/Datasets not found. Please install them to run this example: pip install 'reward-kit[trl]' transformers bitsandbytes"
         )

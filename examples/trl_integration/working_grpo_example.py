@@ -47,7 +47,7 @@ try:
     HAS_TRL = True
 except ImportError as e:
     print(f"Could not import TRL-related packages: {e}")
-    print("Install with: pip install trl peft datasets accelerate math_verify")
+    print("Install with: pip install 'reward-kit[trl]' math_verify")
     HAS_TRL = False
 
 
@@ -282,7 +282,7 @@ def run_grpo_training_example():
     """
     if not HAS_TRL:
         print(
-            "TRL or related packages not installed. Install with: pip install trl peft datasets accelerate"
+            "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
         )
         return
 

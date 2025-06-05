@@ -82,6 +82,12 @@ jobs:
         echo "Pytest exit code: $PYTEST_EXIT_CODE"
         exit $PYTEST_EXIT_CODE
 
+    - name: Test OpenEvals integration
+      run: |
+        pip install openevals
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
+        pytest tests/test_openeval_integration.py -v
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

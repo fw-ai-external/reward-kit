@@ -59,7 +59,7 @@ jobs:
         # Run mypy and make the CI fail on errors to enforce type checking
         mypy reward_kit
 
-    - name: Test with pytest
+    - name: Test with pytest (excluding Docker tests)
       run: |
         pip install pytest pytest-cov pytest-asyncio
 
@@ -74,8 +74,9 @@ jobs:
 
         # Run tests with increased timeout and filter out deprecation warnings
         # We're only focusing on actual test failures
+        # Exclude Docker tests in regular CI as Docker-in-Docker can be unreliable
         PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
-        pytest tests/ --cov=reward_kit --cov-report=xml -v --durations=10
+        pytest tests/ --cov=reward_kit --cov-report=xml -v --durations=10 -m "not docker"
 
         # Check the exit code from pytest as source of truth
         PYTEST_EXIT_CODE=$?
@@ -100,6 +101,54 @@ jobs:
         files: ./coverage.xml
         fail_ci_if_error: false # Don't fail if token isn't provided
         verbose: true
+
+  docker-integration-tests:
+    name: Docker Integration Tests
+    runs-on: ubuntu-latest
+    # Only run on main branch or when specifically requested
+    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'test-docker')
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install types-requests types-PyYAML types-setuptools
+        pip install e2b || echo "e2b not available, some tests may be skipped"
+        pip install pytest pytest-cov pytest-asyncio
+
+    - name: Build required Docker images
+      run: |
+        # Build the mock MCP server image for tests
+        docker build -t mock-mcp-server:latest tests/mcp_agent/mock_mcp_server_image/
+        # Pull any other required images
+        docker pull mcp/filesystem || echo "mcp/filesystem not available, some tests may be skipped"
+
+    - name: Run Docker integration tests
+      run: |
+        export E2B_API_KEY="${{ secrets.E2B_API_KEY }}"
+        export FIREWORKS_API_KEY="${{ secrets.FIREWORKS_API_KEY }}"
+        export FIREWORKS_ACCOUNT_ID="${{ secrets.FIREWORKS_ACCOUNT_ID }}"
+
+        # Run only Docker-marked tests
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
+        pytest tests/ -v -m "docker" --durations=10
+
+    - name: Cleanup Docker images
+      if: always()
+      run: |
+        docker image prune -f
+        docker system prune -f
 
   torch-trl-tests:
     name: Torch & TRL Tests

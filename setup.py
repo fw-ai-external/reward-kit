@@ -41,9 +41,6 @@ setup(
             "types-docker",
             "versioneer>=0.20",
             "openai==1.78.1",  # needed for tests using OpenAI types
-            "torch>=1.9",
-            "trl>=0.7.0",
-            "peft>=0.7.0",
             # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
             "e2b>=0.15.0",  # Added e2b for E2B environment tests

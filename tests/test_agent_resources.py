@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict  # Added Dict, Any
 from unittest.mock import AsyncMock  # For mocking async methods if needed later
 
+import os
+
 import pytest
 import pytest_asyncio  # Import pytest_asyncio
 
@@ -19,6 +21,9 @@ from reward_kit.agent.resources.docker_resource import (
     DOCKER_SDK_AVAILABLE,
     DockerResource,
 )
+
+# Skip Docker tests unless explicitly enabled via environment variable.
+RUN_DOCKER_TESTS = os.getenv("RUN_DOCKER_TESTS") == "1"
 from reward_kit.agent.resources.filesystem_resource import FileSystemResource
 from reward_kit.agent.resources.python_state_resource import PythonStateResource
 from reward_kit.agent.resources.sql_resource import SQLResource
@@ -343,7 +348,8 @@ class TestFileSystemResource:
 
 
 pytestmark_docker = pytest.mark.skipif(
-    not DOCKER_SDK_AVAILABLE, reason="Docker SDK not installed or Docker not running"
+    not DOCKER_SDK_AVAILABLE or not RUN_DOCKER_TESTS,
+    reason="Docker tests disabled. Set RUN_DOCKER_TESTS=1 to enable.",
 )
 
 

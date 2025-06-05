@@ -40,13 +40,15 @@ setup(
             "types-PyYAML",
             "types-docker",
             "versioneer>=0.20",
-            "torch>=1.9",
-            "trl>=0.7.0",
-            "peft>=0.7.0",
             # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
             "e2b>=0.15.0",  # Added e2b for E2B environment tests
             "docker==7.1.0",
+        ],
+        "trl": [
+            "torch>=1.9",
+            "trl>=0.7.0",
+            "peft>=0.7.0",
         ],
         "deepseek": [
             "difflib>=3.0.0",

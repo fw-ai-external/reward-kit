@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator, List
@@ -18,6 +19,12 @@ from reward_kit.mcp_agent.config import AppConfig, BackendServerConfig
 from reward_kit.mcp_agent.orchestration.base_client import ManagedInstanceInfo
 from reward_kit.mcp_agent.orchestration.local_docker_client import (
     LocalDockerOrchestrationClient,
+)
+
+RUN_DOCKER_TESTS = os.getenv("RUN_DOCKER_TESTS") == "1"
+pytestmark = pytest.mark.skipif(
+    not RUN_DOCKER_TESTS,
+    reason="Docker tests disabled. Set RUN_DOCKER_TESTS=1 to enable.",
 )
 
 logger = logging.getLogger(__name__)

@@ -18,6 +18,12 @@
 pip install reward-kit
 ```
 
+If you plan to use the optional TRL integration, install with the `trl` extra:
+
+```bash
+pip install "reward-kit[trl]"
+```
+
 ## Getting Started
 
 The Reward Kit simplifies the creation and deployment of reward functions for evaluating AI model outputs.
@@ -489,9 +495,17 @@ Our CI pipeline enforces type checking, so please ensure your code passes mypy c
 ```bash
 # Install test dependencies
 pip install -e ".[dev]"
+# Install additional dependencies for TRL tests if needed
+pip install -e ".[trl]"
 
 # Run tests
 pytest
+# Set RUN_DOCKER_TESTS=1 to enable Docker tests
+RUN_DOCKER_TESTS=1 pytest tests/test_agent_resources.py
+# Local Docker orchestrator tests are also optional
+RUN_DOCKER_TESTS=1 pytest tests/mcp_agent/orchestration
+# Run optional TRL tests
+pytest tests_trl
 ```
 
 ## Code of Conduct

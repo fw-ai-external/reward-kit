@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+import shutil
 from pathlib import Path
 from typing import AsyncGenerator, List
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -21,6 +22,12 @@ from reward_kit.mcp_agent.orchestration.local_docker_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Skip all tests in this module if the Docker CLI is not available
+pytestmark = pytest.mark.skipif(
+    shutil.which("docker") is None,
+    reason="Docker CLI not available",
+)
 
 # IMPORTANT: Before running tests in this file that use MOCK_HTTP_BACKEND_CONFIG,
 # ensure you have built the mock Docker image locally:

@@ -17,6 +17,7 @@ import pytest_asyncio  # Import pytest_asyncio
 
 from reward_kit.agent.resources.docker_resource import (
     DOCKER_SDK_AVAILABLE,
+    DOCKER_DAEMON_AVAILABLE,
     DockerResource,
 )
 from reward_kit.agent.resources.filesystem_resource import FileSystemResource
@@ -343,7 +344,8 @@ class TestFileSystemResource:
 
 
 pytestmark_docker = pytest.mark.skipif(
-    not DOCKER_SDK_AVAILABLE, reason="Docker SDK not installed or Docker not running"
+    not DOCKER_SDK_AVAILABLE or not DOCKER_DAEMON_AVAILABLE,
+    reason="Docker SDK not installed or Docker daemon not running",
 )
 
 

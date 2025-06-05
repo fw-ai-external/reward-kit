@@ -46,7 +46,7 @@ This roadmap outlines the development priorities. Tasks within each phase can be
     *   [ ] **TRL Adapter:** Update `RewardFunction.get_trl_adapter` in `reward_kit/reward_function.py`.
     *   [ ] **`RewardFunction` Class:** Review and align `reward_kit/reward_function.py` (especially `__call__` and `func_path` handling).
 *   **P1.4: Code Quality & Tooling Setup:**
-    *   [ ] **Configuration Standardization:** Standardize `flake8`, `black`, `mypy` configurations across `.pre-commit-config.yaml`, `.flake8`, `mypy.ini`, `Makefile`, `pyproject.toml` (if adopted).
+    *   [ ] **Configuration Standardization:** Standardize `flake8`, `black`, `ruff` configurations across `.pre-commit-config.yaml`, `.flake8`, `ruff.toml`, `Makefile`, `pyproject.toml` (if adopted).
     *   [ ] **MyPy Strictness:** Systematically review and reduce globally disabled MyPy error codes.
     *   [ ] **Makefile & Pre-commit Consistency:** Ensure Makefile targets and pre-commit hooks are consistent.
     *   [ ] **Docstring Checking:** Enable and enforce docstring checking.

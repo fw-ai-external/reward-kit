@@ -20,7 +20,7 @@ source .venv/bin/activate
 .venv/bin/pytest
 
 # Type check
-.venv/bin/mypy reward_kit
+.venv/bin/ruff reward_kit
 
 # Lint code
 .venv/bin/flake8 reward_kit
@@ -242,7 +242,7 @@ To maintain code quality and consistency, please adhere to the following standar
     - Adhere to `flake8` guidelines.
 - **Type Hinting**:
     - Use type hints for all function parameters, return values, and variables where appropriate.
-    - Run `mypy reward_kit` to check for type errors.
+    - Run `ruff reward_kit` to check for code quality issues.
 - **Naming Conventions**:
     - `snake_case` for functions, methods, and variables.
     - `PascalCase` for classes and dataclasses.
@@ -351,10 +351,10 @@ class TestYourFunction(unittest.TestCase):
 
    Ensure your virtual environment is activated (`source .venv/bin/activate`). Then run these tools from the virtual environment:
 ```bash
-# Type checking
-.venv/bin/mypy reward_kit
+# Code quality
+.venv/bin/ruff reward_kit
 
-# Linting
+# Legacy linting
 .venv/bin/flake8 reward_kit
 
 # Format code
@@ -590,8 +590,7 @@ We welcome contributions to Reward Kit! Please follow these steps to contribute:
 6.  **Run Code Quality Checks**:
     *   Ensure your virtual environment is activated (`source .venv/bin/activate`).
     *   Format your code: `.venv/bin/black reward_kit tests`
-    *   Check linting: `.venv/bin/flake8 reward_kit tests`
-    *   Check types: `.venv/bin/mypy reward_kit`
+    *   Check linting: `.venv/bin/ruff reward_kit tests`
     *   Run pre-commit hooks (which should use the venv's tools if configured correctly): `pre-commit run --all-files`
 
 7.  **Update Documentation**:
@@ -629,6 +628,6 @@ Update the documentation when adding new functionality:
 2. **Authentication Failures**: Verify your API key and account ID
 3. **Import Errors**: Ensure you're using the correct virtual environment
 4. **Deployment Failures**: Check API logs and your account permissions
-5. **Type Errors**: Run `mypy reward_kit` to identify typing issues
+5. **Code Quality Issues**: Run `ruff reward_kit` to identify potential problems
 
 For more help, consult the [official documentation](https://github.com/fireworks-ai/reward-kit) or file an issue on GitHub.

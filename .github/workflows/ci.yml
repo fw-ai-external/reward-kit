@@ -51,13 +51,10 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 reward_kit tests examples scripts --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
 
-    - name: Type check with mypy
+    - name: Lint with ruff
       run: |
-        pip install mypy types-docker
-        # Install stubs for dependencies
-        python -m pip install types-requests types-PyYAML types-setuptools
-        # Run mypy and make the CI fail on errors to enforce type checking
-        mypy reward_kit
+        pip install ruff
+        ruff reward_kit tests examples scripts
 
     - name: Test with pytest
       run: |

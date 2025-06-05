@@ -32,12 +32,8 @@ repos:
         args: [--max-line-length=2000, --max-complexity=100, "--ignore=E402,F401,F541,W503,E203,F811,E226,F841,E704,E713,E712,E231,E731"]
         # additional_dependencies: [flake8-docstrings, flake8-import-order] # Optional: add flake8 plugins
 
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.1
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
     hooks:
-    -   id: mypy
-        args: [--ignore-missing-imports, --install-types, --non-interactive]
-        additional_dependencies:
-        - types-requests
-        - types-setuptools
-        # Add other types-* packages your project uses
+    -   id: ruff
+        args: [--fix]

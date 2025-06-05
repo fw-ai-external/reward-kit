@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Orchestrator for the Agent Evaluation Framework V2.
 Manages the lifecycle of a task using ForkableResources.

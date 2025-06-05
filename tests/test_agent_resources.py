@@ -271,7 +271,6 @@ class TestFileSystemResource:
                 resource._managed_dir_path is not None
                 and resource._managed_dir_path.exists()
             )
-            # Add assertion for mypy
             assert resource._managed_dir_path is not None
             assert (
                 resource._managed_dir_path / "file1.txt"
@@ -293,7 +292,6 @@ class TestFileSystemResource:
                     forked_resource._managed_dir_path is not None
                     and forked_resource._managed_dir_path.exists()
                 )
-                # Add assertion for mypy
                 assert forked_resource._managed_dir_path is not None
                 assert (
                     forked_resource._managed_dir_path / "original.txt"
@@ -301,7 +299,6 @@ class TestFileSystemResource:
                 (forked_resource._managed_dir_path / "forked_new.txt").write_text(
                     "forked specific"
                 )
-                # Add assertion for mypy
                 assert original_resource._managed_dir_path is not None
                 assert not (
                     original_resource._managed_dir_path / "forked_new.txt"
@@ -323,7 +320,7 @@ class TestFileSystemResource:
             try:
                 await res2.setup({"base_dir_name": "fs_res2_init"})
                 await res2.restore(checkpoint_info)
-                assert res2._managed_dir_path is not None  # Ensure for mypy
+                assert res2._managed_dir_path is not None
                 assert (
                     res2._managed_dir_path / "data.txt"
                 ).read_text() == "checkpoint me"

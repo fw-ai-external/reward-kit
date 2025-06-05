@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Code execution reward functions for evaluating code correctness.
 

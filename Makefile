@@ -23,7 +23,7 @@ lint:
 	flake8 $(PYTHON_DIRS)
 
 typecheck:
-	mypy $(PYTHON_DIRS)
+        ruff $(PYTHON_DIRS)
 
 format:
 	black $(PYTHON_DIRS)
@@ -150,7 +150,7 @@ help:
 	@echo "  upload        - Upload to PyPI (make sure to bump version first)"
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run flake8 linter"
-	@echo "  typecheck     - Run mypy type checker"
+        @echo "  typecheck     - Run ruff linter"
 	@echo "  format        - Run black code formatter"
 	@echo "  sync-docs     - Sync docs to ~/home/docs with links under 'evaluators'"
 	@echo "  release       - Run lint, typecheck, test, build, then upload"

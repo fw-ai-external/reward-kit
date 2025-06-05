@@ -26,7 +26,7 @@ Create your reward function using the `@reward_function` decorator or by structu
 ### Example: Basic Reward Function
 
 ```python
-from reward_kit import reward_function, EvaluateResult, MetricResult # Updated import
+from reward_kit import reward_function, EvaluateResult, MetricResult
 from typing import List, Dict, Optional
 
 @reward_function
@@ -34,7 +34,7 @@ def helpfulness_reward(
     messages: List[Dict[str, str]],
     original_messages: Optional[List[Dict[str, str]]] = None,
     **kwargs
-) -> EvaluateResult: # Updated return type
+) -> EvaluateResult:
     """Evaluate the helpfulness of a response."""
     # Get the assistant's response
     response_content = messages[-1].get("content", "").lower()
@@ -49,13 +49,13 @@ def helpfulness_reward(
     score = min(keyword_count / 3.0, 1.0)  # Cap at 1.0
     success = keyword_count > 0 # Example success condition
 
-    return EvaluateResult( # Updated to EvaluateResult
+    return EvaluateResult(
         score=score,
-        reason=f"Helpfulness evaluation based on {keyword_count} keywords.", # Added top-level reason
+        reason=f"Helpfulness evaluation based on {keyword_count} keywords.",
         metrics={
-            "helpfulness": MetricResult( # Updated to MetricResult
+            "helpfulness": MetricResult(
                 score=score,
-                success=success, # Added success field
+                success=success,
                 reason=f"Found {keyword_count} helpful keywords"
             )
         }
@@ -115,41 +115,25 @@ You can also load the `*.jsonl` result files programmatically (e.g., with Pandas
 
 ## 5. Deployment
 
-### Direct Deployment from Function
+Once your reward function is developed and tested locally, you can deploy it as an evaluator. The primary methods are using the `deploy()` method on a reward function object or the `reward-kit deploy` CLI command.
 
-You can deploy the reward function directly:
+### Using the `deploy()` Method (Programmatic)
+
+If you have a reward function object (created with `@reward_function`), you can deploy it directly:
 
 ```python
-# Deploy the function
+# Assuming 'helpfulness_reward' is your @reward_function decorated function
 evaluation_id = helpfulness_reward.deploy(
-    name="helpfulness-evaluator",
+    name="helpfulness-evaluator", # This will be the evaluator_id
     description="Evaluates the helpfulness of responses",
-    force=True  # Overwrite if it already exists
+    force=True  # Overwrite if an evaluator with this name already exists
 )
 
 print(f"Deployed helpfulness evaluator with ID: {evaluation_id}")
 ```
 
-### Using the CLI for Deployment
-
-Or use the CLI to deploy the function:
-
-```bash
-# Deploy with the CLI
-reward-kit deploy \
-  --id helpfulness-evaluator \
-  --metrics-folders "helpfulness=./path/to/helpfulness_metric" \
-  --display-name "Helpfulness Evaluator" \
-  --description "Evaluates the helpfulness of responses" \
-  --force
-```
-
-### Custom Provider Deployment
-
-Deploy with a specific model provider:
-
+You can also specify providers if needed:
 ```python
-# Deploy with a custom provider
 custom_evaluation_id = helpfulness_reward.deploy(
     name="helpfulness-evaluator-anthropic",
     description="Helpfulness evaluation using Claude model",
@@ -161,30 +145,44 @@ custom_evaluation_id = helpfulness_reward.deploy(
         }
     ]
 )
-
 print(f"Deployed custom provider evaluator: {custom_evaluation_id}")
 ```
 
-### Using create_evaluation Function
+### Using the CLI (`reward-kit deploy`)
 
-You can also use the `create_evaluation` function directly:
+The `reward-kit deploy` command is suitable for deploying reward functions defined in script files. The `--metrics-folders` argument should point to the directory containing your reward function script (e.g., a `main.py` with the `@reward_function` decorator).
+
+```bash
+# Deploy with the CLI
+reward-kit deploy \
+  --id helpfulness-evaluator \
+  --metrics-folders "helpfulness=./path/to/your/metric_script_directory" \
+  --display-name "Helpfulness Evaluator" \
+  --description "Evaluates the helpfulness of responses" \
+  --force
+```
+For more details on `reward-kit deploy`, see the [CLI Reference](../cli_reference/cli_overview.mdx).
+
+### Lower-level `create_evaluation` Function
+
+For more direct control, or if not using the `@reward_function` decorator's `deploy` method, you can use the `create_evaluation` function from `reward_kit.evaluation`. This is generally for more advanced use cases or internal tooling.
 
 ```python
 from reward_kit.evaluation import create_evaluation
 
 # Create an evaluation
 evaluator = create_evaluation(
-    evaluator_id="helpfulness-evaluator",
-    metric_folders=["helpfulness=./path/to/helpfulness_metric"],
-    display_name="Helpfulness Evaluator",
-    description="Evaluates the helpfulness of responses",
+    evaluator_id="helpfulness-evaluator-low-level",
+    metric_folders=["helpfulness=./path/to/your/metric_script_directory"], # Note: path to directory
+    display_name="Helpfulness Evaluator (Low-Level)",
+    description="Evaluates the helpfulness of responses, created via create_evaluation",
     force=True
 )
 
 print(f"Created evaluator: {evaluator['name']}")
 ```
 
-## 4. Integration with Training
+## 6. Integration with Training
 
 ### Using in an RL Training Job
 
@@ -218,14 +216,14 @@ trl_reward_fn = reward_fn.get_trl_adapter()
 # ...
 ```
 
-## Best Practices
+## 7. Best Practices
 
-1. **Iterative Development**: Start simple, test thoroughly, and refine your reward function
-2. **Version Control**: Use version control for your reward functions and track changes
-3. **Sample Diversity**: Test with a diverse set of samples to ensure robustness
-4. **Documentation**: Document the behavior and assumptions of your reward function
-5. **Error Handling**: Include robust error handling to prevent evaluation failures
-6. **Logging**: Add detailed logging for debugging and monitoring
+1. **Iterative Development**: Start simple, test thoroughly, and refine your reward function. Use `reward-kit run` and `reward-kit preview` extensively.
+2. **Version Control**: Use version control for your reward functions, configurations, and datasets.
+3. **Sample Diversity**: Test with a diverse set of samples to ensure robustness.
+4. **Documentation**: Document the behavior and assumptions of your reward function.
+5. **Error Handling**: Include robust error handling in your reward logic to prevent evaluation failures.
+6. **Logging**: Add detailed logging within your reward functions for easier debugging.
 
 ## Next Steps
 

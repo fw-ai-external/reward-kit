@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import aiohttp
 import pytest
+
 try:
     import torch  # type: ignore
 except Exception:  # pragma: no cover - optional dependency

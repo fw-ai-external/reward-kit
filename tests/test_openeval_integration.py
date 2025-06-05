@@ -2,8 +2,9 @@ import unittest
 
 try:
     from openevals import exact_match
-    from openevals.string import levenshtein_distance
     from openevals.json import create_json_match_evaluator
+    from openevals.string import levenshtein_distance
+
     OPENEVALS_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     OPENEVALS_AVAILABLE = False

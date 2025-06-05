@@ -6,8 +6,8 @@ from reward_kit.typed_interface import reward_function
 __all__ = ["adapt_metric"]
 
 try:
-    from deepeval.metrics.base_metric import BaseMetric, BaseConversationalMetric
-    from deepeval.test_case import LLMTestCase, ConversationalTestCase
+    from deepeval.metrics.base_metric import BaseConversationalMetric, BaseMetric
+    from deepeval.test_case import ConversationalTestCase, LLMTestCase
 except Exception:  # pragma: no cover - deepeval is optional
     BaseMetric = None
     BaseConversationalMetric = None
@@ -17,7 +17,11 @@ except Exception:  # pragma: no cover - deepeval is optional
 
 def _metric_name(metric: Any) -> str:
     name = getattr(metric, "__name__", None)
-    if name and name not in {"Base Metric", "Base Conversational Metric", "Base Multimodal Metric"}:
+    if name and name not in {
+        "Base Metric",
+        "Base Conversational Metric",
+        "Base Multimodal Metric",
+    }:
         return str(name)
     name = getattr(metric, "name", None)
     if name:
@@ -35,9 +39,7 @@ def adapt_metric(metric: Any):
         **kwargs: Any,
     ) -> EvaluateResult:
         if BaseMetric is None or LLMTestCase is None:
-            raise ImportError(
-                "deepeval must be installed to use this integration"
-            )
+            raise ImportError("deepeval must be installed to use this integration")
         if not messages:
             return EvaluateResult(score=0.0, reason="No messages", metrics={})
 
@@ -100,7 +102,9 @@ def adapt_metric(metric: Any):
         score = float(metric.score or 0.0)
         reason = getattr(metric, "reason", None)
         name = _metric_name(metric)
-        metrics = {name: MetricResult(score=score, reason=reason or "", is_score_valid=True)}
+        metrics = {
+            name: MetricResult(score=score, reason=reason or "", is_score_valid=True)
+        }
         return EvaluateResult(score=score, reason=reason, metrics=metrics)
 
     return wrapped

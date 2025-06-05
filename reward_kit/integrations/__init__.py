@@ -10,4 +10,3 @@ __all__ = [
     "reward_fn_to_scorer",
     "create_trl_adapter",
 ]
-

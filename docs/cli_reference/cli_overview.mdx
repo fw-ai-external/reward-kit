@@ -90,6 +90,14 @@ The `run` command typically generates:
     -   Result files, often including:
         -   `<config_output_name>_results.jsonl` (e.g., `math_example_results.jsonl`): Detailed evaluation results for each sample.
         -   `preview_input_output_pairs.jsonl`: Generated prompts and responses, suitable for use with `reward-kit preview`.
+    -   Console Output:
+        -   A summary report is logged to the console, including:
+            -   Total samples processed.
+            -   Number of successful evaluations.
+            -   Number of evaluation errors.
+            -   Average, min, and max scores (if applicable).
+            -   Score distribution.
+            -   Details of the first few errors encountered.
 
 ## Preview Command (`reward-kit preview`)
 

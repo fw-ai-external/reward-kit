@@ -446,6 +446,21 @@ Check the `examples` directory for complete examples:
 - `deploy_example.py`: How to deploy a reward function to Fireworks.
 - `math_example/`: Demonstrates CLI-based evaluation (`reward-kit run`) and TRL GRPO training for math problems (GSM8K dataset).
 - `apps_coding_example/`: Shows CLI-based evaluation (`reward-kit run`) for code generation tasks (APPS dataset).
+ - `apps_coding_example/`: Shows CLI-based evaluation (`reward-kit run`) for code generation tasks (APPS dataset).
+
+The OpenEvals project provides a suite of evaluators that can be used directly within Reward Kit. The helper `reward_kit.integrations.openeval.adapt` converts any OpenEvals evaluator into a reward function returning an `EvaluateResult`.
+
+```python
+from openevals import exact_match
+from reward_kit.integrations.openeval import adapt
+
+exact_match_reward = adapt(exact_match)
+result = exact_match_reward(
+    messages=[{"role": "assistant", "content": "hello"}],
+    ground_truth="hello",
+)
+print(result.score)
+```
 
 ## Command Line Interface
 

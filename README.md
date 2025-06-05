@@ -85,13 +85,7 @@ def exact_tool_match_reward(
     if not isinstance(ground_truth, dict):
          return EvaluateResult(score=0.0, reason="Ground truth is not a dictionary.", metrics={})
 
-    # The core logic from eval_tool_call would be used here.
-    # This is a placeholder for the actual comparison logic.
-    # score = float(eval_tool_call(generation_dict, ground_truth)) # eval_tool_call is a helper
-
-    # Simplified placeholder for the actual comparison:
-    # Real implementation involves detailed comparison of tool call names and arguments.
-    # See reward_kit/rewards/function_calling.py for the full `eval_tool_call` logic.
+    # This simplified check compares generated tool calls with the expected ones.
     expected_tcs = ground_truth.get("tool_calls", [])
     generated_tcs = generation_dict.get("tool_calls", [])
 

@@ -814,7 +814,7 @@ def git_pieces_from_vcs(
 
     pieces: Dict[str, Any] = {}
     pieces["long"] = full_out
-    pieces["short"] = full_out[:7]  # maybe improved later
+    pieces["short"] = full_out[:7]
     pieces["error"] = None
 
     branch_name, rc = runner(GITS, ["rev-parse", "--abbrev-ref", "HEAD"],
@@ -1357,7 +1357,7 @@ def git_pieces_from_vcs(
 
     pieces: Dict[str, Any] = {}
     pieces["long"] = full_out
-    pieces["short"] = full_out[:7]  # maybe improved later
+    pieces["short"] = full_out[:7]
     pieces["error"] = None
 
     branch_name, rc = runner(GITS, ["rev-parse", "--abbrev-ref", "HEAD"], cwd=root)

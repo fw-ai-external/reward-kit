@@ -40,6 +40,7 @@ setup(
             "types-PyYAML",
             "types-docker",
             "versioneer>=0.20",
+            "openai==1.78.1",  # needed for tests using OpenAI types
             "torch>=1.9",
             "trl>=0.7.0",
             "peft>=0.7.0",

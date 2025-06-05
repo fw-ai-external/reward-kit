@@ -1,6 +1,6 @@
 import pytest
 
-from reward_kit.adapters.braintrust import scorer_to_reward_fn, reward_fn_to_scorer
+from reward_kit.integrations.braintrust import scorer_to_reward_fn, reward_fn_to_scorer
 from reward_kit.models import Message, EvaluateResult
 from reward_kit.typed_interface import reward_function
 

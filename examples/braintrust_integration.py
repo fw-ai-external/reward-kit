@@ -1,5 +1,5 @@
 from braintrust import Eval
-from reward_kit.adapters.braintrust import scorer_to_reward_fn
+from reward_kit.integrations.braintrust import scorer_to_reward_fn
 
 
 def equality_scorer(input: str, output: str, expected: str) -> float:

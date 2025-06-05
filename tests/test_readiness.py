@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import aiohttp
 import pytest
-import torch
+try:
+    import torch  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    torch = None
 
 # Ensure reward-kit is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

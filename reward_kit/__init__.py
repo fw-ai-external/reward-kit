@@ -13,6 +13,7 @@ import warnings
 from .models import EvaluateResult, Message, MetricResult
 from .reward_function import RewardFunction
 from .typed_interface import reward_function
+from .adapters.braintrust import scorer_to_reward_fn, reward_fn_to_scorer
 
 warnings.filterwarnings("default", category=DeprecationWarning, module="reward_kit")
 
@@ -23,6 +24,8 @@ __all__ = [
     "EvaluateResult",
     "reward_function",
     "RewardFunction",
+    "scorer_to_reward_fn",
+    "reward_fn_to_scorer",
 ]
 
 from . import _version

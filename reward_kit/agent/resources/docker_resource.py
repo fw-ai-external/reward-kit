@@ -27,9 +27,21 @@ try:
     NotFound = NotFound
     APIError = APIError
     Container = Container
+    try:
+        _daemon_check_client = docker.from_env()
+        _daemon_check_client.ping()
+        DOCKER_DAEMON_AVAILABLE = True
+    except Exception:
+        DOCKER_DAEMON_AVAILABLE = False
+    finally:
+        try:
+            _daemon_check_client.close()
+        except Exception:
+            pass
 
 except ImportError:
     DOCKER_SDK_AVAILABLE = False
+    DOCKER_DAEMON_AVAILABLE = False
 
     # Define dummy classes/exceptions if docker SDK is not available
     # These are only defined if the import fails.
@@ -85,6 +97,8 @@ class DockerResource(ForkableResource):
             raise ImportError(
                 "Docker SDK not found. Please install 'docker' package to use DockerResource."
             )
+        if not DOCKER_DAEMON_AVAILABLE:
+            raise RuntimeError("Docker daemon not running or not accessible")
         self._client = docker.from_env()
         self._config: Dict[str, Any] = {}
         self._container: Optional[Container] = None

@@ -303,7 +303,10 @@ By using pre-commit hooks, we can ensure a consistent code style and catch many 
 
    Ensure your virtual environment is activated (`source .venv/bin/activate`). Then run tests using `pytest` from the virtual environment:
 ```bash
-# Run all tests
+# Run all tests (excluding Docker tests)
+.venv/bin/pytest tests/ -m "not docker"
+
+# Run all tests including Docker tests (requires Docker)
 .venv/bin/pytest tests/
 
 # Run specific test file
@@ -314,7 +317,40 @@ By using pre-commit hooks, we can ensure a consistent code style and catch many 
 
 # Run with coverage report
 .venv/bin/pytest --cov=reward_kit
+
+# Run only Docker-dependent tests
+.venv/bin/pytest tests/ -m docker
+
+# Run MCP agent integration tests
+.venv/bin/pytest tests/mcp_agent/ -v
+
+# Run slow integration tests
+.venv/bin/pytest tests/ -m slow
 ```
+
+#### Test Categories
+
+Tests are organized using pytest markers:
+
+- `docker`: Tests that require Docker to be available (automatically skipped if Docker CLI not found)
+- `slow`: Tests that take a long time to run (useful for CI optimization)
+- `integration`: Integration tests that may require external services
+
+#### Docker-based Tests
+
+Some tests require Docker to run MCP server containers. These tests:
+- Are automatically skipped if Docker CLI is not available
+- Can be run separately using `pytest -m docker`
+- Are excluded from regular CI runs to avoid Docker-in-Docker complexity
+- Have a dedicated CI job that runs on main branch or when specifically requested
+
+#### Legacy Test Scripts
+
+The `scripts/testing/` directory contains legacy shell scripts for running MCP agent tests:
+- `run_filesystem_rl_example_test.sh`: End-to-end filesystem RL example
+- `run_mcp_test.sh`: MCP intermediary server test
+
+These scripts are maintained for backwards compatibility but pytest is preferred for new development.
 
 We can focus on tests/ and examples/ folder for now since there are a lot of other repos
 

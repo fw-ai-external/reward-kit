@@ -6,8 +6,11 @@
 
 # Ensure the script is run from the repository root
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-if [ "$PWD" != "$SCRIPT_DIR" ]; then
-  echo "Please run this script from the repository root: $SCRIPT_DIR"
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+if [ "$PWD" != "$REPO_ROOT" ]; then
+  echo "Please run this script from the repository root: $REPO_ROOT"
+  echo "Current directory: $PWD"
+  echo "Usage: cd $REPO_ROOT && ./scripts/testing/$(basename $0)"
   exit 1
 fi
 

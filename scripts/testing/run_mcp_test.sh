@@ -2,8 +2,22 @@
 
 # Script to run MCP Intermediary Server and Test Client
 
+# Ensure the script is run from the repository root
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+if [ "$PWD" != "$REPO_ROOT" ]; then
+  echo "Please run this script from the repository root: $REPO_ROOT"
+  echo "Current directory: $PWD"
+  echo "Usage: cd $REPO_ROOT && ./scripts/testing/$(basename $0)"
+  exit 1
+fi
+
 # Activate virtual environment
 source .venv/bin/activate
+if [ $? -ne 0 ]; then
+    echo "Failed to activate virtual environment. Make sure it's set up at ./.venv"
+    exit 1
+fi
 
 # Define server command
 SERVER_COMMAND=".venv/bin/python reward_kit/mcp_agent/main.py --config mcp_agent_config.yaml --host localhost --port 8001"

@@ -284,7 +284,7 @@ if __name__ == "__main__":
         print(
             "Please ensure PyTorch, Transformers, TRL, Datasets, PEFT, and Accelerate are installed."
         )
-        print("Example: pip install torch transformers trl datasets peft accelerate")
+        print("Example: pip install 'reward-kit[trl]' transformers")
         sys.exit(1)
 
     # Calling main() directly here will invoke Hydra's initialization process.

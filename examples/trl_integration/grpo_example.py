@@ -43,7 +43,7 @@ try:
     HAS_TRL = True
 except ImportError:
     print(
-        "TRL or related packages not installed. Install with: pip install trl peft datasets math-verify"
+        "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]' math_verify"
     )
     HAS_TRL = False
 
@@ -309,7 +309,7 @@ def prepare_dataset_for_trl(
     """
     if not HAS_TRL:
         print(
-            "TRL or related packages not installed. Install with: pip install trl peft datasets"
+            "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
         )
         return None
 
@@ -388,7 +388,7 @@ def train_with_grpo_example():
     """
     if not HAS_TRL:
         print(
-            "TRL or related packages not installed. Install with: pip install trl peft datasets"
+            "TRL or related packages not installed. Install with: pip install 'reward-kit[trl]'"
         )
         return
 

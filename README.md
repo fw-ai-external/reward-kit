@@ -18,6 +18,15 @@
 pip install reward-kit
 ```
 
+### Optional TRL Extras
+
+Install the additional dependencies required for running the TRL-based training
+examples:
+
+```bash
+pip install "reward-kit[trl]"
+```
+
 ## Getting Started
 
 The Reward Kit simplifies the creation and deployment of reward functions for evaluating AI model outputs.

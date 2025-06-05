@@ -20,9 +20,9 @@ A sample `dataset.jsonl` is provided in the example directory. For tool calling 
     # From the root of the repository
     pip install -e ".[dev]"
     ```
-2.  **TRL Dependencies (for `trl_grpo_integration.py`)**:
+2.  **TRL Extras (for `trl_grpo_integration.py`)**:
     ```bash
-    pip install trl peft datasets accelerate
+    pip install "reward-kit[trl]"
     ```
 3.  **API Keys**: If using models that require API keys (e.g., Fireworks AI models for `local_eval.py` if not using a local model, or for downloading a base model for TRL), ensure necessary keys like `FIREWORKS_API_KEY` are set.
 

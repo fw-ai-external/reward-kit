@@ -96,6 +96,49 @@ jobs:
         fail_ci_if_error: false # Don't fail if token isn't provided
         verbose: true
 
+  torch-trl-tests:
+    name: Torch & TRL Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install "reward-kit[trl]"
+        pip install types-requests types-PyYAML types-setuptools
+        pip install e2b || echo "e2b not available, some tests may be skipped"
+
+    - name: Run torch/trl tests
+      run: |
+        pip install pytest pytest-cov pytest-asyncio
+        export E2B_API_KEY="${{ secrets.E2B_API_KEY }}"
+        export FIREWORKS_API_KEY="${{ secrets.FIREWORKS_API_KEY }}"
+        export FIREWORKS_ACCOUNT_ID="${{ secrets.FIREWORKS_ACCOUNT_ID }}"
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
+        pytest tests/ --cov=reward_kit --cov-report=xml -v --durations=10
+
+    - name: Test OpenEvals integration
+      run: |
+        pip install openevals
+        PYTHONWARNINGS="ignore::DeprecationWarning,ignore::RuntimeWarning" \
+        pytest tests/test_openeval_integration.py -v
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Optional: if you have a Codecov token
+        files: ./coverage.xml
+        fail_ci_if_error: false # Don't fail if token isn't provided
+        verbose: true
+
   build-package:
     name: Build Package
     runs-on: ubuntu-latest

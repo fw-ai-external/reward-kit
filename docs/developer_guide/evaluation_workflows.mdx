@@ -6,7 +6,7 @@ This guide explains the lifecycle of developing, testing, and deploying reward f
 
 The typical workflow involves:
 
-1.  **Dataset Configuration**: Defining how your data is loaded and prepared (see [Dataset Configuration Guide](../dataset_configuration_guide.md)).
+1.  **Dataset Configuration**: Defining how your data is loaded and prepared (see [Dataset Configuration Guide](dataset_configuration_guide.md)).
 2.  **Reward Function Implementation**: Writing the logic to evaluate model responses.
 3.  **Local Evaluation (using `reward-kit run`)**: Running evaluations locally using Hydra-based configurations to generate responses and score them.
 4.  **Previewing Results (using `reward-kit preview`)**: Inspecting or re-evaluating generated outputs.
@@ -17,7 +17,7 @@ The typical workflow involves:
 
 Before evaluation, you need to configure your dataset. This involves setting up YAML files (typically in `conf/dataset/` or an example's `conf/dataset/` directory) to define how raw data is sourced, processed, and formatted (e.g., adding system prompts).
 
-Refer to the [Dataset Configuration Guide](../dataset_configuration_guide.md) for detailed instructions.
+Refer to the [Dataset Configuration Guide](dataset_configuration_guide.md) for detailed instructions.
 
 ## 2. Reward Function Implementation
 
@@ -229,6 +229,5 @@ trl_reward_fn = reward_fn.get_trl_adapter()
 
 Now that you understand the complete workflow:
 
-1. Try creating a [Basic Reward Function](../examples/basic_reward_function.md)
-2. Explore [Advanced Reward Functions](../examples/advanced_reward_functions.md) with multiple metrics
-3. Learn about [Best Practices](../tutorials/best_practices.md) for designing effective reward functions
+1. Try creating a [Basic Reward Function](../examples/basic_examples/basic_reward_function.mdx)
+2. Explore [Advanced Reward Functions](../examples/advanced_examples/advanced_reward_functions.mdx) with multiple metrics

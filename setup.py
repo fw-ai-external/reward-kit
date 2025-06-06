@@ -14,15 +14,14 @@ setup(
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",
         "python-dotenv>=0.19.0",
-        "openai==1.78.1",
+        "openai>=1.78.1",
         "aiosqlite",
         "aiohttp",
-        "mcp==1.9.2",
-        "PyYAML>=5.0",  # Added PyYAML
-        "datasets==3.6.0",  # For dataset loading functionality
-        "fsspec==2025.3.0",  # For filesystem interactions, pinned for dataset compatibility
-        "hydra-core>=1.3.2",  # For configuration management
-        "omegaconf>=2.3.0",  # For configuration objects
+        "mcp>=1.9.2",
+        "PyYAML>=5.0",
+        "datasets>=3.6.0",
+        "hydra-core>=1.3.2",
+        "omegaconf>=2.3.0",
     ],
     extras_require={
         "dev": [
@@ -40,11 +39,9 @@ setup(
             "types-PyYAML",
             "types-docker",
             "versioneer>=0.20",
-            "openai==1.78.1",  # needed for tests using OpenAI types
-            # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
-            "e2b>=0.15.0",  # Added e2b for E2B environment tests
-            "docker==7.1.0",
+            "e2b>=0.15.0",
+            "docker>=7.1.0",
         ],
         "trl": [
             "torch>=1.9",

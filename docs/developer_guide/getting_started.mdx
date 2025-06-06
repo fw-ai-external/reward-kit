@@ -4,30 +4,11 @@ This guide will help you understand the basics of creating, testing, and deployi
 
 ## What is a Reward Function?
 
-A reward function is a mechanism for evaluating the quality of model outputs in reinforcement learning from machine feedback (RLMF) workflows. Reward functions help:
+A reward function is a mechanism for evaluating the quality of model outputs in reinforcement learning from verifiable reward (RLVR) workflows. Reward functions help:
 
 -   Evaluate model responses based on specific criteria.
 -   Provide numerical scores that can be used to optimize models.
 -   Offer explanations for why specific scores were assigned.
-
-## Getting started on www.fireworks.ai
-
-You will start your journey on our evaluators page
-
-![image](images/list_of_evaluators.png)
-
-Click on "Create Evaluator" on the upper right corner; you will be taken to the rewards page we have been working on.
-
-![image](images/create_evaluator.png)
-
-You can check out how to define an evaluator in our [tutorials](../tutorials) or in our examples for [out of the box evaluators](../examples/examples_overview.mdx). But before we decide on authoring any evaluators, let's actually pick a dataset. Let's take a look at eval-result-job17-epoch1. *(Note: The specific dataset "eval-result-job17-epoch1" mentioned here might be an internal or outdated reference; you may need to adapt this part to a publicly available or generally understandable example if this tutorial is for external use).*
-
-![image](images/create_evaluator_data.png)
-
-It is a tool calling dataset, with messages and tools field. Let's update the evaluator to run this. We will say that if the message is longer than 3 rows, then we have engaged user for long enough and call it a success (score is 1), otherwise it is a failure (score is 0).
-
-*(The image below seems to be a duplicate of the one above, ensure it's the correct one or remove if redundant)*
-![image](images/create_evaluator_data.png)
 
 ## Installation
 
@@ -52,14 +33,6 @@ To use Reward Kit with the Fireworks AI platform, set up your authentication cre
 ```bash
 # Set your API key
 export FIREWORKS_API_KEY=your_api_key
-```
-
-For development environments, you might use:
-
-```bash
-# Set environment variables for development
-export FIREWORKS_API_KEY=$DEV_FIREWORKS_API_KEY
-export FIREWORKS_API_BASE=https://dev.api.fireworks.ai
 ```
 
 ## Basic Reward Function Structure
@@ -140,7 +113,7 @@ print(f"Explanation: {result.metrics['word_count'].reason}")
 
 For evaluating datasets or running complete examples, the primary method is the `reward-kit run` CLI command. This uses [Hydra for configuration](./hydra_configuration.mdx), allowing you to define your dataset, model, and reward logic in YAML files.
 
-1.  **Explore Examples**: Check out the examples in the `examples/` directory at the root of the repository. The [main Examples README](../../../examples/README.md) provides an overview and guidance on their structure. Each example (e.g., `examples/math_example/`) has its own README explaining how to run it.
+1.  **Explore Examples**: Check out the examples in the `examples/` directory at the root of the repository. The [main Examples README](../../examples/README.md) provides an overview and guidance on their structure. Each example (e.g., `examples/math_example/`) has its own README explaining how to run it.
 
 2.  **Run an Example**:
     ```bash
@@ -187,8 +160,8 @@ reward-kit deploy --id word-count-evaluator --metrics-folders "word_count=./path
 
 Now that you have an overview of getting started:
 
-1.  Dive deeper into [Reward Function Anatomy](./reward_function_anatomy.md).
-2.  Understand the [Core Data Types](./core_data_types.md) used in Reward Kit.
+1.  Dive deeper into [Reward Function Anatomy](./reward_function_anatomy.mdx).
+2.  Understand the [Core Data Types](./core_data_types.mdx) used in Reward Kit.
 3.  Explore the [Evaluation Workflows](./evaluation_workflows.mdx) in more detail.
-4.  Browse the [Examples Overview](../examples/examples_overview.mdx) and the main [Examples README](../../../examples/README.md) to find practical implementations.
-5.  Follow our [step-by-step tutorial](../tutorials/creating_your_first_reward_function.md) for a hands-on walkthrough.
+4.  Browse the [Examples Overview](../examples/examples_overview.mdx) and the main [Examples README](../../examples/README.md) to find practical implementations.
+5.  Follow our [step-by-step tutorial](../tutorials/creating_your_first_reward_function.mdx) for a hands-on walkthrough.

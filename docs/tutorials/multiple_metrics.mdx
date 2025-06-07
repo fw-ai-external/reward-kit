@@ -1,0 +1,37 @@
+# Multiple Metrics
+
+This guide explains how to combine multiple metrics in your reward functions to create more sophisticated evaluation systems.
+
+## Overview
+
+RewardKit supports evaluating model responses using multiple metrics simultaneously. This allows you to create nuanced reward functions that consider various aspects of model performance.
+
+## Combining Metrics
+
+You can combine multiple metrics using the `CompositeReward` class or by implementing custom logic in your reward function.
+
+### Example: Accuracy and Length
+
+```python
+from reward_kit import reward_function
+from reward_kit.rewards import accuracy, length
+
+@reward_function
+def accuracy_length_reward(response, expected_response):
+    acc_score = accuracy(response, expected_response)
+    len_score = length(response)
+
+    # Combine scores with weights
+    return 0.8 * acc_score + 0.2 * len_score
+```
+
+## Best Practices
+
+- Consider the relative importance of each metric
+- Use appropriate weights for combining scores
+- Test your combined metrics on representative data
+- Document your metric combination rationale
+
+## Next Steps
+
+- [Advanced Reward Functions](../examples/advanced_examples/advanced_reward_functions.mdx)

@@ -1,0 +1,49 @@
+# Basic Reward Function
+
+This example demonstrates how to create a simple reward function using RewardKit.
+
+## Overview
+
+A basic reward function evaluates model responses and returns a numerical score. This example shows the fundamental concepts and patterns.
+
+## Simple Accuracy Reward
+
+```python
+from reward_kit import reward_function
+
+@reward_function
+def simple_accuracy(response: str, expected_response: str) -> float:
+    """
+    A basic accuracy reward that returns 1.0 for exact matches, 0.0 otherwise.
+    """
+    return 1.0 if response.strip().lower() == expected_response.strip().lower() else 0.0
+```
+
+## Usage
+
+```python
+# Evaluate a single response
+score = simple_accuracy("Hello world", "hello world")
+print(f"Score: {score}")  # Score: 1.0
+
+# Evaluate a dataset
+from reward_kit.evaluation import evaluate_dataset
+
+results = evaluate_dataset(
+    reward_function=simple_accuracy,
+    dataset_path="my_dataset.jsonl"
+)
+```
+
+## Key Concepts
+
+- **Decoration**: Use `@reward_function` to create a reward function
+- **Type Hints**: Include type hints for better IDE support
+- **Normalization**: Consider normalizing inputs (e.g., lowercasing, stripping whitespace)
+- **Return Values**: Return numerical scores (typically 0.0 to 1.0)
+
+## Next Steps
+
+- [Advanced Reward Functions](./examples/advanced_examples/advanced_reward_functions.mdx)
+- [Reward Functions Overview](./reward_functions_overview.mdx)
+- [Creating Your First Reward Function](../../tutorials/creating_your_first_reward_function.mdx)

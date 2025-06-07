@@ -1,0 +1,294 @@
+# E2B Code Execution Overview
+
+This guide explains how to use E2B (Code Interpreter) with RewardKit for safe code execution and evaluation.
+
+## Overview
+
+E2B provides sandboxed environments for executing code safely. RewardKit integrates with E2B to enable code execution rewards that can run and evaluate generated code.
+
+## Setup
+
+First, install the E2B integration:
+
+```bash
+pip install e2b-code-interpreter
+```
+
+Set up your E2B API key:
+
+```bash
+export E2B_API_KEY="your_api_key_here"
+```
+
+## Basic Code Execution Reward
+
+```python
+from reward_kit import reward_function
+from e2b_code_interpreter import CodeInterpreter
+
+@reward_function
+def e2b_code_execution_reward(response: str, expected_output: str, **kwargs) -> float:
+    """
+    Executes code using E2B and compares output to expected result.
+    """
+    try:
+        with CodeInterpreter() as sandbox:
+            # Execute the generated code
+            execution = sandbox.notebook.exec_cell(response)
+
+            if execution.error:
+                return 0.0
+
+            # Get the output
+            output = ""
+            for result in execution.results:
+                if hasattr(result, 'text'):
+                    output += result.text
+                elif hasattr(result, 'data'):
+                    output += str(result.data)
+
+            # Compare with expected output
+            if output.strip() == expected_output.strip():
+                return 1.0
+            else:
+                # Partial credit based on similarity
+                return calculate_output_similarity(output, expected_output)
+
+    except Exception as e:
+        print(f"E2B execution error: {e}")
+        return 0.0
+
+def calculate_output_similarity(actual: str, expected: str) -> float:
+    """Calculate similarity between outputs."""
+    actual = actual.strip()
+    expected = expected.strip()
+
+    if not expected:
+        return 1.0 if not actual else 0.0
+
+    # Simple word-based similarity
+    actual_words = set(actual.lower().split())
+    expected_words = set(expected.lower().split())
+
+    if not expected_words:
+        return 1.0
+
+    intersection = actual_words & expected_words
+    return len(intersection) / len(expected_words)
+```
+
+## Advanced Code Evaluation
+
+```python
+@reward_function
+def advanced_code_evaluation(response: str, test_cases: list, **kwargs) -> float:
+    """
+    Evaluates code against multiple test cases using E2B.
+    """
+    if not test_cases:
+        return 0.0
+
+    passed_tests = 0
+    total_tests = len(test_cases)
+
+    try:
+        with CodeInterpreter() as sandbox:
+            # First, execute the response code to define functions/variables
+            setup_execution = sandbox.notebook.exec_cell(response)
+
+            if setup_execution.error:
+                return 0.0
+
+            # Run each test case
+            for test_case in test_cases:
+                test_code = test_case.get('code', '')
+                expected_output = test_case.get('expected', '')
+
+                test_execution = sandbox.notebook.exec_cell(test_code)
+
+                if test_execution.error:
+                    continue
+
+                # Check output
+                actual_output = ""
+                for result in test_execution.results:
+                    if hasattr(result, 'text'):
+                        actual_output += result.text
+
+                if actual_output.strip() == expected_output.strip():
+                    passed_tests += 1
+
+    except Exception as e:
+        print(f"E2B execution error: {e}")
+        return 0.0
+
+    return passed_tests / total_tests
+```
+
+## File-based Code Evaluation
+
+```python
+@reward_function
+def file_based_code_reward(response: str, file_operations: list, **kwargs) -> float:
+    """
+    Evaluates code that performs file operations.
+    """
+    try:
+        with CodeInterpreter() as sandbox:
+            # Execute the code
+            execution = sandbox.notebook.exec_cell(response)
+
+            if execution.error:
+                return 0.0
+
+            score = 0.0
+            total_operations = len(file_operations)
+
+            # Check each expected file operation
+            for operation in file_operations:
+                file_path = operation.get('path', '')
+                expected_content = operation.get('content', '')
+                operation_type = operation.get('type', 'create')
+
+                if operation_type == 'create':
+                    # Check if file was created with correct content
+                    try:
+                        # Read the file
+                        read_execution = sandbox.notebook.exec_cell(f"""
+with open('{file_path}', 'r') as f:
+    content = f.read()
+print(content)
+                        """)
+
+                        if not read_execution.error:
+                            actual_content = ""
+                            for result in read_execution.results:
+                                if hasattr(result, 'text'):
+                                    actual_content += result.text
+
+                            if actual_content.strip() == expected_content.strip():
+                                score += 1.0
+
+                    except Exception:
+                        pass
+
+                elif operation_type == 'exists':
+                    # Check if file exists
+                    check_execution = sandbox.notebook.exec_cell(f"""
+import os
+print(os.path.exists('{file_path}'))
+                    """)
+
+                    if not check_execution.error:
+                        for result in check_execution.results:
+                            if hasattr(result, 'text') and 'True' in result.text:
+                                score += 1.0
+                                break
+
+            return score / total_operations if total_operations > 0 else 0.0
+
+    except Exception as e:
+        print(f"E2B execution error: {e}")
+        return 0.0
+```
+
+## Data Analysis Code Evaluation
+
+```python
+@reward_function
+def data_analysis_reward(response: str, dataset_path: str, expected_insights: list, **kwargs) -> float:
+    """
+    Evaluates data analysis code by checking insights and outputs.
+    """
+    try:
+        with CodeInterpreter() as sandbox:
+            # Upload dataset to sandbox
+            with open(dataset_path, 'rb') as f:
+                data_file = sandbox.files.write('dataset.csv', f.read())
+
+            # Execute the analysis code
+            execution = sandbox.notebook.exec_cell(response)
+
+            if execution.error:
+                return 0.0
+
+            score = 0.0
+
+            # Check for expected insights
+            output_text = ""
+            for result in execution.results:
+                if hasattr(result, 'text'):
+                    output_text += result.text.lower()
+
+            # Check each expected insight
+            for insight in expected_insights:
+                if insight.lower() in output_text:
+                    score += 1.0
+
+            # Bonus for plots/visualizations
+            has_plot = any(
+                hasattr(result, 'formats') and 'image/png' in result.formats
+                for result in execution.results
+            )
+
+            if has_plot:
+                score += 0.5
+
+            return min(score / len(expected_insights), 1.0) if expected_insights else 0.0
+
+    except Exception as e:
+        print(f"E2B execution error: {e}")
+        return 0.0
+```
+
+## Safety and Best Practices
+
+1. **Timeout Handling**: E2B automatically handles timeouts for long-running code
+2. **Resource Limits**: Sandboxes have built-in resource limits
+3. **Error Handling**: Always handle execution errors gracefully
+4. **Clean Output**: Parse output carefully as it may contain formatting
+5. **State Management**: Each CodeInterpreter session maintains state across cells
+
+## Usage Examples
+
+```python
+# Test a simple calculation
+test_cases = [
+    {
+        'code': 'result = add_numbers(2, 3)',
+        'expected': '5'
+    },
+    {
+        'code': 'result = add_numbers(-1, 1)',
+        'expected': '0'
+    }
+]
+
+code_response = """
+def add_numbers(a, b):
+    return a + b
+"""
+
+score = advanced_code_evaluation(code_response, test_cases)
+print(f"Code evaluation score: {score}")
+```
+
+## Integration with RewardKit
+
+E2B code execution can be easily integrated into your evaluation workflows:
+
+```python
+from reward_kit.evaluation import evaluate_dataset
+
+# Evaluate a dataset of coding problems
+results = evaluate_dataset(
+    reward_function=e2b_code_execution_reward,
+    dataset_path="coding_problems.jsonl",
+    additional_fields=['test_cases', 'expected_output']
+)
+```
+
+## Next Steps
+
+- [Code Execution with E2B Example](https://github.com/fireworks-ai/reward-kit/blob/main/examples/e2b_reward_example.py)
+- [Advanced Reward Functions](./examples/advanced_examples/advanced_reward_functions.mdx)

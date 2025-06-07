@@ -1,0 +1,92 @@
+# Reward Functions Overview
+
+This guide provides an overview of reward functions in RewardKit and how to use them effectively.
+
+## What are Reward Functions?
+
+Reward functions are the core building blocks of RewardKit. They evaluate model responses and provide numerical feedback that can be used for training, evaluation, and analysis.
+
+## Basic Structure
+
+Every reward function follows this pattern:
+
+```python
+from reward_kit import reward_function
+
+@reward_function
+def my_reward(response: str, expected_response: str, **kwargs) -> float:
+    # Your evaluation logic here
+    return score
+```
+
+## Built-in Reward Functions
+
+RewardKit provides several built-in reward functions:
+
+### Accuracy-based
+- `accuracy`: Exact string matching
+- `fuzzy_accuracy`: Fuzzy string matching with configurable threshold
+
+### Length-based
+- `length`: Evaluates response length
+- `length_penalty`: Penalizes responses that are too long or short
+
+### Format-based
+- `json_schema`: Validates JSON responses against a schema
+- `format_compliance`: Checks if responses follow expected formats
+
+### Code-specific
+- `code_execution`: Evaluates code by executing it
+- `syntax_validation`: Checks code syntax
+
+## Custom Reward Functions
+
+You can create custom reward functions for domain-specific evaluation:
+
+```python
+@reward_function
+def domain_specific_reward(response: str, expected_response: str) -> float:
+    # Custom logic for your domain
+    score = 0.0
+
+    # Example: Check for specific keywords
+    if "important_keyword" in response.lower():
+        score += 0.5
+
+    # Example: Length consideration
+    if 50 <= len(response) <= 200:
+        score += 0.3
+
+    # Example: Accuracy component
+    if response.strip() == expected_response.strip():
+        score += 0.2
+
+    return min(score, 1.0)  # Cap at 1.0
+```
+
+## Best Practices
+
+1. **Clear Naming**: Use descriptive names for your reward functions
+2. **Type Hints**: Include type hints for better IDE support
+3. **Documentation**: Add docstrings explaining what your function evaluates
+4. **Normalization**: Normalize scores to a consistent range (typically 0.0 to 1.0)
+5. **Testing**: Test your reward functions with edge cases
+
+## Combining Rewards
+
+You can combine multiple reward functions:
+
+```python
+@reward_function
+def combined_reward(response: str, expected_response: str) -> float:
+    acc_score = accuracy(response, expected_response)
+    len_score = length_penalty(response, min_length=10, max_length=100)
+
+    return 0.8 * acc_score + 0.2 * len_score
+```
+
+## Next Steps
+
+- [Basic Reward Function Example](./basic_reward_function.mdx)
+- [Advanced Reward Functions](./examples/advanced_examples/advanced_reward_functions.mdx)
+- [Creating Your First Reward Function](../../tutorials/creating_your_first_reward_function.mdx)

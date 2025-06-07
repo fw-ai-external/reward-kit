@@ -33,7 +33,7 @@ def pointwise_scoring_func(
 
 @reward_function(mode="batch")
 def batch_rl_rewards_func(
-    rollouts_messages: List[List[Message]], ground_truths: List[Any], **kwargs
+    rollouts_messages: List[List[Message]], ground_truth: Any, **kwargs
 ) -> List[EvaluateResult]:
     """Returns List[EvaluateResult] with step_outputs for RL."""
     results = []
@@ -58,7 +58,7 @@ def batch_rl_rewards_func(
 
 @reward_function(mode="batch")
 def batch_scoring_func(
-    rollouts_messages: List[List[Message]], ground_truths: List[Any], **kwargs
+    rollouts_messages: List[List[Message]], ground_truth: Any, **kwargs
 ) -> List[EvaluateResult]:
     """Returns List[EvaluateResult] with only scores."""
     results = []
@@ -79,7 +79,7 @@ def pointwise_invalid_output_func(
 
 @reward_function(mode="batch")
 def batch_invalid_output_func(
-    rollouts_messages: List[List[Message]], ground_truths: List[Any], **kwargs
+    rollouts_messages: List[List[Message]], ground_truth: Any, **kwargs
 ) -> List[Dict]:
     """Returns a list of dicts, not EvaluateResult."""
     return [{"score_is_actually_string": "0.5"}]
@@ -139,9 +139,9 @@ class TestTypedInterfaceRL:
                 {"role": "assistant", "content": "R2A2"},
             ],
         ]
-        ground_truths = [None, None]
+        ground_truth = None
         results = batch_rl_rewards_func(
-            rollouts_messages=raw_rollouts, ground_truths=ground_truths
+            rollouts_messages=raw_rollouts, ground_truth=ground_truth
         )
         assert isinstance(results, list)
         assert len(results) == 2
@@ -164,9 +164,9 @@ class TestTypedInterfaceRL:
             [{"role": "user", "content": "R1"}],
             [{"role": "user", "content": "R2"}],
         ]
-        ground_truths = ["gt1", "gt2"]
+        ground_truth = "gt"
         results = batch_scoring_func(
-            rollouts_messages=raw_rollouts, ground_truths=ground_truths
+            rollouts_messages=raw_rollouts, ground_truth=ground_truth
         )
         assert isinstance(results, list)
         assert len(results) == 2
@@ -191,7 +191,7 @@ class TestTypedInterfaceRL:
             ValueError, match="Input 'rollouts_messages' failed Pydantic validation"
         ):
             batch_rl_rewards_func(
-                rollouts_messages=raw_rollouts, ground_truths=[None, None]
+                rollouts_messages=raw_rollouts, ground_truth=None
             )
 
     def test_pointwise_invalid_output(self):
@@ -211,7 +211,7 @@ class TestTypedInterfaceRL:
             match=r"Return value from function 'batch_invalid_output_func' failed Pydantic validation for mode 'batch':\n1 validation error for list\[EvaluateResult]",
         ):
             batch_invalid_output_func(
-                rollouts_messages=raw_rollouts, ground_truths=[None]
+                rollouts_messages=raw_rollouts, ground_truth=None
             )
 
     def test_decorator_mode_mismatch_error_handling(self):

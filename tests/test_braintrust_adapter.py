@@ -22,7 +22,7 @@ def test_scorer_to_reward_fn():
 
 
 @reward_function
-def my_reward(messages, ground_truth=None):
+def my_reward(messages, ground_truth=None, **kwargs):
     expected = ground_truth[-1].content if ground_truth else ""
     score = 1.0 if messages[-1].content == expected else 0.0
     return EvaluateResult(score=score)

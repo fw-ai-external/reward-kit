@@ -16,16 +16,14 @@ from reward_kit.config import GCPCloudRunConfig, RewardKitConfig
 DUMMY_DEPLOY_TEST_MODULE_NAME = "dummy_deploy_test_module"
 DUMMY_DEPLOY_TEST_MODULE_FILENAME = f"{DUMMY_DEPLOY_TEST_MODULE_NAME}.py"
 DUMMY_DEPLOY_TEST_FUNCTION_NAME = "my_dummy_deploy_reward_func"
-DUMMY_DEPLOY_FUNCTION_REF = (
-    f"{DUMMY_DEPLOY_TEST_MODULE_NAME}.{DUMMY_DEPLOY_TEST_FUNCTION_NAME}"
-)
+DUMMY_DEPLOY_FUNCTION_REF = f"{DUMMY_DEPLOY_TEST_MODULE_NAME}.{DUMMY_DEPLOY_TEST_FUNCTION_NAME}"
 DUMMY_DEPLOY_REQUIREMENTS = "requests==2.25.0\nfastapi==0.70.0"
 
 DUMMY_DEPLOY_MODULE_CONTENT = f"""
 from reward_kit.typed_interface import reward_function
 
 @reward_function(id="test-deploy-func", requirements='''{DUMMY_DEPLOY_REQUIREMENTS}''')
-def {DUMMY_DEPLOY_TEST_FUNCTION_NAME}(messages, ground_truth=None):
+def {DUMMY_DEPLOY_TEST_FUNCTION_NAME}(messages, ground_truth=None, **kwargs):
     return {{"score": 0.5, "reason": "Deployed dummy"}}
 """
 
@@ -144,9 +142,7 @@ def test_deploy_gcp_with_inline_requirements(
     )
 
     # Mock all external dependencies of _deploy_to_gcp_cloud_run and deploy_command
-    with patch(
-        "reward_kit.cli_commands.deploy.check_environment", return_value=True
-    ) as mock_check_env, patch(
+    with patch("reward_kit.cli_commands.deploy.check_environment", return_value=True) as mock_check_env, patch(
         "reward_kit.cli_commands.deploy.get_config"
     ) as mock_get_config, patch(
         "reward_kit.cli_commands.deploy.ensure_artifact_registry_repo_exists",
@@ -191,12 +187,8 @@ def test_deploy_gcp_with_inline_requirements(
         mock_gen_dockerfile.assert_called_once()
         call_args, call_kwargs = mock_gen_dockerfile.call_args
         assert call_kwargs.get("function_ref") == function_ref
-        assert (
-            call_kwargs.get("inline_requirements_content") == DUMMY_DEPLOY_REQUIREMENTS
-        )
-        assert (
-            call_kwargs.get("user_requirements_path") is None
-        )  # Ensure it's not trying to use both
+        assert call_kwargs.get("inline_requirements_content") == DUMMY_DEPLOY_REQUIREMENTS
+        assert call_kwargs.get("user_requirements_path") is None  # Ensure it's not trying to use both
 
         mock_ensure_ar.assert_called_once_with(
             project_id=args.gcp_project,

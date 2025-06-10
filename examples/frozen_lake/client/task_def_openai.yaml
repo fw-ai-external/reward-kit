@@ -1,0 +1,22 @@
+name: "frozen_lake_http_rollout_openai"
+description: "Evaluate an agent's ability to navigate a Frozen Lake environment via HTTP rollout using OpenAI GPT-4"
+
+# Resource configuration - connects to the game server
+resource_type: "http_rollout"
+base_resource_config:
+  base_url: "http://localhost:8080"
+  timeout: 30.0
+
+# Reward function - the only client-side logic needed
+reward_function_path: "examples.frozen_lake.client.reward.frozen_lake_reward"
+
+# Minimal initial message - server provides the actual prompt content
+messages:
+  - role: "user"
+    content: "Start playing the game!"
+
+# Evaluation configuration
+poc_max_turns: 20
+
+# Note: The actual game prompt and rules are provided by the server via /initial_prompt endpoint
+# This minimizes client-side configuration and keeps game logic on the server

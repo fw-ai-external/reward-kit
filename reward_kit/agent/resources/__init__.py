@@ -7,8 +7,21 @@ This package contains concrete implementations of the ForkableResource ABC.
 from .bfcl_sim_api_resource import BFCLSimAPIResource
 from .docker_resource import DockerResource
 from .filesystem_resource import FileSystemResource
+from .http_rollout_resource import HttpRolloutResource
 from .python_state_resource import PythonStateResource
 from .sql_resource import SQLResource
+
+# HTTP Rollout Protocol types for server implementations
+from .http_rollout_protocol import (
+    HttpRolloutConfig,
+    StartEpisodeResponse,
+    StepRequest,
+    StepResponse,
+    EndEpisodeRequest,
+    EndEpisodeResponse,
+    HealthResponse,
+    GameObservation,
+)
 
 __all__ = [
     "PythonStateResource",
@@ -16,4 +29,14 @@ __all__ = [
     "FileSystemResource",
     "DockerResource",
     "BFCLSimAPIResource",
+    "HttpRolloutResource",
+    # HTTP Rollout Protocol
+    "HttpRolloutConfig",
+    "StartEpisodeResponse",
+    "StepRequest", 
+    "StepResponse",
+    "EndEpisodeRequest",
+    "EndEpisodeResponse",
+    "HealthResponse",
+    "GameObservation",
 ]

@@ -101,67 +101,55 @@ class HttpRolloutResource(ForkableResource):
     async def get_initial_state_description(self) -> str:
         """
         Get a formatted description of the initial game state for the agent.
-        Now fetches the initial prompt from the server's /initial_prompt endpoint.
+        Uses the observation from start_episode to build the prompt.
         """
-        try:
-            # Try to get initial prompt from server
-            url = f"{self.config.base_url}/initial_prompt"
-            response = self.client.get(url)
-            response.raise_for_status()
-            
-            prompt_data = response.json()
-            
-            # Start episode to get current game state
-            if not self.is_episode_active:
-                await self.initialize()
-            
-            # Combine server prompt with current game state
-            description_parts = [prompt_data["content"]]
-            
-            if self.current_observation:
-                obs = self.current_observation
-                if obs.get("message"):
-                    description_parts.append(f"\nEnvironment: {obs['message']}")
-                
-                if obs.get("visual"):
-                    description_parts.append(f"\nGame Board:\n{obs['visual']}")
-                
-                if obs.get("position"):
-                    description_parts.append(f"\nStarting Position: {obs['position']}")
-            
-            description_parts.append(f"\n{prompt_data['game_rules']}")
-            
-            return "\n".join(description_parts)
-            
-        except Exception as e:
-            self.logger.warning(f"Failed to get initial prompt from server: {e}")
-            # Fallback to basic description
-            if not self.is_episode_active:
-                await self.initialize()
-            
-            if not self.current_observation:
-                return "No initial state available."
-            
-            obs = self.current_observation
-            description_parts = []
-            
-            if obs.get("message"):
-                description_parts.append(f"Environment: {obs['message']}")
-            
-            if obs.get("visual"):
-                description_parts.append(f"\nGame Board:\n{obs['visual']}")
-            
-            if obs.get("position"):
-                description_parts.append(f"\nStarting Position: {obs['position']}")
-            
-            description_parts.append("\nGame Rules:")
-            description_parts.append("- S = Start position")
-            description_parts.append("- F = Frozen (safe to step on)")
-            description_parts.append("- H = Hole (game over if you step here)")
-            description_parts.append("- G = Goal (reach this to win)")
-            description_parts.append("- [X] = Your current position")
-            
-            return "\n".join(description_parts)
+        # Start episode to get current game state
+        if not self.is_episode_active:
+            await self.initialize()
+        
+        if not self.current_observation:
+            return "No initial state available."
+        
+        obs = self.current_observation
+        
+        # Build comprehensive game prompt
+        content = """🎮 FROZEN LAKE GAME - AUTONOMOUS PLAY MODE
+
+🎯 OBJECTIVE: Navigate from S to G without hitting H
+
+📋 GAME RULES: S=start, F=safe, H=hole(death), G=goal(win)
+
+🤖 AUTONOMOUS MODE INSTRUCTIONS:
+- You are playing this game AUTONOMOUSLY until completion
+- KEEP MAKING MOVES using the step tool until you reach G or hit H
+- DO NOT ask for user input or wait for confirmation
+- DO NOT stop after one move - continue until the game ends
+- Each move should be followed immediately by another move
+- Game only ends when you reach G (win) or hit H (lose)
+
+🎮 ACTION: Use step tool with: "left", "right", "up", or "down"
+
+⚡ START NOW - Make your first move and continue until the game is complete!"""
+
+        description_parts = [content]
+        
+        if obs.get("message"):
+            description_parts.append(f"\nEnvironment: {obs['message']}")
+        
+        if obs.get("visual"):
+            description_parts.append(f"\nGame Board:\n{obs['visual']}")
+        
+        if obs.get("position"):
+            description_parts.append(f"\nStarting Position: {obs['position']}")
+        
+        description_parts.append("\nGame Rules:")
+        description_parts.append("- S = Start position")
+        description_parts.append("- F = Frozen (safe to step on)")
+        description_parts.append("- H = Hole (game over if you step here)")
+        description_parts.append("- G = Goal (reach this to win)")
+        description_parts.append("- [X] = Your current position")
+        
+        return "\n".join(description_parts)
 
     async def cleanup(self) -> None:
         """

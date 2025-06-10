@@ -43,7 +43,10 @@ frozen_lake/
 │       ├── full_evaluation_*.log      # Complete system logs
 │       ├── agent_trajectory_*.log     # Agent decision traces
 │       └── openai_evaluation_*.log    # OpenAI-specific logs
-└── frozen_lake_server.py       # Core game logic (shared dependency)
+├── gymnasium_frozen_lake_server.py  # Gymnasium-based game implementation
+└── deprecated/                 # Legacy implementations
+    ├── frozen_lake_server.py   # Original hand-rolled implementation
+    └── gymnasium_adapter.py    # Abstract adapter (future extensibility)
 ```
 
 ## Separation of Concerns
@@ -69,11 +72,35 @@ frozen_lake/
 - Generates evaluation metrics and analysis
 
 ### 🔗 **HTTP Rollout Protocol**
-The standardized communication interface between server and client:
-- `POST /start_episode` → Initialize game
-- `POST /step` → Execute action  
-- `POST /end_episode` → Cleanup
-- `GET /health` → Status check
+Clean and simple standardized communication interface:
+1. **Episode Start:** `POST /start_episode` → Initialize game
+2. **Action Execution:** `POST /step` → Execute agent action
+3. **Episode End:** `POST /end_episode` → Cleanup
+4. **Health Check:** `GET /health` → Status check
+
+## Gymnasium Integration
+
+This implementation is built on the official **Gymnasium FrozenLake-v1** environment, providing:
+
+### 🏗️ **Standard RL Compatibility**
+- Uses the official Gymnasium interface for consistent behavior
+- Compatible with other RL frameworks and tools
+- Supports both deterministic (`is_slippery=False`) and stochastic (`is_slippery=True`) modes
+- Official action space (0=Left, 1=Down, 2=Right, 3=Up) with string conversion layer
+
+### 🎛️ **Configurable Environments**
+- **Map sizes**: 4x4 (default) and 8x8 grids
+- **Slipperiness**: Toggle deterministic vs stochastic behavior
+- **Render modes**: Support for different visualization options
+- **Custom maps**: Can be extended to support custom grid layouts
+
+### 🔌 **Extensible Architecture**
+Clean and focused implementation that can be extended for other Gymnasium environments in the future.
+
+### 🧹 **Clean API Design**
+- Focused on core functionality with minimal endpoints
+- Initial prompt embedded in start_episode response
+- Environment information available through Gymnasium metadata
 
 ## Game Rules
 
@@ -177,6 +204,9 @@ export OPENAI_API_KEY="your_key"
 ### 🎯 **String-Based Actions**
 Clear action commands (`"left"`, `"right"`, `"up"`, `"down"`) instead of confusing numeric codes.
 
+### 🏋️ **Gymnasium Integration**
+Built on the official Gymnasium FrozenLake-v1 environment for standard RL compatibility and extensibility.
+
 ### 🔄 **Initial State Injection**  
 Agent automatically receives the game board and rules at the start of each episode.
 
@@ -188,6 +218,9 @@ Detailed trajectory analysis including agent reasoning, tool calls, and game sta
 
 ### 🔧 **Modular Architecture**
 Server and client can be developed, deployed, and maintained independently.
+
+### 🌟 **Extensible Environment Support**
+Abstraction layer supports multiple Gymnasium environments beyond FrozenLake.
 
 ## Model Performance Results
 
@@ -348,13 +381,36 @@ This protocol can be adapted for other interactive environments beyond Frozen La
 - Review individual README files for component-specific guidance
 - Verify HTTP communication in server logs
 
+## ✨ Migration Summary: Hand-Rolled → Gymnasium
+
+This project successfully migrated from a custom FrozenLake implementation to the **official Gymnasium FrozenLake-v1 environment**.
+
+### 🎯 **Key Achievements**
+- ✅ **Standard RL Compatibility**: Now uses official Gymnasium interface
+- ✅ **Simplified Architecture**: Clean 4-endpoint HTTP API (was 6+ endpoints)
+- ✅ **Backward Compatibility**: All existing evaluation scripts work unchanged
+- ✅ **Better Reliability**: Battle-tested Gymnasium code vs custom implementation
+- ✅ **Future Ready**: Foundation for supporting more Gymnasium environments
+
+### 🔄 **What Changed**
+- `frozen_lake_server.py` → `gymnasium_frozen_lake_server.py` (Gymnasium-based)
+- HTTP endpoints simplified from 6 to 4 core endpoints
+- Initial prompt now embedded in start_episode (not separate endpoint)
+- Environment info available through Gymnasium metadata (not separate endpoint)
+
+### 📦 **What Stayed the Same**
+- All evaluation scripts work without changes
+- Same string-based action interface (`"left"`, `"right"`, etc.)
+- Same HTTP rollout protocol structure
+- Same reward functions and scoring
+
 ## Use Cases
 
 This example serves as a foundation for:
-- **Game environment developers:** Reference implementation for HTTP rollout API
-- **Agent evaluation teams:** Production-ready evaluation framework
-- **Research:** Comparative studies across different environments and agents
-- **Infrastructure:** Template for deploying scalable evaluation systems
+- **Game environment developers:** Reference implementation for HTTP rollout API with Gymnasium
+- **Agent evaluation teams:** Production-ready evaluation framework with standard RL environments
+- **Research:** Comparative studies across different Gymnasium environments and agents
+- **Infrastructure:** Template for deploying scalable evaluation systems with official RL environments
 
 ## Next Steps
 

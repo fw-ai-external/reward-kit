@@ -11,9 +11,9 @@ import os
 from typing import Dict
 from fastapi import FastAPI, HTTPException
 
-# Add parent directory to path to import frozen_lake_server
+# Add parent directory to path to import gymnasium frozen lake server
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from frozen_lake_server import FrozenLakeGame
+from gymnasium_frozen_lake_server import GymnasiumFrozenLakeGame as FrozenLakeGame
 
 # Import standardized HTTP rollout protocol types from reward-kit
 from reward_kit.agent.resources import (
@@ -25,14 +25,8 @@ from reward_kit.agent.resources import (
     HealthResponse,
 )
 
-# Additional model for initial prompt
+# Additional models for responses
 from pydantic import BaseModel
-
-class InitialPromptResponse(BaseModel):
-    """Response containing the initial prompt and game state for the agent."""
-    content: str
-    visual_state: str
-    game_rules: str
 
 
 # FastAPI app
@@ -42,51 +36,20 @@ app = FastAPI(title="Frozen Lake HTTP Rollout Server")
 episodes: Dict[str, FrozenLakeGame] = {}
 
 
-@app.get("/initial_prompt", response_model=InitialPromptResponse)
-async def get_initial_prompt() -> InitialPromptResponse:
-    """Get the initial prompt and game setup for the agent."""
-    content = """🎮 FROZEN LAKE GAME - AUTONOMOUS PLAY MODE
-
-🎯 OBJECTIVE: Navigate from S to G without hitting H
-
-📋 GAME RULES: S=start, F=safe, H=hole(death), G=goal(win)
-
-🤖 AUTONOMOUS MODE INSTRUCTIONS:
-- You are playing this game AUTONOMOUSLY until completion
-- KEEP MAKING MOVES using the step tool until you reach G or hit H
-- DO NOT ask for user input or wait for confirmation
-- DO NOT stop after one move - continue until the game ends
-- Each move should be followed immediately by another move
-- Game only ends when you reach G (win) or hit H (lose)
-
-🎮 ACTION: Use step tool with: "left", "right", "up", or "down"
-
-⚡ START NOW - Make your first move and continue until the game is complete!"""
-    
-    visual_state = """[S] F  F  F 
- F  H  F  H 
- F  F  F  H 
- H  F  F  G """
-    
-    game_rules = """Game Rules:
-- S = Start position
-- F = Frozen (safe to step on)
-- H = Hole (game over if you step here)
-- G = Goal (reach this to win)
-- [X] = Your current position"""
-    
-    return InitialPromptResponse(
-        content=content,
-        visual_state=visual_state,
-        game_rules=game_rules
-    )
 
 
 @app.post("/start_episode", response_model=StartEpisodeResponse)
 async def start_episode() -> StartEpisodeResponse:
     """Start a new episode of the Frozen Lake game."""
     episode_id = str(uuid.uuid4())
-    game = FrozenLakeGame()
+    
+    # Create Gymnasium-based game with deterministic behavior for consistent evaluation
+    # This can be configured via environment variables or request parameters in the future
+    game = FrozenLakeGame(
+        map_name="4x4",
+        is_slippery=False,  # Deterministic for reproducible agent evaluation
+        render_mode=None
+    )
     observation = game.reset()
     episodes[episode_id] = game
     
@@ -126,8 +89,10 @@ async def health_check() -> HealthResponse:
     """Health check endpoint."""
     return HealthResponse(
         status="healthy", 
-        game="frozen_lake"
+        game="frozen_lake_gymnasium"
     )
+
+
 
 
 if __name__ == "__main__":

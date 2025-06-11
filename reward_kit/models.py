@@ -174,6 +174,19 @@ class EvaluateResult(BaseModel):
 # --- Models for New Agent Evaluation Framework (V2) ---
 
 
+class ResourceServerConfig(BaseModel):
+    """
+    Configuration for a resource server required by a task.
+    """
+
+    start_command: str = Field(
+        description="The command to start the server. The string '{port}' will be replaced with a dynamically allocated free port."
+    )
+    health_check_url: str = Field(
+        description="The URL to poll to check if the server is ready. The string '{port}' will be replaced with the allocated port."
+    )
+
+
 class EvaluationCriteriaModel(BaseModel):
     """
     Defines criteria for evaluating task success, often by querying the final state of a resource.
@@ -256,6 +269,16 @@ class TaskDefinitionModel(BaseModel):
     # These will be accessible via `model_extra` if `model_config` has `extra = 'allow'`
     # Or define a specific field:
     # custom_task_params: Dict[str, Any] = Field(default_factory=dict)
+    resource_server: Optional[ResourceServerConfig] = Field(
+        default=None,
+        description="Configuration for a background server required for the task.",
+    )
+
+    num_rollouts: int = Field(
+        default=1,
+        ge=1,
+        description="Number of parallel rollouts to execute for this task definition.",
+    )
 
     class Config:
         extra = "allow"  # Allow and capture extra fields not explicitly defined

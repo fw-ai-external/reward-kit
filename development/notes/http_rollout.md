@@ -30,11 +30,9 @@ Request body:
 ```
 Signals that the episode is complete.
 
-The example in `examples/remote_http_rollout_server/main.py` demonstrates a small
-fake MCP server. It manipulates a temporary text file and returns the file contents
-after each step. The Reward Kit pipeline is responsible for invoking an
+The Reward Kit pipeline is responsible for invoking an
 OpenAI-compatible API between steps and feeding the resulting assistant messages
 back into the rollout. This illustrates how an environment can interact with an
 LLM at every step while keeping model calls in the pipeline.
 
-A more concrete example of this is the [Frozen Lake Example](./frozen_lake_plan.md), which uses a remote HTTP rollout server to play the Frozen Lake game.
+A concrete example of this is the [Frozen Lake Example](./frozen_lake_plan.md), which uses a remote HTTP rollout server to play the Frozen Lake game.

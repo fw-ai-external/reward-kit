@@ -11,7 +11,6 @@ import json
 import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, cast
-from unittest.mock import AsyncMock
 
 # Attempt to import OpenAI client
 try:
@@ -106,37 +105,48 @@ class Orchestrator:
             try:
                 self._openai_client = AsyncOpenAI(
                     api_key=os.environ.get("FIREWORKS_API_KEY"),
-                    base_url="https://api.fireworks.ai/inference/v1"
+                    base_url="https://api.fireworks.ai/inference/v1",
                 )
                 self.logger.info("Fireworks client initialized.")
             except Exception as e:
                 self.logger.error(f"Failed to initialize Fireworks client: {e}")
                 self._openai_client = None
 
-    def _validate_conversation_messages(self, conversation_messages: List[Dict[str, Any]]) -> None:
+    def _validate_conversation_messages(
+        self, conversation_messages: List[Dict[str, Any]]
+    ) -> None:
         """
         Validate and fix conversation messages to ensure OpenAI API compliance.
-        
+
         OpenAI requires that tool messages must be preceded by an assistant message with tool_calls.
         This method detects and fixes cases where tool messages are orphaned.
         """
         if not conversation_messages:
             return
-            
+
         for i, msg in enumerate(conversation_messages):
             if msg.get("role") == "tool":
                 # Check if previous message is assistant with tool_calls
                 if i == 0:
                     # Tool message at start - this is always invalid
-                    self.logger.error(f"Found orphaned tool message at start of conversation: {msg}")
-                    raise ValueError("Tool message cannot be the first message in conversation")
-                    
-                prev_msg = conversation_messages[i-1]
-                if (prev_msg.get("role") != "assistant" or 
-                    not prev_msg.get("tool_calls")):
+                    self.logger.error(
+                        f"Found orphaned tool message at start of conversation: {msg}"
+                    )
+                    raise ValueError(
+                        "Tool message cannot be the first message in conversation"
+                    )
+
+                prev_msg = conversation_messages[i - 1]
+                if prev_msg.get("role") != "assistant" or not prev_msg.get(
+                    "tool_calls"
+                ):
                     # Found orphaned tool message - log and remove it
-                    self.logger.warning(f"Found orphaned tool message without preceding assistant tool_calls at index {i}: {msg}")
-                    self.logger.warning("This suggests a bug in conversation history management - removing invalid tool message")
+                    self.logger.warning(
+                        f"Found orphaned tool message without preceding assistant tool_calls at index {i}: {msg}"
+                    )
+                    self.logger.warning(
+                        "This suggests a bug in conversation history management - removing invalid tool message"
+                    )
                     conversation_messages.pop(i)
                     # Recursively validate again since we modified the list
                     return self._validate_conversation_messages(conversation_messages)
@@ -530,7 +540,9 @@ class Orchestrator:
         elif agent_model_name.startswith("fireworks/"):
             self._initialize_fireworks_client()
             if not self._openai_client:
-                self.logger.error("Fireworks client failed to initialize. Cannot proceed.")
+                self.logger.error(
+                    "Fireworks client failed to initialize. Cannot proceed."
+                )
                 return None
             agent_model_name = agent_model_name.split("fireworks/", 1)[
                 1
@@ -562,16 +574,19 @@ class Orchestrator:
             self.logger.info(
                 f"Episode resource forked: {type(episode_resource).__name__}"
             )
-            
+
             # Get initial state for injection into first prompt (for HTTP rollout)
             initial_state_description = None
-            if hasattr(episode_resource, 'get_initial_state_description'):
+            if hasattr(episode_resource, "get_initial_state_description"):
                 try:
-                    initial_state_description = await episode_resource.get_initial_state_description()
-                    self.logger.info("Retrieved initial state description for first prompt")
+                    initial_state_description = (
+                        await episode_resource.get_initial_state_description()
+                    )
+                    self.logger.info(
+                        "Retrieved initial state description for first prompt"
+                    )
                 except Exception as e:
                     self.logger.warning(f"Failed to get initial state description: {e}")
-            
 
             # --- Initial Conversation State ---
             # The conversation_messages list will be built turn by turn.
@@ -622,14 +637,18 @@ class Orchestrator:
                     current_user_turn_message = user_turns_from_task[
                         current_user_turn_index
                     ].copy()  # Make a copy to avoid modifying the original
-                    
+
                     # Inject initial state into first user message
                     if current_user_turn_index == 0 and initial_state_description:
                         original_content = current_user_turn_message.get("content", "")
-                        enhanced_content = f"{original_content}\n\n{initial_state_description}"
+                        enhanced_content = (
+                            f"{original_content}\n\n{initial_state_description}"
+                        )
                         current_user_turn_message["content"] = enhanced_content
-                        self.logger.info("Injected initial state into first user prompt")
-                    
+                        self.logger.info(
+                            "Injected initial state into first user prompt"
+                        )
+
                     # The user message content might be a string or a list of content blocks (e.g. for multi-modal)
                     # For BFCL, it's a string that might represent a JSON list of user messages for that turn.
                     # We need to parse it if it's a JSON string representing a list of messages.
@@ -747,7 +766,7 @@ class Orchestrator:
                     try:
                         # Validate conversation messages for OpenAI API compliance
                         self._validate_conversation_messages(conversation_messages)
-                        
+
                         self.logger.debug(
                             f"Calling OpenAI: model={agent_model_name}, messages_FULL_HISTORY={json.dumps(conversation_messages, indent=2)}, tools={openai_tools}"
                         )  # Log full message history
@@ -992,14 +1011,39 @@ class Orchestrator:
                 eval_args["ground_truth"] = ground_truth_for_reward
 
             # Call the reward function
+            self.logger.info(f"=== CALLING REWARD FUNCTION DEBUG ===")
+            self.logger.info(f"Reward function type: {type(self.reward_function)}")
+            self.logger.info(f"Eval args keys: {list(eval_args.keys())}")
+            self.logger.info(
+                f"Task achieved: {eval_args.get('task_achieved', 'NOT_SET')}"
+            )
+            self.logger.info(f"Messages count: {len(eval_args.get('messages', []))}")
             evaluation_result = self.reward_function(**eval_args)
+            self.logger.info(f"=== REWARD FUNCTION RESULT ===")
             self.logger.info(f"Reward function result: {evaluation_result}")
+            self.logger.info(f"Result type: {type(evaluation_result)}")
+            self.logger.info(f"=== END REWARD FUNCTION DEBUG ===")
+
+            # Return both the evaluation result and the inputs for trajectory capture
+            return {
+                "evaluation_result": evaluation_result,
+                "reward_function_inputs": {
+                    "messages": conversation_messages,
+                    "state": state_for_reward,
+                    "task_achieved": task_achieved,
+                    "task_definition_name": self.task_definition.name,
+                    "ground_truth": ground_truth_for_reward,
+                },
+            }
 
         except Exception as e_lifecycle:
             self.logger.error(
                 f"Exception during task lifecycle: {e_lifecycle}", exc_info=True
             )
-            evaluation_result = {"error": str(e_lifecycle)}  # Return error info
+            return {
+                "evaluation_result": {"error": str(e_lifecycle)},
+                "reward_function_inputs": None,
+            }
         finally:
             if episode_resource:
                 await episode_resource.close()
@@ -1009,4 +1053,8 @@ class Orchestrator:
                 self.base_resource = None
                 self.logger.info("Base resource closed.")
         self.logger.info(f"Execution for task '{self.task_definition.name}' finished.")
-        return evaluation_result
+        # This should not be reached normally since we return earlier, but handle edge case
+        return {
+            "evaluation_result": {"error": "Unexpected execution path"},
+            "reward_function_inputs": None,
+        }

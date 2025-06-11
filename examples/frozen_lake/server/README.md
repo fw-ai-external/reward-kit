@@ -17,7 +17,7 @@ Initializes a new game episode.
   "episode_id": "uuid-string",
   "observation": {
     "position": [0, 0],
-    "current_cell": "S", 
+    "current_cell": "S",
     "done": false,
     "won": false,
     "visual": "[S] F  F  F \n F  H  F  H \n F  F  F  H \n H  F  F  G ",
@@ -39,7 +39,7 @@ Executes an action in the game.
 
 **Action Values:**
 - `0` = Left
-- `1` = Down  
+- `1` = Down
 - `2` = Right
 - `3` = Up
 
@@ -91,7 +91,7 @@ Health check endpoint.
 ### Board Layout
 ```
 S F F F
-F H F H  
+F H F H
 F F F H
 H F F G
 ```
@@ -134,7 +134,7 @@ Environment variables:
 
 This server is designed to work with any HTTP rollout-compatible evaluation framework. The client side handles:
 - Action translation (string → numeric)
-- State interpretation 
+- State interpretation
 - Reward calculation
 - Episode management
 
@@ -146,7 +146,7 @@ Modify the `FROZEN_LAKE_MAP` constant:
 FROZEN_LAKE_MAP = [
     "SFFF",
     "FHFH",
-    "FFFH", 
+    "FFFH",
     "HFFG"
 ]
 ```

@@ -1,15 +1,73 @@
-# Frozen Lake HTTP Rollout Evaluation
+# Frozen Lake Agent Evaluation
 
-This example demonstrates how to evaluate LLM agents on the Frozen Lake game using reward-kit's HTTP rollout evaluation framework. The agent must navigate from start (S) to goal (G) while avoiding holes (H).
+This example demonstrates LLM agent evaluation on the Frozen Lake game using reward-kit's HTTP rollout framework. The agent must navigate from start (S) to goal (G) while avoiding holes (H).
 
-## Overview
+## Quick Start
 
-This implementation bridges reward-kit's agent evaluation framework with HTTP-based game environments, showcasing:
-- **Separated server/client architecture** for clear responsibility boundaries
-- **HTTP rollout protocol** for standardized environment communication  
-- **Real-time agent evaluation** on interactive environments
-- **String-based actions** for clearer agent decision-making
-- **Comprehensive logging** and trajectory analysis
+### Setup
+```bash
+# For Fireworks AI
+export FIREWORKS_API_KEY="your_fireworks_api_key"
+export MODEL_AGENT="fireworks/accounts/fireworks/models/qwen3-235b-a22b"
+
+# For OpenAI
+export OPENAI_API_KEY="your_openai_api_key"
+export MODEL_AGENT="openai/gpt-4o-mini"
+
+# For other providers, set appropriate API key and MODEL_AGENT
+```
+
+### Run Evaluation
+```bash
+# Batch evaluation (8 parallel rollouts) - recommended
+reward-kit agent-eval --task-def examples/frozen_lake/client/task_def.yaml
+
+# Single rollout for debugging
+reward-kit agent-eval --task-def examples/frozen_lake/client/task_def.yaml --num-rollouts 1
+
+# Custom batch size
+reward-kit agent-eval --task-def examples/frozen_lake/client/task_def.yaml --num-rollouts 16
+```
+
+### Output
+```bash
+Task 'frozen_lake_http_rollout' batch results:
+  - Rollouts: 6/8 successful
+  - Success rate: 75.00%
+  - Average score: 0.7500 ± 0.4330
+  - Trajectory data saved to: client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl
+```
+
+## Trajectory Re-evaluation
+
+**New Feature**: Re-evaluate saved trajectories with different reward functions without re-running agent rollouts.
+
+### Generate Trajectories
+```bash
+# Run evaluation (captures conversation messages and tool calls)
+reward-kit agent-eval --task-def client/task_def.yaml --num-rollouts 8
+# Saves to: client/evaluation_logs/trajectory_frozen_lake_http_rollout_TIMESTAMP.jsonl
+```
+
+### Re-evaluate with Different Reward Functions
+```bash
+# Re-evaluate with original reward function
+reward-kit jsonl-reward-eval \
+  --jsonl-file client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl \
+  --reward-module examples.frozen_lake.client.reward.frozen_lake_reward
+
+# Re-evaluate with custom efficiency-based reward
+reward-kit jsonl-reward-eval \
+  --jsonl-file client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl \
+  --reward-module my_custom_rewards.efficiency_reward \
+  --output-file client/evaluation_logs/efficiency_reeval_results.jsonl
+```
+
+### Benefits
+- **Save time**: No need to re-run expensive agent rollouts
+- **Rapid experimentation**: Test multiple reward functions on same data
+- **Comparative analysis**: Easily compare different scoring approaches
+- **Complete conversation history**: Full OpenAI format messages and tool calls preserved
 
 ## Architecture
 
@@ -28,395 +86,106 @@ This implementation bridges reward-kit's agent evaluation framework with HTTP-ba
 
 ```
 frozen_lake/
-├── README.md                    # This overview document
-├── server/                      # 🎮 Game Environment (Server Side)
-│   ├── README.md               # Server setup & API documentation
-│   └── http_rollout_server.py  # FastAPI game server implementation
-├── client/                     # 🤖 Agent Evaluation (Client Side)  
-│   ├── README.md               # Client setup & evaluation guide
-│   ├── task_def.yaml           # Fireworks model evaluation config
-│   ├── task_def_openai.yaml    # OpenAI model evaluation config
-│   ├── reward.py               # Performance scoring function
-│   ├── run_evaluation.sh       # Fireworks model test script
-│   ├── run_evaluation_openai.sh # OpenAI model test script
-│   └── evaluation_logs/        # Generated evaluation results
-│       ├── full_evaluation_*.log      # Complete system logs
-│       ├── agent_trajectory_*.log     # Agent decision traces
-│       └── openai_evaluation_*.log    # OpenAI-specific logs
-├── gymnasium_frozen_lake_server.py  # Gymnasium-based game implementation
-└── deprecated/                 # Legacy implementations
-    ├── frozen_lake_server.py   # Original hand-rolled implementation
-    └── gymnasium_adapter.py    # Abstract adapter (future extensibility)
+├── README.md                    # This overview
+├── server/                      # Game Environment (HTTP API)
+│   ├── README.md               # Server documentation
+│   └── http_rollout_server.py  # FastAPI game server
+└── client/                     # Agent Evaluation
+    ├── task_def.yaml           # Task configuration (works with any model)
+    ├── reward.py               # Reward function
+    └── evaluation_logs/        # Generated results & trajectories
+        ├── trajectory_*.jsonl  # Conversation histories + tool calls
+        └── *_reeval_*.jsonl    # Re-evaluation results
 ```
-
-## Separation of Concerns
-
-### 🎮 **Server Side** (`server/`)
-**Who uses this:** Game environment developers, infrastructure teams
-
-**Responsibilities:**
-- Implements the game logic and rules
-- Provides HTTP API endpoints (`/start_episode`, `/step`, `/end_episode`)
-- Manages game state and episode lifecycle
-- Returns structured observations and rewards
-- Can be deployed independently and reused across evaluations
-
-### 🤖 **Client Side** (`client/`)  
-**Who uses this:** ML researchers, agent evaluation teams
-
-**Responsibilities:**
-- Configures agent evaluation parameters
-- Defines reward functions and success criteria
-- Handles LLM model integration (Fireworks, OpenAI, etc.)
-- Processes agent actions and responses
-- Generates evaluation metrics and analysis
-
-### 🔗 **HTTP Rollout Protocol**
-Clean and simple standardized communication interface:
-1. **Episode Start:** `POST /start_episode` → Initialize game
-2. **Action Execution:** `POST /step` → Execute agent action
-3. **Episode End:** `POST /end_episode` → Cleanup
-4. **Health Check:** `GET /health` → Status check
-
-## Gymnasium Integration
-
-This implementation is built on the official **Gymnasium FrozenLake-v1** environment, providing:
-
-### 🏗️ **Standard RL Compatibility**
-- Uses the official Gymnasium interface for consistent behavior
-- Compatible with other RL frameworks and tools
-- Supports both deterministic (`is_slippery=False`) and stochastic (`is_slippery=True`) modes
-- Official action space (0=Left, 1=Down, 2=Right, 3=Up) with string conversion layer
-
-### 🎛️ **Configurable Environments**
-- **Map sizes**: 4x4 (default) and 8x8 grids
-- **Slipperiness**: Toggle deterministic vs stochastic behavior
-- **Render modes**: Support for different visualization options
-- **Custom maps**: Can be extended to support custom grid layouts
-
-### 🔌 **Extensible Architecture**
-Clean and focused implementation that can be extended for other Gymnasium environments in the future.
-
-### 🧹 **Clean API Design**
-- Focused on core functionality with minimal endpoints
-- Initial prompt embedded in start_episode response
-- Environment information available through Gymnasium metadata
 
 ## Game Rules
 
 **Objective:** Navigate from S to G without falling into holes (H)
 
-**Game Board:**
 ```
-[S] F  F  F 
- F  H  F  H 
- F  F  F  H 
- H  F  F  G 
+[S] F  F  F
+ F  H  F  H
+ F  F  F  H
+ H  F  F  G
 ```
-
-**Legend:**
-- `S` = Start position
-- `F` = Frozen (safe to step on) 
-- `H` = Hole (game over if you step here)
-- `G` = Goal (win condition)
-- `[X]` = Current position
 
 **Actions:** `"left"`, `"right"`, `"up"`, `"down"`
 
-## Setup
+## Trajectory Data Format
 
-### Prerequisites
+Each trajectory JSONL file contains:
 
-1. **reward-kit installed** with agent evaluation support
-2. **Fireworks API key** for LLM model access
-3. **Python 3.8+** with required dependencies
-
-### API Key Configuration
-
-For **Fireworks models** (qwen3):
-```bash
-export FIREWORKS_API_KEY="your_fireworks_api_key_here"
-export MODEL_AGENT="accounts/fireworks/models/qwen3-235b-a22b"
+```json
+{"type": "summary", "task_id": "frozen_lake_http_rollout", "num_rollouts": 8, "success_rate": 0.75, "avg_score": 0.75}
+{"type": "individual_result", "rollout_index": 0, "score": 1.0, "conversation_messages": [...], "reward_function_inputs": {...}}
 ```
 
-For **OpenAI models** (GPT-4):
-```bash
-export OPENAI_API_KEY="your_openai_api_key_here"
-export MODEL_AGENT="openai/gpt-4.1-2025-04-14"
+### Conversation Messages
+Complete OpenAI format conversation history:
+- User prompts
+- Assistant responses with reasoning
+- Tool calls (game actions)
+- Tool results (game observations)
+
+### Reward Function Inputs
+Exact parameters passed to reward functions:
+- `messages`: Full conversation history
+- `state`: Game state and successful function calls
+- `task_achieved`: Success/failure status
+- `ground_truth`: Reference data (if available)
+
+## Customization
+
+### Custom Reward Functions
+Create new reward functions and test them on existing trajectories:
+
+```python
+# my_rewards.py
+from reward_kit.typed_interface import reward_function
+from reward_kit.models import EvaluateResult, MetricResult
+
+@reward_function
+def efficiency_reward(messages, state=None, **kwargs):
+    # Count steps taken
+    step_count = len(state.get("successful_func_calls", [[]])[0])
+
+    # Reward fewer steps
+    efficiency_score = max(0.0, 1.0 - (step_count - 4) * 0.1)
+
+    return EvaluateResult(
+        score=efficiency_score,
+        reason=f"Efficiency reward: {step_count} steps",
+        metrics={"efficiency": MetricResult(score=efficiency_score, reason="Step efficiency")}
+    )
 ```
 
-## Getting Started
-
-### For Game Environment Developers (Server Side)
-If you're implementing a game environment for HTTP rollout evaluation:
-
-1. **Review the API specification** in `server/README.md`
-2. **Study the reference implementation** in `server/http_rollout_server.py`
-3. **Implement the required endpoints** for your game
-4. **Test with the provided client** to verify compatibility
-
-### For Agent Evaluation Teams (Client Side)  
-If you're evaluating agents on an existing HTTP rollout environment:
-
-1. **Set up your LLM API credentials** (Fireworks, OpenAI, etc.)
-2. **Configure the evaluation parameters** in `client/task_def.yaml`
-3. **Customize reward functions** in `client/reward.py` if needed
-4. **Run the evaluation** using `client/run_evaluation.sh`
-
-### Quick Start - Model Comparison
-Run both Fireworks and OpenAI models to compare performance:
-
-**Test Fireworks qwen3 model:**
+### Test Custom Rewards
 ```bash
-cd client/
-export FIREWORKS_API_KEY="your_key"
-./run_evaluation.sh
+# Generate trajectories once
+reward-kit agent-eval --task-def client/task_def.yaml
+
+# Test multiple reward functions
+reward-kit jsonl-reward-eval --jsonl-file client/evaluation_logs/trajectory_*.jsonl --reward-module my_rewards.efficiency_reward
+reward-kit jsonl-reward-eval --jsonl-file client/evaluation_logs/trajectory_*.jsonl --reward-module my_rewards.creativity_reward
 ```
 
-**Test OpenAI GPT-4.1 model:**
-```bash
-cd client/
-export OPENAI_API_KEY="your_key" 
-./run_evaluation_openai.sh
-```
+## Model Performance
 
-### Full End-to-End Setup
-To run the complete example from scratch:
-
-```bash
-# 1. Start the game server (in one terminal)
-cd server/
-python http_rollout_server.py
-
-# 2. Run agent evaluation (in another terminal)  
-cd client/
-# For Fireworks:
-export FIREWORKS_API_KEY="your_key"
-./run_evaluation.sh
-
-# OR for OpenAI:
-export OPENAI_API_KEY="your_key"
-./run_evaluation_openai.sh
-```
-
-## Key Features
-
-### 🎯 **String-Based Actions**
-Clear action commands (`"left"`, `"right"`, `"up"`, `"down"`) instead of confusing numeric codes.
-
-### 🏋️ **Gymnasium Integration**
-Built on the official Gymnasium FrozenLake-v1 environment for standard RL compatibility and extensibility.
-
-### 🔄 **Initial State Injection**  
-Agent automatically receives the game board and rules at the start of each episode.
-
-### ⚡ **Analysis Paralysis Prevention**
-Ultra-concise prompts prevent the agent from getting stuck in long reasoning loops.
-
-### 📊 **Comprehensive Logging**
-Detailed trajectory analysis including agent reasoning, tool calls, and game state changes.
-
-### 🔧 **Modular Architecture**
-Server and client can be developed, deployed, and maintained independently.
-
-### 🌟 **Extensible Environment Support**
-Abstraction layer supports multiple Gymnasium environments beyond FrozenLake.
-
-## Model Performance Results
-
-We've tested multiple LLM models with different prompting strategies. Here are the comprehensive results:
-
-### 🏆 Winner: Fireworks qwen3-235b-a22b (Enhanced Prompt)
-```bash
-Strategy: down→down→right→right→down→right
-Steps: 6 moves
-Result: ✅ SUCCESS - Reached goal at (3,3)!
-Path: (0,0) → (1,0) → (2,0) → (2,1) → (2,2) → (3,2) → (3,3)
-Score: 1.0
-```
-
-### Other Model Results
-| Model | Strategy | Steps | Result | Score |
-|-------|----------|-------|--------|-------|
-| qwen3 (original) | right→right→right→down | 4 | ❌ Failed at [1,3] | 0.0 |
-| GPT-4-1106 | down→down→right→right→right | 5 | ❌ Failed at [2,3] | 0.0 |
-| GPT-4.1-2025 | right→right→right→down | 4 | ❌ Failed at [1,3] | 0.0 |
-
-### Key Insights
-- **Prompt engineering matters**: Enhanced autonomous gameplay instructions improved qwen3 from failure to complete victory
-- **Strategic planning**: The winning model showed sophisticated path planning in reasoning traces
-- **Model-specific responses**: Different models responded differently to the same prompt improvements
-
-## Example Output
-
-### Successful Evaluation (qwen3 Enhanced)
-```bash
-🎮 FROZEN LAKE HTTP ROLLOUT EVALUATION
-========================================
-
-📊 AGENT TRAJECTORY SUMMARY:
-• Total tool calls made: 6
-• Result: ✅ SUCCESS - Agent reached the goal!
-
-🎮 DETAILED TRAJECTORY:
-STEP 1: down - Move to (1,0) on F cell
-STEP 2: down - Move to (2,0) on F cell  
-STEP 3: right - Move to (2,1) on F cell
-STEP 4: right - Move to (2,2) on F cell
-STEP 5: down - Move to (3,2) on F cell
-STEP 6: right - Move to (3,3) on G cell - VICTORY!
-
-📄 Final Score: 1.0 - Successfully reached the goal in Frozen Lake
-
-🎉 Congratulations! You've successfully navigated the Frozen Lake!
-```
-
-### Failed Evaluation Example
-```bash
-📊 AGENT TRAJECTORY SUMMARY:
-• Total tool calls made: 4
-• Result: ❌ FAILURE - Agent fell into hole
-
-🎮 DETAILED TRAJECTORY:
-STEP 1: right - Move to (0,1) on F cell
-STEP 2: right - Move to (0,2) on F cell
-STEP 3: right - Move to (0,3) on F cell
-STEP 4: down - Move to (1,3) on H cell - GAME OVER
-
-📄 Final Score: 0.0 - Failed to reach the goal (fell into hole)
-```
-
-## Reproducing the Evaluation Results
-
-### Step 1: Setup Environment
-```bash
-# Install reward-kit and dependencies
-cd /path/to/reward-kit/examples/frozen_lake
-
-# Set up API keys
-export FIREWORKS_API_KEY="your_fireworks_api_key"
-export OPENAI_API_KEY="your_openai_api_key"
-```
-
-### Step 2: Test the Winning Model (qwen3 Enhanced)
-```bash
-cd client/
-./run_evaluation.sh
-```
-
-**Expected Output:**
-- 6 tool calls made
-- Success path: down→down→right→right→down→right  
-- Final score: 1.0
-- Logs saved to `evaluation_logs/full_evaluation_*.log`
-
-### Step 3: Compare with OpenAI GPT-4.1
-```bash
-cd client/
-./run_evaluation_openai.sh
-```
-
-**Expected Output:**
-- 4 tool calls made
-- Failed path: right→right→right→down
-- Final score: 0.0
-- Logs saved to `evaluation_logs/openai_evaluation_*.log`
-
-### Step 4: Analyze Results
-```bash
-# View detailed agent reasoning
-cat evaluation_logs/agent_trajectory_*.log
-
-# Compare model strategies
-ls evaluation_logs/
-```
-
-### Step 5: Test Different Prompts
-To test the original (weaker) prompt, modify the server's `/initial_prompt` endpoint in `server/http_rollout_server.py` to use the original shorter prompt without autonomous instructions.
-
-## Success Metrics
-
-- **Score 1.0:** Agent successfully navigated to goal
-- **Score 0.0:** Agent failed (fell in hole or got stuck)
-- **Tool calls:** Number of actions taken by the agent
-- **Trajectory quality:** Analysis of decision-making efficiency
-- **Strategy effectiveness:** Path planning and hole avoidance
-
-## Customization & Extension
-
-### Server Side Customization
-See `server/README.md` for:
-- Custom game board layouts
-- Different game mechanics  
-- API endpoint modifications
-- Deployment configurations
-
-### Client Side Customization
-See `client/README.md` for:
-- Different LLM models (OpenAI, Fireworks, etc.)
-- Custom reward functions
-- Batch evaluation setups
-- Prompt engineering strategies
-
-## HTTP Rollout Protocol
-
-This example implements a standardized communication protocol:
-
-1. **Episode Start:** `POST /start_episode` → Initialize game
-2. **Action Execution:** `POST /step` → Execute agent action
-3. **Episode End:** `POST /end_episode` → Cleanup
-
-This protocol can be adapted for other interactive environments beyond Frozen Lake.
+| Model | Success Rate | Average Score | Best Strategy |
+|-------|-------------|---------------|---------------|
+| qwen3-235b-a22b | 75-100% | 0.75-1.0 | down→down→right→right→down→right |
+| gpt-4o-mini | 0-25% | 0.0-0.25 | Often fails at holes |
 
 ## Troubleshooting
 
-### Common Issues
-- **Connection errors:** Ensure server is running at configured URL
-- **API key issues:** Verify LLM model access credentials  
-- **Action format errors:** System enforces string-based actions
-- **Analysis paralysis:** Ultra-concise prompts prevent reasoning loops
-
-### Debug Resources
-- Check `client/evaluation_logs/` for detailed execution traces
-- Review individual README files for component-specific guidance
-- Verify HTTP communication in server logs
-
-## ✨ Migration Summary: Hand-Rolled → Gymnasium
-
-This project successfully migrated from a custom FrozenLake implementation to the **official Gymnasium FrozenLake-v1 environment**.
-
-### 🎯 **Key Achievements**
-- ✅ **Standard RL Compatibility**: Now uses official Gymnasium interface
-- ✅ **Simplified Architecture**: Clean 4-endpoint HTTP API (was 6+ endpoints)
-- ✅ **Backward Compatibility**: All existing evaluation scripts work unchanged
-- ✅ **Better Reliability**: Battle-tested Gymnasium code vs custom implementation
-- ✅ **Future Ready**: Foundation for supporting more Gymnasium environments
-
-### 🔄 **What Changed**
-- `frozen_lake_server.py` → `gymnasium_frozen_lake_server.py` (Gymnasium-based)
-- HTTP endpoints simplified from 6 to 4 core endpoints
-- Initial prompt now embedded in start_episode (not separate endpoint)
-- Environment info available through Gymnasium metadata (not separate endpoint)
-
-### 📦 **What Stayed the Same**
-- All evaluation scripts work without changes
-- Same string-based action interface (`"left"`, `"right"`, etc.)
-- Same HTTP rollout protocol structure
-- Same reward functions and scoring
-
-## Use Cases
-
-This example serves as a foundation for:
-- **Game environment developers:** Reference implementation for HTTP rollout API with Gymnasium
-- **Agent evaluation teams:** Production-ready evaluation framework with standard RL environments
-- **Research:** Comparative studies across different Gymnasium environments and agents
-- **Infrastructure:** Template for deploying scalable evaluation systems with official RL environments
+- **Connection errors**: Server auto-starts, check port conflicts
+- **API key issues**: Verify MODEL_AGENT and API key are set
+- **Empty trajectories**: Check `client/evaluation_logs/` directory
+- **Re-evaluation errors**: Ensure reward function module path is correct
 
 ## Next Steps
 
-1. **Start with the basics:** Run the example end-to-end
-2. **Customize for your needs:** Modify game rules or evaluation criteria  
-3. **Scale up:** Deploy server/client architecture for production use
-4. **Extend:** Apply the pattern to other interactive environments
-
-For detailed implementation guidance, see the respective README files in `server/` and `client/` directories.
+1. **Run the example**: Start with single rollout, then batch evaluation
+2. **Analyze trajectories**: Examine generated JSONL files
+3. **Create custom rewards**: Implement your own scoring functions
+4. **Compare approaches**: Use re-evaluation to test different strategies

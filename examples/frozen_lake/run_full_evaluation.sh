@@ -40,7 +40,7 @@ info() {
 # Cleanup function
 cleanup() {
     log "Cleaning up servers..."
-    
+
     # Kill HTTP rollout server
     if [ -f "$HTTP_ROLLOUT_PID_FILE" ]; then
         HTTP_ROLLOUT_PID=$(cat "$HTTP_ROLLOUT_PID_FILE")
@@ -52,10 +52,10 @@ cleanup() {
         fi
         rm -f "$HTTP_ROLLOUT_PID_FILE"
     fi
-    
+
     # Kill any remaining Python processes for our servers
     pkill -f "http_rollout_server.py" 2>/dev/null || true
-    
+
     log "Cleanup complete"
 }
 
@@ -67,9 +67,9 @@ wait_for_server() {
     local url=$1
     local name=$2
     local max_wait=$3
-    
+
     log "Waiting for $name to be ready at $url..."
-    
+
     for i in $(seq 1 $max_wait); do
         if curl -s -f "$url" > /dev/null 2>&1; then
             log "$name is ready!"
@@ -77,7 +77,7 @@ wait_for_server() {
         fi
         sleep 1
     done
-    
+
     error "$name failed to start within $max_wait seconds"
     return 1
 }
@@ -85,24 +85,24 @@ wait_for_server() {
 # Check prerequisites
 check_prerequisites() {
     info "Checking prerequisites..."
-    
+
     # Check if reward-kit is available
     if ! python -c "import reward_kit" 2>/dev/null; then
         error "reward-kit not installed or not in Python path"
         exit 1
     fi
-    
+
     # Check if required files exist
     if [ ! -f "$SCRIPT_DIR/task_def.yaml" ]; then
         error "task_def.yaml not found in $SCRIPT_DIR"
         exit 1
     fi
-    
+
     if [ ! -f "$SCRIPT_DIR/http_rollout_server.py" ]; then
         error "http_rollout_server.py not found in $SCRIPT_DIR"
         exit 1
     fi
-    
+
     # Check if FIREWORKS_API_KEY is set
     if [ -z "$FIREWORKS_API_KEY" ]; then
         warn "FIREWORKS_API_KEY environment variable is not set"
@@ -111,7 +111,7 @@ check_prerequisites() {
     else
         info "FIREWORKS_API_KEY is set (length: ${#FIREWORKS_API_KEY})"
     fi
-    
+
     info "Prerequisites check complete"
 }
 
@@ -122,72 +122,72 @@ main() {
     echo "🎮 FROZEN LAKE HTTP ROLLOUT EVALUATION"
     echo "========================================"
     echo ""
-    
+
     check_prerequisites
-    
+
     # Change to the script directory
     cd "$SCRIPT_DIR"
-    
+
     # Check if ports are available
     if lsof -Pi :$HTTP_ROLLOUT_SERVER_PORT -sTCP:LISTEN -t >/dev/null; then
         error "Port $HTTP_ROLLOUT_SERVER_PORT is already in use"
         exit 1
     fi
-    
+
     # Start HTTP rollout server
     log "Starting HTTP rollout server on port $HTTP_ROLLOUT_SERVER_PORT..."
     python http_rollout_server.py &
     HTTP_ROLLOUT_PID=$!
     echo $HTTP_ROLLOUT_PID > "$HTTP_ROLLOUT_PID_FILE"
-    
+
     # Wait for servers to be ready
     wait_for_server "http://localhost:$HTTP_ROLLOUT_SERVER_PORT/health" "HTTP rollout server" $MAX_WAIT_TIME
-    
+
     # Test the HTTP rollout server
     info "Testing HTTP rollout server..."
-    
+
     # Test start episode
     EPISODE_DATA=$(curl -s -X POST "http://localhost:$HTTP_ROLLOUT_SERVER_PORT/start_episode")
     EPISODE_ID=$(echo "$EPISODE_DATA" | python -c "import sys, json; print(json.load(sys.stdin)['episode_id'])")
     info "Started episode: $EPISODE_ID"
-    
+
     # Test step
     STEP_DATA=$(curl -s -X POST "http://localhost:$HTTP_ROLLOUT_SERVER_PORT/step" \
         -H "Content-Type: application/json" \
         -d "{\"episode_id\": \"$EPISODE_ID\", \"action\": 2}")
     info "Step result: $STEP_DATA"
-    
+
     # End episode
     curl -s -X POST "http://localhost:$HTTP_ROLLOUT_SERVER_PORT/end_episode" \
         -H "Content-Type: application/json" \
         -d "{\"episode_id\": \"$EPISODE_ID\"}" > /dev/null
     info "Episode ended successfully"
-    
+
     # Run the evaluation
     log "Starting agent evaluation..."
     cd "$REPO_ROOT"
-    
+
     # Set model configuration
     export MODEL_AGENT="fireworks/accounts/fireworks/models/qwen3-235b-a22b"
-    
+
     # Create logs directory
     LOG_DIR="$SCRIPT_DIR/evaluation_logs"
     mkdir -p "$LOG_DIR"
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     FULL_LOG_FILE="$LOG_DIR/full_evaluation_${TIMESTAMP}.log"
     TRAJECTORY_LOG_FILE="$LOG_DIR/agent_trajectory_${TIMESTAMP}.log"
-    
+
     # Run the evaluation with detailed logging
     info "Executing: python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/task_def.yaml"
     info "Full logs will be saved to: $FULL_LOG_FILE"
     info "Agent trajectory will be extracted to: $TRAJECTORY_LOG_FILE"
-    
+
     # Capture all output and filter agent trajectory
     python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/task_def.yaml 2>&1 | tee "$FULL_LOG_FILE"
-    
+
     # Extract agent trajectory and tool calls
     log "Extracting agent trajectory for review..."
-    
+
     # Create a detailed trajectory log
     cat > "$TRAJECTORY_LOG_FILE" << 'EOF'
 FROZEN LAKE AGENT EVALUATION TRAJECTORY
@@ -203,35 +203,35 @@ This log contains the complete agent decision-making process including:
 ======================================
 
 EOF
-    
+
     # Extract the relevant trajectory information
     grep -A 5 -B 5 "User Turn\|Inner Step\|Tool.*result\|OpenAI response\|Calling OpenAI\|tool calls" "$FULL_LOG_FILE" >> "$TRAJECTORY_LOG_FILE" || true
-    
+
     echo "" >> "$TRAJECTORY_LOG_FILE"
     echo "======================================" >> "$TRAJECTORY_LOG_FILE"
     echo "DETAILED MESSAGES HISTORY" >> "$TRAJECTORY_LOG_FILE"
     echo "======================================" >> "$TRAJECTORY_LOG_FILE"
     echo "" >> "$TRAJECTORY_LOG_FILE"
-    
+
     # Extract the complete conversation flow
     grep -A 20 "messages_FULL_HISTORY" "$FULL_LOG_FILE" >> "$TRAJECTORY_LOG_FILE" || true
-    
+
     echo "" >> "$TRAJECTORY_LOG_FILE"
     echo "======================================" >> "$TRAJECTORY_LOG_FILE"
     echo "TOOL CALLS AND RESPONSES" >> "$TRAJECTORY_LOG_FILE"
     echo "======================================" >> "$TRAJECTORY_LOG_FILE"
     echo "" >> "$TRAJECTORY_LOG_FILE"
-    
+
     # Extract tool call details
     grep -A 10 -B 2 "tool_calls\|Tool.*result\|step.*action" "$FULL_LOG_FILE" >> "$TRAJECTORY_LOG_FILE" || true
-    
+
     # Run the trajectory analyzer
     cd "$SCRIPT_DIR"
     if [ -f "analyze_trajectory.py" ] && [ -f "$FULL_LOG_FILE" ]; then
         info "Running trajectory analysis..."
         python analyze_trajectory.py "$FULL_LOG_FILE" > "${LOG_DIR}/trajectory_analysis_${TIMESTAMP}.txt" 2>&1 || true
     fi
-    
+
     echo ""
     echo "========================================"
     echo "✅ EVALUATION INFRASTRUCTURE COMPLETE"
@@ -246,23 +246,23 @@ EOF
     echo "• ✅ HTTP rollout server communication verified"
     echo "• ✅ Complete evaluation framework functional"
     echo ""
-    
+
     echo "📋 EVALUATION LOGS SAVED:"
     echo "• Full evaluation log: $FULL_LOG_FILE"
     echo "• Agent trajectory log: $TRAJECTORY_LOG_FILE"
-    
+
     ANALYSIS_FILE="${LOG_DIR}/trajectory_analysis_${TIMESTAMP}.txt"
     if [ -f "$ANALYSIS_FILE" ]; then
         echo "• Trajectory analysis: $ANALYSIS_FILE"
     fi
     echo ""
-    
+
     echo "📊 AGENT TRAJECTORY SUMMARY:"
     if [ -f "$FULL_LOG_FILE" ]; then
         # Show a quick summary of tool calls
         TOOL_CALL_COUNT=$(grep -c "Attempting tool call: step" "$FULL_LOG_FILE" || echo "0")
         echo "• Total tool calls made: $TOOL_CALL_COUNT"
-        
+
         # Show quick trajectory analysis if available
         if [ -f "$ANALYSIS_FILE" ]; then
             echo ""
@@ -273,7 +273,7 @@ EOF
             echo "   cat $ANALYSIS_FILE"
         else
             echo "• Review detailed trajectory in: $TRAJECTORY_LOG_FILE"
-            
+
             # Show the first few tool calls for quick review
             echo ""
             echo "First few tool calls:"
@@ -281,7 +281,7 @@ EOF
         fi
     fi
     echo ""
-    
+
     if [ -z "$FIREWORKS_API_KEY" ]; then
         echo "To run with actual LLM inference:"
         echo "1. Set FIREWORKS_API_KEY environment variable"

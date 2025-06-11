@@ -11,6 +11,7 @@ def evaluate(
     ground_truth: str,
     final_filesystem_state: Optional[Dict[str, Any]] = None,
     task_description: Optional[str] = None,
+    **kwargs: Any,
 ) -> EvaluateResult:
     """
     Pure evaluation function that compares actual vs expected filesystem state.

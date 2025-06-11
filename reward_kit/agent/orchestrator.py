@@ -537,16 +537,17 @@ class Orchestrator:
                 1
             ]  # Get actual model name
             self.logger.info(f"Using OpenAI model: {agent_model_name}")
-        elif agent_model_name.startswith("fireworks/"):
+        elif agent_model_name.startswith("fireworks/") or agent_model_name.startswith("accounts/fireworks"):
             self._initialize_fireworks_client()
             if not self._openai_client:
                 self.logger.error(
                     "Fireworks client failed to initialize. Cannot proceed."
                 )
                 return None
-            agent_model_name = agent_model_name.split("fireworks/", 1)[
-                1
-            ]  # Get actual model name
+            # Remove prefix if it exists
+            if agent_model_name.startswith("fireworks/"):
+                agent_model_name = agent_model_name.split("fireworks/", 1)[1]
+            # If it starts with accounts/fireworks, keep the full model name
             self.logger.info(f"Using Fireworks model: {agent_model_name}")
         else:
             # Placeholder for other model providers if needed in the future

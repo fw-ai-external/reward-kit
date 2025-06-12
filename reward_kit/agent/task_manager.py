@@ -131,6 +131,9 @@ class TaskManager:
                 with open(file_path, "r") as f:
                     task_data = json.load(f)
 
+            # Store the original file path for downstream use
+            task_data["task_def_path"] = str(file_path_obj.resolve())
+
             # Validate with Pydantic model
             task_def = TaskDefinitionModel.model_validate(task_data)
             return task_def
@@ -705,20 +708,42 @@ class TaskManager:
         if output_file is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            # Try to save in evaluation_logs directory relative to task definition
-            # Look for common evaluation log directories
-            possible_log_dirs = [
-                Path("client/evaluation_logs"),
-                Path("evaluation_logs"),
-                Path("logs"),
-                Path("."),  # Fallback to current directory
-            ]
+            # Prefer evaluation_logs relative to the task definition file
+            chosen_dir = None
 
-            chosen_dir = Path(".")  # Default fallback
-            for log_dir in possible_log_dirs:
-                if log_dir.exists() and log_dir.is_dir():
-                    chosen_dir = log_dir
-                    break
+            task_def = self.tasks.get(task_id)
+            if task_def is not None and hasattr(task_def, "task_def_path"):
+                try:
+                    task_def_path = Path(getattr(task_def, "task_def_path"))
+                    base_dir = task_def_path.parent
+                    eval_dir = base_dir / "evaluation_logs"
+                    eval_dir.mkdir(parents=True, exist_ok=True)
+                    chosen_dir = eval_dir
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to create evaluation_logs relative to task definition: {e}"
+                    )
+
+            if chosen_dir is None:
+                # Look for or create common evaluation log directories
+                possible_log_dirs = [
+                    Path("client/evaluation_logs"),
+                    Path("evaluation_logs"),
+                    Path("logs"),
+                    Path("."),  # Fallback to current directory
+                ]
+
+                for log_dir in possible_log_dirs:
+                    try:
+                        log_dir.mkdir(parents=True, exist_ok=True)
+                    except Exception:
+                        continue
+                    if log_dir.exists() and log_dir.is_dir():
+                        chosen_dir = log_dir
+                        break
+
+                if chosen_dir is None:
+                    chosen_dir = Path(".")
 
             output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
 

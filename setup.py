@@ -23,6 +23,8 @@ setup(
         "fsspec==2025.3.0",  # For filesystem interactions, pinned for dataset compatibility
         "hydra-core>=1.3.2",  # For configuration management
         "omegaconf>=2.3.0",  # For configuration objects
+        "gymnasium>=0.29.0",  # For FrozenLake and other gym environments
+        "httpx>=0.24.0",  # For HTTP client functionality in agent resources
     ],
     extras_require={
         "dev": [

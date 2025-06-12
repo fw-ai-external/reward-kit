@@ -537,7 +537,9 @@ class Orchestrator:
                 1
             ]  # Get actual model name
             self.logger.info(f"Using OpenAI model: {agent_model_name}")
-        elif agent_model_name.startswith("fireworks/") or agent_model_name.startswith("accounts/fireworks"):
+        elif agent_model_name.startswith("fireworks/") or agent_model_name.startswith(
+            "accounts/fireworks"
+        ):
             self._initialize_fireworks_client()
             if not self._openai_client:
                 self.logger.error(

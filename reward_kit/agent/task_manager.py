@@ -597,7 +597,7 @@ class TaskManager:
         scores = []
 
         for result in rollout_results:
-            if isinstance(result, dict) and "error" in result:
+            if isinstance(result, dict) and result.get("error") is not None:
                 failed_results.append(result)
             elif isinstance(result, dict) and "score" in result:
                 scores.append(result["score"])
@@ -761,14 +761,42 @@ class TaskManager:
                 )
                 for i, result in enumerate(individual_results):
                     self.logger.info(
-                        f"Processing individual result {i}: {type(result)} - {result}"
+                        f"Processing individual result {i}: {type(result)} - {len(str(result))} chars"
                     )
+
+                    # Clean the result for JSON serialization
+                    clean_result = {}
+                    for key, value in result.items():
+                        if key == "reward_function_inputs" and isinstance(value, dict):
+                            # Clean the reward function inputs
+                            clean_inputs = {}
+                            for input_key, input_value in value.items():
+                                if input_key == "state" and isinstance(
+                                    input_value, dict
+                                ):
+                                    # Clean the state by removing non-serializable objects
+                                    clean_state = {}
+                                    for state_key, state_value in input_value.items():
+                                        if state_key == "resource":
+                                            # Replace resource object with a string representation
+                                            clean_state[state_key] = (
+                                                f"<{type(state_value).__name__}>"
+                                            )
+                                        else:
+                                            clean_state[state_key] = state_value
+                                    clean_inputs[input_key] = clean_state
+                                else:
+                                    clean_inputs[input_key] = input_value
+                            clean_result[key] = clean_inputs
+                        else:
+                            clean_result[key] = value
+
                     detailed_result = {
                         "type": "individual_result",
                         "task_id": task_id,
                         "rollout_index": i,
                         "timestamp": datetime.now().isoformat(),
-                        **result,
+                        **clean_result,
                     }
                     f.write(json.dumps(detailed_result) + "\n")
                     self.logger.info(f"Wrote individual result {i} to {output_path}")

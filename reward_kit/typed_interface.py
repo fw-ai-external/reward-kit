@@ -67,7 +67,9 @@ def reward_function(
         params = sig.parameters
 
         # Validate that the function accepts **kwargs
-        has_var_keyword = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
+        has_var_keyword = any(
+            param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()
+        )
 
         if not has_var_keyword:
             raise ValueError(
@@ -114,9 +116,13 @@ def reward_function(
             # Create a mutable copy of arguments to modify
             final_func_args = dict(bound_args.arguments)
 
-            def _coerce_to_list_message(data_list: Any, arg_name_for_error: str) -> List[Message]:
+            def _coerce_to_list_message(
+                data_list: Any, arg_name_for_error: str
+            ) -> List[Message]:
                 if not isinstance(data_list, list):
-                    raise TypeError(f"Expected a list for '{arg_name_for_error}', got {type(data_list)}")
+                    raise TypeError(
+                        f"Expected a list for '{arg_name_for_error}', got {type(data_list)}"
+                    )
                 typed_list = []
                 for i, item_data in enumerate(data_list):
                     if isinstance(item_data, Message):
@@ -124,11 +130,17 @@ def reward_function(
                     elif isinstance(item_data, dict):
                         typed_list.append(Message(**item_data))
                     else:
-                        raise TypeError(f"Unexpected type for item {i} in '{arg_name_for_error}': {type(item_data)}")
+                        raise TypeError(
+                            f"Unexpected type for item {i} in '{arg_name_for_error}': {type(item_data)}"
+                        )
                 return typed_list
 
             # 1. Conditional Pydantic conversion for 'messages' (pointwise) or 'rollouts_messages' (batch)
-            if mode == "pointwise" and "messages" in params and "messages" in final_func_args:
+            if (
+                mode == "pointwise"
+                and "messages" in params
+                and "messages" in final_func_args
+            ):
                 messages_param_annotation = params["messages"].annotation
                 is_list_message_hint = False
                 if get_origin(messages_param_annotation) in (list, List):
@@ -138,11 +150,19 @@ def reward_function(
 
                 if is_list_message_hint:
                     try:
-                        final_func_args["messages"] = _coerce_to_list_message(final_func_args["messages"], "messages")
+                        final_func_args["messages"] = _coerce_to_list_message(
+                            final_func_args["messages"], "messages"
+                        )
                     except Exception as err:
-                        raise ValueError(f"Input 'messages' failed Pydantic validation: {err}") from None
+                        raise ValueError(
+                            f"Input 'messages' failed Pydantic validation: {err}"
+                        ) from None
 
-            elif mode == "batch" and "rollouts_messages" in params and "rollouts_messages" in final_func_args:
+            elif (
+                mode == "batch"
+                and "rollouts_messages" in params
+                and "rollouts_messages" in final_func_args
+            ):
                 param_annotation = params["rollouts_messages"].annotation
                 is_list_list_msg_hint = False
                 # Check if the annotation is List[List[Message]]
@@ -153,17 +173,29 @@ def reward_function(
                         inner_list_type = inner_list_type_args[0]
                         if get_origin(inner_list_type) == list:
                             msg_type_args = get_args(inner_list_type)
-                            if msg_type_args and len(msg_type_args) == 1 and msg_type_args[0] == Message:
+                            if (
+                                msg_type_args
+                                and len(msg_type_args) == 1
+                                and msg_type_args[0] == Message
+                            ):
                                 is_list_list_msg_hint = True
 
                 if is_list_list_msg_hint:
                     try:
                         coerced_rollouts = []
-                        for i, rollout_data in enumerate(final_func_args["rollouts_messages"]):
-                            coerced_rollouts.append(_coerce_to_list_message(rollout_data, f"rollouts_messages[{i}]"))
+                        for i, rollout_data in enumerate(
+                            final_func_args["rollouts_messages"]
+                        ):
+                            coerced_rollouts.append(
+                                _coerce_to_list_message(
+                                    rollout_data, f"rollouts_messages[{i}]"
+                                )
+                            )
                         final_func_args["rollouts_messages"] = coerced_rollouts
                     except Exception as err:
-                        raise ValueError(f"Input 'rollouts_messages' failed Pydantic validation: {err}") from None
+                        raise ValueError(
+                            f"Input 'rollouts_messages' failed Pydantic validation: {err}"
+                        ) from None
 
             # 2. Conditional Pydantic conversion for 'ground_truth' (applies to both modes if present)
             # This logic might need to be mode-aware if ground_truth structure changes with mode (e.g. List[Any] for batch)
@@ -190,7 +222,9 @@ def reward_function(
                             elif isinstance(gt_item_data, dict):
                                 typed_ground_truth_list.append(Message(**gt_item_data))
                             else:
-                                raise TypeError(f"Unexpected type in ground_truth list: {type(gt_item_data)}")
+                                raise TypeError(
+                                    f"Unexpected type in ground_truth list: {type(gt_item_data)}"
+                                )
                         final_func_args["ground_truth"] = typed_ground_truth_list
                     except Exception as err:
                         raise ValueError(
@@ -227,11 +261,15 @@ def reward_function(
                         return result
                     return _single_res_adapter.validate_python(result)
                 elif mode == "batch":
-                    if isinstance(result, list) and all(isinstance(item, EvaluateResult) for item in result):
+                    if isinstance(result, list) and all(
+                        isinstance(item, EvaluateResult) for item in result
+                    ):
                         return result
                     return _list_res_adapter.validate_python(result)
                 else:  # Should not happen due to EvaluationMode typing
-                    raise ValueError(f"Internal error: Invalid mode '{mode}' in wrapper.")
+                    raise ValueError(
+                        f"Internal error: Invalid mode '{mode}' in wrapper."
+                    )
             except ValidationError as err:
                 raise ValueError(
                     f"Return value from function '{func.__name__}' failed Pydantic validation for mode '{mode}':\n{err}"
@@ -244,7 +282,9 @@ def reward_function(
 
         return cast(F, wrapper)
 
-    if _func is None:  # Decorator called with arguments, e.g., @reward_function(mode="batch")
+    if (
+        _func is None
+    ):  # Decorator called with arguments, e.g., @reward_function(mode="batch")
         return decorator
     else:  # Decorator called without arguments, e.g., @reward_function (defaults to pointwise)
         return decorator(_func)

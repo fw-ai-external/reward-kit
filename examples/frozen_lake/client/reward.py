@@ -29,10 +29,29 @@ def frozen_lake_reward(messages: List[Message], state=None, **kwargs) -> Evaluat
             metrics={"success": MetricResult(score=0.0, reason="No messages provided")},
         )
 
-    last_message = messages[-1]
-    content = last_message.content.lower()
+    # Check all messages (especially tool responses) for game outcome
+    def extract_content_from_message(msg):
+        """Extract text content from a message, handling JSON-encoded tool responses."""
+        content = msg.content
+        if content and isinstance(content, str):
+            try:
+                # Try to parse JSON content from tool responses
+                import json
 
-    # Check for success indicators in the message content
+                parsed_content = json.loads(content)
+                if isinstance(parsed_content, dict) and "content" in parsed_content:
+                    # Extract text from tool response format
+                    content_list = parsed_content["content"]
+                    if isinstance(content_list, list) and len(content_list) > 0:
+                        text_item = content_list[0]
+                        if isinstance(text_item, dict) and "text" in text_item:
+                            content = text_item["text"]
+            except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                # If parsing fails, use original content
+                pass
+        return content.lower() if content else ""
+
+    # Check for success/failure indicators in all messages
     success_indicators = [
         "you win",
         "you reached the goal",
@@ -40,14 +59,35 @@ def frozen_lake_reward(messages: List[Message], state=None, **kwargs) -> Evaluat
         "success",
         "goal reached",
         "you made it",
+        "victory",
     ]
 
-    failure_indicators = ["you lose", "game over", "you fell", "hole", "frozen"]
+    failure_indicators = ["you lose", "game over", "you fell", "hole"]
 
-    is_success = any(indicator in content for indicator in success_indicators)
-    is_failure = any(indicator in content for indicator in failure_indicators)
+    is_success = False
+    is_failure = False
+    winning_message = ""
+    losing_message = ""
 
-    # Determine the score
+    # Check all messages for game outcome indicators
+    for msg in messages:
+        content = extract_content_from_message(msg)
+
+        # Check for success
+        for indicator in success_indicators:
+            if indicator in content:
+                is_success = True
+                winning_message = content[:100]
+                break
+
+        # Check for failure
+        for indicator in failure_indicators:
+            if indicator in content:
+                is_failure = True
+                losing_message = content[:100]
+                break
+
+    # Determine the score (success takes precedence over failure)
     if is_success:
         score = 1.0
         reason = "Successfully reached the goal in Frozen Lake"

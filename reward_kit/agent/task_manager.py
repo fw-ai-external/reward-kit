@@ -8,8 +8,17 @@ import importlib
 import json
 import logging
 import os
+import shlex
+import socket
+import statistics
+import subprocess
+import time
+from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+import requests
 
 from ..models import TaskDefinitionModel
 from .orchestrator import Orchestrator
@@ -29,6 +38,9 @@ class TaskManager:
         self.resource_pool = ResourcePool()
         self.logger = logging.getLogger("TaskManager")
         self.orchestrators: Dict[str, Orchestrator] = {}
+        self.server_processes: Dict[str, subprocess.Popen] = {}
+        self.server_ports: Dict[str, int] = {}
+        self.all_server_pids: Set[int] = set()
 
     def register_task(self, task_definition: TaskDefinitionModel) -> str:
         """
@@ -126,6 +138,119 @@ class TaskManager:
             self.logger.error(f"Error loading task definition from {file_path}: {e}")
             return None
 
+    def _find_free_port(self) -> int:
+        """Find a free port on localhost."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            s.listen(1)
+            port = s.getsockname()[1]
+        return port
+
+    def _wait_for_server_health(self, health_url: str, timeout: int = 30) -> bool:
+        """Wait for a server to become healthy by polling its health endpoint."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                response = requests.get(health_url, timeout=5)
+                if response.status_code == 200:
+                    self.logger.info(f"Server is healthy at {health_url}")
+                    return True
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+
+        self.logger.error(
+            f"Server failed to become healthy at {health_url} within {timeout} seconds"
+        )
+        return False
+
+    def _start_resource_server(
+        self, task_id: str, task_def: TaskDefinitionModel
+    ) -> Optional[int]:
+        """Start a resource server for a task and return the allocated port."""
+        if not task_def.resource_server:
+            return None
+
+        # Find a free port
+        port = self._find_free_port()
+
+        # Replace {port} placeholder in start command
+        start_command = task_def.resource_server.start_command.replace(
+            "{port}", str(port)
+        )
+
+        # Start the server process
+        try:
+            self.logger.info(
+                f"Starting resource server for task '{task_id}' on port {port}: {start_command}"
+            )
+            process = subprocess.Popen(
+                shlex.split(start_command),
+                shell=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                preexec_fn=os.setsid if hasattr(os, "setsid") else None,
+            )
+
+            # Store the process and port
+            self.server_processes[task_id] = process
+            self.server_ports[task_id] = port
+            self.all_server_pids.add(process.pid)
+
+            # Wait for server to become healthy
+            health_url = task_def.resource_server.health_check_url.replace(
+                "{port}", str(port)
+            )
+            if self._wait_for_server_health(health_url):
+                self.logger.info(
+                    f"Resource server for task '{task_id}' is ready on port {port}"
+                )
+                return port
+            else:
+                # Server failed to start properly, clean up
+                self._stop_resource_server(task_id)
+                return None
+
+        except Exception as e:
+            self.logger.error(
+                f"Failed to start resource server for task '{task_id}': {e}"
+            )
+            return None
+
+    def _stop_resource_server(self, task_id: str) -> None:
+        """Stop the resource server for a task."""
+        if task_id in self.server_processes:
+            process = self.server_processes[task_id]
+            self.all_server_pids.discard(process.pid)
+            try:
+                # Try to terminate gracefully first
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(process.pid), 15)  # SIGTERM
+                else:
+                    process.terminate()
+
+                # Wait a bit for graceful shutdown
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # Force kill if it doesn't shut down gracefully
+                    if hasattr(os, "killpg"):
+                        os.killpg(os.getpgid(process.pid), 9)  # SIGKILL
+                    else:
+                        process.kill()
+                    process.wait()
+
+                self.logger.info(f"Stopped resource server for task '{task_id}'")
+            except Exception as e:
+                self.logger.error(
+                    f"Error stopping resource server for task '{task_id}': {e}"
+                )
+
+            del self.server_processes[task_id]
+
+        if task_id in self.server_ports:
+            del self.server_ports[task_id]
+
     async def prepare_task(self, task_id: str) -> bool:
         """
         Prepare a task for execution by setting up its resources.
@@ -142,8 +267,39 @@ class TaskManager:
 
         task_def = self.tasks[task_id]
 
+        # Start resource server if needed
+        allocated_port = None
+        if task_def.resource_server:
+            allocated_port = self._start_resource_server(task_id, task_def)
+            if allocated_port is None:
+                self.logger.error(
+                    f"Failed to start resource server for task '{task_id}'"
+                )
+                return False
+
+        # Create a modified task definition with updated base_url if a server was started
+        effective_task_def = task_def
+        if allocated_port is not None:
+            # Create a deep copy and update the base_url
+            effective_task_def = deepcopy(task_def)
+            if hasattr(effective_task_def.base_resource_config, "base_url"):
+                # Update existing base_url
+                effective_task_def.base_resource_config["base_url"] = (
+                    f"http://localhost:{allocated_port}"
+                )
+            elif "base_url" in effective_task_def.base_resource_config:
+                # Update base_url in dict
+                effective_task_def.base_resource_config["base_url"] = (
+                    f"http://localhost:{allocated_port}"
+                )
+            else:
+                # Add base_url if it doesn't exist
+                effective_task_def.base_resource_config["base_url"] = (
+                    f"http://localhost:{allocated_port}"
+                )
+
         # Create an orchestrator for this specific task
-        orchestrator = Orchestrator(task_definition=task_def)
+        orchestrator = Orchestrator(task_definition=effective_task_def)
         self.orchestrators[task_id] = orchestrator
 
         # Prepare the resources for this task
@@ -153,6 +309,9 @@ class TaskManager:
             return True
         except Exception as e:
             self.logger.error(f"Error preparing resources for task '{task_id}': {e}")
+            # Clean up server if we started one
+            if allocated_port is not None:
+                self._stop_resource_server(task_id)
             return False
 
     async def execute_task(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -194,6 +353,7 @@ class TaskManager:
         task_ids: Optional[List[str]] = None,
         parallel: bool = False,
         max_concurrency: int = 3,
+        num_rollouts_override: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Execute multiple tasks sequentially or in parallel.
@@ -202,9 +362,10 @@ class TaskManager:
             task_ids: List of task IDs to execute. If None, execute all registered tasks.
             parallel: If True, execute tasks in parallel; otherwise, execute sequentially
             max_concurrency: Maximum number of tasks to execute in parallel
+            num_rollouts_override: Override the number of rollouts for each task
 
         Returns:
-            results: Dictionary mapping task IDs to execution results
+            results: Dictionary mapping task IDs to execution results (aggregated if multiple rollouts)
         """
         task_ids_to_execute = (
             task_ids if task_ids is not None else list(self.tasks.keys())
@@ -222,46 +383,486 @@ class TaskManager:
 
         results: Dict[str, Any] = {}
 
-        if parallel and len(valid_task_ids) > 1:
-            # Execute tasks in parallel with concurrency limit
-            self.logger.info(
-                f"Executing {len(valid_task_ids)} tasks in parallel with max concurrency {max_concurrency}."
+        # For each task, determine how many rollouts to execute
+        for task_id in valid_task_ids:
+            task_def = self.tasks[task_id]
+            num_rollouts = (
+                num_rollouts_override
+                if num_rollouts_override is not None
+                else task_def.num_rollouts
             )
 
-            # Prepare all tasks first
-            prepare_tasks = [self.prepare_task(task_id) for task_id in valid_task_ids]
-            prepare_results = await asyncio.gather(*prepare_tasks)
-
-            # Filter out tasks that failed preparation
-            prepared_task_ids = [
-                tid for tid, success in zip(valid_task_ids, prepare_results) if success
-            ]
-
-            if not prepared_task_ids:
-                self.logger.error("No tasks were successfully prepared.")
-                return results
-
-            # Execute tasks with semaphore for concurrency control
-            semaphore = asyncio.Semaphore(max_concurrency)
-
-            async def execute_with_semaphore(tid):
-                async with semaphore:
-                    return tid, await self.execute_task(tid)
-
-            execution_tasks = [execute_with_semaphore(tid) for tid in prepared_task_ids]
-            execution_results = await asyncio.gather(*execution_tasks)
-
-            results = {tid: result for tid, result in execution_results}
-        else:
-            # Execute tasks sequentially
-            self.logger.info(f"Executing {len(valid_task_ids)} tasks sequentially.")
-            for task_id in valid_task_ids:
+            if num_rollouts == 1:
+                # Single rollout - existing behavior
                 if await self.prepare_task(task_id):
                     results[task_id] = await self.execute_task(task_id)
                 else:
                     results[task_id] = {"error": "Task preparation failed"}
+            else:
+                # Multiple rollouts - batch execution
+                self.logger.info(
+                    f"Executing {num_rollouts} rollouts for task '{task_id}'"
+                )
+                rollout_results = await self._execute_batch_rollouts(
+                    task_id, num_rollouts, max_concurrency
+                )
+
+                # Aggregate results
+                if rollout_results:
+                    aggregated_result = self._aggregate_results(rollout_results)
+                    results[task_id] = aggregated_result
+
+                    # Always save detailed results to .jsonl file (including failed rollouts for analysis)
+                    try:
+                        detailed_file_path = self._save_detailed_results(
+                            task_id, aggregated_result
+                        )
+                        self.logger.info(
+                            f"Detailed results saved to: {detailed_file_path}"
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to save detailed results for task '{task_id}': {e}"
+                        )
+                else:
+                    results[task_id] = {"error": "All rollouts failed"}
 
         return results
+
+    async def _execute_batch_rollouts(
+        self, task_id: str, num_rollouts: int, max_concurrency: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute multiple rollouts for a single task in parallel.
+
+        Args:
+            task_id: The base task ID
+            num_rollouts: Number of rollouts to execute
+            max_concurrency: Maximum number of concurrent rollouts
+
+        Returns:
+            List of results from each rollout
+        """
+        task_def = self.tasks[task_id]
+        rollout_results = []
+
+        # Create a semaphore to limit concurrency
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def execute_single_rollout(rollout_index: int):
+            """Execute a single rollout with its own server instance."""
+            rollout_task_id = f"{task_id}_rollout_{rollout_index}"
+
+            async with semaphore:
+                try:
+                    # Start resource server if needed for this rollout
+                    allocated_port = None
+                    if task_def.resource_server:
+                        allocated_port = self._start_resource_server(
+                            rollout_task_id, task_def
+                        )
+                        if allocated_port is None:
+                            self.logger.error(
+                                f"Failed to start resource server for rollout {rollout_index} of task '{task_id}'"
+                            )
+                            return {
+                                "error": f"Failed to start resource server for rollout {rollout_index}"
+                            }
+
+                    # Create effective task definition with updated base_url if needed
+                    effective_task_def = task_def
+                    if allocated_port is not None:
+                        effective_task_def = deepcopy(task_def)
+                        if hasattr(effective_task_def.base_resource_config, "base_url"):
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+                        elif "base_url" in effective_task_def.base_resource_config:
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+                        else:
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+
+                    # Create orchestrator for this rollout
+                    orchestrator = Orchestrator(task_definition=effective_task_def)
+
+                    # Setup and execute
+                    await orchestrator.setup_base_resource()
+                    result = await orchestrator.execute_task_poc()
+
+                    # Cleanup orchestrator resources
+                    if orchestrator.base_resource:
+                        await orchestrator.base_resource.close()
+
+                    # Stop the resource server for this rollout
+                    if allocated_port is not None:
+                        self._stop_resource_server(rollout_task_id)
+
+                    # Handle case where result is None
+                    if result is None:
+                        result = {"error": "Execution returned None"}
+
+                    # Handle new orchestrator format that includes reward_function_inputs
+                    reward_function_inputs = None
+                    if isinstance(result, dict) and "evaluation_result" in result:
+                        # New format with separate evaluation_result and reward_function_inputs
+                        reward_function_inputs = result.get("reward_function_inputs")
+                        result = result["evaluation_result"]
+
+                    # Convert EvaluateResult to dict if needed
+                    if hasattr(result, "model_dump"):
+                        # Pydantic model - convert to dict
+                        result = result.model_dump()
+                    elif hasattr(result, "dict"):
+                        # Older pydantic models
+                        result = result.dict()
+                    # If it's already a dict, leave it as is
+
+                    # Add reward function inputs to the result for JSONL trajectory storage
+                    if reward_function_inputs is not None and isinstance(result, dict):
+                        result["reward_function_inputs"] = reward_function_inputs
+
+                    score = (
+                        result.get("score", "N/A")
+                        if isinstance(result, dict)
+                        else "N/A"
+                    )
+                    self.logger.info(
+                        f"Rollout {rollout_index} of task '{task_id}' completed with score: {score}"
+                    )
+                    return result
+
+                except Exception as e:
+                    error_msg = (
+                        f"Error in rollout {rollout_index} of task '{task_id}': {e}"
+                    )
+                    self.logger.error(error_msg, exc_info=True)
+
+                    # Capture server logs if available for debugging
+                    if rollout_task_id in self.server_processes:
+                        process = self.server_processes[rollout_task_id]
+                        try:
+                            stdout, stderr = process.communicate(timeout=1)
+                            if stdout:
+                                self.logger.error(
+                                    f"Server stdout for rollout {rollout_index}: {stdout.decode()}"
+                                )
+                            if stderr:
+                                self.logger.error(
+                                    f"Server stderr for rollout {rollout_index}: {stderr.decode()}"
+                                )
+                        except Exception:
+                            pass  # Ignore errors in log capture
+
+                    # Cleanup on error
+                    if allocated_port is not None:
+                        self._stop_resource_server(rollout_task_id)
+                    return {"error": str(e)}
+
+        # Execute all rollouts concurrently
+        rollout_tasks = [execute_single_rollout(i) for i in range(num_rollouts)]
+        rollout_results = await asyncio.gather(*rollout_tasks)
+
+        # Log failed rollouts but return all results for comprehensive analysis
+        successful_results = [
+            r for r in rollout_results if not (isinstance(r, dict) and "error" in r)
+        ]
+        failed_count = len(rollout_results) - len(successful_results)
+
+        if failed_count > 0:
+            self.logger.warning(
+                f"{failed_count} out of {num_rollouts} rollouts failed for task '{task_id}'"
+            )
+
+        # Return all results (successful and failed) for comprehensive logging
+        return rollout_results
+
+    def _aggregate_results(
+        self, rollout_results: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Aggregate results from multiple rollouts into a single summary.
+
+        Args:
+            rollout_results: List of individual rollout results
+
+        Returns:
+            Aggregated result dictionary
+        """
+        if not rollout_results:
+            return {"error": "No successful rollouts to aggregate"}
+
+        # Separate successful and failed results
+        successful_results = []
+        failed_results = []
+        scores = []
+
+        for result in rollout_results:
+            if isinstance(result, dict) and result.get("error") is not None:
+                failed_results.append(result)
+            elif isinstance(result, dict) and "score" in result:
+                scores.append(result["score"])
+                successful_results.append(result)
+            else:
+                # Handle unexpected result format
+                failed_results.append({"error": f"Invalid result format: {result}"})
+
+        if not scores:
+            # Even with no successful rollouts, we still want to save failed rollout data
+            aggregated_result = {
+                "aggregated": True,
+                "num_rollouts": len(rollout_results),
+                "successful_rollouts": 0,
+                "failed_rollouts": len(failed_results),
+                "success_rate": 0.0,
+                "avg_score": 0.0,
+                "std_dev": 0.0,
+                "min_score": 0.0,
+                "max_score": 0.0,
+                "score": 0.0,  # For compatibility with existing logging
+                "individual_scores": [],
+                "individual_results": rollout_results,  # Include all results (failed)
+                "successful_results": [],
+                "failed_results": failed_results,
+                "timestamp": datetime.now().isoformat(),
+                "error": "No valid scores found in rollout results",
+            }
+            return aggregated_result
+
+        # Calculate aggregated statistics
+        avg_score = sum(scores) / len(scores)
+        min_score = min(scores)
+        max_score = max(scores)
+        success_rate = len(scores) / len(rollout_results) if rollout_results else 0
+
+        # Calculate standard deviation
+        std_dev = statistics.stdev(scores) if len(scores) > 1 else 0.0
+
+        aggregated_result = {
+            "aggregated": True,
+            "num_rollouts": len(rollout_results),
+            "successful_rollouts": len(scores),
+            "failed_rollouts": len(failed_results),
+            "success_rate": success_rate,
+            "avg_score": avg_score,
+            "std_dev": std_dev,
+            "min_score": min_score,
+            "max_score": max_score,
+            "score": avg_score,  # For compatibility with existing logging
+            "individual_scores": scores,
+            "individual_results": rollout_results,  # Include all results (successful and failed)
+            "successful_results": successful_results,
+            "failed_results": failed_results,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Aggregate metrics if available
+        if successful_results and "metrics" in successful_results[0]:
+            aggregated_metrics = {}
+            for metric_name in successful_results[0]["metrics"].keys():
+                metric_scores = []
+                for result in successful_results:
+                    if metric_name in result.get("metrics", {}):
+                        metric_result = result["metrics"][metric_name]
+                        if isinstance(metric_result, dict) and "score" in metric_result:
+                            metric_scores.append(metric_result["score"])
+                        elif isinstance(metric_result, (int, float)):
+                            metric_scores.append(metric_result)
+
+                if metric_scores:
+                    aggregated_metrics[metric_name] = {
+                        "avg_score": sum(metric_scores) / len(metric_scores),
+                        "min_score": min(metric_scores),
+                        "max_score": max(metric_scores),
+                        "individual_scores": metric_scores,
+                    }
+
+            if aggregated_metrics:
+                aggregated_result["aggregated_metrics"] = aggregated_metrics
+
+        return aggregated_result
+
+    def _save_detailed_results(
+        self,
+        task_id: str,
+        aggregated_result: Dict[str, Any],
+        output_file: Optional[str] = None,
+    ) -> str:
+        """
+        Save detailed results to a .jsonl file for analysis.
+
+        Args:
+            task_id: The task identifier
+            aggregated_result: The aggregated result dictionary
+            output_file: Optional custom output file path
+
+        Returns:
+            The path to the saved file
+        """
+        if output_file is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Try to save in evaluation_logs directory relative to task definition
+            # Look for common evaluation log directories
+            possible_log_dirs = [
+                Path("client/evaluation_logs"),
+                Path("evaluation_logs"),
+                Path("logs"),
+                Path("."),  # Fallback to current directory
+            ]
+
+            chosen_dir = Path(".")  # Default fallback
+            for log_dir in possible_log_dirs:
+                if log_dir.exists() and log_dir.is_dir():
+                    chosen_dir = log_dir
+                    break
+
+            output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
+
+        output_path = Path(output_file)
+
+        try:
+            self.logger.info(f"=== TRAJECTORY SAVE DEBUG START ===")
+            self.logger.info(f"Saving trajectory data to: {output_path}")
+            self.logger.info(f"Chosen directory: {chosen_dir}")
+            self.logger.info(
+                f"Individual results count: {len(aggregated_result.get('individual_results', []))}"
+            )
+            self.logger.info(
+                f"Output path parent directory exists: {output_path.parent.exists()}"
+            )
+
+            # Ensure the directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "w") as f:
+                # Write summary line
+                summary = {
+                    "type": "summary",
+                    "task_id": task_id,
+                    "timestamp": aggregated_result.get(
+                        "timestamp", datetime.now().isoformat()
+                    ),
+                    "num_rollouts": aggregated_result["num_rollouts"],
+                    "successful_rollouts": aggregated_result["successful_rollouts"],
+                    "failed_rollouts": aggregated_result.get("failed_rollouts", 0),
+                    "success_rate": aggregated_result["success_rate"],
+                    "avg_score": aggregated_result["avg_score"],
+                    "std_dev": aggregated_result["std_dev"],
+                    "min_score": aggregated_result["min_score"],
+                    "max_score": aggregated_result["max_score"],
+                }
+                f.write(json.dumps(summary) + "\n")
+                self.logger.info(f"Wrote summary line to {output_path}")
+
+                # Write individual results
+                individual_results = aggregated_result.get("individual_results", [])
+                self.logger.info(
+                    f"Processing {len(individual_results)} individual results"
+                )
+                for i, result in enumerate(individual_results):
+                    self.logger.info(
+                        f"Processing individual result {i}: {type(result)} - {len(str(result))} chars"
+                    )
+
+                    # Clean the result for JSON serialization
+                    clean_result = {}
+                    for key, value in result.items():
+                        if key == "reward_function_inputs" and isinstance(value, dict):
+                            # Clean the reward function inputs
+                            clean_inputs = {}
+                            for input_key, input_value in value.items():
+                                if input_key == "state" and isinstance(
+                                    input_value, dict
+                                ):
+                                    # Clean the state by removing non-serializable objects
+                                    clean_state = {}
+                                    for state_key, state_value in input_value.items():
+                                        if state_key == "resource":
+                                            # Replace resource object with a string representation
+                                            clean_state[state_key] = (
+                                                f"<{type(state_value).__name__}>"
+                                            )
+                                        else:
+                                            clean_state[state_key] = state_value
+                                    clean_inputs[input_key] = clean_state
+                                else:
+                                    clean_inputs[input_key] = input_value
+                            clean_result[key] = clean_inputs
+                        else:
+                            clean_result[key] = value
+
+                    detailed_result = {
+                        "type": "individual_result",
+                        "task_id": task_id,
+                        "rollout_index": i,
+                        "timestamp": datetime.now().isoformat(),
+                        **clean_result,
+                    }
+                    f.write(json.dumps(detailed_result) + "\n")
+                    self.logger.info(f"Wrote individual result {i} to {output_path}")
+
+                # Force flush to ensure data is written
+                f.flush()
+                import os
+
+                os.fsync(f.fileno())
+
+            self.logger.info(f"Successfully saved trajectory data to: {output_path}")
+            self.logger.info(
+                f"Trajectory file size: {output_path.stat().st_size} bytes"
+            )
+            self.logger.info(
+                f"Re-evaluate with: reward-kit jsonl-reward-eval --jsonl-file {output_path} --reward-module your_reward_function"
+            )
+            self.logger.info(f"=== TRAJECTORY SAVE DEBUG END ===")
+            return str(output_path)
+
+        except Exception as e:
+            self.logger.error(f"Failed to save detailed results to {output_path}: {e}")
+            import traceback
+
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return ""
+
+    def cleanup_all_servers(self) -> None:
+        """A more robust cleanup that terminates any tracked server process."""
+        if not self.all_server_pids:
+            self.logger.info("No tracked server PIDs to clean up.")
+            return
+
+        self.logger.info(
+            f"Performing robust cleanup of all {len(self.all_server_pids)} tracked server PIDs."
+        )
+        # Iterate over a copy as the set will be modified
+        for pid in list(self.all_server_pids):
+            try:
+                # Find the task_id associated with this PID for logging
+                task_id = "unknown_task"
+                for tid, proc in self.server_processes.items():
+                    if proc.pid == pid:
+                        task_id = tid
+                        break
+
+                self.logger.warning(
+                    f"Force-cleaning up potentially orphaned server process for task '{task_id}' (PID: {pid})."
+                )
+                # Use the same killpg logic
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(pid), 9)  # Use SIGKILL for forceful cleanup
+                else:
+                    os.kill(pid, 9)
+                self.all_server_pids.discard(pid)
+
+            except ProcessLookupError:
+                # Process already gone, which is fine
+                self.all_server_pids.discard(pid)
+            except Exception as e:
+                self.logger.error(f"Error during robust cleanup of PID {pid}: {e}")
+                self.all_server_pids.discard(pid)
 
     async def cleanup(self, task_ids: Optional[List[str]] = None) -> None:
         """
@@ -275,6 +876,10 @@ class TaskManager:
         )
 
         for task_id in task_ids_to_cleanup:
+            # Stop resource server if running
+            self._stop_resource_server(task_id)
+
+            # Clean up orchestrator resources
             if task_id in self.orchestrators:
                 orchestrator = self.orchestrators[task_id]
                 if orchestrator.base_resource:
@@ -286,3 +891,6 @@ class TaskManager:
                             f"Error cleaning up resources for task '{task_id}': {e}"
                         )
                 del self.orchestrators[task_id]
+
+        # Perform robust cleanup of any remaining orphaned processes
+        self.cleanup_all_servers()

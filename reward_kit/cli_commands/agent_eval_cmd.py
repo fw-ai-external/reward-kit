@@ -102,16 +102,58 @@ def agent_eval_command(args):
                     return
 
             try:
+                num_rollouts_override = getattr(args, "num_rollouts", None)
                 results = await task_manager.execute_tasks(
                     task_ids=tasks_to_run,
                     parallel=parallel,
                     max_concurrency=max_concurrency,
+                    num_rollouts_override=num_rollouts_override,
                 )
 
                 logger.info(f"Execution completed for {len(results)} tasks")
                 for task_id, result in results.items():
                     if isinstance(result, dict) and "error" in result:
                         logger.error(f"Task '{task_id}' failed: {result['error']}")
+                    elif isinstance(result, dict) and result.get("aggregated", False):
+                        # Handle aggregated results from multiple rollouts
+                        logger.info(f"Task '{task_id}' batch results:")
+                        logger.info(
+                            f"  - Rollouts: {result['successful_rollouts']}/{result['num_rollouts']} successful ({result.get('failed_rollouts', 0)} failed)"
+                        )
+                        logger.info(f"  - Success rate: {result['success_rate']:.2%}")
+                        logger.info(f"  - Average score: {result['avg_score']:.4f}")
+                        logger.info(
+                            f"  - Standard deviation: {result.get('std_dev', 0.0):.4f}"
+                        )
+                        logger.info(
+                            f"  - Score range: {result['min_score']:.4f} - {result['max_score']:.4f}"
+                        )
+                        if "aggregated_metrics" in result:
+                            logger.info(f"  - Aggregated metrics:")
+                            for metric_name, metric_data in result[
+                                "aggregated_metrics"
+                            ].items():
+                                logger.info(
+                                    f"    * {metric_name}: avg={metric_data['avg_score']:.4f}, range={metric_data['min_score']:.4f}-{metric_data['max_score']:.4f}"
+                                )
+
+                        # Log path to detailed results file
+                        if result.get("timestamp"):
+                            timestamp = (
+                                result["timestamp"]
+                                .replace(":", "")
+                                .replace("-", "")
+                                .replace("T", "_")
+                                .split(".")[0]
+                            )
+                            # Use the trajectory filename format that matches TaskManager
+                            trajectory_file = f"trajectory_{task_id}_{timestamp}.jsonl"
+                            logger.info(
+                                f"  - Trajectory data saved to: {trajectory_file}"
+                            )
+                            logger.info(
+                                f"  - Re-evaluate with: reward-kit jsonl-reward-eval --jsonl-file {trajectory_file} --reward-module your_reward_function"
+                            )
                     elif isinstance(result, dict) and "score" in result:
                         logger.info(f"Task '{task_id}' score: {result['score']}")
                     else:

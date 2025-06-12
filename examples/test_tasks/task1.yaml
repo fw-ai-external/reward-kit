@@ -20,3 +20,4 @@ messages:
   - role: "user"
     content: "Add two items to the list and increment the counter twice. When done, set the status to 'completed'."
 poc_max_turns: 1
+num_rollouts: 3

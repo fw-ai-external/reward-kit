@@ -216,3 +216,4 @@ outputs/
 # Gitleaks reports
 gitleaks-report*.json
 .deepeval/
+examples/frozen_lake/evaluation_logs/

@@ -8,6 +8,7 @@ import importlib
 import json
 import logging
 import os
+import shlex
 import socket
 import statistics
 import subprocess
@@ -39,6 +40,7 @@ class TaskManager:
         self.orchestrators: Dict[str, Orchestrator] = {}
         self.server_processes: Dict[str, subprocess.Popen] = {}
         self.server_ports: Dict[str, int] = {}
+        self.all_server_pids: Set[int] = set()
 
     def register_task(self, task_definition: TaskDefinitionModel) -> str:
         """
@@ -183,8 +185,8 @@ class TaskManager:
                 f"Starting resource server for task '{task_id}' on port {port}: {start_command}"
             )
             process = subprocess.Popen(
-                start_command,
-                shell=True,
+                shlex.split(start_command),
+                shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid if hasattr(os, "setsid") else None,
@@ -193,6 +195,7 @@ class TaskManager:
             # Store the process and port
             self.server_processes[task_id] = process
             self.server_ports[task_id] = port
+            self.all_server_pids.add(process.pid)
 
             # Wait for server to become healthy
             health_url = task_def.resource_server.health_check_url.replace(
@@ -218,6 +221,7 @@ class TaskManager:
         """Stop the resource server for a task."""
         if task_id in self.server_processes:
             process = self.server_processes[task_id]
+            self.all_server_pids.discard(process.pid)
             try:
                 # Try to terminate gracefully first
                 if hasattr(os, "killpg"):
@@ -824,6 +828,42 @@ class TaskManager:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return ""
 
+    def cleanup_all_servers(self) -> None:
+        """A more robust cleanup that terminates any tracked server process."""
+        if not self.all_server_pids:
+            self.logger.info("No tracked server PIDs to clean up.")
+            return
+
+        self.logger.info(
+            f"Performing robust cleanup of all {len(self.all_server_pids)} tracked server PIDs."
+        )
+        # Iterate over a copy as the set will be modified
+        for pid in list(self.all_server_pids):
+            try:
+                # Find the task_id associated with this PID for logging
+                task_id = "unknown_task"
+                for tid, proc in self.server_processes.items():
+                    if proc.pid == pid:
+                        task_id = tid
+                        break
+
+                self.logger.warning(
+                    f"Force-cleaning up potentially orphaned server process for task '{task_id}' (PID: {pid})."
+                )
+                # Use the same killpg logic
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(pid), 9)  # Use SIGKILL for forceful cleanup
+                else:
+                    os.kill(pid, 9)
+                self.all_server_pids.discard(pid)
+
+            except ProcessLookupError:
+                # Process already gone, which is fine
+                self.all_server_pids.discard(pid)
+            except Exception as e:
+                self.logger.error(f"Error during robust cleanup of PID {pid}: {e}")
+                self.all_server_pids.discard(pid)
+
     async def cleanup(self, task_ids: Optional[List[str]] = None) -> None:
         """
         Clean up resources for specified tasks or all tasks.
@@ -851,3 +891,6 @@ class TaskManager:
                             f"Error cleaning up resources for task '{task_id}': {e}"
                         )
                 del self.orchestrators[task_id]
+
+        # Perform robust cleanup of any remaining orphaned processes
+        self.cleanup_all_servers()

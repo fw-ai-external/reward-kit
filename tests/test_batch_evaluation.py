@@ -273,6 +273,7 @@ class TestBatchEvaluation:
 
     @pytest.mark.asyncio
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("aiohttp.ClientSession.post")
     @patch("httpx.Client.post")
     @patch("requests.get")
@@ -281,6 +282,7 @@ class TestBatchEvaluation:
         mock_requests_get,
         mock_httpx_post,
         mock_aiohttp_post,
+        mock_subprocess_popen,
         mock_openai_constructor,
     ):
         """Test batch evaluation using TaskManager with Fireworks API."""
@@ -399,11 +401,18 @@ class TestBatchEvaluation:
         task_id = task_manager.register_task(task_def)
         assert task_id == "frozen_lake_http_rollout"
 
+        # Configure subprocess.Popen mock to prevent real process creation
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None
+        mock_process.communicate.return_value = (b"", b"")
+        mock_subprocess_popen.return_value = mock_process
+
         try:
             # Mock server process management
             with patch.object(
                 task_manager, "_start_resource_server", return_value=12345
-            ), patch.object(task_manager, "_wait_for_server_health", return_value=None):
+            ), patch.object(task_manager, "_wait_for_server_health", return_value=True):
 
                 # Execute the task with batch evaluation
                 results = await task_manager.execute_tasks(
@@ -463,10 +472,11 @@ class TestBatchEvaluation:
 
     @pytest.mark.asyncio
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("httpx.Client.post")
     @patch("requests.get")
     async def test_batch_evaluation_task_manager_openai(
-        self, mock_requests_get, mock_httpx_post, mock_openai
+        self, mock_requests_get, mock_httpx_post, mock_subprocess_popen, mock_openai
     ):
         """Test batch evaluation using TaskManager with OpenAI API."""
         # Mock OpenAI client and response
@@ -560,11 +570,18 @@ class TestBatchEvaluation:
         task_id = task_manager.register_task(task_def)
         assert task_id == "frozen_lake_http_rollout_openai"
 
+        # Configure subprocess.Popen mock to prevent real process creation
+        mock_process = Mock()
+        mock_process.pid = 12346
+        mock_process.poll.return_value = None
+        mock_process.communicate.return_value = (b"", b"")
+        mock_subprocess_popen.return_value = mock_process
+
         try:
             # Mock server process management
             with patch.object(
                 task_manager, "_start_resource_server", return_value=12346
-            ), patch.object(task_manager, "_wait_for_server_health", return_value=None):
+            ), patch.object(task_manager, "_wait_for_server_health", return_value=True):
 
                 # Execute the task with batch evaluation
                 results = await task_manager.execute_tasks(
@@ -628,6 +645,7 @@ class TestBatchEvaluation:
             await task_manager.cleanup()
 
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("aiohttp.ClientSession.post")
     @patch("httpx.Client.post")
     @patch("requests.get")
@@ -636,6 +654,7 @@ class TestBatchEvaluation:
         mock_requests_get,
         mock_httpx_post,
         mock_aiohttp_post,
+        mock_subprocess_popen,
         mock_openai_constructor,
     ):
         """Test batch evaluation through CLI command with Fireworks."""
@@ -723,18 +742,26 @@ class TestBatchEvaluation:
             max_concurrency=2,
         )
 
+        # Configure subprocess.Popen mock to prevent real process creation
+        mock_process = Mock()
+        mock_process.pid = 12348
+        mock_process.poll.return_value = None
+        mock_process.communicate.return_value = (b"", b"")
+        mock_subprocess_popen.return_value = mock_process
+
         # Execute CLI command with mocked subprocess for server management
-        with patch("subprocess.Popen"), patch("time.sleep"):
+        with patch("time.sleep"):
             exit_code = agent_eval_command(args)
 
         # Should complete successfully
         assert exit_code == 0, "CLI command should complete successfully"
 
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("httpx.Client.post")
     @patch("requests.get")
     def test_cli_batch_evaluation_openai(
-        self, mock_requests_get, mock_httpx_post, mock_openai
+        self, mock_requests_get, mock_httpx_post, mock_subprocess_popen, mock_openai
     ):
         """Test batch evaluation through CLI command with OpenAI."""
         # Mock OpenAI client
@@ -819,8 +846,15 @@ class TestBatchEvaluation:
                 max_concurrency=2,
             )
 
+            # Configure subprocess.Popen mock to prevent real process creation
+            mock_process = Mock()
+            mock_process.pid = 12349
+            mock_process.poll.return_value = None
+            mock_process.communicate.return_value = (b"", b"")
+            mock_subprocess_popen.return_value = mock_process
+
             # Execute CLI command with mocked subprocess for server management
-            with patch("subprocess.Popen"), patch("time.sleep"):
+            with patch("time.sleep"):
                 exit_code = agent_eval_command(args)
 
             # Should complete successfully
@@ -835,6 +869,7 @@ class TestBatchEvaluation:
 
     @pytest.mark.asyncio
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("aiohttp.ClientSession.post")
     @patch("httpx.Client.post")
     @patch("requests.get")
@@ -843,6 +878,7 @@ class TestBatchEvaluation:
         mock_requests_get,
         mock_httpx_post,
         mock_aiohttp_post,
+        mock_subprocess_popen,
         mock_openai_constructor,
     ):
         """Test parallel execution of multiple rollouts."""
@@ -960,11 +996,18 @@ class TestBatchEvaluation:
 
         task_id = task_manager.register_task(task_def)
 
+        # Configure subprocess.Popen mock to prevent real process creation
+        mock_process = Mock()
+        mock_process.pid = 12347
+        mock_process.poll.return_value = None
+        mock_process.communicate.return_value = (b"", b"")
+        mock_subprocess_popen.return_value = mock_process
+
         try:
             # Mock server process management
             with patch.object(
                 task_manager, "_start_resource_server", return_value=12347
-            ), patch.object(task_manager, "_wait_for_server_health", return_value=None):
+            ), patch.object(task_manager, "_wait_for_server_health", return_value=True):
 
                 # Execute with parallel enabled
                 results = await task_manager.execute_tasks(
@@ -990,6 +1033,7 @@ class TestBatchEvaluation:
 
     @pytest.mark.asyncio
     @patch("reward_kit.agent.orchestrator.AsyncOpenAI")
+    @patch("subprocess.Popen")
     @patch("aiohttp.ClientSession.post")
     @patch("httpx.Client.post")
     @patch("requests.get")
@@ -998,6 +1042,7 @@ class TestBatchEvaluation:
         mock_requests_get,
         mock_httpx_post,
         mock_aiohttp_post,
+        mock_subprocess_popen,
         mock_openai_constructor,
     ):
         """Test that resource servers are properly started and stopped."""
@@ -1108,11 +1153,18 @@ class TestBatchEvaluation:
         assert len(task_manager.server_processes) == 0
         assert len(task_manager.server_ports) == 0
 
+        # Configure subprocess.Popen mock to prevent real process creation
+        mock_process = Mock()
+        mock_process.pid = 12348
+        mock_process.poll.return_value = None
+        mock_process.communicate.return_value = (b"", b"")
+        mock_subprocess_popen.return_value = mock_process
+
         try:
             # Mock server process management
             with patch.object(
                 task_manager, "_start_resource_server", return_value=12348
-            ), patch.object(task_manager, "_wait_for_server_health", return_value=None):
+            ), patch.object(task_manager, "_wait_for_server_health", return_value=True):
 
                 # Execute task
                 results = await task_manager.execute_tasks(

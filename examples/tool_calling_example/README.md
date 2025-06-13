@@ -1,83 +1,70 @@
 # Tool Calling Example
 
-This directory provides examples for evaluating and training models for tool/function calling capabilities, primarily using the `Salesforce/xlam-function-calling-60k` dataset.
+A simplified example showing how to evaluate function/tool calling capabilities using reward-kit.
 
-## Dataset Setup: Salesforce/xlam-function-calling-60k
+## Quick Start
 
-This example is configured to use the `Salesforce/xlam-function-calling-60k` dataset from Hugging Face. The setup involves:
+```bash
+# Run the evaluation
+python -m reward_kit.cli run --config-name simple_tool_calling_eval
+```
 
-1.  **Base Dataset Configuration (`conf/dataset/xlam_fc_source.yaml`)**: Defines how to load the raw dataset from Hugging Face.
-2.  **Derived Dataset Configuration (`conf/dataset/xlam_fc_eval_prompts.yaml`)**: Transforms the raw data into the format required for evaluation. This includes:
-    *   Parsing JSON strings for `tools` and `answers` columns from the source dataset.
-    *   Formatting the `query` into a `messages` list (e.g., `[{"role": "user", "content": query}]`).
-    *   Formatting the `answers` (expected tool calls) into a `ground_truth` object (e.g., `{"role": "assistant", "tool_calls": [...]}`).
-3.  **Custom Processors (`examples/tool_calling_example/custom_processors.py`)**: Contains Python helper functions (`safe_json_loads`, `format_messages_for_eval`, `format_ground_truth_for_eval`) used by `xlam_fc_eval_prompts.yaml` for data transformation.
+That's it! The framework automatically:
+- Detects the local `conf/` directory
+- Adds the current directory to Python path
+- Loads the dataset and reward function
+- Evaluates tool calling conversations and produces real scores
 
-The reward function used is `reward_kit.rewards.function_calling.exact_tool_match_reward`, which performs an exact comparison of generated tool calls against the ground truth.
+## What This Example Does
 
-## Running Evaluation
+This example evaluates tool calling capabilities by:
 
-The primary way to run evaluation for this example is using the `reward_kit.cli run` command with the provided Hydra configuration.
+1. **Loading conversations** from `dataset.jsonl` (user queries with expected tool calls)
+2. **Comparing tool calls** using exact match scoring against ground truth
+3. **Producing results** with scores (0.0 to 1.0) indicating tool calling accuracy
 
-*   **Purpose**: Performs model response generation and evaluation for tool calling abilities using the `Salesforce/xlam-function-calling-60k` dataset.
-*   **Configuration**: Uses Hydra and `conf/run_xlam_fc_eval.yaml`. This configuration specifies:
-    *   The dataset to use (`xlam_fc_eval_prompts`).
-    *   The model for generation (e.g., `mistralai/Mistral-7B-Instruct-v0.2` - **please update this to your desired model**).
-    *   The reward function (`exact_tool_match_reward`).
-*   **How to Run**:
-    ```bash
-    # Ensure your virtual environment is active
-    source .venv/bin/activate
-    # Navigate to the repository root
-    # cd /path/to/reward-kit
+## Files
 
-    # Run evaluation using the CLI
-    python -m reward_kit.cli run --config-path examples/tool_calling_example/conf --config-name run_xlam_fc_eval.yaml
+- `main.py` - Custom reward function that reuses built-in tool calling evaluation
+- `conf/simple_tool_calling_eval.yaml` - Simplified configuration (no complex inheritance)
+- `dataset.jsonl` - Sample tool calling conversations with ground truth
+- `README.md` - This file
 
-    # You can override parameters from the command line, e.g., to change the model:
-    python -m reward_kit.cli run --config-path examples/tool_calling_example/conf --config-name run_xlam_fc_eval.yaml generation.model_id="your-model-hf-id"
-    ```
-    Outputs, including evaluation results and preview samples, will be saved to the directory specified in `hydra.run.dir` within `run_xlam_fc_eval.yaml` (e.g., `./outputs/tool_calling_example/xlam_fc_eval/...`).
+## Configuration
 
-## Other Scripts
+The `simple_tool_calling_eval.yaml` config is self-contained and includes:
+- Dataset loading from `dataset.jsonl`
+- Evaluation mode (no generation needed - using existing conversations)
+- Automatic mapping of ground truth for evaluation
+- 3 sample limit for quick testing (remove `limit_samples` to run all samples)
 
-### 1. `local_eval.py` (Alternative/Legacy)
-*   **Purpose**: Performs local evaluation if you have a pre-processed dataset in JSONL format. This script does *not* use the full Hydra dataset pipeline (`xlam_fc_source.yaml`, `xlam_fc_eval_prompts.yaml`) directly for data loading but expects a path to a JSONL file.
-*   **Configuration**: Uses Hydra and `conf/local_eval_config.yaml`.
-*   **Note**: For the `Salesforce/xlam-function-calling-60k` dataset, prefer the `reward_kit.cli run` method described above. `local_eval.py` could be adapted or used if you manually prepare a JSONL file in the expected format.
+## Data Format
 
-### 2. `trl_grpo_integration.py`
-*   **Purpose**: A scaffold script demonstrating how to fine-tune a model for tool calling using TRL GRPO.
-    **Note**: This script currently uses a MOCK model and tokenizer by default for demonstration and requires further implementation to use a real model (see `use_mock_model_tokenizer` in the config or script).
-*   **Configuration**: Uses Hydra and `conf/trl_grpo_config.yaml`.
-*   **How to Run (with Mock Model)**:
-    ```bash
-    # Ensure your virtual environment is active
-    source .venv/bin/activate
-    # Navigate to the repository root
-    # cd /path/to/reward-kit
+Each example in `dataset.jsonl` contains:
+- `messages`: Conversation with user query and assistant tool calls
+- `tools`: Available function definitions
+- `ground_truth`: Expected assistant response with correct tool calls
 
-    # Run with default config (uses mock model)
-    .venv/bin/python examples/tool_calling_example/trl_grpo_integration.py
+## Output
 
-    # Override parameters (e.g., dataset, mock model behavior if extended)
-    .venv/bin/python examples/tool_calling_example/trl_grpo_integration.py dataset_file_path=my_tool_train.jsonl grpo.num_train_epochs=1
-    ```
-*   **To Run with a Real Model (Requires Code Changes)**:
-    1.  Modify `trl_grpo_integration.py` to load your desired Hugging Face model and tokenizer (comment out or conditionalize the MockModel/MockTokenizer part).
-    2.  Ensure your model is suitable for tool calling and the `format_prompt_and_extract_ground_truth` function in the script correctly prepares prompts for it.
-    3.  Update `conf/trl_grpo_config.yaml` with the correct `model_name` and any other relevant training parameters.
-    4.  Run the script, potentially disabling the mock model via config override if you added such a flag:
-        `.venv/bin/python examples/tool_calling_example/trl_grpo_integration.py +use_mock_model_tokenizer=false ...other_overrides`
+Results are saved to `outputs/tool_calling_eval/[timestamp]/eval_results.jsonl` with:
+- Exact match scores for tool calling accuracy (1.0 = perfect match, 0.0 = no match)
+- Score distribution and statistics
+- Detailed evaluation metrics
 
-    Refer to `conf/trl_grpo_config.yaml` for configuration options. Outputs are saved to Hydra's default output directory.
+## About Tool Calling Evaluation
 
-## Dataset Format Notes
+This example demonstrates how to create custom reward functions that reuse existing reward-kit functionality. The `main.py` file imports and wraps the built-in `exact_tool_match_reward` function, showing the recommended pattern for:
 
-The `Salesforce/xlam-function-calling-60k` dataset, after processing by `xlam_fc_eval_prompts.yaml` and `custom_processors.py`, will yield items with the following key structure for evaluation:
+- **Reusing existing functions**: Import from `reward_kit.rewards.function_calling`
+- **Adding customization**: Easy to extend with preprocessing or custom logic
+- **Maintaining simplicity**: Keep the core evaluation logic while allowing flexibility
 
-*   `messages`: A list containing a single user message, e.g., `[{"role": "user", "content": "User's query string"}]`.
-*   `tools`: A list of tool definition objects, parsed directly from the `tools` field of the source dataset. Each tool object typically includes `name`, `description`, and `parameters`.
-*   `ground_truth`: An object representing the expected assistant's response, e.g., `{"role": "assistant", "content": null, "tool_calls": [{"name": "tool_name", "arguments": {...}}]}`. The `tool_calls` array is parsed from the `answers` field of the source dataset.
+The evaluation performs precise comparison of:
+- Function names
+- Function arguments
+- Tool call structure
 
-The `dataset.jsonl` file included in this directory is a small sample and is primarily used by `local_eval.py` if run with its default configuration. For the main evaluation path using `reward_kit.cli run`, the data is sourced and processed dynamically from Hugging Face as per the YAML configurations.
+The reward function returns 1.0 for perfect matches and 0.0 for mismatches, making it ideal for evaluating function calling accuracy.
+
+The original complex setup with multiple config files, custom processors, and manual inheritance has been simplified to work with a single command while maintaining full evaluation functionality.

@@ -139,12 +139,24 @@ def load_and_process_dataset(
     column_mapping_from_kwargs = kwargs.pop("column_mapping", None)
     preprocessing_steps_from_kwargs = kwargs.pop("preprocessing_steps", None)
     dataset_description = kwargs.pop("description", "No description provided.")
-    # Also pop metadata fields not intended for datasets.load_dataset
-    kwargs.pop("dataset_name", None)
-    kwargs.pop("pretty_name", None)
-    # Potentially pop other metadata like 'dataset_type' if it's only for reward-kit logic
-    # and not a standard datasets.load_dataset parameter.
-    # For now, 'dataset_type' is used by reward-kit logic before this point.
+
+    # Pop all reward-kit specific metadata fields not intended for datasets.load_dataset
+    reward_kit_specific_keys = [
+        "dataset_name",
+        "pretty_name",
+        "final_columns",
+        "column_transformations",
+        "output_columns_creation",
+        "preprocess_functions",
+        "postprocess_functions",
+        "_target_",
+        "dataset_type",
+    ]
+
+    for key in reward_kit_specific_keys:
+        if key in kwargs:
+            logger.debug(f"Filtering out reward-kit specific config key: {key}")
+            kwargs.pop(key, None)
 
     logger.info(f"Dataset description: {dataset_description}")
 

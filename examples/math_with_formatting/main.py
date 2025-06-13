@@ -52,26 +52,33 @@ def evaluate(
     else:
         assistant_response = assistant_message.content or ""
 
-    # Evaluate numerical accuracy using built-in function
-    accuracy_result = math_reward(
-        messages=messages, ground_truth=ground_truth, **kwargs
-    )
-
-    # Evaluate format compliance
+    # Evaluate format compliance first
     format_correct = check_think_answer_format(assistant_response)
     format_score = 1.0 if format_correct else 0.0
 
-    # Combine scores (average of accuracy and format)
-    combined_score = (accuracy_result.score + format_score) / 2.0
+    # For math_with_formatting, if format is incorrect, accuracy should also be 0
+    if not format_correct:
+        accuracy_score = 0.0
+        accuracy_reason = "Format requirement not met, accuracy set to 0"
+    else:
+        # Evaluate numerical accuracy using built-in function
+        accuracy_result = math_reward(
+            messages=messages, ground_truth=ground_truth, **kwargs
+        )
+        accuracy_score = accuracy_result.score
+        accuracy_reason = f"Numerical accuracy: {accuracy_result.reason}"
 
-    # Create detailed metrics
+    # Combine scores (average of accuracy and format)
+    combined_score = (accuracy_score + format_score) / 2.0
+
+    # Create metrics structure expected by tests
     metrics = {
-        "accuracy": MetricResult(
-            score=accuracy_result.score,
-            reason=f"Numerical accuracy: {accuracy_result.reason}",
+        "accuracy_reward": MetricResult(
+            score=accuracy_score,
+            reason=accuracy_reason,
             is_score_valid=True,
         ),
-        "format": MetricResult(
+        "format_reward": MetricResult(
             score=format_score,
             reason=f"Format compliance: {'correct' if format_correct else 'incorrect'} <think>...</think><answer>...</answer> structure",
             is_score_valid=True,
@@ -80,6 +87,6 @@ def evaluate(
 
     return EvaluateResult(
         score=combined_score,
-        reason=f"Combined score: {combined_score:.2f} (accuracy: {accuracy_result.score:.2f}, format: {format_score:.2f})",
+        reason=f"Combined score: {combined_score:.2f} (accuracy: {accuracy_score:.2f}, format: {format_score:.2f})",
         metrics=metrics,
     )

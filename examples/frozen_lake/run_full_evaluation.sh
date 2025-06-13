@@ -93,12 +93,12 @@ check_prerequisites() {
     fi
 
     # Check if required files exist
-    if [ ! -f "$SCRIPT_DIR/client/task_def.yaml" ]; then
+    if [ ! -f "$SCRIPT_DIR/task_def.yaml" ]; then
         error "task_def.yaml not found in $SCRIPT_DIR"
         exit 1
     fi
 
-    if [ ! -f "$SCRIPT_DIR/server/http_rollout_server.py" ]; then
+    if [ ! -f "$SCRIPT_DIR/http_rollout_server.py" ]; then
         error "http_rollout_server.py not found in $SCRIPT_DIR"
         exit 1
     fi
@@ -136,7 +136,7 @@ main() {
 
     # Start HTTP rollout server
     log "Starting HTTP rollout server on port $HTTP_ROLLOUT_SERVER_PORT..."
-    python server/http_rollout_server.py &
+    python http_rollout_server.py &
     HTTP_ROLLOUT_PID=$!
     echo $HTTP_ROLLOUT_PID > "$HTTP_ROLLOUT_PID_FILE"
 
@@ -178,12 +178,12 @@ main() {
     TRAJECTORY_LOG_FILE="$LOG_DIR/agent_trajectory_${TIMESTAMP}.log"
 
     # Run the evaluation with detailed logging
-    info "Executing: python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/client/task_def.yaml"
+    info "Executing: python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/task_def.yaml"
     info "Full logs will be saved to: $FULL_LOG_FILE"
     info "Agent trajectory will be extracted to: $TRAJECTORY_LOG_FILE"
 
     # Capture all output and filter agent trajectory
-    python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/client/task_def.yaml 2>&1 | tee "$FULL_LOG_FILE"
+    python -m reward_kit.cli agent-eval --task-def examples/frozen_lake/task_def.yaml 2>&1 | tee "$FULL_LOG_FILE"
 
     # Extract agent trajectory and tool calls
     log "Extracting agent trajectory for review..."

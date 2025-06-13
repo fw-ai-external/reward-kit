@@ -16,7 +16,7 @@ from reward_kit.rewards.math import math_reward
 
 
 @reward_function
-def evaluate_math_problem(
+def evaluate(
     messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[str] = None,
     **kwargs,

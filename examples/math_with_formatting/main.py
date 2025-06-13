@@ -25,7 +25,7 @@ def check_think_answer_format(text: str) -> bool:
 
 
 @reward_function
-def evaluate_math_with_formatting(
+def evaluate(
     messages: Union[List[Message], List[Dict[str, Any]]],
     ground_truth: Optional[str] = None,
     **kwargs,

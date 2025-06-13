@@ -46,7 +46,7 @@ generation:
 
 # Reward Function Configuration
 reward:
-  function_path: "main.evaluate_math_with_formatting"
+  function_path: "main.evaluate"
   params:
     tolerance: 0.001
     require_units: false

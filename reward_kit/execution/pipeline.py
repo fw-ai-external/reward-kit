@@ -116,10 +116,18 @@ class EvaluationPipeline:
         sample_id = sample.get("id", sample_id_fallback)
         user_query = sample.get("user_query")
         ground_truth_for_eval = sample.get("ground_truth_for_eval")
+        existing_messages = sample.get("messages")
 
-        if user_query is None or ground_truth_for_eval is None:
+        # Check if we have either the generation format (user_query + ground_truth)
+        # or the evaluation format (existing messages)
+        has_generation_format = (
+            user_query is not None and ground_truth_for_eval is not None
+        )
+        has_evaluation_format = existing_messages is not None
+
+        if not has_generation_format and not has_evaluation_format:
             logger.warning(
-                f"Skipping sample {sample_id} due to missing 'user_query' or 'ground_truth_for_eval'."
+                f"Skipping sample {sample_id}: needs either ('user_query' + 'ground_truth_for_eval') for generation or 'messages' for evaluation."
             )
             return None
 
@@ -251,7 +259,54 @@ class EvaluationPipeline:
             else:
                 system_prompt_content = "You are a helpful assistant with access to tools. Use them if appropriate."
 
-        # Initial messages for the main rollout (or single generation if not agent)
+        # Handle existing messages for evaluation vs building new messages for generation
+        if has_evaluation_format and not has_generation_format:
+            # Evaluation mode: use existing messages, skip generation
+            if not self.cfg.generation.enabled:
+                # Pass raw messages as-is for evaluation mode - the @reward_function decorator
+                # will handle conversion based on the function's type annotations
+                final_messages_for_eval = existing_messages
+
+                # Call reward function directly with existing messages
+                eval_params = dict(self.cfg.reward.get("params", OmegaConf.create({})))
+
+                # Extract per-sample values and add them to eval_params
+                sample_agent_id = sample.get("agent_id")
+                sample_test_id = sample.get("test_id")
+                if sample_agent_id is not None:
+                    eval_params["agent_id"] = sample_agent_id
+                if sample_test_id is not None:
+                    eval_params["test_id"] = sample_test_id
+
+                eval_result_obj = self.reward_function(
+                    messages=final_messages_for_eval,
+                    ground_truth=ground_truth_for_eval,
+                    final_filesystem_state=None,
+                    **eval_params,
+                )
+
+                return {
+                    "id": sample_id,
+                    "user_query": None,  # Not applicable for evaluation mode
+                    "system_prompt": system_prompt_content,
+                    "assistant_response": None,  # Not applicable for evaluation mode
+                    "ground_truth_for_eval": ground_truth_for_eval,
+                    "evaluation_score": eval_result_obj.score,
+                    "evaluation_reason": eval_result_obj.reason,
+                    "evaluation_metrics": (
+                        {k: v.model_dump() for k, v in eval_result_obj.metrics.items()}
+                        if eval_result_obj.metrics
+                        else {}
+                    ),
+                    "full_conversation_history": existing_messages,  # Store original messages
+                }
+            else:
+                logger.warning(
+                    f"Sample {sample_id}: Evaluation mode requires generation.enabled=false"
+                )
+                return None
+
+        # Generation mode: Initial messages for the main rollout (or single generation if not agent)
         current_messages_for_rollout: List[Dict[str, Any]] = []
         if system_prompt_content:
             current_messages_for_rollout.append(

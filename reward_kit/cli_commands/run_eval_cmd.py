@@ -125,13 +125,66 @@ def run_evaluation_command_logic(cfg: DictConfig) -> None:
             logger.info("No results to summarize.")
 
     except ValueError as ve:
-        logger.error(f"Configuration or Value error in pipeline: {ve}", exc_info=True)
+        error_msg = str(ve)
+        logger.error(f"Configuration or Value error in pipeline: {ve}")
+
+        # Provide helpful suggestions based on common errors
+        if "final_columns" in error_msg:
+            logger.error(
+                "HINT: This error suggests your dataset config has 'final_columns' which conflicts with the datasets library."
+            )
+            logger.error(
+                "SOLUTION: Remove 'final_columns' from your dataset config or use the simplified config."
+            )
+        elif "user_query" in error_msg and "missing" in error_msg.lower():
+            logger.error("HINT: Your data is missing the 'user_query' column.")
+            logger.error(
+                "SOLUTION: Run 'reward-kit validate-data --file your_data.jsonl' to check data schema."
+            )
+        elif "import" in error_msg.lower() or "module" in error_msg.lower():
+            logger.error("HINT: Cannot import your reward function module.")
+            logger.error(
+                "SOLUTION: Ensure your reward function file is in the current directory."
+            )
+        elif "config" in error_msg.lower() and "not found" in error_msg.lower():
+            logger.error("HINT: Configuration file not found.")
+            logger.error(
+                "SOLUTION: Ensure your config file is in ./conf/ directory or use --config-path."
+            )
+
         sys.exit(1)  # Exit with error code for critical failures
     except Exception as e:
+        error_msg = str(e)
         logger.error(
-            f"An unexpected error occurred during the evaluation pipeline: {e}",
-            exc_info=True,
+            f"An unexpected error occurred during the evaluation pipeline: {e}"
         )
+
+        # Provide helpful suggestions for common issues
+        if "unexpected keyword argument" in error_msg:
+            logger.error(
+                "HINT: This suggests a configuration parameter is being passed incorrectly."
+            )
+            logger.error(
+                "SOLUTION: Check your dataset config for extra parameters like 'final_columns'."
+            )
+        elif "No module named" in error_msg:
+            logger.error("HINT: Cannot find Python module for reward function.")
+            logger.error(
+                "SOLUTION: Ensure your reward function file is in the current directory."
+            )
+        elif "not enough values to unpack" in error_msg:
+            logger.error("HINT: Data format mismatch.")
+            logger.error(
+                "SOLUTION: Run 'reward-kit validate-data --file your_data.jsonl' to check data format."
+            )
+
+        logger.error("For more help, try:")
+        logger.error(
+            "1. Run 'reward-kit validate-data --file your_data.jsonl' to check data"
+        )
+        logger.error("2. Use the simplified config: --config-name simple_uipath_eval")
+        logger.error("3. Check that all files are in the correct locations")
+
         sys.exit(1)  # Exit with error code
 
 

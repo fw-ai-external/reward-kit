@@ -301,6 +301,21 @@ def main():
     except ImportError:
         pass
 
+    # Automatic PYTHONPATH enhancement - add current directory to Python path
+    # This needs to happen early, before any module loading occurs
+    current_dir = os.getcwd()
+    current_pythonpath = os.environ.get("PYTHONPATH", "")
+    if current_dir not in current_pythonpath.split(os.pathsep):
+        if current_pythonpath:
+            os.environ["PYTHONPATH"] = f"{current_dir}{os.pathsep}{current_pythonpath}"
+        else:
+            os.environ["PYTHONPATH"] = current_dir
+        logger.debug(f"Added current directory to PYTHONPATH: {current_dir}")
+
+        # Also add to sys.path so it takes effect immediately for the current process
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+
     # Store original sys.argv[0] because Hydra might manipulate it
     # and we need it if we're not calling a Hydra app.
     original_script_name = sys.argv[0]
@@ -321,6 +336,20 @@ def main():
 
         # Filter out the initial '--' if present in remaining_argv, which parse_known_args might add
         hydra_specific_args = [arg for arg in remaining_argv if arg != "--"]
+
+        # Auto-detect local conf directory and add it to config path if not explicitly provided
+        has_config_path = any(
+            arg.startswith("--config-path") for arg in hydra_specific_args
+        )
+        current_dir = os.getcwd()
+        local_conf_dir = os.path.join(current_dir, "conf")
+
+        if not has_config_path and os.path.isdir(local_conf_dir):
+            logger.info(f"Auto-detected local conf directory: {local_conf_dir}")
+            hydra_specific_args = [
+                "--config-path",
+                local_conf_dir,
+            ] + hydra_specific_args
 
         processed_hydra_args = []
         i = 0
@@ -356,8 +385,50 @@ def main():
             f"SYSCALL_ARGV_FOR_HYDRA (after potential abspath conversion): {sys.argv}"
         )
 
-        hydra_cli_entry_point()
-        return 0
+        try:
+            hydra_cli_entry_point()
+            return 0
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Evaluation failed: {e}")
+
+            # Provide helpful suggestions for common Hydra/config errors
+            if "Cannot find primary config" in error_msg:
+                logger.error("HINT: Configuration file not found.")
+                logger.error(
+                    "SOLUTION: Ensure you have a config file in ./conf/ directory"
+                )
+                logger.error("Try: reward-kit run --config-name simple_uipath_eval")
+            elif (
+                "missing from config" in error_msg
+                or "MissingMandatoryValue" in error_msg
+            ):
+                logger.error("HINT: Required configuration values are missing.")
+                logger.error(
+                    "SOLUTION: Check your config file for missing required fields"
+                )
+            elif "Config search path" in error_msg:
+                logger.error("HINT: Hydra cannot find the configuration directory.")
+                logger.error(
+                    "SOLUTION: Create a ./conf directory with your config files"
+                )
+            elif "ValidationError" in error_msg:
+                logger.error("HINT: Configuration validation failed.")
+                logger.error(
+                    "SOLUTION: Run 'reward-kit validate-data --file your_data.jsonl' to check data"
+                )
+
+            logger.error("\nQuick fix suggestions:")
+            logger.error(
+                "1. Use the simplified setup: reward-kit run --config-name simple_uipath_eval"
+            )
+            logger.error(
+                "2. Validate your data first: reward-kit validate-data --file data.jsonl --schema agent"
+            )
+            logger.error(
+                "3. Ensure you have: ./conf/simple_uipath_eval.yaml and ./uipath_reward.py"
+            )
+            return 1
     else:
         temp_parser = argparse.ArgumentParser(
             prog=os.path.basename(original_script_name)

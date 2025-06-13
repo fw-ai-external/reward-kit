@@ -38,36 +38,6 @@ Task 'frozen_lake_http_rollout' batch results:
   - Trajectory data saved to: client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl
 ```
 
-## Trajectory Re-evaluation
-
-**New Feature**: Re-evaluate saved trajectories with different reward functions without re-running agent rollouts.
-
-### Generate Trajectories
-```bash
-# Run evaluation (captures conversation messages and tool calls)
-reward-kit agent-eval --task-def client/task_def.yaml --num-rollouts 8
-# Saves to: client/evaluation_logs/trajectory_frozen_lake_http_rollout_TIMESTAMP.jsonl
-```
-
-### Re-evaluate with Different Reward Functions
-```bash
-# Re-evaluate with original reward function
-reward-kit jsonl-reward-eval \
-  --jsonl-file client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl \
-  --reward-module examples.frozen_lake.client.reward.frozen_lake_reward
-
-# Re-evaluate with custom efficiency-based reward
-reward-kit jsonl-reward-eval \
-  --jsonl-file client/evaluation_logs/trajectory_frozen_lake_http_rollout_20250610_143052.jsonl \
-  --reward-module my_custom_rewards.efficiency_reward \
-  --output-file client/evaluation_logs/efficiency_reeval_results.jsonl
-```
-
-### Benefits
-- **Save time**: No need to re-run expensive agent rollouts
-- **Rapid experimentation**: Test multiple reward functions on same data
-- **Comparative analysis**: Easily compare different scoring approaches
-- **Complete conversation history**: Full OpenAI format messages and tool calls preserved
 
 ## Architecture
 
@@ -159,15 +129,6 @@ def efficiency_reward(messages, state=None, **kwargs):
     )
 ```
 
-### Test Custom Rewards
-```bash
-# Generate trajectories once
-reward-kit agent-eval --task-def client/task_def.yaml
-
-# Test multiple reward functions
-reward-kit jsonl-reward-eval --jsonl-file client/evaluation_logs/trajectory_*.jsonl --reward-module my_rewards.efficiency_reward
-reward-kit jsonl-reward-eval --jsonl-file client/evaluation_logs/trajectory_*.jsonl --reward-module my_rewards.creativity_reward
-```
 
 ## Model Performance
 

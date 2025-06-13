@@ -151,9 +151,6 @@ def agent_eval_command(args):
                             logger.info(
                                 f"  - Trajectory data saved to: {trajectory_file}"
                             )
-                            logger.info(
-                                f"  - Re-evaluate with: reward-kit jsonl-reward-eval --jsonl-file {trajectory_file} --reward-module your_reward_function"
-                            )
                     elif isinstance(result, dict) and "score" in result:
                         logger.info(f"Task '{task_id}' score: {result['score']}")
                     else:

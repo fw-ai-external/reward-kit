@@ -23,7 +23,6 @@ from .cli_commands.common import (
     setup_logging,
 )
 from .cli_commands.deploy import deploy_command
-from .cli_commands.jsonl_reward_eval_cmd import jsonl_reward_eval_command
 from .cli_commands.preview import preview_command
 from .cli_commands.run_eval_cmd import hydra_cli_entry_point
 
@@ -266,25 +265,6 @@ def parse_args(args=None):
         help="Run an evaluation using a Hydra configuration. All arguments after 'run' are passed to Hydra.",
     )
 
-    # JSONL reward evaluation command
-    jsonl_eval_parser = subparsers.add_parser(
-        "jsonl-reward-eval",
-        help="Re-evaluate reward functions from saved JSONL trajectory files",
-    )
-    jsonl_eval_parser.add_argument(
-        "--jsonl-file",
-        required=True,
-        help="Path to JSONL file containing trajectory data from previous agent runs",
-    )
-    jsonl_eval_parser.add_argument(
-        "--reward-module",
-        required=True,
-        help="Python module path for the reward function (e.g., 'examples.frozen_lake.client.reward.frozen_lake_reward')",
-    )
-    jsonl_eval_parser.add_argument(
-        "--output-file",
-        help="Optional output file for re-evaluated results (default: re_evaluated_<input_filename>.jsonl)",
-    )
 
     # Use parse_known_args to allow Hydra to handle its own arguments
     return parser.parse_known_args(args)
@@ -329,8 +309,6 @@ def main():
         return deploy_command(args)
     elif args.command == "agent-eval":
         return agent_eval_command(args)
-    elif args.command == "jsonl-reward-eval":
-        return jsonl_reward_eval_command(args)
     elif args.command == "run":
         # For the 'run' command, Hydra takes over argument parsing.
 

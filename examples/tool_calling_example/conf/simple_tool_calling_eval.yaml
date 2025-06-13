@@ -43,7 +43,7 @@ generation:
 
 # Reward Function Configuration
 reward:
-  function_path: "reward_kit.rewards.function_calling.exact_tool_match_reward"
+  function_path: "main.evaluate_tool_calling"
 
 # Evaluation Parameters
 evaluation_params:

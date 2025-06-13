@@ -25,6 +25,7 @@ This example evaluates tool calling capabilities by:
 
 ## Files
 
+- `main.py` - Custom reward function that reuses built-in tool calling evaluation
 - `conf/simple_tool_calling_eval.yaml` - Simplified configuration (no complex inheritance)
 - `dataset.jsonl` - Sample tool calling conversations with ground truth
 - `README.md` - This file
@@ -53,7 +54,13 @@ Results are saved to `outputs/tool_calling_eval/[timestamp]/eval_results.jsonl` 
 
 ## About Tool Calling Evaluation
 
-This example uses the built-in `exact_tool_match_reward` function which performs precise comparison of:
+This example demonstrates how to create custom reward functions that reuse existing reward-kit functionality. The `main.py` file imports and wraps the built-in `exact_tool_match_reward` function, showing the recommended pattern for:
+
+- **Reusing existing functions**: Import from `reward_kit.rewards.function_calling`
+- **Adding customization**: Easy to extend with preprocessing or custom logic
+- **Maintaining simplicity**: Keep the core evaluation logic while allowing flexibility
+
+The evaluation performs precise comparison of:
 - Function names
 - Function arguments
 - Tool call structure

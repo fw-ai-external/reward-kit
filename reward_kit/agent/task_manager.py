@@ -815,9 +815,6 @@ class TaskManager:
             self.logger.info(
                 f"Trajectory file size: {output_path.stat().st_size} bytes"
             )
-            self.logger.info(
-                f"Re-evaluate with: reward-kit jsonl-reward-eval --jsonl-file {output_path} --reward-module your_reward_function"
-            )
             self.logger.info(f"=== TRAJECTORY SAVE DEBUG END ===")
             return str(output_path)
 

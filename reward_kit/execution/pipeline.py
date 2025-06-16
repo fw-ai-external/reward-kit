@@ -100,6 +100,126 @@ class EvaluationPipeline:
                 f"Pipeline configured for mcp_agent. IntermediaryMCPClient will be initialized in run()."
             )
 
+    async def _discover_tools(self, sample_id: str) -> List[Dict[str, Any]]:
+        """Run a short MCP session to discover available tools for the LLM."""
+        if not (self.mcp_intermediary_client and self.cfg.agent.type == "mcp_agent"):
+            return []
+
+        rk_session_id_for_tools: Optional[str] = None
+        discovered_tools: List[Dict[str, Any]] = []
+        try:
+            mcp_backend_ref_for_tools = self.cfg.agent.get("mcp_backend_ref")
+            if not mcp_backend_ref_for_tools:
+                raise ValueError(
+                    "agent.mcp_backend_ref must be configured for mcp_agent tool discovery."
+                )
+
+            backend_requests_for_tools = [
+                {"backend_name_ref": mcp_backend_ref_for_tools, "num_instances": 1}
+            ]
+            init_response_for_tools = (
+                await self.mcp_intermediary_client.initialize_session(
+                    backend_requests_for_tools
+                )
+            )
+
+            if init_response_for_tools.get("error"):
+                raise RuntimeError(
+                    f"MCP session for tool discovery failed: {init_response_for_tools.get('error_details', init_response_for_tools['error'])}"
+                )
+            rk_session_id_for_tools = init_response_for_tools.get("rk_session_id")
+            initialized_backends_for_tools = init_response_for_tools.get(
+                "initialized_backends", []
+            )
+
+            if not rk_session_id_for_tools or not initialized_backends_for_tools:
+                raise RuntimeError(
+                    f"Malformed init response for tool discovery: {init_response_for_tools}"
+                )
+
+            for backend_info in initialized_backends_for_tools:
+                current_backend_name_ref = backend_info.get("backend_name_ref")
+                instances_info = backend_info.get("instances", [])
+                if not current_backend_name_ref or not instances_info:
+                    continue
+                for inst_info_dict in instances_info:
+                    current_instance_id = inst_info_dict.get("instance_id")
+                    if not current_instance_id:
+                        continue
+                    list_tools_result = (
+                        await self.mcp_intermediary_client.list_backend_tools(
+                            rk_session_id=rk_session_id_for_tools,
+                            instance_id=current_instance_id,
+                            backend_name_ref=current_backend_name_ref,
+                        )
+                    )
+                    if list_tools_result and list_tools_result.tools:
+                        for tool_obj in list_tools_result.tools:
+                            discovered_tools.append(
+                                tool_obj.model_dump(exclude_none=True)
+                            )
+            logger.info(
+                f"Sample {sample_id}: Pre-generation: Discovered {len(discovered_tools)} tools."
+            )
+        except Exception as e_tool_discovery:
+            logger.error(
+                f"Sample {sample_id}: Error during pre-generation tool discovery: {e_tool_discovery}",
+                exc_info=True,
+            )
+            discovered_tools = []
+        finally:
+            if rk_session_id_for_tools and self.mcp_intermediary_client:
+                try:
+                    await self.mcp_intermediary_client.cleanup_session(
+                        rk_session_id_for_tools
+                    )
+                except Exception as e_cl:
+                    logger.error(
+                        f"Error cleaning up pre-discovery session '{rk_session_id_for_tools}': {e_cl}",
+                        exc_info=True,
+                    )
+        return discovered_tools
+
+    def _prepare_initial_messages(
+        self,
+        original_system_prompt: Optional[str],
+        user_query: str,
+        discovered_tools: List[Dict[str, Any]],
+    ) -> tuple[str, Optional[List[Dict[str, Any]]], List[Dict[str, Any]]]:
+        """Build the system prompt, tool list for the LLM, and starting messages."""
+        system_prompt_content = original_system_prompt
+        openai_formatted_tools: Optional[List[Dict[str, Any]]] = None
+        if (
+            self.mcp_intermediary_client
+            and self.cfg.agent.type == "mcp_agent"
+            and discovered_tools
+        ):
+            openai_formatted_tools = []
+            for mcp_tool_dict in discovered_tools:
+                input_schema = mcp_tool_dict.get("inputSchema", {})
+                openai_formatted_tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": mcp_tool_dict.get("name", "unknown"),
+                            "description": mcp_tool_dict.get("description", ""),
+                            "parameters": input_schema,
+                        },
+                    }
+                )
+            if original_system_prompt:
+                system_prompt_content = f"{original_system_prompt}\n\nYou have access to tools. Use them if appropriate."
+            else:
+                system_prompt_content = "You are a helpful assistant with access to tools. Use them if appropriate."
+
+        current_messages: List[Dict[str, Any]] = []
+        if system_prompt_content:
+            current_messages.append(
+                {"role": "system", "content": system_prompt_content}
+            )
+        current_messages.append({"role": "user", "content": user_query})
+        return system_prompt_content or "", openai_formatted_tools, current_messages
+
     async def _process_single_sample(
         self,
         sample: Dict[str, Any],
@@ -126,138 +246,19 @@ class EvaluationPipeline:
         original_system_prompt = sample.get("system_prompt") or self.cfg.get(
             "system_prompt"
         )
-        discovered_tools_for_llm_prompt: List[Dict[str, Any]] = []
-        openai_formatted_tools: Optional[List[Dict[str, Any]]] = None
+        # Tools and initial conversation setup
+        discovered_tools_for_llm_prompt = await self._discover_tools(sample_id)
+        (
+            system_prompt_content,
+            openai_formatted_tools,
+            current_messages_for_rollout,
+        ) = self._prepare_initial_messages(
+            original_system_prompt, user_query, discovered_tools_for_llm_prompt
+        )
 
         # This variable will hold the final assistant response string for top-level logging/preview
         # It might be a text response or a JSON string of the last tool call request by LLM.
         final_assistant_output_for_log: Optional[str] = None
-
-        # --- Pre-generation: Tool Discovery (if MCP agent) ---
-        if self.mcp_intermediary_client and self.cfg.agent.type == "mcp_agent":
-            rk_session_id_for_tools: Optional[str] = None
-            try:
-                mcp_backend_ref_for_tools = self.cfg.agent.get("mcp_backend_ref")
-                if not mcp_backend_ref_for_tools:
-                    raise ValueError(
-                        "agent.mcp_backend_ref must be configured for mcp_agent tool discovery."
-                    )
-
-                backend_requests_for_tools = [
-                    {"backend_name_ref": mcp_backend_ref_for_tools, "num_instances": 1}
-                ]
-                init_response_for_tools = (
-                    await self.mcp_intermediary_client.initialize_session(
-                        backend_requests_for_tools
-                    )
-                )
-
-                if init_response_for_tools.get("error"):
-                    raise RuntimeError(
-                        f"MCP session for tool discovery failed: {init_response_for_tools.get('error_details', init_response_for_tools['error'])}"
-                    )
-                rk_session_id_for_tools = init_response_for_tools.get("rk_session_id")
-                initialized_backends_for_tools = init_response_for_tools.get(
-                    "initialized_backends", []
-                )
-
-                if not rk_session_id_for_tools or not initialized_backends_for_tools:
-                    raise RuntimeError(
-                        f"Malformed init response for tool discovery: {init_response_for_tools}"
-                    )
-
-                for backend_info in initialized_backends_for_tools:
-                    # ... (tool discovery logic as before, populating discovered_tools_for_llm_prompt) ...
-                    current_backend_name_ref = backend_info.get("backend_name_ref")
-                    instances_info = backend_info.get("instances", [])
-                    if not current_backend_name_ref or not instances_info:
-                        continue
-                    for inst_info_dict in instances_info:
-                        current_instance_id = inst_info_dict.get("instance_id")
-                        if not current_instance_id:
-                            continue
-                        list_tools_result = (
-                            await self.mcp_intermediary_client.list_backend_tools(
-                                rk_session_id=rk_session_id_for_tools,
-                                instance_id=current_instance_id,
-                                backend_name_ref=current_backend_name_ref,
-                            )
-                        )
-                        if list_tools_result and list_tools_result.tools:
-                            for tool_obj in list_tools_result.tools:
-                                discovered_tools_for_llm_prompt.append(
-                                    tool_obj.model_dump(exclude_none=True)
-                                )
-                logger.info(
-                    f"Sample {sample_id}: Pre-generation: Discovered {len(discovered_tools_for_llm_prompt)} tools."
-                )
-            except Exception as e_tool_discovery:
-                logger.error(
-                    f"Sample {sample_id}: Error during pre-generation tool discovery: {e_tool_discovery}",
-                    exc_info=True,
-                )
-                if rk_session_id_for_tools:  # Cleanup if session was created
-                    try:
-                        await self.mcp_intermediary_client.cleanup_session(
-                            rk_session_id_for_tools
-                        )
-                    except Exception as e_cleanup:
-                        logger.error(
-                            f"Error cleaning up discovery session {rk_session_id_for_tools}: {e_cleanup}"
-                        )
-                rk_session_id_for_tools = (
-                    None  # Ensure it's None so main block doesn't try to clean it again
-                )
-                discovered_tools_for_llm_prompt = []
-            finally:
-                # This pre-generation session for tool discovery MUST be cleaned up here if it was successful
-                # The main agent execution block will create its own session.
-                if rk_session_id_for_tools and self.mcp_intermediary_client:
-                    logger.info(
-                        f"Sample {sample_id}: Cleaning up pre-generation tool discovery session '{rk_session_id_for_tools}'."
-                    )
-                    try:
-                        await self.mcp_intermediary_client.cleanup_session(
-                            rk_session_id_for_tools
-                        )
-                    except Exception as e_cl:
-                        logger.error(
-                            f"Error cleaning up pre-discovery session '{rk_session_id_for_tools}': {e_cl}",
-                            exc_info=True,
-                        )
-
-        # --- Construct System Prompt and Format Tools for LLM ---
-        system_prompt_content = original_system_prompt
-        if (
-            self.mcp_intermediary_client
-            and self.cfg.agent.type == "mcp_agent"
-            and discovered_tools_for_llm_prompt
-        ):
-            openai_formatted_tools = []
-            for mcp_tool_dict in discovered_tools_for_llm_prompt:
-                input_schema = mcp_tool_dict.get("inputSchema", {})
-                openai_formatted_tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": mcp_tool_dict.get("name", "unknown"),
-                            "description": mcp_tool_dict.get("description", ""),
-                            "parameters": input_schema,
-                        },
-                    }
-                )
-            if original_system_prompt:
-                system_prompt_content = f"{original_system_prompt}\n\nYou have access to tools. Use them if appropriate."
-            else:
-                system_prompt_content = "You are a helpful assistant with access to tools. Use them if appropriate."
-
-        # Initial messages for the main rollout (or single generation if not agent)
-        current_messages_for_rollout: List[Dict[str, Any]] = []
-        if system_prompt_content:
-            current_messages_for_rollout.append(
-                {"role": "system", "content": system_prompt_content}
-            )
-        current_messages_for_rollout.append({"role": "user", "content": user_query})
 
         # --- LLM Generation / Agent Rollout ---
         if not self.cfg.generation.enabled:

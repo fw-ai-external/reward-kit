@@ -710,7 +710,7 @@ class TaskManager:
             file_name = f"trajectory_{task_id}_{timestamp}.jsonl"
             if output_dir:
                 # Use provided output directory
-                output_file = Path(output_dir) / file_name
+                chosen_dir = Path(output_dir)
             else:
                 # Try to save in evaluation_logs directory relative to task definition
                 # Look for common evaluation log directories
@@ -727,7 +727,7 @@ class TaskManager:
                         chosen_dir = log_dir
                         break
 
-                output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
+            output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
 
         output_path = Path(output_file)
 

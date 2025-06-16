@@ -222,17 +222,11 @@ def bfcl_eval_command(args):
                 os.environ["MODEL_AGENT"] = args.model
                 logger.info(f"Model overridden to: {args.model}")
 
-            if args.output_dir:
-                output_path = Path(args.output_dir)
-                output_path.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Results will be saved to {output_path}")
-
             try:
                 results = await task_manager.execute_tasks(
                     task_ids=registered_task_ids,
                     parallel=args.parallel,
                     max_concurrency=args.max_concurrency,
-                    output_dir=args.output_dir,
                 )
 
                 logger.info(f"BFCL evaluation completed for {len(results)} tasks")

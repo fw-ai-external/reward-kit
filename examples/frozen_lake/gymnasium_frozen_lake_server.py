@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 
 class GymnasiumFrozenLakeGame:
@@ -34,7 +35,7 @@ class GymnasiumFrozenLakeGame:
 
     def __init__(
         self,
-        map_name: str = "4x4",
+        # map_name: str = "4x4",
         is_slippery: bool = False,
         render_mode: Optional[str] = None,
     ):
@@ -46,13 +47,14 @@ class GymnasiumFrozenLakeGame:
             is_slippery: Whether the ice is slippery (stochastic environment)
             render_mode: Rendering mode for Gymnasium environment
         """
-        self.map_name = map_name
+        # self.map_name = map_name
         self.is_slippery = is_slippery
 
         # Create the Gymnasium environment
         self.env = gym.make(
             "FrozenLake-v1",
-            map_name=map_name,
+            desc=generate_random_map(size=6),
+            # map_name=map_name,
             is_slippery=is_slippery,
             render_mode=render_mode,
         )
@@ -217,7 +219,7 @@ class GymnasiumFrozenLakeGame:
         """Get comprehensive environment information."""
         return {
             "name": "FrozenLake-v1",
-            "map_name": self.map_name,
+            # "map_name": self.map_name,
             "is_slippery": self.is_slippery,
             "nrow": int(self.nrow),  # Convert numpy int to Python int
             "ncol": int(self.ncol),  # Convert numpy int to Python int

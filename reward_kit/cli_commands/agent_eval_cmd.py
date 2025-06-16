@@ -108,6 +108,7 @@ def agent_eval_command(args):
                     parallel=parallel,
                     max_concurrency=max_concurrency,
                     num_rollouts_override=num_rollouts_override,
+                    output_dir=args.output_dir,
                 )
 
                 logger.info(f"Execution completed for {len(results)} tasks")
@@ -231,6 +232,7 @@ def bfcl_eval_command(args):
                     task_ids=registered_task_ids,
                     parallel=args.parallel,
                     max_concurrency=args.max_concurrency,
+                    output_dir=args.output_dir,
                 )
 
                 logger.info(f"BFCL evaluation completed for {len(results)} tasks")

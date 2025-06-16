@@ -354,6 +354,7 @@ class TaskManager:
         parallel: bool = False,
         max_concurrency: int = 3,
         num_rollouts_override: Optional[int] = None,
+        output_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute multiple tasks sequentially or in parallel.
@@ -415,7 +416,7 @@ class TaskManager:
                     # Always save detailed results to .jsonl file (including failed rollouts for analysis)
                     try:
                         detailed_file_path = self._save_detailed_results(
-                            task_id, aggregated_result
+                            task_id, aggregated_result, output_dir=output_dir,
                         )
                         self.logger.info(
                             f"Detailed results saved to: {detailed_file_path}"
@@ -690,6 +691,7 @@ class TaskManager:
         task_id: str,
         aggregated_result: Dict[str, Any],
         output_file: Optional[str] = None,
+        output_dir: Optional[str] = None,
     ) -> str:
         """
         Save detailed results to a .jsonl file for analysis.
@@ -705,22 +707,27 @@ class TaskManager:
         if output_file is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            # Try to save in evaluation_logs directory relative to task definition
-            # Look for common evaluation log directories
-            possible_log_dirs = [
-                Path("client/evaluation_logs"),
-                Path("evaluation_logs"),
-                Path("logs"),
-                Path("."),  # Fallback to current directory
-            ]
+            file_name = f"trajectory_{task_id}_{timestamp}.jsonl"
+            if output_dir:
+                # Use provided output directory
+                output_file = Path(output_dir) / file_name
+            else:
+                # Try to save in evaluation_logs directory relative to task definition
+                # Look for common evaluation log directories
+                possible_log_dirs = [
+                    Path("client/evaluation_logs"),
+                    Path("evaluation_logs"),
+                    Path("logs"),
+                    Path("."),  # Fallback to current directory
+                ]
 
-            chosen_dir = Path(".")  # Default fallback
-            for log_dir in possible_log_dirs:
-                if log_dir.exists() and log_dir.is_dir():
-                    chosen_dir = log_dir
-                    break
+                chosen_dir = Path(".")  # Default fallback
+                for log_dir in possible_log_dirs:
+                    if log_dir.exists() and log_dir.is_dir():
+                        chosen_dir = log_dir
+                        break
 
-            output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
+                output_file = chosen_dir / f"trajectory_{task_id}_{timestamp}.jsonl"
 
         output_path = Path(output_file)
 

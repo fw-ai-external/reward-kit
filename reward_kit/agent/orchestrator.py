@@ -112,6 +112,18 @@ class Orchestrator:
                 self.logger.error(f"Failed to initialize Fireworks client: {e}")
                 self._openai_client = None
 
+    def _initialze_local_client(self):
+        if not OPENAI_AVAILABLE:
+            self.logger.warning(
+                "OpenAI library not available. Cannot use local models."
+            )
+            return
+        self._openai_client = AsyncOpenAI(
+            api_key="foo",
+            base_url = f"http://localhost:80/v1",
+        )
+        self.logger.info("Local client initialized.")
+
     def _validate_conversation_messages(
         self, conversation_messages: List[Dict[str, Any]]
     ) -> None:
@@ -550,6 +562,12 @@ class Orchestrator:
             if agent_model_name.startswith("fireworks/"):
                 agent_model_name = agent_model_name.split("fireworks/", 1)[1]
             # If it starts with accounts/fireworks, keep the full model name
+            self.logger.info(f"Using Fireworks model: {agent_model_name}")
+        elif agent_model_name.startswith("rlor_model"):
+            self._initialze_local_client()
+            if not self._openai_client:
+                self.logger.error("Local client failed to initialize. Cannot proceed.")
+                return None
             self.logger.info(f"Using Fireworks model: {agent_model_name}")
         else:
             # Placeholder for other model providers if needed in the future

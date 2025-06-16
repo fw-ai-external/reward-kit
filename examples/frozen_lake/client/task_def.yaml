@@ -21,7 +21,7 @@ messages:
     content: "Start playing the game!"
 
 # Evaluation configuration
-poc_max_turns: 20
+poc_max_turns: 40
 num_rollouts: 8
 
 # Note: The TaskManager will automatically start the server on a free port

@@ -799,8 +799,8 @@ class Orchestrator:
                             messages=conversation_messages,  # type: ignore
                             tools=openai_tools if openai_tools else None,
                             tool_choice="auto" if openai_tools else None,
-                            max_tokens=4096,
-                            temperature=0.0,
+                            max_tokens=8192,
+                            temperature=1.0,
                         )
                         response_message = response.choices[0].message
                         self.logger.debug(

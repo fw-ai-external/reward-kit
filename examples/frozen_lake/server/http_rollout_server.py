@@ -44,7 +44,8 @@ async def start_episode() -> StartEpisodeResponse:
     # Create Gymnasium-based game with deterministic behavior for consistent evaluation
     # This can be configured via environment variables or request parameters in the future
     game = FrozenLakeGame(
-        # map_name="4x4",
+        size=6,
+        seed=,
         is_slippery=False,  # Deterministic for reproducible agent evaluation
         render_mode=None,
     )

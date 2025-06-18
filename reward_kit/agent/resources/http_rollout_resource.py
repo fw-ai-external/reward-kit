@@ -183,7 +183,6 @@ class HttpRolloutResource(ForkableResource):
         """
         return [
             {
-                "type": "function",
                 "name": "step",
                 "description": "Take a step in the Frozen Lake game by choosing a direction to move",
                 "parameters": {

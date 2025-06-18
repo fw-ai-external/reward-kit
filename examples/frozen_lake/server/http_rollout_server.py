@@ -39,7 +39,7 @@ episodes: Dict[str, FrozenLakeGame] = {}
 
 
 @app.post("/start_episode", response_model=StartEpisodeResponse)
-async def start_episode(req: StartEpisodeRequest) -> StartEpisodeResponse:
+async def start_episode() -> StartEpisodeResponse:
     """Start a new episode of the Frozen Lake game."""
     # if req.task_id:
     #     seed = hash(req.task_id) % (2**32)

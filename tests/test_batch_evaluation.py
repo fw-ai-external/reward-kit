@@ -60,8 +60,8 @@ class TestBatchEvaluation:
                 # Check if this is a step request with JSON data
                 json_data = kwargs.get("json", {})
 
-                if "/start_episode" in url and json_data:
-                    return self._start_episode(json_data.get("task_id"))
+                if "/start_episode" in url:
+                    return self._start_episode()
                 elif "/step" in url and json_data:
                     episode_id = json_data.get("episode_id")
                     action = json_data.get("action")
@@ -70,7 +70,7 @@ class TestBatchEvaluation:
                     # Default response for other requests
                     return self._default_response()
 
-            def _start_episode(self, task_id):
+            def _start_episode(self):
                 """Start a new episode"""
                 episode_id = f"episode_{self.call_count}"
                 self.episodes[episode_id] = {

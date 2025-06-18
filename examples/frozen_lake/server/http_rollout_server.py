@@ -6,7 +6,6 @@ library's standardized types for consistent client/server communication.
 """
 
 import os
-import random
 import sys
 import uuid
 from typing import Dict
@@ -25,7 +24,6 @@ from reward_kit.agent.resources import (
     EndEpisodeRequest,
     EndEpisodeResponse,
     HealthResponse,
-    StartEpisodeRequest,
     StartEpisodeResponse,
     StepRequest,
     StepResponse,
@@ -39,19 +37,15 @@ episodes: Dict[str, FrozenLakeGame] = {}
 
 
 @app.post("/start_episode", response_model=StartEpisodeResponse)
-async def start_episode(req: StartEpisodeRequest) -> StartEpisodeResponse:
+async def start_episode() -> StartEpisodeResponse:
     """Start a new episode of the Frozen Lake game."""
-    if req.task_id:
-        seed = hash(req.task_id) % (2**32)
-    else:
-        seed = random.getrandbits(16)
     episode_id = str(uuid.uuid4())
 
     # Create Gymnasium-based game with deterministic behavior for consistent evaluation
     # This can be configured via environment variables or request parameters in the future
     game = FrozenLakeGame(
         size=6,
-        seed=seed,
+        seed=,
         is_slippery=False,  # Deterministic for reproducible agent evaluation
         render_mode=None,
     )

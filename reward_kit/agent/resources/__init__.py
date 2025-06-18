@@ -15,6 +15,7 @@ from .http_rollout_protocol import (
     GameObservation,
     HealthResponse,
     HttpRolloutConfig,
+    StartEpisodeRequest,
     StartEpisodeResponse,
     StepRequest,
     StepResponse,
@@ -32,6 +33,7 @@ __all__ = [
     "HttpRolloutResource",
     # HTTP Rollout Protocol
     "HttpRolloutConfig",
+    "StartEpisodeRequest",
     "StartEpisodeResponse",
     "StepRequest",
     "StepResponse",

@@ -120,7 +120,7 @@ class Orchestrator:
             return
         self._openai_client = AsyncOpenAI(
             api_key="foo",
-            base_url = f"http://localhost:80/v1",
+            base_url = f"http://localhost:11235/v1",
         )
         self.logger.info("Local client initialized.")
 

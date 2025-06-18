@@ -10,6 +10,11 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 
+class StartEpisodeRequest(BaseModel):
+    """Request to start a new episode."""
+
+    task_id: Optional[str] = None
+
 class StartEpisodeResponse(BaseModel):
     """Response from starting a new episode."""
 

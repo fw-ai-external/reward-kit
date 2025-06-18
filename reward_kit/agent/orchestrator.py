@@ -568,7 +568,7 @@ class Orchestrator:
             if not self._openai_client:
                 self.logger.error("Local client failed to initialize. Cannot proceed.")
                 return None
-            self.logger.info(f"Using Fireworks model: {agent_model_name}")
+            self.logger.info(f"Using local model: {agent_model_name}")
         else:
             # Placeholder for other model providers if needed in the future
             self.logger.error(

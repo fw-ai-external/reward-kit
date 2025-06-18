@@ -41,10 +41,11 @@ episodes: Dict[str, FrozenLakeGame] = {}
 @app.post("/start_episode", response_model=StartEpisodeResponse)
 async def start_episode(req: StartEpisodeRequest) -> StartEpisodeResponse:
     """Start a new episode of the Frozen Lake game."""
-    if req.task_id:
-        seed = hash(req.task_id) % (2**32)
-    else:
-        seed = random.getrandbits(16)
+    # if req.task_id:
+    #     seed = hash(req.task_id) % (2**32)
+    # else:
+    #     seed = random.getrandbits(16)
+    seed=123
     episode_id = str(uuid.uuid4())
 
     # Create Gymnasium-based game with deterministic behavior for consistent evaluation

@@ -184,20 +184,18 @@ class HttpRolloutResource(ForkableResource):
         return [
             {
                 "type": "function",
-                "function": {
-                    "name": "step",
-                    "description": "Take a step in the Frozen Lake game by choosing a direction to move",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "action": {
-                                "type": "string",
-                                "enum": ["left", "down", "right", "up"],
-                                "description": "The direction to move in the game: 'left', 'down', 'right', or 'up'",
-                            }
-                        },
-                        "required": ["action"],
+                "name": "step",
+                "description": "Take a step in the Frozen Lake game by choosing a direction to move",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["left", "down", "right", "up"],
+                            "description": "The direction to move in the game: 'left', 'down', 'right', or 'up'",
+                        }
                     },
+                    "required": ["action"],
                 },
             }
         ]

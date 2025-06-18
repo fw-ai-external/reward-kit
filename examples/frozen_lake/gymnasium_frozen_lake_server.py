@@ -54,7 +54,7 @@ class GymnasiumFrozenLakeGame:
         # Create the Gymnasium environment
         self.env = gym.make(
             "FrozenLake-v1",
-            desc=generate_random_map(size=size, seed=seed),
+            desc=generate_random_map(size=size, seed=123),
             # map_name=map_name,
             is_slippery=is_slippery,
             render_mode=render_mode,

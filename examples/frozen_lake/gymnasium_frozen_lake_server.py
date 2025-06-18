@@ -35,8 +35,7 @@ class GymnasiumFrozenLakeGame:
 
     def __init__(
         self,
-        size: int = 4,
-        seed: int = 123,
+        # map_name: str = "4x4",
         is_slippery: bool = False,
         render_mode: Optional[str] = None,
     ):
@@ -54,7 +53,7 @@ class GymnasiumFrozenLakeGame:
         # Create the Gymnasium environment
         self.env = gym.make(
             "FrozenLake-v1",
-            desc=generate_random_map(size=size, seed=seed),
+            desc=generate_random_map(size=6),
             # map_name=map_name,
             is_slippery=is_slippery,
             render_mode=render_mode,

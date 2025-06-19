@@ -407,6 +407,76 @@ def test_math_with_formatting_example(temp_examples_dir, mock_env_variables):
     # The key is that accuracy_reward is 0.0 due to unparseable completion.
 
 
+def test_math_with_format_and_length_example(temp_examples_dir, mock_env_variables):
+    """Test the math_with_format_and_length example's evaluate function."""
+    example_main_path = os.path.join(
+        temp_examples_dir, "math_with_format_and_length", "main.py"
+    )
+    example_module = load_module_from_path(
+        "math_with_format_and_length_main_test", example_main_path
+    )
+
+    # Correct short answer with proper format
+    messages_short_correct = [
+        Message(role="user", content="What is 2+2?"),
+        Message(
+            role="assistant",
+            content="<think>Adding two and two.</think><answer>4</answer>",
+        ),
+    ]
+    result_short_correct = example_module.evaluate(
+        messages=messages_short_correct, ground_truth="4", max_length=10
+    )
+    assert result_short_correct["metrics"]["accuracy_reward"]["score"] == 1.0
+    assert result_short_correct["metrics"]["format_reward"]["score"] == 1.0
+    assert result_short_correct["metrics"]["length_reward"]["score"] > 0.8
+
+    # Correct but verbose answer (length penalty applies)
+    long_content = (
+        "<think>Adding step by step: first 2+2 is computed." +
+        " This explanation is intentionally long." * 5 +
+        "</think><answer>4</answer>"
+    )
+    messages_long_correct = [
+        Message(role="user", content="What is 2+2?"),
+        Message(role="assistant", content=long_content),
+    ]
+    result_long_correct = example_module.evaluate(
+        messages=messages_long_correct, ground_truth="4", max_length=10
+    )
+    assert result_long_correct["metrics"]["accuracy_reward"]["score"] == 1.0
+    assert result_long_correct["metrics"]["format_reward"]["score"] == 1.0
+    assert result_long_correct["metrics"]["length_reward"]["score"] < 0.7
+    assert result_long_correct["score"] < result_short_correct["score"]
+
+    # Incorrect answer but correct format
+    messages_incorrect = [
+        Message(role="user", content="What is 2+2?"),
+        Message(
+            role="assistant",
+            content="<think>Adding numbers.</think><answer>5</answer>",
+        ),
+    ]
+    result_incorrect = example_module.evaluate(
+        messages=messages_incorrect, ground_truth="4", max_length=10
+    )
+    assert result_incorrect["metrics"]["accuracy_reward"]["score"] == 0.0
+    assert result_incorrect["metrics"]["format_reward"]["score"] == 1.0
+    assert result_incorrect["score"] < 0.5
+
+    # Correct answer but missing format tags
+    messages_bad_format = [
+        Message(role="user", content="What is 2+2?"),
+        Message(role="assistant", content="The answer is 4."),
+    ]
+    result_bad_format = example_module.evaluate(
+        messages=messages_bad_format, ground_truth="4", max_length=10
+    )
+    assert result_bad_format["metrics"]["accuracy_reward"]["score"] == 1.0
+    assert result_bad_format["metrics"]["format_reward"]["score"] == 0.0
+    assert result_bad_format["score"] < result_short_correct["score"]
+
+
 def test_tool_calling_example(temp_examples_dir, mock_env_variables):
     """Test the tool_calling_example's exact_tool_match_reward function."""
     # The tool_calling_example/local_eval.py uses exact_tool_match_reward directly.

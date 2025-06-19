@@ -1,5 +1,4 @@
-# Simplified Math evaluation configuration
-# This config avoids inheritance to reduce complexity and provide clearer error messages
+# Simplified Math with Format and Length evaluation
 
 defaults:
   - _self_
@@ -8,28 +7,25 @@ defaults:
 
 hydra:
   run:
-    dir: ./outputs/math_eval/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./outputs/math_format_length_eval/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ./multirun/math_eval/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./multirun/math_format_length_eval/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
 
-# Dataset Configuration - Load from HuggingFace GSM8K
 dataset:
   _target_: reward_kit.datasets.loader.load_and_process_dataset
   source_type: "huggingface"
   path_or_name: "openai/gsm8k"
-  config_name: "main"  # Required for GSM8K dataset
-  split: "test"  # Use test split for evaluation
-  max_samples: 5  # Limit for quick testing
+  config_name: "main"
+  split: "test"
+  max_samples: 5
   column_mapping:
     user_query: "question"
     ground_truth_for_eval: "answer"
   hf_extra_load_params: {}
 
-# System prompt for math problems (applied during generation)
-system_prompt: "Solve the following math problem. Show your work clearly. Put the final numerical answer between <answer> and </answer> tags."
+system_prompt: "Solve the following math problem. Provide the final answer inside <answer> tags."
 
-# Model Generation Configuration (enabled to generate responses to GSM8K questions)
 generation:
   enabled: true
   _target_: reward_kit.generation.generate_responses
@@ -44,19 +40,16 @@ generation:
     max_retries: 3
     max_concurrent_requests: 5
 
-# Reward Function Configuration
 reward:
   function_path: "main.evaluate"
   params:
     tolerance: 0.001
     require_units: false
+    max_length: 200
 
-# Evaluation Parameters
 evaluation_params:
-  # To run on all samples, remove or comment out the line below
   limit_samples: 2
 
-# Output Configuration
 output:
   results_file: "eval_results.jsonl"
   preview_pairs_file: "preview_samples.jsonl"
@@ -64,6 +57,5 @@ output:
 logging_params:
   batch_log_interval: 10
 
-# Other settings
 seed: 42
 verbose: true

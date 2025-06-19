@@ -46,7 +46,7 @@ The `simple_math_formatting_eval.yaml` config is self-contained and includes:
 This example uses the **GSM8K dataset** from HuggingFace (`openai/gsm8k`):
 - **Questions**: Grade school math word problems
 - **Answers**: Step-by-step solutions with final numerical answers
-- **System Prompt**: Guides model to use specific formatting with `<think>...</think><answer>...</answer>` structure
+- **System Prompt**: Simply requests the final answer in `<answer>` tags. A reasoning model automatically includes `<think>` tags for its thought process.
 
 The generated responses are evaluated for both numerical accuracy and strict format compliance.
 

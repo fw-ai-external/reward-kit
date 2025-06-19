@@ -27,13 +27,13 @@ dataset:
   hf_extra_load_params: {}
 
 # System prompt for math problems with formatting requirements (applied during generation)
-system_prompt: "Solve the following math problem. Think through it step by step, then provide your final answer.\n\nFormat your response as:\n<think>Your reasoning here</think>\n<answer>Final numerical answer</answer>"
+system_prompt: "Solve the following math problem. Provide your reasoning and the final answer. The final numerical answer must appear inside <answer> tags."
 
 # Model Generation Configuration (enabled to generate responses to GSM8K questions)
 generation:
   enabled: true
   _target_: reward_kit.generation.generate_responses
-  model_name: "accounts/fireworks/models/llama-v3p3-70b-instruct"
+  model_name: "accounts/fireworks/models/llama-v3p3-70b-reasoning"
   batch_size: 1
   max_new_tokens: 1024
   temperature: 0.0

@@ -10,6 +10,13 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 
+class StartEpisodeRequest(BaseModel):
+    """Request to start a new episode."""
+
+    class Config:
+        extra = "allow"  # Allow arbitrary extra fields (like seed)
+
+
 class StartEpisodeResponse(BaseModel):
     """Response from starting a new episode."""
 

@@ -16,8 +16,12 @@ def load_module_from_path(name, path):
 
 
 def get_example_module():
-    example_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                "examples", "braintrust_example", "main.py")
+    example_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "examples",
+        "braintrust_example",
+        "main.py",
+    )
     return load_module_from_path("braintrust_example_main_test", example_path)
 
 

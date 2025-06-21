@@ -24,6 +24,7 @@ from reward_kit.agent.resources import (
     EndEpisodeRequest,
     EndEpisodeResponse,
     HealthResponse,
+    StartEpisodeRequest,
     StartEpisodeResponse,
     StepRequest,
     StepResponse,
@@ -37,17 +38,26 @@ episodes: Dict[str, FrozenLakeGame] = {}
 
 
 @app.post("/start_episode", response_model=StartEpisodeResponse)
-async def start_episode() -> StartEpisodeResponse:
+async def start_episode(
+    request: StartEpisodeRequest = StartEpisodeRequest(),
+) -> StartEpisodeResponse:
     """Start a new episode of the Frozen Lake game."""
     episode_id = str(uuid.uuid4())
 
-    # Create Gymnasium-based game with deterministic behavior for consistent evaluation
-    # This can be configured via environment variables or request parameters in the future
-    game = FrozenLakeGame(
-        map_name="4x4",
-        is_slippery=False,  # Deterministic for reproducible agent evaluation
-        render_mode=None,
-    )
+    # Extract request data to pass to the game constructor
+    request_data = request.dict() if hasattr(request, "dict") else request.model_dump()
+
+    # Create Gymnasium-based game with configuration from request
+    # Default values maintained for backward compatibility
+    game_config = {
+        "map_name": "4x4",
+        "is_slippery": True,  # Enable stochastic behavior to demonstrate seed effect
+        "render_mode": None,
+    }
+    # Override with any values from the request (like seed)
+    game_config.update(request_data)
+
+    game = FrozenLakeGame(**game_config)
     observation = game.reset()
     episodes[episode_id] = game
 

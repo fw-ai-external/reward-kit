@@ -1,79 +1,93 @@
-# Frozen Lake Example Plan
+# Frozen Lake Example Plan: Data-Driven Rollouts
 
-This document outlines the plan for creating a Frozen Lake example using `reward-kit`.
+This document outlines the plan for refactoring the Frozen Lake example to use a data-driven evaluation workflow. The goal is to make the system more robust, extensible, and aligned with standard practices in reinforcement learning research.
 
-### **Part 1: Standalone Frozen Lake Test Server**
+The core principle is to treat the initial conditions of an environment (like a random seed) as data. Each row in a dataset will define a specific scenario, and the framework will run a configurable number of rollouts for each scenario.
 
-The first step is to create a simple, standalone web server that wraps the Frozen Lake environment. This will allow us to test the game logic and environment interactions in isolation before integrating with the `reward-kit` ecosystem.
+### 1. The Dataset (`dataset.jsonl`)
 
-1.  **Create the Server File:**
-    *   Create a new file named `frozen_lake_server.py` inside a new `examples/frozen_lake` directory.
-2.  **Implement the Flask Server:**
-    *   The server will use Flask to expose a few simple RESTful endpoints.
-    *   It will import the `FrozenLakeEnv` from `gymnasium.envs.toy_text.frozen_lake`.
-3.  **Define the API Endpoints:**
-    *   `POST /reset`:
-        *   Creates a new instance of the `FrozenLakeEnv`.
-        *   Calls `env.reset()` to initialize the game.
-        *   Stores the environment instance in a global dictionary, keyed by a unique `episode_id`.
-        *   Returns the initial `observation` and the `episode_id`.
-    *   `POST /step`:
-        *   Accepts an `episode_id` and an `action` in the request body.
-        *   Retrieves the correct environment instance from the global dictionary.
-        *   Calls `env.step(action)` to advance the game.
-        *   Returns the `observation`, `reward`, `done`, and `info` from the environment.
-    *   `GET /render`:
-        *   Accepts an `episode_id`.
-        *   Calls `env.render(mode='ansi')` to get a text-based representation of the game state.
-        *   Returns the rendered string.
-4.  **Create a Test Client:**
-    *   Create a separate script, `test_frozen_lake_server.py`, to act as a client.
-    *   This script will make requests to the server's endpoints to ensure everything is working as expected. It will:
-        *   Call `/reset` to start a game.
-        *   Send a series of hardcoded actions to `/step`.
-        *   Fetch the rendered state with `/render` after each step.
+The foundation of this new approach is a dataset file that defines the experimental conditions.
 
-### **Part 2: HTTP Rollout Integration**
+-   **Action:** Create a new dataset file at `examples/frozen_lake/client/dataset.jsonl`.
+-   **Format:** Each line in the file will be a JSON object representing a single experimental sample. Initially, this will just contain a unique `id` and a `seed`.
+-   **Example Content:**
+    ```json
+    {"id": "run_001", "seed": 42}
+    {"id": "run_002", "seed": 123}
+    {"id": "run_003", "seed": 555}
+    {"id": "run_004", "seed": 678}
+    ```
 
-With the standalone server working, the next step is to create a client that interacts with it using the `reward-kit` HTTP rollout protocol. This will simulate an LLM playing the game.
+### 2. The Task Definition (`task_def.yaml`)
 
-1.  **Create the Rollout Client:**
-    *   Create a new file, `frozen_lake_rollout_client.py`, in the `examples/frozen_lake` directory.
-2.  **Implement the `RemoteHttpRolloutClient` API:**
-    *   This client will implement the three key endpoints defined in `development/notes/http_rollout.md`:
-        *   `POST /start_episode`: This will call the `/reset` endpoint of our `frozen_lake_server.py`.
-        *   `POST /step`: This will take an action (initially, a random one), and call the `/step` endpoint of our `frozen_lake_server.py`.
-        *   `POST /end_episode`: This will clean up the episode data.
-3.  **Simulate the LLM:**
-    *   Inside the `/step` endpoint implementation, add a function that generates a random, valid action for the Frozen Lake environment. This will stand in for the LLM's decision-making process.
-4.  **Test the End-to-End Flow:**
-    *   Write a test script that uses the `reward-kit` infrastructure to run a rollout against our `frozen_lake_rollout_client.py`. This will verify that the entire HTTP rollout process is working correctly.
+The task definition will be updated to reference the dataset and specify how many rollouts (`N`) to perform for each sample.
 
-### **Part 3: Evaluating an LLM on Frozen Lake**
+-   **File to Modify:** `examples/frozen_lake/client/task_def.yaml`
+-   **Changes:**
+    -   Remove the old `num_rollouts` field.
+    -   Add `dataset_path` to point to our new `dataset.jsonl` file.
+    -   Add `num_rollouts_per_sample` to define `N`.
+-   **Example:**
+    ```yaml
+    name: "frozen_lake_http_rollout"
+    description: "Evaluate an agent's ability to navigate a Frozen Lake environment via HTTP rollout"
 
-The final step is to use the `reward-kit` evaluation pipeline to test how well a specific LLM can play the Frozen Lake game. The `reward-kit` CLI will act as the client, managing the conversation with the LLM and using our HTTP rollout server to interact with the environment.
+    # Data-driven configuration
+    dataset_path: "examples/frozen_lake/client/dataset.jsonl"
+    num_rollouts_per_sample: 5 # This is 'N', the number of rollouts per seed
 
-1.  **Create the Reward Function:**
-    *   Create a new file, `examples/frozen_lake/reward.py`.
-    *   This function will be decorated with `@reward_function` and will analyze the final conversation history to determine if the agent succeeded. It will return an `EvaluateResult` with a score of 1.0 for success and 0.0 for failure.
+    # Resource configuration remains the same
+    resource_type: "http_rollout"
+    # ... (rest of the file)
+    ```
 
-2.  **Create the Initial Prompt Dataset:**
-    *   Create a new file, `examples/frozen_lake/initial_prompt.jsonl`.
-    *   This file will contain a single JSON object with a system message that instructs the LLM on its goal and how to use the available tools (e.g., `step(action: int)`).
+### 3. Core Framework Modifications
 
-3.  **Create the Evaluation Configuration (`config.yaml`):**
-    *   Create a new file, `examples/frozen_lake/config.yaml`.
-    *   This file will configure the `reward-kit` evaluation run:
-        *   `dataset`: Point to the `initial_prompt.jsonl` file.
-        *   `generation_config`: Specify the LLM to use (e.g., `accounts/fireworks/models/qwen3-235b-a22b`) and the necessary API credentials.
-        *   `rollout_client`: Configure the connection to our `http_rollout_server.py` using the `remote_http` type.
-        *   `reward_function`: Point to the `frozen_lake_reward` function.
+The following changes will plumb the `seed` from the dataset through the framework to the game environment.
 
-4.  **Create a Final Runner Script:**
-    *   Create a new shell script, `examples/frozen_lake/run_evaluation.sh`.
-    *   This script will:
-        1.  Start the `frozen_lake_server.py`.
-        2.  Start the `http_rollout_server.py`.
-        3.  Wait for both servers to be ready.
-        4.  Execute the evaluation using the `reward-kit` CLI: `reward-kit --config-path examples/frozen_lake/config.yaml run-evaluation`.
-        5.  Clean up and terminate the server processes.
+1.  **Data Model (`reward_kit/models.py`):**
+    -   Update `TaskDefinitionModel` to include `dataset_path: Optional[str]` and `num_rollouts_per_sample: int`.
+
+2.  **TaskManager (`reward_kit/agent/task_manager.py`):**
+    -   Modify the `execute_tasks` method to load samples from the `dataset_path`.
+    -   For each sample, generate `num_rollouts_per_sample` rollout jobs.
+    -   Pass the sample data (containing the `seed`) for each job down to the `Orchestrator`.
+
+3.  **Orchestrator (`reward_kit/agent/orchestrator.py`):**
+    -   Modify `execute_task_poc` to accept `sample_data` as a parameter.
+    -   Pass this data to the resource's `initialize` method: `await episode_resource.initialize(**sample_data)`.
+
+4.  **HTTP Rollout Resource (`reward_kit/agent/resources/http_rollout_resource.py`):**
+    -   The `initialize` method will accept `**kwargs`.
+    -   These `kwargs` (the `sample_data`) will be sent as the JSON body of the POST request to the `/start_episode` endpoint.
+
+5.  **HTTP Rollout Server & Protocol:**
+    -   The `/start_episode` endpoint in `examples/frozen_lake/server/http_rollout_server.py` will be updated to accept a JSON request body.
+    -   It will pass the entire request body as keyword arguments to the `GymnasiumFrozenLakeGame` constructor: `game = FrozenLakeGame(**request_data)`.
+    -   The `StartEpisodeRequest` model in `reward_kit/agent/resources/http_rollout_protocol.py` will be updated to allow arbitrary extra fields.
+
+6.  **Gymnasium Game (`examples/frozen_lake/gymnasium_frozen_lake_server.py`):**
+    -   The `__init__` method of `GymnasiumFrozenLakeGame` will be changed to accept `**kwargs`.
+    -   The `reset` method will use the `seed` from these arguments to initialize the environment deterministically: `self.env.reset(seed=self.seed)`.
+
+### 4. Visualization of the Flow
+
+```mermaid
+sequenceDiagram
+    participant TaskManager
+    participant Orchestrator
+    participant Resource as HttpRolloutResource
+    participant Server as http_rollout_server
+    participant Game as GymnasiumFrozenLakeGame
+
+    TaskManager->>TaskManager: Reads dataset.jsonl
+    TaskManager->>Orchestrator: execute_task_poc(sample_data={"seed": 42})
+    Orchestrator->>Resource: fork()
+    Orchestrator->>Resource: initialize(**sample_data)
+    Resource->>Server: POST /start_episode (body={"seed": 42})
+    Server->>Game: __init__(**{"seed": 42})
+    Game->>Game: self.env.reset(seed=42)
+    Game-->>Server: observation
+    Server-->>Resource: {episode_id, observation}
+    Resource-->>Orchestrator: (initialization complete)
+    Orchestrator->>Orchestrator: (proceeds with agent interaction)

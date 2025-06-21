@@ -12,8 +12,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from reward_kit import EvaluateResult, MetricResult, reward_function
 from reward_kit.models import Message
-from reward_kit.rewards.math import math_reward
 from reward_kit.rewards.length import count_tokens
+from reward_kit.rewards.math import math_reward
 
 
 def check_think_answer_format(text: str) -> bool:
@@ -39,10 +39,16 @@ def evaluate(
 ) -> EvaluateResult:
     """Evaluate math reasoning with format and length considerations."""
     assistant_message = messages[-1]
-    text = assistant_message["content"] if isinstance(assistant_message, dict) else assistant_message.content or ""
+    text = (
+        assistant_message["content"]
+        if isinstance(assistant_message, dict)
+        else assistant_message.content or ""
+    )
 
     # Accuracy using built-in math reward
-    accuracy_result = math_reward(messages=messages, ground_truth=ground_truth, **kwargs)
+    accuracy_result = math_reward(
+        messages=messages, ground_truth=ground_truth, **kwargs
+    )
     accuracy_score = accuracy_result.score
 
     # Format compliance
@@ -64,9 +70,19 @@ def evaluate(
     combined_score = (accuracy_score + format_score + length_score) / 3.0
 
     metrics = {
-        "accuracy_reward": MetricResult(score=accuracy_score, reason=accuracy_result.reason, is_score_valid=True),
-        "format_reward": MetricResult(score=format_score, reason="correct format" if format_correct else "incorrect format", is_score_valid=True),
-        "length_reward": MetricResult(score=length_score, reason=f"{token_count} tokens", is_score_valid=token_count <= max_length),
+        "accuracy_reward": MetricResult(
+            score=accuracy_score, reason=accuracy_result.reason, is_score_valid=True
+        ),
+        "format_reward": MetricResult(
+            score=format_score,
+            reason="correct format" if format_correct else "incorrect format",
+            is_score_valid=True,
+        ),
+        "length_reward": MetricResult(
+            score=length_score,
+            reason=f"{token_count} tokens",
+            is_score_valid=token_count <= max_length,
+        ),
     }
 
     return EvaluateResult(

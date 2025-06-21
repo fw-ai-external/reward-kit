@@ -16,6 +16,7 @@ from .http_rollout_protocol import (
     EndEpisodeRequest,
     GameObservation,
     HttpRolloutConfig,
+    StartEpisodeRequest,
     StartEpisodeResponse,
     StepRequest,
     StepResponse,
@@ -85,10 +86,17 @@ class HttpRolloutResource(ForkableResource):
     async def initialize(self, **kwargs) -> None:
         """
         Initialize the resource by starting a new episode.
+        Passes any provided kwargs (like seed) to the server in the request body.
         """
         try:
             url = f"{self.config.base_url}{self.config.start_episode_endpoint}"
-            response = self.client.post(url)
+
+            # Include any sample data (like seed) in the request body
+            if kwargs:
+                self.logger.info(f"Sending initialization data to server: {kwargs}")
+                response = self.client.post(url, json=kwargs)
+            else:
+                response = self.client.post(url)
             response.raise_for_status()
 
             episode_data = response.json()

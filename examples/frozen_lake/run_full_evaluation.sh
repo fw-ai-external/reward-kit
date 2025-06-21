@@ -8,7 +8,7 @@ set -e  # Exit on any error
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HTTP_ROLLOUT_SERVER_PORT=8080
+HTTP_ROLLOUT_SERVER_PORT=8082
 MAX_WAIT_TIME=30
 
 # PID files to track server processes
@@ -136,7 +136,7 @@ main() {
 
     # Start HTTP rollout server
     log "Starting HTTP rollout server on port $HTTP_ROLLOUT_SERVER_PORT..."
-    python server/http_rollout_server.py &
+    python server/http_rollout_server.py --port $HTTP_ROLLOUT_SERVER_PORT &
     HTTP_ROLLOUT_PID=$!
     echo $HTTP_ROLLOUT_PID > "$HTTP_ROLLOUT_PID_FILE"
 

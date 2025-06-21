@@ -497,7 +497,9 @@ class Orchestrator:
         self.logger.info(f"Combined available tools: {list(available_tools.keys())}")
         return available_tools
 
-    async def execute_task_poc(self) -> Optional[Dict[str, Any]]:
+    async def execute_task_poc(
+        self, sample_data: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         if not await self._load_task_components():
             self.logger.error("Failed to load task components.")
             return None
@@ -577,6 +579,18 @@ class Orchestrator:
             self.logger.info(
                 f"Episode resource forked: {type(episode_resource).__name__}"
             )
+
+            # Initialize the episode resource with sample data if provided
+            if sample_data:
+                self.logger.info(
+                    f"Initializing episode resource with sample data: {sample_data}"
+                )
+                if hasattr(episode_resource, "initialize"):
+                    await episode_resource.initialize(**sample_data)
+                else:
+                    self.logger.warning(
+                        f"Episode resource {type(episode_resource).__name__} does not have initialize method"
+                    )
 
             # Get initial state for injection into first prompt (for HTTP rollout)
             initial_state_description = None

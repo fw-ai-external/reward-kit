@@ -1,6 +1,10 @@
 name: "frozen_lake_http_rollout"
 description: "Evaluate an agent's ability to navigate a Frozen Lake environment via HTTP rollout"
 
+# Data-driven configuration
+dataset_path: "examples/frozen_lake/client/dataset.jsonl"
+num_rollouts_per_sample: 1  # This is 'N', the number of rollouts per seed
+
 # Resource configuration - connects to the game server
 resource_type: "http_rollout"
 base_resource_config:
@@ -22,7 +26,21 @@ messages:
 
 # Evaluation configuration
 poc_max_turns: 20
-num_rollouts: 8
+
+# Generation configuration
+generation:
+  enabled: true
+  _target_: reward_kit.generation.generate_responses
+  model_name: "accounts/fireworks/models/qwen3-235b-a22b"
+  temperature: 0.0
+  max_new_tokens: 500
+  batch_size: 1
+  cache:
+    enabled: true
+
+# Reward Function Configuration
+reward:
+  function_path: "examples.frozen_lake.client.reward.frozen_lake_reward"
 
 # Note: The TaskManager will automatically start the server on a free port
 # and update the base_url accordingly for parallel execution support

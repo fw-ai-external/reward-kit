@@ -265,7 +265,6 @@ def parse_args(args=None):
         help="Run an evaluation using a Hydra configuration. All arguments after 'run' are passed to Hydra.",
     )
 
-
     # Use parse_known_args to allow Hydra to handle its own arguments
     return parser.parse_known_args(args)
 

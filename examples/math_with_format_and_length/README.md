@@ -11,4 +11,3 @@ python -m reward_kit.cli run --config-name simple_math_format_length_eval
 
 The framework will download a small GSM8K subset, generate answers using a reasoning
 model, and evaluate them for numerical accuracy, format compliance, and length.
-

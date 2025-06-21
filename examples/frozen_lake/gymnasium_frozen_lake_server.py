@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 
 class GymnasiumFrozenLakeGame:
@@ -37,25 +38,42 @@ class GymnasiumFrozenLakeGame:
         map_name: str = "4x4",
         is_slippery: bool = False,
         render_mode: Optional[str] = None,
+        seed: Optional[int] = None,
+        **kwargs,
     ):
         """
         Initialize the Gymnasium Frozen Lake game.
 
         Args:
-            map_name: Map size ("4x4" or "8x8")
+            map_name: Map size ("4x4" or "8x8") - only used if seed is None
             is_slippery: Whether the ice is slippery (stochastic environment)
             render_mode: Rendering mode for Gymnasium environment
+            seed: Random seed for reproducible map generation and behavior
+            **kwargs: Additional keyword arguments (ignored for compatibility)
         """
         self.map_name = map_name
         self.is_slippery = is_slippery
+        self.seed = seed
 
         # Create the Gymnasium environment
-        self.env = gym.make(
-            "FrozenLake-v1",
-            map_name=map_name,
-            is_slippery=is_slippery,
-            render_mode=render_mode,
-        )
+        if seed is not None:
+            # Use random map generation with seed for reproducible boards
+            size = 4 if map_name == "4x4" else 8
+            desc = generate_random_map(size=size, p=0.8, seed=seed)
+            self.env = gym.make(
+                "FrozenLake-v1",
+                desc=desc,
+                is_slippery=is_slippery,
+                render_mode=render_mode,
+            )
+        else:
+            # Use fixed predefined maps
+            self.env = gym.make(
+                "FrozenLake-v1",
+                map_name=map_name,
+                is_slippery=is_slippery,
+                render_mode=render_mode,
+            )
 
         # Get environment properties
         self.desc = self.env.unwrapped.desc
@@ -91,7 +109,10 @@ class GymnasiumFrozenLakeGame:
 
     def reset(self) -> Dict:
         """Reset the game to the starting position."""
-        self.current_state, _ = self.env.reset()
+        if self.seed is not None:
+            self.current_state, _ = self.env.reset(seed=self.seed)
+        else:
+            self.current_state, _ = self.env.reset()
         self.current_pos = self._state_to_pos(self.current_state)
         self.done = False
         self.won = False

@@ -389,46 +389,64 @@ class TaskManager:
         # For each task, determine how many rollouts to execute
         for task_id in valid_task_ids:
             task_def = self.tasks[task_id]
-            num_rollouts = (
-                num_rollouts_override
-                if num_rollouts_override is not None
-                else task_def.num_rollouts
-            )
 
-            if num_rollouts == 1:
-                # Single rollout - existing behavior
-                if await self.prepare_task(task_id):
-                    results[task_id] = await self.execute_task(task_id)
-                else:
-                    results[task_id] = {"error": "Task preparation failed"}
-            else:
-                # Multiple rollouts - batch execution
+            # Check if this is a data-driven evaluation
+            if task_def.dataset_path:
+                # Data-driven evaluation: load samples from dataset
+                samples = self._load_dataset_samples(task_def.dataset_path)
+                if not samples:
+                    results[task_id] = {
+                        "error": "Failed to load dataset or dataset is empty"
+                    }
+                    continue
+
                 self.logger.info(
-                    f"Executing {num_rollouts} rollouts for task '{task_id}'"
+                    f"Executing data-driven evaluation for task '{task_id}': {len(samples)} samples, {task_def.num_rollouts_per_sample} rollouts per sample"
                 )
-                rollout_results = await self._execute_batch_rollouts(
-                    task_id, num_rollouts, max_concurrency
+                rollout_results = await self._execute_data_driven_rollouts(
+                    task_id, samples, task_def.num_rollouts_per_sample, max_concurrency
+                )
+            else:
+                # Traditional evaluation: fixed number of rollouts
+                num_rollouts = (
+                    num_rollouts_override
+                    if num_rollouts_override is not None
+                    else task_def.num_rollouts
                 )
 
-                # Aggregate results
-                if rollout_results:
-                    aggregated_result = self._aggregate_results(rollout_results)
-                    results[task_id] = aggregated_result
-
-                    # Always save detailed results to .jsonl file (including failed rollouts for analysis)
-                    try:
-                        detailed_file_path = self._save_detailed_results(
-                            task_id, aggregated_result
-                        )
-                        self.logger.info(
-                            f"Detailed results saved to: {detailed_file_path}"
-                        )
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to save detailed results for task '{task_id}': {e}"
-                        )
+                if num_rollouts == 1:
+                    # Single rollout - existing behavior
+                    if await self.prepare_task(task_id):
+                        results[task_id] = await self.execute_task(task_id)
+                    else:
+                        results[task_id] = {"error": "Task preparation failed"}
+                    continue
                 else:
-                    results[task_id] = {"error": "All rollouts failed"}
+                    # Multiple rollouts - batch execution
+                    self.logger.info(
+                        f"Executing {num_rollouts} rollouts for task '{task_id}'"
+                    )
+                    rollout_results = await self._execute_batch_rollouts(
+                        task_id, num_rollouts, max_concurrency
+                    )
+
+            # Aggregate results (for both data-driven and traditional batch execution)
+            if rollout_results:
+                aggregated_result = self._aggregate_results(rollout_results)
+                results[task_id] = aggregated_result
+
+                # Always save detailed results to .jsonl file (including failed rollouts for analysis)
+                try:
+                    detailed_file_path = self._save_detailed_results(
+                        task_id, aggregated_result
+                    )
+                    self.logger.info(f"Detailed results saved to: {detailed_file_path}")
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to save detailed results for task '{task_id}': {e}"
+                    )
+            else:
+                results[task_id] = {"error": "All rollouts failed"}
 
         return results
 
@@ -582,6 +600,234 @@ class TaskManager:
 
         # Return all results (successful and failed) for comprehensive logging
         return rollout_results
+
+    def _load_dataset_samples(self, dataset_path: str) -> List[Dict[str, Any]]:
+        """
+        Load samples from a JSONL dataset file.
+
+        Args:
+            dataset_path: Path to the JSONL dataset file
+
+        Returns:
+            List of sample dictionaries loaded from the dataset
+        """
+        try:
+            samples = []
+            # Support both absolute and relative paths
+            if not os.path.isabs(dataset_path):
+                # Make relative paths relative to the current working directory
+                dataset_path = os.path.abspath(dataset_path)
+
+            if not os.path.exists(dataset_path):
+                self.logger.error(f"Dataset file not found: {dataset_path}")
+                return []
+
+            with open(dataset_path, "r") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        sample = json.loads(line)
+                        samples.append(sample)
+                    except json.JSONDecodeError as e:
+                        self.logger.error(
+                            f"Invalid JSON on line {line_num} in {dataset_path}: {e}"
+                        )
+                        continue
+
+            self.logger.info(f"Loaded {len(samples)} samples from {dataset_path}")
+            return samples
+
+        except Exception as e:
+            self.logger.error(f"Error loading dataset from {dataset_path}: {e}")
+            return []
+
+    async def _execute_data_driven_rollouts(
+        self,
+        task_id: str,
+        samples: List[Dict[str, Any]],
+        rollouts_per_sample: int,
+        max_concurrency: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute data-driven rollouts where each sample from the dataset is used for multiple rollouts.
+
+        Args:
+            task_id: The base task ID
+            samples: List of samples from the dataset
+            rollouts_per_sample: Number of rollouts to execute per sample
+            max_concurrency: Maximum number of concurrent rollouts
+
+        Returns:
+            List of results from all rollouts across all samples
+        """
+        task_def = self.tasks[task_id]
+        all_rollout_results = []
+
+        # Create a semaphore to limit concurrency
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def execute_single_rollout(
+            sample_index: int, rollout_index: int, sample_data: Dict[str, Any]
+        ):
+            """Execute a single rollout with sample data."""
+            rollout_task_id = f"{task_id}_sample_{sample_index}_rollout_{rollout_index}"
+
+            async with semaphore:
+                try:
+                    # Start resource server if needed for this rollout
+                    allocated_port = None
+                    if task_def.resource_server:
+                        allocated_port = self._start_resource_server(
+                            rollout_task_id, task_def
+                        )
+                        if allocated_port is None:
+                            self.logger.error(
+                                f"Failed to start resource server for rollout {rollout_index} of sample {sample_index} for task '{task_id}'"
+                            )
+                            return {
+                                "error": f"Failed to start resource server for sample {sample_index}, rollout {rollout_index}",
+                                "sample_data": sample_data,
+                            }
+
+                    # Create effective task definition with updated base_url if needed
+                    effective_task_def = task_def
+                    if allocated_port is not None:
+                        effective_task_def = deepcopy(task_def)
+                        if hasattr(effective_task_def.base_resource_config, "base_url"):
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+                        elif "base_url" in effective_task_def.base_resource_config:
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+                        else:
+                            effective_task_def.base_resource_config["base_url"] = (
+                                f"http://localhost:{allocated_port}"
+                            )
+
+                    # Create orchestrator for this rollout
+                    orchestrator = Orchestrator(task_definition=effective_task_def)
+
+                    # Setup and execute with sample data
+                    await orchestrator.setup_base_resource()
+                    result = await orchestrator.execute_task_poc(
+                        sample_data=sample_data
+                    )
+
+                    # Cleanup orchestrator resources
+                    if orchestrator.base_resource:
+                        await orchestrator.base_resource.close()
+
+                    # Stop the resource server for this rollout
+                    if allocated_port is not None:
+                        self._stop_resource_server(rollout_task_id)
+
+                    # Handle case where result is None
+                    if result is None:
+                        result = {"error": "Execution returned None"}
+
+                    # Handle new orchestrator format that includes reward_function_inputs
+                    reward_function_inputs = None
+                    if isinstance(result, dict) and "evaluation_result" in result:
+                        # New format with separate evaluation_result and reward_function_inputs
+                        reward_function_inputs = result.get("reward_function_inputs")
+                        result = result["evaluation_result"]
+
+                    # Convert EvaluateResult to dict if needed
+                    if hasattr(result, "model_dump"):
+                        # Pydantic model - convert to dict
+                        result = result.model_dump()
+                    elif hasattr(result, "dict"):
+                        # Older pydantic models
+                        result = result.dict()
+                    # If it's already a dict, leave it as is
+
+                    # Add reward function inputs to the result for JSONL trajectory storage
+                    if reward_function_inputs is not None and isinstance(result, dict):
+                        result["reward_function_inputs"] = reward_function_inputs
+
+                    # Add sample metadata to the result
+                    if isinstance(result, dict):
+                        result["sample_data"] = sample_data
+                        result["sample_index"] = sample_index
+                        result["rollout_index"] = rollout_index
+
+                    score = (
+                        result.get("score", "N/A")
+                        if isinstance(result, dict)
+                        else "N/A"
+                    )
+                    self.logger.info(
+                        f"Completed rollout {rollout_index} for sample {sample_index} of task '{task_id}' with score: {score}"
+                    )
+                    return result
+
+                except Exception as e:
+                    self.logger.error(
+                        f"Error in rollout {rollout_index} for sample {sample_index} of task '{task_id}': {e}",
+                        exc_info=True,
+                    )
+
+                    # Try to capture server logs on error
+                    if allocated_port is not None:
+                        try:
+                            process = self.server_processes.get(rollout_task_id)
+                            if process:
+                                stdout, stderr = process.communicate(timeout=1)
+                                if stdout:
+                                    self.logger.error(
+                                        f"Server stdout for sample {sample_index}, rollout {rollout_index}: {stdout.decode()}"
+                                    )
+                                if stderr:
+                                    self.logger.error(
+                                        f"Server stderr for sample {sample_index}, rollout {rollout_index}: {stderr.decode()}"
+                                    )
+                        except Exception:
+                            pass  # Ignore errors in log capture
+
+                    # Cleanup on error
+                    if allocated_port is not None:
+                        self._stop_resource_server(rollout_task_id)
+                    return {
+                        "error": str(e),
+                        "sample_data": sample_data,
+                        "sample_index": sample_index,
+                        "rollout_index": rollout_index,
+                    }
+
+        # Create rollout tasks for all samples
+        rollout_tasks = []
+        for sample_index, sample_data in enumerate(samples):
+            for rollout_index in range(rollouts_per_sample):
+                task = execute_single_rollout(sample_index, rollout_index, sample_data)
+                rollout_tasks.append(task)
+
+        # Execute all rollouts concurrently
+        all_rollout_results = await asyncio.gather(*rollout_tasks)
+
+        # Log summary statistics
+        total_rollouts = len(all_rollout_results)
+        successful_results = [
+            r for r in all_rollout_results if not (isinstance(r, dict) and "error" in r)
+        ]
+        failed_count = total_rollouts - len(successful_results)
+
+        if failed_count > 0:
+            self.logger.warning(
+                f"{failed_count} out of {total_rollouts} total rollouts failed for task '{task_id}' "
+                f"({len(samples)} samples x {rollouts_per_sample} rollouts per sample)"
+            )
+
+        self.logger.info(
+            f"Completed data-driven evaluation for task '{task_id}': "
+            f"{len(successful_results)} successful rollouts out of {total_rollouts} total"
+        )
+
+        # Return all results (successful and failed) for comprehensive logging
+        return all_rollout_results
 
     def _aggregate_results(
         self, rollout_results: List[Dict[str, Any]]

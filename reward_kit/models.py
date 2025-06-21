@@ -280,6 +280,17 @@ class TaskDefinitionModel(BaseModel):
         description="Number of parallel rollouts to execute for this task definition.",
     )
 
+    # Data-driven evaluation fields
+    dataset_path: Optional[str] = Field(
+        default=None,
+        description="Path to dataset file (JSONL) containing experimental conditions for data-driven evaluation.",
+    )
+    num_rollouts_per_sample: int = Field(
+        default=1,
+        ge=1,
+        description="Number of rollouts to execute per sample from the dataset.",
+    )
+
     class Config:
         extra = "allow"  # Allow and capture extra fields not explicitly defined
         # For Pydantic v2, it's model_config = {"extra": "allow"}

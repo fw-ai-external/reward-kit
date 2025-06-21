@@ -23,9 +23,11 @@ from .models import (  # Removed StepOutput as it's not used here directly
     Message,
 )
 
+# Import resource types
+from .resources import ResourceDict
+
 _single_res_adapter = TypeAdapter(EvaluateResult)
 _list_res_adapter = TypeAdapter(List[EvaluateResult])
-
 
 # Define a type for the mode parameter
 EvaluationMode = Literal["pointwise", "batch"]
@@ -40,15 +42,17 @@ def reward_function(
     mode: EvaluationMode = "pointwise",
     id: Optional[str] = None,
     requirements: Optional[List[str]] = None,  # Changed to List[str]
+    resources: Optional[ResourceDict] = None,  # Resource management
 ) -> Union[F, Callable[[F], F]]:
     """
-    Decorator for user-defined reward and evaluation functions.
+    Decorator for user-defined reward and evaluation functions with resource management.
 
     It handles:
     - Coercing input messages (and ground truths if applicable) to Pydantic `Message` objects
       if the decorated function is type-hinted to receive them. This part currently targets
       parameters named 'messages' and 'ground_truth'.
     - Validating that the output conforms to `EvaluateResult` (for pointwise) or `List[EvaluateResult]` (for batch).
+    - Managing declared resources (LLMs, databases, etc.) with automatic setup and cleanup
 
     Args:
         _func: The user's reward/evaluation function. Optional for decorator usage with args.
@@ -57,6 +61,9 @@ def reward_function(
               - "batch": Function processes a batch of rollouts. Expected output: `List[EvaluateResult]`.
         id: Optional identifier for the reward function, used for deployment
         requirements: Optional string content for requirements.txt for deployment
+        resources: Optional dictionary of resource types to resource instances.
+                  Example: {"llms": [llm_resource]}
+                  Resources are automatically setup before evaluation and cleaned up after.
 
     Returns:
         A decorator if `_func` is None, or the decorated function.
@@ -76,6 +83,16 @@ def reward_function(
                 f"Function '{func.__name__}' must accept **kwargs parameter. "
                 f"Please add '**kwargs' to the function signature."
             )
+
+        # Setup resources once when the decorator is applied
+        resource_managers = {}
+        if resources:
+            for resource_type, resource_list in resources.items():
+                managers = []
+                for resource in resource_list:
+                    resource.setup()
+                    managers.append(resource)
+                resource_managers[resource_type] = managers
 
         @wraps(func)
         def wrapper(
@@ -231,6 +248,13 @@ def reward_function(
                             f"Input 'ground_truth' failed Pydantic validation for List[Message]: {err}"
                         ) from None
 
+            # Inject resource clients into kwargs (resources are already setup)
+            if resource_managers:
+                final_func_args["resources"] = {
+                    resource_type: [manager.get_client() for manager in managers]
+                    for resource_type, managers in resource_managers.items()
+                }
+
             # Call the author's function using the (potentially modified) arguments dictionary.
             # final_func_args should contain all parameters expected by func, correctly mapped.
             # Reconstruct args and kwargs for the call to func
@@ -275,10 +299,11 @@ def reward_function(
                     f"Return value from function '{func.__name__}' failed Pydantic validation for mode '{mode}':\n{err}"
                 ) from None
 
-        # Set id, requirements, and mode attributes
+        # Set attributes for introspection and deployment
         wrapper._reward_function_id = id
         wrapper._reward_function_requirements = requirements
         wrapper._reward_function_mode = mode
+        wrapper._reward_function_resources = resources
 
         return cast(F, wrapper)
 

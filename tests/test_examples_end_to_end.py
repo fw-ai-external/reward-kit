@@ -433,9 +433,9 @@ def test_math_with_format_and_length_example(temp_examples_dir, mock_env_variabl
 
     # Correct but verbose answer (length penalty applies)
     long_content = (
-        "<think>Adding step by step: first 2+2 is computed." +
-        " This explanation is intentionally long." * 5 +
-        "</think><answer>4</answer>"
+        "<think>Adding step by step: first 2+2 is computed."
+        + " This explanation is intentionally long." * 5
+        + "</think><answer>4</answer>"
     )
     messages_long_correct = [
         Message(role="user", content="What is 2+2?"),

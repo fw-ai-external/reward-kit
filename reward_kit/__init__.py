@@ -12,6 +12,7 @@ import warnings
 
 from .adapters.braintrust import reward_fn_to_scorer, scorer_to_reward_fn
 from .models import EvaluateResult, Message, MetricResult
+from .resources import create_llm_resource
 from .reward_function import RewardFunction
 from .typed_interface import reward_function
 
@@ -26,6 +27,8 @@ __all__ = [
     "RewardFunction",
     "scorer_to_reward_fn",
     "reward_fn_to_scorer",
+    # Resource management
+    "create_llm_resource",
 ]
 
 from . import _version

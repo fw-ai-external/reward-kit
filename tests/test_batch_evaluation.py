@@ -395,7 +395,10 @@ class TestBatchEvaluation:
         task_def = task_manager._load_task_from_file(str(task_def_path))
         assert task_def is not None, "Failed to load task definition"
 
-        # Override num_rollouts to reduce test time
+        # Override for traditional batch evaluation (not data-driven)
+        task_def.dataset_path = (
+            None  # Remove dataset path to use traditional evaluation
+        )
         task_def.num_rollouts = 2
 
         task_id = task_manager.register_task(task_def)

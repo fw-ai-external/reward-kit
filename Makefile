@@ -28,6 +28,16 @@ typecheck:
 format:
 	black $(PYTHON_DIRS)
 
+validate-docs:
+	@echo "Validating documentation links..."
+	@if [ -f ~/home/docs/scripts/validate_links.py ]; then \
+		cd ~/home/docs && python scripts/validate_links.py; \
+	else \
+		echo "❌ Error: Link validation script not found at ~/home/docs/scripts/validate_links.py"; \
+		echo "Please ensure the validation script exists."; \
+		exit 1; \
+	fi
+
 # Sync docs to ~/home/docs with links under 'evaluators'
 sync-docs:
 	@echo "Syncing docs to ~/home/docs with links under 'evaluators'..."
@@ -46,6 +56,13 @@ sync-docs:
 	@# Copy processed files to destination
 	@rsync -av --delete /tmp/reward-kit-docs-processed/ ~/home/docs/evaluators/
 	@echo "Docs synced successfully to ~/home/docs/evaluators"
+	@# Validate all documentation links
+	@echo "Validating documentation links..."
+	@if [ -f ~/home/docs/scripts/validate_links.py ]; then \
+		cd ~/home/docs && python scripts/validate_links.py; \
+	else \
+		echo "Warning: Link validation script not found at ~/home/docs/scripts/validate_links.py"; \
+	fi
 
 # Version management commands using versioneer
 version:
@@ -152,6 +169,7 @@ help:
 	@echo "  lint          - Run flake8 linter"
 	@echo "  typecheck     - Run mypy type checker"
 	@echo "  format        - Run black code formatter"
+	@echo "  validate-docs - Validate all documentation links in docs.json"
 	@echo "  sync-docs     - Sync docs to ~/home/docs with links under 'evaluators'"
 	@echo "  release       - Run lint, typecheck, test, build, then upload"
 	@echo ""

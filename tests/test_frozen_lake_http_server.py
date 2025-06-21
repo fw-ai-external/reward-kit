@@ -131,7 +131,7 @@ class TestFrozenLakeHttpServer:
         step_data = step_response.json()
 
         assert "observation" in step_data
-        assert "done" in step_data
+        assert "is_done" in step_data
 
         # Position should have changed (unless blocked)
         observation = step_data["observation"]
@@ -237,7 +237,7 @@ class TestGymnasiumFrozenLakeIntegration:
             )
             assert step_response.status_code == 200
 
-            observation = step_response["observation"]
+            observation = step_response.json()["observation"]
             # Visual board should remain the same (only position marker changes)
             current_visual = observation["visual"]
 
@@ -256,7 +256,7 @@ class TestGymnasiumFrozenLakeIntegration:
         # This test verifies the complete data flow from HTTP request to game creation
 
         with patch(
-            "examples.frozen_lake.gymnasium_frozen_lake_server.GymnasiumFrozenLakeGame"
+            "examples.frozen_lake.server.http_rollout_server.FrozenLakeGame"
         ) as mock_game_class:
             mock_game_instance = MagicMock()
             mock_game_instance.reset.return_value = {

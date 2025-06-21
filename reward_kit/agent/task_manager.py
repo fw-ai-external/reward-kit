@@ -42,21 +42,31 @@ class TaskManager:
         self.server_ports: Dict[str, int] = {}
         self.all_server_pids: Set[int] = set()
 
-    def register_task(self, task_definition: TaskDefinitionModel) -> str:
+    def register_task(self, task_definition_or_name, task_definition=None) -> str:
         """
         Register a task with the manager.
 
         Args:
-            task_definition: A validated TaskDefinitionModel instance
+            task_definition_or_name: Either a TaskDefinitionModel instance (legacy) or task name (new)
+            task_definition: TaskDefinitionModel instance when first arg is task name
 
         Returns:
             task_id: A unique identifier for the registered task
         """
-        task_id = task_definition.name
+        # Handle both calling patterns for backward compatibility
+        if task_definition is None:
+            # Legacy call: register_task(task_definition)
+            task_def = task_definition_or_name
+            task_id = task_def.name
+        else:
+            # New call: register_task(task_name, task_definition)
+            task_id = task_definition_or_name
+            task_def = task_definition
+
         if task_id in self.tasks:
             self.logger.warning(f"Task '{task_id}' is already registered. Overwriting.")
 
-        self.tasks[task_id] = task_definition
+        self.tasks[task_id] = task_def
         self.logger.info(f"Registered task: {task_id}")
         return task_id
 
@@ -864,16 +874,19 @@ class TaskManager:
             aggregated_result = {
                 "aggregated": True,
                 "num_rollouts": len(rollout_results),
+                "total_rollouts": len(rollout_results),  # For compatibility with tests
                 "successful_rollouts": 0,
                 "failed_rollouts": len(failed_results),
                 "success_rate": 0.0,
                 "avg_score": 0.0,
+                "average_score": 0.0,  # For compatibility with tests
                 "std_dev": 0.0,
                 "min_score": 0.0,
                 "max_score": 0.0,
                 "score": 0.0,  # For compatibility with existing logging
                 "individual_scores": [],
                 "individual_results": rollout_results,  # Include all results (failed)
+                "detailed_results": rollout_results,  # For compatibility with tests
                 "successful_results": [],
                 "failed_results": failed_results,
                 "timestamp": datetime.now().isoformat(),
@@ -893,16 +906,19 @@ class TaskManager:
         aggregated_result = {
             "aggregated": True,
             "num_rollouts": len(rollout_results),
+            "total_rollouts": len(rollout_results),  # For compatibility with tests
             "successful_rollouts": len(scores),
             "failed_rollouts": len(failed_results),
             "success_rate": success_rate,
             "avg_score": avg_score,
+            "average_score": avg_score,  # For compatibility with tests
             "std_dev": std_dev,
             "min_score": min_score,
             "max_score": max_score,
             "score": avg_score,  # For compatibility with existing logging
             "individual_scores": scores,
             "individual_results": rollout_results,  # Include all results (successful and failed)
+            "detailed_results": rollout_results,  # For compatibility with tests
             "successful_results": successful_results,
             "failed_results": failed_results,
             "timestamp": datetime.now().isoformat(),

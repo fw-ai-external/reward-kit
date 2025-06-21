@@ -106,7 +106,7 @@ class TestDatasetLoading(TestDataDrivenTaskManager):
                 "config": {
                     "map_size": "4x4",
                     "slippery": True,
-                    "holes": [(1, 1), (2, 3)],
+                    "holes": [[1, 1], [2, 3]],
                 },
                 "metadata": {"author": "test", "version": "1.0"},
             },
@@ -126,7 +126,7 @@ class TestDatasetLoading(TestDataDrivenTaskManager):
             assert loaded_samples == samples
 
             # Verify complex objects are preserved
-            assert loaded_samples[0]["config"]["holes"] == [(1, 1), (2, 3)]
+            assert loaded_samples[0]["config"]["holes"] == [[1, 1], [2, 3]]
             assert loaded_samples[1]["metadata"]["version"] == "1.1"
         finally:
             Path(dataset_path).unlink()

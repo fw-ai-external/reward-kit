@@ -799,7 +799,7 @@ class Orchestrator:
                             messages=conversation_messages,  # type: ignore
                             tools=openai_tools if openai_tools else None,
                             tool_choice="auto" if openai_tools else None,
-                            # reasoning_effort="none",
+                            reasoning_effort="low",
                             max_tokens=8192,
                             temperature=1.0,
                         )

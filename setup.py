@@ -17,7 +17,7 @@ setup(
         "openai==1.78.1",
         "aiosqlite",
         "aiohttp",
-        "mcp==1.9.2",
+        "mcp>=1.9.2",
         "PyYAML>=5.0",  # Added PyYAML
         "datasets==3.6.0",  # For dataset loading functionality
         "fsspec==2025.3.0",  # For filesystem interactions, pinned for dataset compatibility

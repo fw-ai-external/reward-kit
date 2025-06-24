@@ -97,9 +97,14 @@ def get_initial_state() -> Dict[str, Any]:
     }
 
 
-# Create FastMCP server with stateless configuration
-# This is the key configuration from the official README
-app = FastMCP("FrozenLake-v1", stateless_http=True)
+# Create FastMCP server with streamable HTTP configuration
+# For Cloud Run, we need to bind to 0.0.0.0 and use PORT environment variable
+# Remove stateless_http=True as it might default to SSE transport
+app = FastMCP(
+    "FrozenLake-v1",
+    host="0.0.0.0",  # Bind to all interfaces for Cloud Run
+    port=int(os.environ.get("PORT", 8000)),  # Use Cloud Run PORT env var
+)
 
 
 # PROPER MCP PATTERN: Provide initial state through resources

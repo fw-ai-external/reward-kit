@@ -7,7 +7,8 @@ using the reward-kit simulation framework. It demonstrates:
 1. No session management tools exposed (framework enforced)
 2. Session initialization via MCP initializationOptions
 3. Only domain game tools exposed to models
-4. Independent from production server (no proxying)
+4. **PROPER MCP PATTERN**: Initial state via MCP resources
+5. Independent from production server (no proxying)
 
 This is a completely separate implementation from the production server,
 similar to how a Google Docs simulation would be separate from Google Docs production.
@@ -17,106 +18,130 @@ Usage:
 """
 
 import argparse
+import json
 import time
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-# Import production server to ensure signature matching
-import frozen_lake_server
-from gymnasium.envs.toy_text import FrozenLakeEnv
+# Import production server to provide to the framework for validation
+import frozen_lake_mcp_server
 
-from reward_kit.mcp.simulation_server import SimulationServerBase
+# Fixed: Use absolute import instead of relative import
+from frozen_lake_adapter import FrozenLakeAdapter
+from mcp.server.fastmcp import Context
+
+from reward_kit.mcp.simulation_server import (
+    SimulationServerBase,
+    simulation_resource,
+    simulation_tool,
+)
 
 
-class FrozenLakeSimulation(SimulationServerBase):
+class FrozenLakeSimulation(FrozenLakeAdapter, SimulationServerBase):
     """
     FrozenLake simulation server using the framework.
 
-    This implements FrozenLake with simulation capabilities but is
-    completely independent from the production server.
+    This inherits from the FrozenLakeAdapter to handle environment logic
+    and from SimulationServerBase for the simulation framework.
     """
 
-    def create_environment(self, config: Dict[str, Any]) -> FrozenLakeEnv:
-        """Create FrozenLake environment for simulation."""
-        return FrozenLakeEnv(
-            map_name=config.get("map_name", "4x4"),
-            is_slippery=config.get(
-                "is_slippery", False
-            ),  # Deterministic for simulation
-            render_mode=None,
-        )
+    @simulation_resource("game://frozen_lake/initial_state")
+    def get_initial_state_resource(self) -> str:
+        """
+        MCP Resource: Provides initial game state for simulation.
 
-    def reset_environment(
-        self, env: FrozenLakeEnv, seed: Optional[int] = None
-    ) -> Tuple[int, Dict[str, Any]]:
-        """Reset FrozenLake environment."""
-        return env.reset(seed=seed)
-
-    def step_environment(
-        self, env: FrozenLakeEnv, action: int
-    ) -> Tuple[int, float, bool, bool, Dict[str, Any]]:
-        """Execute step in FrozenLake environment."""
-        return env.step(action)
-
-    def close_environment(self, env: FrozenLakeEnv) -> None:
-        """Close FrozenLake environment."""
-        if hasattr(env, "close"):
-            env.close()
-
-    def parse_action(self, action_str: str) -> int:
-        """Parse action string to FrozenLake action integer."""
-        action_map = {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}
-        if action_str not in action_map:
-            raise ValueError(
-                f"Invalid action '{action_str}'. Use: {', '.join(action_map.keys())}"
-            )
-        return action_map[action_str]
-
-    def format_observation(self, observation: int) -> int:
-        """Format FrozenLake observation."""
-        return int(observation)
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default FrozenLake simulation configuration."""
-        return {
-            "map_name": "4x4",
-            "is_slippery": False,  # Deterministic for consistent simulation
-            "render_mode": None,
+        This follows the proper MCP pattern where initial state comes from resources
+        during session establishment, not from tool calls.
+        """
+        # Get default initial state
+        initial_observation = self.format_observation(0)  # Starting position
+        initial_state = {
+            "position": initial_observation,
+            "grid_layout": self._get_grid_layout(0),
+            "moves": 0,
+            "terminated": False,
+            "truncated": False,
+            "reward": 0.0,
+            "info": {
+                "grid_size": "4x4",
+                "holes": [5, 7, 11, 12],  # Positions of holes in 4x4 grid
+                "goal": 15,  # Goal position
+                "initial_position": 0,
+            },
         }
+        return json.dumps(initial_state)
 
-    def get_domain_tools(self) -> Dict[str, Callable]:
-        """
-        Get FrozenLake domain tools.
+    @simulation_resource("game://frozen_lake/config")
+    def get_game_config_resource(self) -> str:
+        """MCP Resource: Provides game configuration information for simulation."""
+        config = {
+            "game_type": "FrozenLake",
+            "version": "simulation-v1",
+            "grid_size": "4x4",
+            "deterministic": True,
+            "holes": [5, 7, 11, 12],
+            "goal": 15,
+            "actions": ["LEFT", "DOWN", "RIGHT", "UP"],
+        }
+        return json.dumps(config)
 
-        IMPORTANT: Must match production server tools exactly.
-        Production server tools: lake_move
-        """
-        # Validate we match production server tools exactly
-        production_tools = set(frozen_lake_server.app._tool_manager._tools.keys())
-        simulation_tools = {"lake_move"}
+    def _get_grid_layout(self, position: int) -> str:
+        """Get the grid layout showing current player position."""
+        # Create a simple 4x4 grid representation
+        grid_chars = [
+            ".",
+            ".",
+            ".",
+            ".",
+            ".",
+            "H",
+            ".",
+            "H",
+            ".",
+            ".",
+            ".",
+            "H",
+            "H",
+            ".",
+            ".",
+            "G",
+        ]
 
-        assert (
-            simulation_tools == production_tools
-        ), f"Tool mismatch! Production: {production_tools}, Simulation: {simulation_tools}"
+        # Show player position with 'P'
+        if 0 <= position < len(grid_chars):
+            grid_chars[position] = "P"
 
-        return {"lake_move": self._lake_move}
+        # Format as grid
+        grid_lines = []
+        for i in range(0, 16, 4):
+            grid_lines.append("".join(grid_chars[i : i + 4]))
 
-    def _lake_move(self, session_data: Dict[str, Any], action: str) -> Dict[str, Any]:
+        return "\n".join(grid_lines)
+
+    @simulation_tool
+    def lake_move(
+        self, action: str, ctx: Context, session_state: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Execute a move in the FrozenLake simulation.
 
+        The signature of this method (excluding self, ctx, and session_state) must exactly
+        match the production tool. The framework validates this automatically.
+
         Args:
-            session_data: Session state (injected by framework)
             action: Movement direction (LEFT, DOWN, RIGHT, UP)
+            ctx: The MCP Context
+            session_state: Session state injected by the framework
 
         Returns:
             Game state with position, reward, and completion status
         """
-        env = session_data["env"]
-        session_id = session_data["session_id"]
+        # The framework passes the session state as a parameter
+        env = session_state["env"]
+        session_id = session_state["session_id"]
 
         # Parse and validate action
         try:
-            action_int = self.parse_action(action)
+            action_int = FrozenLakeAdapter.parse_action(self, action)
         except ValueError as e:
             raise ValueError(str(e))
 
@@ -126,18 +151,19 @@ class FrozenLakeSimulation(SimulationServerBase):
         )
 
         # Update session state
-        session_data["steps"] += 1
-        session_data["total_reward"] += reward
-        session_data["last_used"] = time.time()
+        session_state["steps"] += 1
+        session_state["total_reward"] += reward
+        session_state["last_used"] = time.time()
 
-        # Format response
+        # Format response with grid layout
         result = {
             "position": self.format_observation(obs),
+            "grid_layout": self._get_grid_layout(obs),
             "reward": float(reward),
             "terminated": bool(terminated),
             "truncated": bool(truncated),
-            "moves": session_data["steps"],
-            "total_reward": session_data["total_reward"],
+            "moves": session_state["steps"],
+            "total_reward": session_state["total_reward"],
             "info": info or {},
         }
 
@@ -147,7 +173,7 @@ class FrozenLakeSimulation(SimulationServerBase):
             print(f"🎮 {session_id[:12]}... {action} → {obs} | {status} (simulation)")
         else:
             print(
-                f"🎮 {session_id[:12]}... {action} → {obs} | Move #{session_data['steps']}"
+                f"🎮 {session_id[:12]}... {action} → {obs} | Move #{session_state['steps']}"
             )
 
         return result
@@ -175,12 +201,15 @@ def main():
     print()
 
     # Create and run simulation server
-    server = FrozenLakeSimulation("FrozenLake-Simulation")
+    # Pass the production server app to the framework for automatic validation
+    server = FrozenLakeSimulation(
+        "FrozenLake-Simulation",
+        production_server_app=frozen_lake_mcp_server.app,
+    )
 
-    if args.transport in ["sse", "streamable-http"]:
-        server.run(transport=args.transport, port=args.port)
-    else:
-        server.run(transport=args.transport)
+    # FastMCP.run() doesn't accept port parameter directly
+    # Port is configured via PORT environment variable
+    server.run(transport=args.transport)
 
 
 if __name__ == "__main__":

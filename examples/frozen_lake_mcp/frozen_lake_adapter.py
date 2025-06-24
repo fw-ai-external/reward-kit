@@ -58,3 +58,10 @@ class FrozenLakeAdapter(EnvironmentAdapter):
             "actions": self.ACTION_NAMES,
             "description": "Move actions: LEFT(0), DOWN(1), RIGHT(2), UP(3)",
         }
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for FrozenLake."""
+        return {
+            "map_name": "4x4",
+            "is_slippery": False,
+        }

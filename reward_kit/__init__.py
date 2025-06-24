@@ -11,6 +11,7 @@ tool-augmented models using self-contained task bundles.
 import warnings
 
 from .adapters.braintrust import reward_fn_to_scorer, scorer_to_reward_fn
+from .common_utils import load_jsonl
 from .mcp_env import FireworksPolicy, MCPVectorEnv, make, rollout, test_mcp
 from .models import EvaluateResult, Message, MetricResult
 from .reward_function import RewardFunction
@@ -27,6 +28,8 @@ __all__ = [
     "RewardFunction",
     "scorer_to_reward_fn",
     "reward_fn_to_scorer",
+    # Utilities
+    "load_jsonl",
     # MCP Environment API
     "make",
     "rollout",

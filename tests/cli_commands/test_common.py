@@ -121,13 +121,15 @@ def test_load_samples_from_file_invalid_json(tmp_path, caplog):
     assert "Invalid JSON. Skipping line: this is not json..." in caplog.text
 
 
-def test_load_samples_from_file_empty_file(tmp_path, caplog):
+def test_load_samples_from_file_empty_file(tmp_path):
     file_path = tmp_path / "empty.jsonl"
     file_path.write_text("")
-    with caplog.at_level(logging.INFO):
+    with patch("reward_kit.cli_commands.common.logger.info") as mock_info:
         samples = list(common.load_samples_from_file(str(file_path), max_samples=10))
-    assert len(samples) == 0
-    assert f"No valid samples loaded from {str(file_path)}" in caplog.text
+        assert len(samples) == 0
+        mock_info.assert_called_once_with(
+            f"No valid samples loaded from {str(file_path)} after processing 0 lines."
+        )
 
 
 def test_load_samples_from_file_skip_empty_lines(tmp_path):

@@ -25,6 +25,7 @@ setup(
         "omegaconf>=2.3.0",  # For configuration objects
         "gymnasium>=0.29.0",  # For FrozenLake and other gym environments
         "httpx>=0.24.0",  # For HTTP client functionality in agent resources
+        "fireworks-ai>=0.17.19",  # For Fireworks Build SDK integration
     ],
     extras_require={
         "dev": [
@@ -58,7 +59,7 @@ setup(
         "deepseek": [
             "difflib>=3.0.0",
         ],
-        "deepeval": ["deepeval>=3.0.0"],
+        # "deepeval": ["deepeval>=3.1.0"],
         "openevals": ["openevals>=0.1.0"],
     },
     entry_points={

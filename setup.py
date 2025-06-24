@@ -59,7 +59,7 @@ setup(
         "deepseek": [
             "difflib>=3.0.0",
         ],
-        "deepeval": ["deepeval>=3.0.0"],
+        # "deepeval": ["deepeval>=3.1.0"],
         "openevals": ["openevals>=0.1.0"],
     },
     entry_points={

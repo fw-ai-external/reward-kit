@@ -1,23 +1,84 @@
 """
 MCP Environment API for reward-kit north star implementation.
 
-This module provides the `rk.make()` and `rk.rollout()` functions that enable
-the north star developer experience for MCP-based environments.
+This module provides the general tool-calling interface that works with ANY MCP environment
+via dataset-driven configuration and automatic tool discovery.
 
 Usage:
     import reward_kit as rk
 
-    envs = rk.make("http://localhost:8000/mcp/lake@mcp", n=100, seeds=seeds)
-    trajectories = rk.rollout(envs, policy=policy, steps=512)
+    # Load dataset with environment configuration and prompts
+    dataset = load_jsonl("dataset.jsonl")
+
+    # Create general policy (environment-agnostic)
+    policy = rk.FireworksPolicy(model_id="accounts/fireworks/models/qwen3-235b-a22b")
+
+    # Create environments with dataset-driven configuration
+    envs = rk.make("http://localhost:8000/mcp", dataset=dataset)
+
+    # Execute tool-calling rollouts
+    trajectories = await rk.rollout(envs, policy=policy, steps=512)
+
+Key Features:
+- General tool-calling interface that works with any MCP environment
+- Dataset-driven configuration with system prompts and user prompt templates
+- Automatic MCP tool discovery from servers
+- **PROPER MCP PATTERN**: Initial state obtained from MCP resources during session establishment
+- Tools used only for actions/interactions, not for getting initial state
+- Dynamic user prompt formatting based on current observations
+- Environment-agnostic policy that receives tool schemas and makes structured calls
+- Backward compatibility with servers that don't expose resources
+
+MCP Integration:
+- Session establishment creates MCP connection and discovers resources and tools
+- Initial state comes from MCP resources (list_resources + read_resource calls)
+- Tools are used for subsequent actions during rollout steps
+- Resources provide static/configuration data, tools provide dynamic actions
 """
 
 import asyncio
-import uuid
-from concurrent.futures import ThreadPoolExecutor
+import json
+import logging
+import os
+import time
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
-import httpx
+from mcp.client.session import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+# Import Fireworks Build SDK - optional at module level
+try:
+    from fireworks import LLM
+
+    FIREWORKS_AVAILABLE = True
+except ImportError:
+    LLM = None
+    FIREWORKS_AVAILABLE = False
+
+from .auth import get_fireworks_api_key
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolCall:
+    """Represents a tool call to be executed via MCP."""
+
+    tool_name: str
+    arguments: Dict[str, Any]
+
+
+@dataclass
+class DatasetRow:
+    """Represents a row from the dataset JSONL."""
+
+    id: str
+    seed: int
+    system_prompt: str
+    user_prompt_template: str
+    environment_context: Dict[str, Any]
 
 
 @dataclass
@@ -28,9 +89,13 @@ class MCPSession:
     base_url: str
     seed: Optional[int]
     model_id: str
-    client: httpx.AsyncClient
+    dataset_row: Optional[DatasetRow] = None
     terminated: bool = False
     last_observation: Any = None
+
+    # Persistent MCP connection components
+    _exit_stack: Optional[Any] = None
+    _mcp_session: Optional[ClientSession] = None
 
 
 @dataclass
@@ -44,216 +109,1064 @@ class Trajectory:
     terminated: bool
     total_reward: float
     steps: int
+    duration: float
 
 
-class MCPVectorEnv:
+class GeneralMCPVectorEnv:
     """
-    Vector environment interface for MCP sessions.
+    General MCP vector environment that works with any MCP server.
 
-    Provides Gymnasium-like interface for parallel MCP sessions.
+    Maintains persistent MCP sessions for the duration of rollouts.
+    Driven by dataset prompts and MCP tool discovery, not hardcoded logic.
     """
 
-    def __init__(self, sessions: List[MCPSession]):
-        self.sessions = sessions
-        self.n = len(sessions)
-
-    async def reset(self) -> List[Any]:
-        """Reset all environments and return initial observations."""
-        observations = []
-
-        async def reset_session(session: MCPSession) -> Any:
-            # Get initial observation - session creation happens automatically
-            # This follows the MCP protocol where sessions are managed transparently
-            response = await session.client.post(
-                f"{session.base_url}/call_tool",
-                json={"name": "get_initial_observation", "arguments": {}},
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            result = data["content"][0]["text"]
-
-            # Session ID is managed by the MCP transport layer
-            # We don't need to extract it explicitly
-            session.terminated = False
-
-            session.last_observation = result["initialObservation"]
-            return session.last_observation
-
-        tasks = [reset_session(session) for session in self.sessions]
-        observations = await asyncio.gather(*tasks)
-
-        return observations
-
-    async def step(
-        self, actions: List[str]
-    ) -> tuple[List[Any], List[float], List[bool], List[Dict]]:
+    def __init__(
+        self,
+        sessions: List[MCPSession],
+        dataset_rows: List[DatasetRow],
+        user_prompt_formatter: Optional[Callable] = None,
+    ):
         """
-        Take parallel steps in all environments.
+        Initialize with dataset-driven configuration.
 
         Args:
-            actions: List of actions, one per environment
+            sessions: MCP sessions
+            dataset_rows: Full dataset rows with prompts and context
+            user_prompt_formatter: Callback to format user prompts dynamically
+        """
+        self.sessions = sessions
+        self.dataset_rows = dataset_rows
+        self.user_prompt_formatter = user_prompt_formatter or self._default_formatter
+        self.n = len(sessions)
+        self.tool_schemas = []  # Discovered from MCP servers
+
+        if len(sessions) != len(dataset_rows):
+            raise ValueError(
+                f"Sessions ({len(sessions)}) and dataset rows ({len(dataset_rows)}) must have same length"
+            )
+
+    async def _ensure_session_connected(self, session: MCPSession) -> ClientSession:
+        """Ensure the MCP session is connected and return the ClientSession."""
+        if session._mcp_session is not None:
+            return session._mcp_session
+
+        # Create persistent connection
+        session._exit_stack = AsyncExitStack()
+
+        logger.debug(
+            f"Creating persistent MCP connection for session {session.session_id}"
+        )
+
+        # Establish persistent streamable HTTP connection
+        read_stream, write_stream, _ = await session._exit_stack.enter_async_context(
+            streamablehttp_client(session.base_url)
+        )
+
+        # Create persistent MCP session
+        session._mcp_session = await session._exit_stack.enter_async_context(
+            ClientSession(read_stream, write_stream)
+        )
+
+        # Initialize the MCP session
+        await session._mcp_session.initialize()
+
+        logger.debug(f"Persistent MCP session established for {session.session_id}")
+        return session._mcp_session
+
+    async def reset(self) -> tuple[List[Any], List[List[Dict]], List[str]]:
+        """
+        Reset all environments and return observations, tools, and system prompts.
+
+        Uses proper MCP pattern: get initial state from resources during session establishment,
+        not from tool calls. Maintains persistent sessions for rollout duration.
 
         Returns:
-            Tuple of (observations, rewards, dones, infos)
+            observations: Current state of each environment from MCP resources
+            tool_schemas: Available MCP tools for each environment
+            system_prompts: System prompts from dataset
         """
-        if len(actions) != self.n:
-            raise ValueError(f"Expected {self.n} actions, got {len(actions)}")
+        print(f"🔄 Resetting {self.n} MCP environments with persistent sessions...")
 
-        async def step_session(session: MCPSession, action: str):
+        async def reset_session(session: MCPSession) -> tuple[Any, List[Dict]]:
+            # Get or create persistent MCP session
+            mcp_session = await self._ensure_session_connected(session)
+
+            # Get available tools from MCP server
+            tools_response = await mcp_session.list_tools()
+            tools = tools_response.tools if hasattr(tools_response, "tools") else []
+
+            # Convert tools to schema format - filter out internal tools
+            tool_schemas = []
+            for tool in tools:
+                # Only expose action tools to the model, not internal state tools
+                tool_schema = {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": (
+                        tool.inputSchema if hasattr(tool, "inputSchema") else {}
+                    ),
+                }
+                tool_schemas.append(tool_schema)
+
+            # PROPER MCP PATTERN: Get initial state from resources during session establishment
+            initial_observation = None
+
+            try:
+                # List available resources - this is where initial state should come from
+                logger.debug(
+                    f"Session {session.session_id}: Discovering MCP resources for initial state..."
+                )
+                resources_response = await mcp_session.list_resources()
+                resources = (
+                    resources_response.resources
+                    if hasattr(resources_response, "resources")
+                    else []
+                )
+                logger.debug(
+                    f"Session {session.session_id}: Found {len(resources)} MCP resources"
+                )
+
+                # Look for an initial state resource
+                initial_state_resource = None
+                for resource in resources:
+                    # Look for resources that indicate initial state
+                    if (
+                        "initial" in resource.name.lower()
+                        or "state" in resource.name.lower()
+                        or "observation" in resource.name.lower()
+                    ):
+                        initial_state_resource = resource
+                        logger.debug(
+                            f"Session {session.session_id}: Using resource '{resource.name}' for initial state"
+                        )
+                        break
+
+                if initial_state_resource:
+                    # Read the initial state resource
+                    logger.debug(
+                        f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
+                    )
+                    resource_content = await mcp_session.read_resource(
+                        initial_state_resource.uri
+                    )
+                    if (
+                        hasattr(resource_content, "contents")
+                        and resource_content.contents
+                        and len(resource_content.contents) > 0
+                    ):
+                        content = resource_content.contents[0]
+                        if hasattr(content, "text"):
+                            # Parse JSON from text content
+                            try:
+                                initial_observation = json.loads(content.text)
+                                logger.debug(
+                                    f"Session {session.session_id}: Parsed JSON initial state"
+                                )
+                            except json.JSONDecodeError:
+                                # If not JSON, use the text as is
+                                initial_observation = {"observation": content.text}
+                                logger.debug(
+                                    f"Session {session.session_id}: Using text initial state"
+                                )
+                        elif hasattr(content, "blob"):
+                            # Handle binary blob if needed
+                            initial_observation = {
+                                "observation": "binary_data",
+                                "size": len(content.blob),
+                            }
+                            logger.debug(
+                                f"Session {session.session_id}: Using binary blob initial state"
+                            )
+                        else:
+                            initial_observation = {"observation": str(content)}
+                            logger.debug(
+                                f"Session {session.session_id}: Using string initial state"
+                            )
+                else:
+                    # Fallback: if no initial state resource, try first available resource
+                    if resources:
+                        first_resource = resources[0]
+                        logger.debug(
+                            f"Session {session.session_id}: No initial state resource found, using first resource: {first_resource.name}"
+                        )
+                        resource_content = await mcp_session.read_resource(
+                            first_resource.uri
+                        )
+                        if (
+                            hasattr(resource_content, "contents")
+                            and resource_content.contents
+                            and len(resource_content.contents) > 0
+                        ):
+                            content = resource_content.contents[0]
+                            if hasattr(content, "text"):
+                                try:
+                                    initial_observation = json.loads(content.text)
+                                except json.JSONDecodeError:
+                                    initial_observation = {"observation": content.text}
+                            else:
+                                initial_observation = {"observation": str(content)}
+                    else:
+                        logger.debug(
+                            f"Session {session.session_id}: No resources available from MCP server"
+                        )
+
+            except Exception as e:
+                # If resources are not available, fall back to a default observation
+                # This maintains backward compatibility with servers that don't expose resources
+                logger.warning(
+                    f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
+                )
+                initial_observation = {
+                    "observation": "initial_state",
+                    "message": "Session established",
+                }
+
+            # Ensure we have some observation
+            if initial_observation is None:
+                logger.debug(
+                    f"Session {session.session_id}: Using default initial state"
+                )
+                initial_observation = {
+                    "observation": "default_initial_state",
+                    "session_id": session.session_id,
+                }
+
+            # Update session state
+            session.terminated = False
+            session.last_observation = initial_observation
+            return initial_observation, tool_schemas
+
+        # Execute resets in parallel
+        tasks = [reset_session(session) for session in self.sessions]
+        results = await asyncio.gather(*tasks)
+
+        observations, tool_schemas_list = zip(*results)
+        self.tool_schemas = list(tool_schemas_list)
+
+        # Extract system prompts from dataset
+        system_prompts = [row.system_prompt for row in self.dataset_rows]
+
+        return list(observations), self.tool_schemas, system_prompts
+
+    async def step(
+        self, tool_calls: List[ToolCall]
+    ) -> tuple[List[Any], List[float], List[bool], List[Dict]]:
+        """
+        Execute tool calls via MCP protocol using persistent sessions.
+
+        Note: This uses MCP tools for actions/interactions during rollout.
+        Initial state was obtained from MCP resources during reset() - different pattern.
+
+        Args:
+            tool_calls: Tool calls to execute in each environment
+
+        Returns:
+            observations, rewards, dones, infos
+        """
+        if len(tool_calls) != self.n:
+            raise ValueError(f"Expected {self.n} tool calls, got {len(tool_calls)}")
+
+        async def step_session(session: MCPSession, tool_call: ToolCall):
             if session.terminated:
                 return session.last_observation, 0.0, True, {}
 
-            response = await session.client.post(
-                f"{session.base_url}/call_tool",
-                json={
-                    "name": "lake_move",
-                    "arguments": {
-                        "action": action
-                        # No session_id needed - handled by MCP transport layer
-                    },
-                },
-            )
-            response.raise_for_status()
+            # Use persistent MCP session instead of creating new ones
+            mcp_session = await self._ensure_session_connected(session)
 
-            data = response.json()
-            result = data["content"][0]["text"]
-
-            session.last_observation = result["observation"]
-            session.terminated = result["terminated"] or result["truncated"]
-
-            return (
-                result["observation"],
-                result["reward"],
-                session.terminated,
-                result["info"],
+            # Execute the tool call via MCP protocol
+            tool_result = await mcp_session.call_tool(
+                tool_call.tool_name, tool_call.arguments
             )
 
+            # Extract results using the working pattern
+            if tool_result.content and len(tool_result.content) > 0:
+                content = tool_result.content[0]
+                if hasattr(content, "text"):
+                    # Fix: Handle empty or invalid JSON responses gracefully
+                    if not content.text or content.text.strip() == "":
+                        logger.warning(
+                            f"Session {session.session_id}: Empty tool response from {tool_call.tool_name}"
+                        )
+                        result_data = {
+                            "observation": "empty_response",
+                            "reward": 0.0,
+                            "terminated": False,
+                        }
+                    else:
+                        try:
+                            result_data = json.loads(content.text)
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"Session {session.session_id}: Invalid JSON from {tool_call.tool_name}: {content.text}. Error: {e}"
+                            )
+                            # Create a structured response from the raw text
+                            result_data = {
+                                "observation": content.text,
+                                "reward": 0.0,
+                                "terminated": False,
+                                "error": "invalid_json_response",
+                            }
+                else:
+                    # Handle non-text content
+                    result_data = {
+                        "observation": str(content),
+                        "reward": 0.0,
+                        "terminated": False,
+                    }
+            else:
+                # Handle completely empty tool result
+                logger.warning(
+                    f"Session {session.session_id}: Tool {tool_call.tool_name} returned empty result"
+                )
+                result_data = {
+                    "observation": "no_response",
+                    "reward": 0.0,
+                    "terminated": False,
+                }
+
+            # Parse result into observation, reward, done, info
+            # Keep full result_data as observation for rich prompt templates
+            observation = result_data
+            reward = result_data.get("reward", 0.0)
+            terminated = result_data.get("terminated", False)
+            truncated = result_data.get("truncated", False)
+            done = terminated or truncated
+
+            # Update session state
+            session.last_observation = observation
+            session.terminated = done
+
+            info = {
+                "steps": result_data.get("moves", result_data.get("steps", 0)),
+                "tool_call": tool_call.tool_name,
+                "arguments": tool_call.arguments,
+            }
+
+            return observation, reward, done, info
+
+        # Execute steps in parallel using persistent sessions
         tasks = [
-            step_session(session, action)
-            for session, action in zip(self.sessions, actions)
+            step_session(session, tool_call)
+            for session, tool_call in zip(self.sessions, tool_calls)
         ]
         results = await asyncio.gather(*tasks)
 
         observations, rewards, dones, infos = zip(*results)
         return list(observations), list(rewards), list(dones), list(infos)
 
+    def format_user_prompts(self, observations: List[Any]) -> List[str]:
+        """
+        Format user prompts dynamically based on current observations.
+
+        This is the callback pattern - prompts are generated based on current state.
+        """
+        user_prompts = []
+
+        for obs, row in zip(observations, self.dataset_rows):
+            # Use the callback to format the prompt
+            prompt = self.user_prompt_formatter(
+                row.user_prompt_template, obs, row.environment_context
+            )
+            user_prompts.append(prompt)
+
+        return user_prompts
+
+    def _default_formatter(self, template: str, observation: Any, context: Dict) -> str:
+        """Default user prompt formatter."""
+        return template.format(observation=observation, **context)
+
     async def close(self):
-        """Close all sessions and HTTP clients."""
+        """Close all persistent MCP sessions cleanly."""
+        print(f"🔄 Closing {self.n} persistent MCP sessions...")
 
-        async def close_session(session: MCPSession):
-            try:
-                # Session cleanup happens automatically when HTTP connection closes
-                # No explicit delete tool needed - this follows MCP protocol
-                await session.client.aclose()
-            except Exception:
-                pass  # Ignore cleanup errors
+        close_tasks = []
+        for session in self.sessions:
+            if session._exit_stack is not None:
+                logger.debug(f"Closing persistent session {session.session_id}")
 
-        tasks = [close_session(session) for session in self.sessions]
-        await asyncio.gather(*tasks, return_exceptions=True)
+                # Use asyncio.create_task to handle cleanup properly
+                async def cleanup_session(sess):
+                    try:
+                        await sess._exit_stack.aclose()
+                    except Exception as e:
+                        logger.warning(f"Error closing session {sess.session_id}: {e}")
+                    finally:
+                        sess._mcp_session = None
+                        sess._exit_stack = None
+
+                close_tasks.append(cleanup_session(session))
+
+        if close_tasks:
+            # Wait for all cleanup tasks with proper exception handling
+            results = await asyncio.gather(*close_tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Session cleanup {i} failed: {result}")
+
+        print(f"✅ All {self.n} MCP sessions closed")
 
 
-def make(
-    env_spec: str, n: int, seeds: Optional[List[int]] = None, model_id: str = "unknown"
-) -> MCPVectorEnv:
-    """
-    Create a vector of MCP environment sessions.
-
-    Args:
-        env_spec: Environment specification like "http://localhost:8000@mcp"
-        n: Number of parallel environments
-        seeds: List of seeds, one per environment (optional)
-        model_id: Model identifier to pass to sessions
-
-    Returns:
-        MCPVectorEnv instance ready for rollouts
-
-    Example:
-        envs = rk.make("http://localhost:8000@mcp", n=100, seeds=seeds)
-    """
-    # Parse environment specification
-    if "@mcp" not in env_spec:
-        raise ValueError(
-            "Environment spec must end with '@mcp' to indicate MCP protocol"
-        )
-
-    base_url = env_spec.replace("@mcp", "")
-    if not base_url.startswith("http"):
-        raise ValueError("Environment spec must be a valid HTTP URL")
-
-    # Generate seeds if not provided
-    if seeds is None:
-        import random
-
-        seeds = [random.randint(0, 2**31 - 1) for _ in range(n)]
-    elif len(seeds) != n:
-        raise ValueError(f"Expected {n} seeds, got {len(seeds)}")
-
-    # Create sessions
-    sessions = []
-    for i in range(n):
-        session = MCPSession(
-            session_id="",  # Will be set during reset
-            base_url=base_url,
-            seed=seeds[i],
-            model_id=model_id,
-            client=httpx.AsyncClient(timeout=30.0),
-        )
-        sessions.append(session)
-
-    return MCPVectorEnv(sessions)
+# Keep the old MCPVectorEnv for backward compatibility
+MCPVectorEnv = GeneralMCPVectorEnv
 
 
 class FireworksPolicy:
     """
-    Simple policy wrapper for Fireworks API that matches north star example.
+    General Fireworks AI policy that works with ANY MCP environment via tool calling.
+
+    Maintains conversation history per environment for proper OpenAI-style trajectories.
+    NO environment-specific logic - everything comes from MCP tools and dataset prompts.
     """
 
-    def __init__(self, model_id: str, temperature: float = 0.2):
+    def __init__(
+        self,
+        model_id: str,
+        temperature: float = 0.2,
+        deployment_type: str = "serverless",
+        max_tokens: int = 4096,
+        trajectory_file: str = None,
+        openai_format_file: str = None,
+    ):
+        """
+        Initialize general policy with no environment knowledge.
+
+        Args:
+            model_id: Fireworks model identifier (e.g., "accounts/fireworks/models/qwen3-235b-a22b")
+            temperature: Sampling temperature (0.0 to 2.0)
+            deployment_type: "serverless", "on-demand", or "auto"
+            max_tokens: Maximum tokens to generate per request
+        """
+        if not FIREWORKS_AVAILABLE:
+            raise ImportError(
+                "The 'fireworks-ai' package is required for FireworksPolicy. "
+                "Please install it with 'pip install fireworks-ai'"
+            )
+
         self.model_id = model_id
         self.temperature = temperature
+        self.deployment_type = deployment_type
+        self.max_tokens = max_tokens
+        self.trajectory_file = trajectory_file
+        self.openai_format_file = openai_format_file
 
-    async def __call__(self, observations: List[Any]) -> List[str]:
-        """
-        Generate actions based on observations.
+        # Verify authentication
+        api_key = get_fireworks_api_key()
+        if not api_key:
+            raise ValueError(
+                "FIREWORKS_API_KEY environment variable or ~/.fireworks/auth.ini file is required "
+                "to use FireworksPolicy. See the reward-kit documentation for setup instructions."
+            )
 
-        For now, this is a simple heuristic policy.
-        In the full implementation, this would call the Fireworks API.
+        # Set the API key for the Fireworks SDK
+        os.environ["FIREWORKS_API_KEY"] = api_key
+
+        # Initialize the LLM instance using Build SDK
+        try:
+            self.llm = LLM(
+                model=self.model_id,
+                deployment_type=self.deployment_type,
+                temperature=self.temperature,
+            )
+            logger.info(
+                f"✅ Initialized Fireworks LLM: {self.model_id} ({self.deployment_type})"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to initialize Fireworks LLM '{self.model_id}': {e}"
+            )
+
+        # Conversation state tracking for proper OpenAI trajectories
+        self.conversation_histories = {}  # {env_index: [messages]}
+        self.initialized = False
+
+    def initialize_conversations(
+        self, n_envs: int, system_prompts: List[str], initial_user_prompts: List[str]
+    ):
+        """Initialize conversation histories for each environment."""
+        self.conversation_histories = {}
+        for i in range(n_envs):
+            self.conversation_histories[i] = [
+                {"role": "system", "content": system_prompts[i]},
+                {"role": "user", "content": initial_user_prompts[i]},
+            ]
+        self.initialized = True
+
+    def log_trajectory_step(
+        self,
+        env_index: int,
+        step: int,
+        tool_call: ToolCall,
+        tool_response: str,
+        reward: float,
+        terminated: bool,
+        observation: Any,
+    ):
+        """Log a complete trajectory step with all relevant information."""
+        if self.trajectory_file:
+            step_entry = {
+                "env_index": env_index,
+                "step": step,
+                "timestamp": time.time(),
+                "step_type": "trajectory_step",
+                "action": {
+                    "tool_name": tool_call.tool_name,
+                    "arguments": tool_call.arguments,
+                },
+                "observation": observation,
+                "reward": reward,
+                "terminated": terminated,
+                "tool_response_raw": tool_response,
+            }
+
+            with open(self.trajectory_file, "a") as f:
+                f.write(json.dumps(step_entry) + "\n")
+
+    def add_tool_response(
+        self, env_index: int, tool_call: ToolCall, tool_response: str
+    ):
+        """Add tool call and response to conversation history."""
+        if env_index not in self.conversation_histories:
+            return
+
+        conversation = self.conversation_histories[env_index]
+
+        # Find the most recent assistant message with tool calls to get the correct call_id
+        call_id = None
+        for i in range(len(conversation) - 1, -1, -1):
+            if (
+                conversation[i]["role"] == "assistant"
+                and "tool_calls" in conversation[i]
+            ):
+                # Find the tool call that matches our tool_name
+                for tc in conversation[i]["tool_calls"]:
+                    if tc["function"]["name"] == tool_call.tool_name:
+                        call_id = tc["id"]
+                        break
+                if call_id:
+                    break
+
+        # Fallback if no matching tool call found
+        if not call_id:
+            call_id = f"call_{env_index}_{len(conversation)}"
+
+        # Add tool response (the assistant message was already added by _generate_tool_call_with_history)
+        tool_message = {
+            "role": "tool",
+            "tool_call_id": call_id,
+            "content": tool_response,
+        }
+        conversation.append(tool_message)
+
+        # Add user message for next step (using the tool response as the new observation)
+        # This creates the proper conversation flow: assistant -> tool -> user -> assistant -> tool -> user ...
+        user_message = {
+            "role": "user",
+            "content": f"Tool response received: {tool_response}. What's your next move?",
+        }
+        conversation.append(user_message)
+
+        # Trajectory logging is now handled in rollout function via log_trajectory_step
+
+        # Log the updated conversation to OpenAI format file
+        if self.openai_format_file:
+            conversation_entry = {
+                "env_index": env_index,
+                "timestamp": time.time(),
+                "step_type": "conversation_after_tool_response",
+                "conversation": conversation.copy(),
+            }
+
+            with open(self.openai_format_file, "a") as f:
+                f.write(json.dumps(conversation_entry) + "\n")
+
+    async def __call__(
+        self,
+        tool_schemas: List[List[Dict]],
+        observations: List[Any],
+        system_prompts: List[str],
+        user_prompts: List[str],
+    ) -> List[ToolCall]:
         """
-        actions = []
-        for obs in observations:
-            # Simple policy: try to go down and right towards goal
-            # In a real implementation, this would use LLM reasoning
-            if isinstance(obs, int):
-                if obs < 4:  # Top row, go down
-                    actions.append("DOWN")
-                elif obs % 4 == 0:  # Left column, go right
-                    actions.append("RIGHT")
+        Generate tool calls based on conversation history and current state.
+
+        For first call: Initialize conversations with system + user prompts
+        For subsequent calls: Use existing conversation history for continuity
+
+        Args:
+            tool_schemas: Available MCP tools for each environment [env][tool]
+            observations: Current observations from each environment
+            system_prompts: System prompts from dataset (environment-specific)
+            user_prompts: Formatted user prompts for current state
+
+        Returns:
+            List of tool calls to execute via MCP protocol
+        """
+        if not observations:
+            return []
+
+        # Initialize conversations on first call
+        if not self.initialized:
+            self.initialize_conversations(
+                len(observations), system_prompts, user_prompts
+            )
+
+        logger.debug(
+            f"🤖 Generating tool calls for {len(observations)} environments using {self.model_id}"
+        )
+
+        # Make parallel API calls to Fireworks using conversation history
+        tasks = []
+        for i, tools in enumerate(tool_schemas):
+            task = asyncio.create_task(self._generate_tool_call_with_history(tools, i))
+            tasks.append(task)
+
+        # Wait for all API calls to complete
+        tool_calls = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process responses and handle exceptions
+        result_calls = []
+        for i, tool_call in enumerate(tool_calls):
+            if isinstance(tool_call, Exception):
+                logger.warning(
+                    f"Tool call generation {i} failed: {tool_call}, using fallback"
+                )
+                # Use first available tool as fallback
+                if tool_schemas[i]:
+                    fallback_tool = tool_schemas[i][0]
+                    fallback_call = ToolCall(
+                        tool_name=fallback_tool["name"], arguments={}
+                    )
+                    result_calls.append(fallback_call)
                 else:
-                    actions.append("DOWN")  # Default
+                    logger.error(f"No tools available for environment {i}")
+                    result_calls.append(ToolCall("unknown", {}))
             else:
-                actions.append("DOWN")  # Fallback
+                result_calls.append(tool_call)
 
-        return actions
+        logger.debug(f"🎯 Generated {len(result_calls)} tool calls")
+        return result_calls
+
+    async def _generate_tool_call_with_history(
+        self, tools: List[Dict], env_index: int
+    ) -> ToolCall:
+        """
+        Generate a tool call using conversation history for proper OpenAI trajectories.
+
+        Args:
+            tools: Available MCP tools for this environment
+            env_index: Environment index
+
+        Returns:
+            ToolCall object
+        """
+        try:
+            # Get conversation history for this environment
+            messages = self.conversation_histories.get(env_index, [])
+            if not messages:
+                raise RuntimeError(
+                    f"No conversation history for environment {env_index}"
+                )
+
+            # Convert MCP tools to OpenAI format
+            openai_tools = self._convert_mcp_tools_to_openai(tools)
+
+            logger.debug(
+                f"Environment {env_index} - Converted {len(tools)} MCP tools to {len(openai_tools)} OpenAI tools"
+            )
+            logger.debug(
+                f"Environment {env_index} - Conversation length: {len(messages)} messages"
+            )
+
+            # Make API call with conversation history
+            loop = asyncio.get_event_loop()
+            current_request = {
+                "messages": messages,
+                "tools": openai_tools,
+                # "tool_choice": "required" if openai_tools else None,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+
+            response = await loop.run_in_executor(
+                None, lambda: self.llm.chat.completions.create(**current_request)
+            )
+
+            # Log request-response pair for trajectory analysis
+            if self.trajectory_file:
+                # Convert response to dict for JSON serialization
+                response_dict = {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": response.choices[0].message.role,
+                                "content": response.choices[0].message.content,
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": tc.type,
+                                        "function": {
+                                            "name": tc.function.name,
+                                            "arguments": tc.function.arguments,
+                                        },
+                                    }
+                                    for tc in (
+                                        response.choices[0].message.tool_calls or []
+                                    )
+                                ],
+                            }
+                        }
+                    ]
+                }
+
+                trajectory_entry = {
+                    "env_index": env_index,
+                    "timestamp": time.time(),
+                    "step_type": "llm_request_response",
+                    "request": current_request,
+                    "response": response_dict,
+                }
+
+                with open(self.trajectory_file, "a") as f:
+                    f.write(json.dumps(trajectory_entry) + "\n")
+
+            # Log the current conversation state to OpenAI format file
+            if self.openai_format_file:
+                # Add the assistant's response to the conversation copy
+                conversation_with_response = messages.copy()
+                assistant_message = {
+                    "role": "assistant",
+                    "content": response.choices[0].message.content,
+                    "tool_calls": (
+                        [
+                            {
+                                "id": tc.id,
+                                "type": tc.type,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in (response.choices[0].message.tool_calls or [])
+                        ]
+                        if response.choices[0].message.tool_calls
+                        else None
+                    ),
+                }
+                # Remove None tool_calls if there are none
+                if assistant_message["tool_calls"] is None:
+                    del assistant_message["tool_calls"]
+                conversation_with_response.append(assistant_message)
+
+                openai_entry = {
+                    "env_index": env_index,
+                    "timestamp": time.time(),
+                    "step_type": "conversation_after_llm_response",
+                    "conversation": conversation_with_response,
+                    "tools": openai_tools,  # Add the available tools to the log
+                }
+
+                with open(self.openai_format_file, "a") as f:
+                    f.write(json.dumps(openai_entry) + "\n")
+
+            # ADD ASSISTANT MESSAGE TO ACTUAL CONVERSATION HISTORY
+            # This is crucial for proper tool call ID management in add_tool_response
+            assistant_message_for_history = {
+                "role": "assistant",
+                "content": response.choices[0].message.content,
+            }
+
+            # Add tool calls if present with the actual API response IDs
+            if response.choices[0].message.tool_calls:
+                assistant_message_for_history["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": tc.type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in response.choices[0].message.tool_calls
+                ]
+
+            # Add to actual conversation history
+            messages.append(assistant_message_for_history)
+
+            # Extract tool call from response
+            message = response.choices[0].message
+            logger.debug(f"Environment {env_index} - Response message: {message}")
+
+            if message.tool_calls and len(message.tool_calls) > 0:
+                tool_call = message.tool_calls[0]
+                logger.debug(
+                    f"Environment {env_index} - Using tool call: {tool_call.function.name}({tool_call.function.arguments})"
+                )
+
+                return ToolCall(
+                    tool_name=tool_call.function.name,
+                    arguments=json.loads(tool_call.function.arguments),
+                )
+            else:
+                # Fallback if no tool calls
+                logger.warning(
+                    f"No tool calls in response for env {env_index}, message content: {message.content}"
+                )
+                return (
+                    ToolCall(tools[0]["name"], {}) if tools else ToolCall("unknown", {})
+                )
+
+        except Exception as e:
+            logger.error(f"Fireworks API call failed for env {env_index}: {e}")
+            raise e
+
+    async def _generate_tool_call(
+        self, system_prompt: str, user_prompt: str, tools: List[Dict], env_index: int
+    ) -> ToolCall:
+        """
+        Generate a single tool call using Fireworks API with proper tool calling.
+
+        Args:
+            system_prompt: System prompt from dataset
+            user_prompt: Formatted user prompt
+            tools: Available MCP tools for this environment
+            env_index: Environment index for logging
+
+        Returns:
+            ToolCall object
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Convert MCP tools to OpenAI tool format
+        openai_tools = self._convert_mcp_tools_to_openai(tools)
+
+        # Debug logging
+        logger.debug(
+            f"Environment {env_index} - Converted {len(tools)} MCP tools to {len(openai_tools)} OpenAI tools"
+        )
+        logger.debug(
+            f"Environment {env_index} - OpenAI tools: {json.dumps(openai_tools, indent=2)}"
+        )
+
+        try:
+            call_params = {
+                "messages": messages,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+            }
+
+            if openai_tools:
+                call_params["tools"] = openai_tools
+                # call_params["tool_choice"] = "required"
+
+            logger.debug(
+                f"Environment {env_index} - API call params: {json.dumps(call_params, indent=2)}"
+            )
+
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None, lambda: self.llm.chat.completions.create(**call_params)
+            )
+
+            message = response.choices[0].message
+            logger.debug(f"Environment {env_index} - Response message: {message}")
+            logger.debug(f"Environment {env_index} - Tool calls: {message.tool_calls}")
+
+            # Parse structured tool calls from response
+            if message.tool_calls:
+                tool_call = message.tool_calls[0]
+                logger.debug(
+                    f"Environment {env_index} - Using tool call: {tool_call.function.name}({tool_call.function.arguments})"
+                )
+                return ToolCall(
+                    tool_name=tool_call.function.name,
+                    arguments=json.loads(tool_call.function.arguments),
+                )
+            else:
+                # Fallback if no tool calls
+                logger.warning(
+                    f"No tool calls in response for env {env_index}, message content: {message.content}"
+                )
+                return (
+                    ToolCall(tools[0]["name"], {}) if tools else ToolCall("unknown", {})
+                )
+
+        except Exception as e:
+            logger.error(f"Fireworks API call failed for env {env_index}: {e}")
+            raise e
+
+    def _convert_mcp_tools_to_openai(self, mcp_tools: List[Dict]) -> List[Dict]:
+        """
+        Convert MCP tool schemas to OpenAI function calling format.
+
+        Args:
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            List of OpenAI-compatible tool definitions
+        """
+        openai_tools = []
+
+        for mcp_tool in mcp_tools:
+            openai_tool = {
+                "type": "function",
+                "function": {
+                    "name": mcp_tool["name"],
+                    "description": mcp_tool.get(
+                        "description", f"Execute {mcp_tool['name']} action"
+                    ),
+                    "parameters": mcp_tool.get(
+                        "input_schema",
+                        {"type": "object", "properties": {}, "required": []},
+                    ),
+                },
+            }
+            openai_tools.append(openai_tool)
+
+        return openai_tools
+
+
+def make(
+    env_spec: str,
+    dataset: Optional[List[Dict]] = None,
+    n: Optional[int] = None,
+    seeds: Optional[List[int]] = None,
+    model_id: str = "unknown",
+    user_prompt_formatter: Optional[Callable] = None,
+) -> "GeneralMCPVectorEnv":
+    """
+    Create general MCP environments driven by dataset configuration.
+
+    Args:
+        env_spec: MCP server URL
+        dataset: List of dataset rows with prompts and context (preferred)
+        n: Number of environments (for backward compatibility)
+        seeds: List of seeds (for backward compatibility)
+        model_id: Model identifier
+        user_prompt_formatter: Optional callback for formatting user prompts
+
+    Returns:
+        General MCP environment that works with any MCP server
+
+    Example:
+        # New dataset-driven approach (preferred)
+        dataset = load_jsonl("dataset.jsonl")
+        envs = rk.make("http://localhost:8000/mcp", dataset=dataset)
+
+        # Legacy approach (backward compatibility)
+        envs = rk.make("http://localhost:8000/mcp", n=10, seeds=seeds)
+    """
+    # Parse environment specification - make sure URL format is correct
+    base_url = env_spec
+    if not base_url.startswith("http"):
+        raise ValueError("Environment spec must be a valid HTTP URL")
+
+    # Ensure we don't have trailing slash to match working client pattern
+    if base_url.endswith("/"):
+        base_url = base_url.rstrip("/")
+
+    # Handle dataset-driven vs legacy approaches
+    if dataset is not None:
+        # New dataset-driven approach
+        dataset_rows = []
+        sessions = []
+
+        for row in dataset:
+            # Parse dataset row
+            if isinstance(row, dict):
+                dataset_row = DatasetRow(
+                    id=row["id"],
+                    seed=row["seed"],
+                    system_prompt=row["system_prompt"],
+                    user_prompt_template=row["user_prompt_template"],
+                    environment_context=row.get("environment_context", {}),
+                )
+            else:
+                dataset_row = row  # Assume it's already a DatasetRow
+
+            dataset_rows.append(dataset_row)
+
+            # Create MCP session
+            session = MCPSession(
+                session_id=dataset_row.id,
+                base_url=base_url,
+                seed=dataset_row.seed,
+                model_id=model_id,
+                dataset_row=dataset_row,
+            )
+            sessions.append(session)
+
+        return GeneralMCPVectorEnv(sessions, dataset_rows, user_prompt_formatter)
+
+    else:
+        # Legacy approach for backward compatibility
+        if n is None:
+            raise ValueError("Either 'dataset' or 'n' must be provided")
+
+        # Generate seeds if not provided
+        if seeds is None:
+            import random
+
+            seeds = [random.randint(0, 2**31 - 1) for _ in range(n)]
+        elif len(seeds) != n:
+            raise ValueError(f"Expected {n} seeds, got {len(seeds)}")
+
+        # Create default dataset rows for legacy mode
+        dataset_rows = []
+        sessions = []
+
+        for i in range(n):
+            # Create a default dataset row (environment-agnostic)
+            dataset_row = DatasetRow(
+                id=f"session_{i}",
+                seed=seeds[i],
+                system_prompt="You are an AI agent interacting with an environment via available tools.",
+                user_prompt_template="Current observation: {observation}. Use available tools to interact with the environment.",
+                environment_context={},
+            )
+            dataset_rows.append(dataset_row)
+
+            # Create MCP session
+            session = MCPSession(
+                session_id=f"session_{i}",
+                base_url=base_url,
+                seed=seeds[i],
+                model_id=model_id,
+                dataset_row=dataset_row,
+            )
+            sessions.append(session)
+
+        return GeneralMCPVectorEnv(sessions, dataset_rows, user_prompt_formatter)
 
 
 async def rollout(
-    envs: MCPVectorEnv, policy: Union[FireworksPolicy, Callable], steps: int = 512
+    envs: Union[GeneralMCPVectorEnv, "MCPVectorEnv"],
+    policy: Union[FireworksPolicy, Callable],
+    steps: int = 512,
 ) -> List[Trajectory]:
     """
-    Execute parallel rollouts across multiple MCP environments.
+    Execute general rollouts using tool calling interface.
+
+    This works with ANY MCP environment because:
+    1. Policy receives tool schemas and makes tool calls
+    2. Environment prompts come from dataset
+    3. No hardcoded environment logic
 
     Args:
-        envs: MCPVectorEnv instance
-        policy: Policy function that takes observations and returns actions
+        envs: GeneralMCPVectorEnv instance
+        policy: Policy that takes tool schemas, observations, prompts and returns tool calls
         steps: Maximum steps per rollout
 
     Returns:
         List of Trajectory objects with complete rollout data
 
     Example:
-        trajectories = rk.rollout(envs, policy=policy, steps=512)
+        trajectories = await rk.rollout(envs, policy=policy, steps=512)
     """
+    start_time = time.time()
+
     # Initialize trajectories
     trajectories = []
     for session in envs.sessions:
@@ -266,58 +1179,90 @@ async def rollout(
                 terminated=False,
                 total_reward=0.0,
                 steps=0,
+                duration=0.0,
             )
         )
 
-    # Reset environments
-    initial_observations = await envs.reset()
+    # Reset environments and get initial state with tool discovery
+    print(f"🔄 Resetting {envs.n} MCP environments...")
+    current_observations, tool_schemas, system_prompts = await envs.reset()
 
     # Record initial observations
-    for trajectory, obs in zip(trajectories, initial_observations):
+    for trajectory, obs in zip(trajectories, current_observations):
         trajectory.observations.append(obs)
 
-    # Run rollouts
-    current_observations = initial_observations
+    print(f"✅ Starting rollouts with {envs.n} environments for {steps} steps...")
 
+    # Run rollout loop with tool calling
     for step in range(steps):
-        # Check if all environments are done
-        active_envs = [i for i, traj in enumerate(trajectories) if not traj.terminated]
-        if not active_envs:
-            break
+        # Format user prompts based on current observations (callback pattern)
+        user_prompts = envs.format_user_prompts(current_observations)
 
-        # Get actions from policy
-        if callable(policy):
-            actions = await policy(current_observations)
-        else:
-            # Handle non-async policies
-            actions = policy(current_observations)
-            if asyncio.iscoroutine(actions):
-                actions = await actions
+        # Generate tool calls using general policy
+        tool_calls = await policy(
+            tool_schemas, current_observations, system_prompts, user_prompts
+        )
 
-        # Take steps
-        observations, rewards, dones, infos = await envs.step(actions)
+        # Execute tool calls via MCP protocol
+        observations, rewards, dones, infos = await envs.step(tool_calls)
+
+        # Update conversation histories with tool responses (for proper OpenAI trajectories)
+        if hasattr(policy, "add_tool_response"):
+            for i, (tool_call, obs, reward, done) in enumerate(
+                zip(tool_calls, observations, rewards, dones)
+            ):
+                # Convert observation to tool response format
+                tool_response = json.dumps(obs) if isinstance(obs, dict) else str(obs)
+                policy.add_tool_response(i, tool_call, tool_response)
+
+                # Log complete trajectory step if supported
+                if hasattr(policy, "log_trajectory_step"):
+                    current_step = (
+                        trajectories[i].steps + 1
+                    )  # +1 because we haven't updated steps yet
+                    policy.log_trajectory_step(
+                        i, current_step, tool_call, tool_response, reward, done, obs
+                    )
 
         # Update trajectories
-        for i, (trajectory, action, obs, reward, done) in enumerate(
-            zip(trajectories, actions, observations, rewards, dones)
+        for i, (trajectory, obs, reward, done, info) in enumerate(
+            zip(trajectories, observations, rewards, dones, infos)
         ):
             if not trajectory.terminated:
-                trajectory.actions.append(action)
                 trajectory.observations.append(obs)
+                # Record the tool call as the action
+                action_str = f"{tool_calls[i].tool_name}({tool_calls[i].arguments})"
+                trajectory.actions.append(action_str)
                 trajectory.rewards.append(reward)
                 trajectory.total_reward += reward
                 trajectory.steps += 1
-                trajectory.terminated = done
 
+                if done:
+                    trajectory.terminated = True
+
+        # Update current observations for next step
         current_observations = observations
+
+        # Check if all environments are done
+        if all(traj.terminated for traj in trajectories):
+            print(f"🏁 All environments terminated at step {step + 1}")
+            break
+
+    # Calculate durations
+    total_duration = time.time() - start_time
+    for trajectory in trajectories:
+        trajectory.duration = total_duration
 
     # Clean up
     await envs.close()
 
+    successful = sum(1 for traj in trajectories if traj.total_reward > 0)
+    print(f"📊 Rollout complete: {successful}/{len(trajectories)} reached goal")
+    print(f"⏱️  Total duration: {total_duration:.2f}s")
+
     return trajectories
 
 
-# Convenience function for testing as mentioned in north star
 async def test_mcp(base_url: str, seeds: List[int]) -> Dict[str, Any]:
     """
     Test function for validating MCP server as mentioned in north star document.
@@ -329,12 +1274,14 @@ async def test_mcp(base_url: str, seeds: List[int]) -> Dict[str, Any]:
     Returns:
         Test results dictionary
     """
+    print(f"🧪 Testing MCP server at {base_url} with {len(seeds)} seeds...")
+
     results = {"total_tests": len(seeds), "successful": 0, "failed": 0, "results": []}
 
     for seed in seeds:
         try:
             # Create single environment
-            envs = make(f"{base_url}@mcp", n=1, seeds=[seed], model_id="test-model")
+            envs = make(base_url, n=1, seeds=[seed], model_id="test-model")
 
             # Simple policy for testing
             policy = FireworksPolicy("test-model")
@@ -364,8 +1311,22 @@ async def test_mcp(base_url: str, seeds: List[int]) -> Dict[str, Any]:
                 {"seed": seed, "status": "failed", "error": str(e)}
             )
 
+    success_rate = results["successful"] / results["total_tests"] * 100
+    print(
+        f"✅ Test complete: {results['successful']}/{results['total_tests']} successful ({success_rate:.1f}%)"
+    )
+
     return results
 
 
 # Add to reward_kit.__init__.py exports
-__all__ = ["make", "rollout", "FireworksPolicy", "MCPVectorEnv", "test_mcp"]
+__all__ = [
+    "make",
+    "rollout",
+    "FireworksPolicy",
+    "MCPVectorEnv",
+    "GeneralMCPVectorEnv",
+    "ToolCall",
+    "DatasetRow",
+    "test_mcp",
+]

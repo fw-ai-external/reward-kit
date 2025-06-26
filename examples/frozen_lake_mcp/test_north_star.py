@@ -28,11 +28,10 @@ async def test_north_star_interface():
         print(f"📊 Loaded dataset with {len(dataset)} rows")
 
         # Create general policy (environment-agnostic via tool calling)
+        # No longer need trajectory_file and openai_format_file in policy - we'll use rollout logging
         policy = rk.FireworksPolicy(
             model_id="accounts/fireworks/models/qwen3-235b-a22b",
             temperature=0.2,
-            trajectory_file="trajectory.jsonl",
-            openai_format_file="openai_format.jsonl",
         )
         print("✅ Policy created successfully")
 
@@ -42,21 +41,38 @@ async def test_north_star_interface():
         )
         print("✅ MCP environments created successfully")
 
-        # 2️⃣ parallel tool-calling rollouts
-        trajectories = await rk.rollout(envs, policy=policy, steps=8)  # Short test
+        # 2️⃣ parallel tool-calling rollouts with CLEAN LOGGING
+        trajectories = await rk.rollout(
+            envs,
+            policy=policy,
+            steps=8,  # Short test
+            trajectory_log_file="clean_trajectories.jsonl",  # ✨ NEW: Clean trajectory logging
+            openai_format_log_file="clean_openai_format.jsonl",  # ✨ NEW: Clean OpenAI format logging
+        )
         print(f"✅ Generated {len(trajectories)} trajectories")
 
-        # Show sample trajectory
+        # Show sample trajectory with seed verification
         if trajectories:
-            traj = trajectories[0]
-            print(
-                f"📝 Sample trajectory: {traj.steps} steps, reward: {traj.total_reward}"
-            )
-            print(f"   Actions: {traj.actions[:3]}...")
-            print(f"   Rewards: {traj.rewards[:3]}...")
-            print(f"   Terminated: {traj.terminated}, Duration: {traj.duration:.2f}s")
+            for i, traj in enumerate(trajectories):
+                # Get the seed from the environment_context in the new structure
+                env_context = dataset[i].get("environment_context", {})
+                seed = env_context.get("seed", "N/A")
+                grid_type = env_context.get("grid_type", "N/A")
+                print("-" * 20)
+                print(f"Trajectory for seed: {seed} (grid: {grid_type})")
+                print(
+                    f"📝 Sample trajectory: {traj.steps} steps, reward: {traj.total_reward}"
+                )
+                print(f"   Actions: {traj.actions[:3]}...")
+                print(f"   Rewards: {traj.rewards[:3]}...")
+                print(
+                    f"   Terminated: {traj.terminated}, Duration: {traj.duration:.2f}s"
+                )
 
         print("🏆 North star interface test completed successfully!")
+        print("📝 Clean logs created:")
+        print("   - clean_trajectories.jsonl: Detailed step-by-step trajectory data")
+        print("   - clean_openai_format.jsonl: OpenAI-compatible conversation format")
         return True
 
     except Exception as e:

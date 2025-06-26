@@ -53,11 +53,10 @@ def simulation_tool(func: Callable) -> Callable:
 
 def simulation_resource(uri_pattern: str) -> Callable:
     """
-    Decorator to mark methods as simulation resources.
-    These resources will be exposed to the MCP client for initial state.
+    Decorator to mark methods as MCP resources in simulation servers.
 
-    Args:
-        uri_pattern: URI pattern for the resource (e.g., "game://frozen_lake/initial_state")
+    Unlike production resources, simulation resources have access to session context
+    and can provide session-specific initial states based on initialization options.
     """
 
     def decorator(func: Callable) -> Callable:
@@ -144,7 +143,7 @@ class SimulationServerBase(ABC):
         Get or create session and return its state.
 
         This handles session initialization using MCP spec:
-        - Configuration from initializationOptions
+        - Configuration from client info
         - Automatic environment creation
         - Internal session management (no tools exposed)
 
@@ -155,12 +154,31 @@ class SimulationServerBase(ABC):
 
         with self.session_lock:
             if session_id not in self.sessions:
-                # TODO: Extract from ctx.session.initialization_options when available
+                # Extract seed from MCP client info if available
                 config = self.get_default_config()
-                seed = None  # Would come from initializationOptions
+                seed = None
 
-                env = self.create_environment(config)
-                obs, info = self.reset_environment(env, seed=seed)
+                # Get seed from client info if available
+                if hasattr(ctx, "session") and hasattr(ctx.session, "client_info"):
+                    client_info = ctx.session.client_info
+                    if client_info and hasattr(client_info, "_extra"):
+                        extra_data = client_info._extra
+                        if extra_data:
+                            # Extract seed from client info
+                            seed = extra_data.get("seed")
+                            # Update config with any additional options
+                            if "config" in extra_data:
+                                config.update(extra_data["config"])
+
+                # Use create_environment_with_seed if available (for proper seeding)
+                # Otherwise fall back to separate create and reset
+                if hasattr(self, "create_environment_with_seed"):
+                    env, obs, info = self.create_environment_with_seed(
+                        config, seed=seed
+                    )
+                else:
+                    env = self.create_environment(config)
+                    obs, info = self.reset_environment(env, seed=seed)
 
                 self.sessions[session_id] = {
                     "env": env,
@@ -171,13 +189,13 @@ class SimulationServerBase(ABC):
                     "session_id": session_id,
                     "steps": 0,
                     "total_reward": 0.0,
+                    "last_used": time.time(),
                 }
                 print(
                     f"🆕 Simulation session created: {session_id[:16]}... (seed={seed})"
                 )
 
             self.sessions[session_id]["last_used"] = time.time()
-            # Return session state instead of trying to inject into context
             return self.sessions[session_id]
 
     def _validate_and_register_tools(self):
@@ -295,8 +313,82 @@ class SimulationServerBase(ABC):
 
         # 2. Register the discovered resources with their URI patterns
         for resource_name, resource_func in self._domain_resources.items():
-            uri_pattern = getattr(resource_func, "_resource_uri", resource_name)
-            self.mcp.resource(uri_pattern)(resource_func)
+            resource_uri = resource_func._resource_uri
+
+            # Create a wrapper that completely hides the original signature from FastMCP
+            # This wrapper has no parameters, which FastMCP can accept
+            def create_clean_resource_wrapper(
+                original_func=resource_func, self_ref=self
+            ):
+                def clean_resource_wrapper() -> str:
+                    """Clean resource wrapper with no parameters for FastMCP compatibility."""
+                    # Create a default session state for resource calls
+                    default_session_state = {
+                        "session_id": "resource_call",
+                        "env": None,
+                        "initial_observation": 0,
+                        "steps": 0,
+                        "total_reward": 0.0,
+                        "seed": 42,  # Default seed for resource calls
+                        "last_used": time.time(),
+                    }
+
+                    try:
+                        # For initial state resources, create a temporary environment
+                        if "initial_state" in original_func.__name__:
+                            # Create a temporary environment for the resource
+                            config = self_ref.get_default_config()
+                            env = self_ref.create_environment(config)
+                            obs, info = self_ref.reset_environment(env, seed=42)
+                            default_session_state.update(
+                                {
+                                    "env": env,
+                                    "initial_observation": obs,
+                                    "seed": 42,
+                                }
+                            )
+
+                        result = original_func(
+                            ctx=None, session_state=default_session_state
+                        )
+
+                        # Clean up temporary environment
+                        if (
+                            "env" in default_session_state
+                            and default_session_state["env"]
+                        ):
+                            try:
+                                self_ref.close_environment(default_session_state["env"])
+                            except Exception:
+                                pass  # Ignore cleanup errors
+
+                        return result
+                    except Exception as e:
+                        # Return a default resource response on error
+                        import json
+
+                        return json.dumps(
+                            {
+                                "error": f"Resource unavailable: {str(e)}",
+                                "resource": original_func.__name__,
+                                "uri": resource_uri,
+                            }
+                        )
+
+                # Set the correct name and docstring for the wrapper
+                clean_resource_wrapper.__name__ = f"{resource_name}_wrapper"
+                clean_resource_wrapper.__doc__ = f"Resource wrapper for {resource_uri}"
+
+                return clean_resource_wrapper
+
+            wrapped_resource = create_clean_resource_wrapper()
+
+            # Register the resource with FastMCP using the URI pattern
+            self.mcp.resource(resource_uri)(wrapped_resource)
+            print(f"📦 Registered resource: {resource_uri} -> {resource_name}")
+
+        if discovered_resources:
+            print(f"✅ Registered {len(discovered_resources)} domain resources")
 
     # Abstract methods that subclasses MUST implement
 

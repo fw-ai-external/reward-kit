@@ -55,7 +55,12 @@ def _generate_mcp_dockerfile_content(
     else:
         requirements = base_requirements
 
-    requirements_content = "\n".join(requirements)
+    # Generate pip install lines with proper escaping
+    pip_install_lines = []
+    for req in requirements[:-1]:
+        pip_install_lines.append(f"    {req} \\")
+    pip_install_lines.append(f"    {requirements[-1]}")
+    pip_install_section = "\n".join(pip_install_lines)
 
     dockerfile_content = f"""# Multi-stage build for MCP server deployment
 FROM python:{python_version}-slim as builder
@@ -72,8 +77,7 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # Install MCP server requirements
 RUN pip install --no-cache-dir \\
-{chr(10).join(f'    {req} \\' for req in requirements[:-1])}
-    {requirements[-1]}
+{pip_install_section}
 
 # Production stage
 FROM python:{python_version}-slim

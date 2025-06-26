@@ -20,7 +20,7 @@ MCP Integration:
 
 import argparse
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from gymnasium.envs.toy_text import FrozenLakeEnv
 from mcp.server.fastmcp import Context, FastMCP
@@ -30,9 +30,12 @@ GAME_ENV: FrozenLakeEnv = None
 CURRENT_POSITION: int = 0
 TOTAL_MOVES: int = 0
 
+# Global seed for client info
+CURRENT_SEED: Optional[int] = None
 
-def initialize_game():
-    """Initialize global game state."""
+
+def initialize_game(seed: Optional[int] = None):
+    """Initialize global game state with optional seed."""
     global GAME_ENV, CURRENT_POSITION, TOTAL_MOVES
 
     print("🎮 Game: 4x4 FrozenLake (deterministic)")
@@ -44,9 +47,12 @@ def initialize_game():
         is_slippery=False,  # Deterministic for production
         render_mode=None,
     )
-    CURRENT_POSITION, _ = GAME_ENV.reset()
+    CURRENT_POSITION, _ = GAME_ENV.reset(seed=seed)
     TOTAL_MOVES = 0
-    print(f"🎯 Game initialized at position {CURRENT_POSITION}")
+    if seed is not None:
+        print(f"🎯 Game initialized at position {CURRENT_POSITION} with seed {seed}")
+    else:
+        print(f"🎯 Game initialized at position {CURRENT_POSITION}")
 
 
 def get_current_grid_layout() -> str:
@@ -97,9 +103,32 @@ def get_initial_state() -> Dict[str, Any]:
     }
 
 
-# Create FastMCP server with stateless configuration
-# This is the key configuration from the official README
-app = FastMCP("FrozenLake-v1", stateless_http=True)
+# Create FastMCP server with streamable HTTP configuration
+# For Cloud Run, we need to bind to 0.0.0.0 and use PORT environment variable
+# Remove stateless_http=True as it might default to SSE transport
+app = FastMCP(
+    "FrozenLake-v1",
+    host="0.0.0.0",  # Bind to all interfaces for Cloud Run
+    port=int(os.environ.get("PORT", 8000)),  # Use Cloud Run PORT env var
+)
+
+
+def extract_seed_from_context(ctx: Context) -> Optional[int]:
+    """Extract seed from MCP client info if available."""
+    global CURRENT_SEED
+
+    if hasattr(ctx, "session") and hasattr(ctx.session, "client_info"):
+        client_info = ctx.session.client_info
+        if client_info and hasattr(client_info, "_extra"):
+            extra_data = client_info._extra
+            if extra_data and "seed" in extra_data:
+                seed = extra_data["seed"]
+                if CURRENT_SEED != seed:
+                    print(f"🌱 New seed from client: {seed}")
+                    initialize_game(seed=seed)
+                    CURRENT_SEED = seed
+                return seed
+    return CURRENT_SEED
 
 
 # PROPER MCP PATTERN: Provide initial state through resources
@@ -109,7 +138,9 @@ def get_initial_state_resource() -> str:
     MCP Resource: Provides initial game state.
 
     This is the CORRECT way to provide initial state in MCP - through resources
-    during session establishment, not through tool calls.
+    during session establishment, not from tool calls.
+
+    Note: For seed handling in production server, we'll check client info in tools.
     """
     import json
 
@@ -153,6 +184,18 @@ def lake_move(action: str, ctx: Context) -> Dict[str, Any]:
         Game state with position, reward, and completion status
     """
     global GAME_ENV, CURRENT_POSITION, TOTAL_MOVES
+
+    # Explicit parameter validation to catch empty/missing action
+    if not action or not isinstance(action, str):
+        raise ValueError(
+            f"Invalid action parameter: '{action}'. "
+            f"Must be a non-empty string. Valid actions: LEFT, DOWN, RIGHT, UP"
+        )
+
+    action = action.strip().upper()  # Normalize the action
+
+    # Extract seed from client info and reinitialize if needed (on first call)
+    extract_seed_from_context(ctx)
 
     # Validate action
     valid_actions = ["LEFT", "DOWN", "RIGHT", "UP"]
@@ -239,7 +282,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Initialize the game state
+    # Initialize the game state with default (no seed) - will be reinitialized when client connects
     initialize_game()
 
     print("🚀 FrozenLake MCP Server Starting...")
@@ -249,6 +292,7 @@ def main():
     print("🎯 MCP Pattern: Resources for initial state, tools for actions")
     print("🔗 Initial state resource: game://frozen_lake/initial_state")
     print("🎮 Action tool: lake_move")
+    print("🌱 Supports seeds via client info")
     print()
 
     # Set environment variable for HTTP port

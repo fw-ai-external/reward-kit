@@ -162,15 +162,35 @@ class GeneralMCPVectorEnv:
             streamablehttp_client(session.base_url)
         )
 
-        # Create persistent MCP session
+        # Prepare client info with seed from dataset
+        from mcp.types import Implementation
+
+        client_info = Implementation(name="reward-kit", version="1.0.0")
+
+        # Include seed in client info's extra data if available
+        if session.seed is not None:
+            client_info._extra = {"seed": session.seed}
+            logger.debug(
+                f"Including seed {session.seed} in client info for session {session.session_id}"
+            )
+
+        # Add any additional context from dataset
+        if session.dataset_row and session.dataset_row.environment_context:
+            if not hasattr(client_info, "_extra"):
+                client_info._extra = {}
+            client_info._extra["config"] = session.dataset_row.environment_context
+
+        # Create persistent MCP session with client info
         session._mcp_session = await session._exit_stack.enter_async_context(
-            ClientSession(read_stream, write_stream)
+            ClientSession(read_stream, write_stream, client_info=client_info)
         )
 
         # Initialize the MCP session
         await session._mcp_session.initialize()
 
-        logger.debug(f"Persistent MCP session established for {session.session_id}")
+        logger.debug(
+            f"Persistent MCP session established for {session.session_id} with seed: {session.seed}"
+        )
         return session._mcp_session
 
     async def reset(self) -> tuple[List[Any], List[List[Dict]], List[str]]:
@@ -225,19 +245,25 @@ class GeneralMCPVectorEnv:
                 logger.debug(
                     f"Session {session.session_id}: Found {len(resources)} MCP resources"
                 )
+                for resource in resources:
+                    logger.debug(
+                        f"Session {session.session_id}: Resource: {resource.name} | URI: {resource.uri}"
+                    )
 
-                # Look for an initial state resource
+                # Try to identify initial state resource based on common patterns
                 initial_state_resource = None
                 for resource in resources:
-                    # Look for resources that indicate initial state
-                    if (
-                        "initial" in resource.name.lower()
-                        or "state" in resource.name.lower()
-                        or "observation" in resource.name.lower()
+                    resource_name_lower = resource.name.lower()
+                    resource_uri_lower = str(
+                        resource.uri
+                    ).lower()  # Convert AnyUrl to string first
+                    if any(
+                        keyword in resource_name_lower or keyword in resource_uri_lower
+                        for keyword in ["initial", "state", "observation", "start"]
                     ):
                         initial_state_resource = resource
                         logger.debug(
-                            f"Session {session.session_id}: Using resource '{resource.name}' for initial state"
+                            f"Session {session.session_id}: ✅ Found initial state resource: {resource.name} | URI: {resource.uri}"
                         )
                         break
 
@@ -259,8 +285,8 @@ class GeneralMCPVectorEnv:
                             # Parse JSON from text content
                             try:
                                 initial_observation = json.loads(content.text)
-                                logger.debug(
-                                    f"Session {session.session_id}: Parsed JSON initial state"
+                                logger.info(
+                                    f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
                                 )
                             except json.JSONDecodeError:
                                 # If not JSON, use the text as is
@@ -282,7 +308,15 @@ class GeneralMCPVectorEnv:
                             logger.debug(
                                 f"Session {session.session_id}: Using string initial state"
                             )
+                    else:
+                        logger.warning(
+                            f"Session {session.session_id}: Resource content is empty"
+                        )
+                        initial_state_resource = None  # Fall back to other options
                 else:
+                    logger.warning(
+                        f"Session {session.session_id}: ❌ No initial state resource found among {len(resources)} resources"
+                    )
                     # Fallback: if no initial state resource, try first available resource
                     if resources:
                         first_resource = resources[0]
@@ -472,8 +506,34 @@ class GeneralMCPVectorEnv:
         return user_prompts
 
     def _default_formatter(self, template: str, observation: Any, context: Dict) -> str:
-        """Default user prompt formatter."""
-        return template.format(observation=observation, **context)
+        """
+        Default user prompt formatter.
+
+        Extracts meaningful display data from MCP observations.
+        For FrozenLake: extracts grid_layout if available, otherwise uses raw observation.
+        """
+        # Extract formatted display from observation if available
+        display_observation = observation
+
+        if isinstance(observation, dict):
+            # For FrozenLake and similar games, prefer grid_layout for display
+            if "grid_layout" in observation:
+                display_observation = observation["grid_layout"]
+            # For other structured observations, try to extract meaningful display
+            elif (
+                "observation" in observation
+                and observation["observation"] != "default_initial_state"
+            ):
+                display_observation = observation["observation"]
+            # If we still have default_initial_state, try to use position info
+            elif (
+                observation.get("observation") == "default_initial_state"
+                and "session_id" in observation
+            ):
+                # This is the fallback case - we should have gotten the proper initial state from MCP resources
+                display_observation = f"Initial game state (Session: {observation['session_id']})\nWaiting for grid data from server..."
+
+        return template.format(observation=display_observation, **context)
 
     async def close(self):
         """Close all persistent MCP sessions cleanly."""
@@ -1076,12 +1136,18 @@ def make(
         for row in dataset:
             # Parse dataset row
             if isinstance(row, dict):
+                # Handle seed from both old location (backward compatibility) and new location
+                environment_context = row.get("environment_context", {})
+                seed = row.get("seed")  # Check old location first
+                if seed is None and "seed" in environment_context:
+                    seed = environment_context["seed"]  # Check new location
+
                 dataset_row = DatasetRow(
                     id=row["id"],
-                    seed=row["seed"],
+                    seed=seed,
                     system_prompt=row["system_prompt"],
                     user_prompt_template=row["user_prompt_template"],
-                    environment_context=row.get("environment_context", {}),
+                    environment_context=environment_context,
                 )
             else:
                 dataset_row = row  # Assume it's already a DatasetRow
@@ -1145,6 +1211,8 @@ async def rollout(
     envs: Union[GeneralMCPVectorEnv, "MCPVectorEnv"],
     policy: Union[FireworksPolicy, Callable],
     steps: int = 512,
+    trajectory_log_file: Optional[str] = None,
+    openai_format_log_file: Optional[str] = None,
 ) -> List[Trajectory]:
     """
     Execute general rollouts using tool calling interface.
@@ -1158,14 +1226,35 @@ async def rollout(
         envs: GeneralMCPVectorEnv instance
         policy: Policy that takes tool schemas, observations, prompts and returns tool calls
         steps: Maximum steps per rollout
+        trajectory_log_file: Optional file to log detailed trajectory data
+        openai_format_log_file: Optional file to log OpenAI-compatible conversation format
 
     Returns:
         List of Trajectory objects with complete rollout data
 
     Example:
-        trajectories = await rk.rollout(envs, policy=policy, steps=512)
+        trajectories = await rk.rollout(envs, policy=policy, steps=512,
+                                      trajectory_log_file="trajectories.jsonl")
     """
     start_time = time.time()
+
+    # Initialize clean logging (separate from policy-level logging)
+    trajectory_logger = None
+    openai_logger = None
+
+    if trajectory_log_file:
+        # Clear the file at start
+        with open(trajectory_log_file, "w") as f:
+            pass
+        trajectory_logger = lambda data: _log_trajectory_entry(
+            trajectory_log_file, data
+        )
+
+    if openai_format_log_file:
+        # Clear the file at start
+        with open(openai_format_log_file, "w") as f:
+            pass
+        openai_logger = lambda data: _log_openai_entry(openai_format_log_file, data)
 
     # Initialize trajectories
     trajectories = []
@@ -1183,6 +1272,21 @@ async def rollout(
             )
         )
 
+    # Log rollout initialization
+    if trajectory_logger:
+        trajectory_logger(
+            {
+                "type": "rollout_start",
+                "timestamp": start_time,
+                "num_environments": envs.n,
+                "max_steps": steps,
+                "sessions": [
+                    {"session_id": session.session_id, "seed": session.seed}
+                    for session in envs.sessions
+                ],
+            }
+        )
+
     # Reset environments and get initial state with tool discovery
     print(f"🔄 Resetting {envs.n} MCP environments...")
     current_observations, tool_schemas, system_prompts = await envs.reset()
@@ -1191,20 +1295,82 @@ async def rollout(
     for trajectory, obs in zip(trajectories, current_observations):
         trajectory.observations.append(obs)
 
+    # Log initial states
+    if trajectory_logger:
+        for i, (session, obs) in enumerate(zip(envs.sessions, current_observations)):
+            trajectory_logger(
+                {
+                    "type": "initial_state",
+                    "timestamp": time.time(),
+                    "env_index": i,
+                    "session_id": session.session_id,
+                    "seed": session.seed,
+                    "initial_observation": obs,
+                }
+            )
+
     print(f"✅ Starting rollouts with {envs.n} environments for {steps} steps...")
 
     # Run rollout loop with tool calling
     for step in range(steps):
+        step_start_time = time.time()
+
         # Format user prompts based on current observations (callback pattern)
         user_prompts = envs.format_user_prompts(current_observations)
+
+        # Log step start
+        if trajectory_logger:
+            trajectory_logger(
+                {
+                    "type": "step_start",
+                    "timestamp": step_start_time,
+                    "step": step,
+                    "observations": current_observations,
+                }
+            )
 
         # Generate tool calls using general policy
         tool_calls = await policy(
             tool_schemas, current_observations, system_prompts, user_prompts
         )
 
+        # Log tool calls
+        if trajectory_logger:
+            for i, tool_call in enumerate(tool_calls):
+                trajectory_logger(
+                    {
+                        "type": "tool_call",
+                        "timestamp": time.time(),
+                        "step": step,
+                        "env_index": i,
+                        "session_id": envs.sessions[i].session_id,
+                        "tool_name": tool_call.tool_name,
+                        "arguments": tool_call.arguments,
+                    }
+                )
+
         # Execute tool calls via MCP protocol
         observations, rewards, dones, infos = await envs.step(tool_calls)
+
+        # Log step results
+        if trajectory_logger:
+            for i, (obs, reward, done, info) in enumerate(
+                zip(observations, rewards, dones, infos)
+            ):
+                trajectory_logger(
+                    {
+                        "type": "step_result",
+                        "timestamp": time.time(),
+                        "step": step,
+                        "env_index": i,
+                        "session_id": envs.sessions[i].session_id,
+                        "observation": obs,
+                        "reward": reward,
+                        "terminated": done,
+                        "info": info,
+                        "step_duration": time.time() - step_start_time,
+                    }
+                )
 
         # Update conversation histories with tool responses (for proper OpenAI trajectories)
         if hasattr(policy, "add_tool_response"):
@@ -1215,13 +1381,18 @@ async def rollout(
                 tool_response = json.dumps(obs) if isinstance(obs, dict) else str(obs)
                 policy.add_tool_response(i, tool_call, tool_response)
 
-                # Log complete trajectory step if supported
-                if hasattr(policy, "log_trajectory_step"):
-                    current_step = (
-                        trajectories[i].steps + 1
-                    )  # +1 because we haven't updated steps yet
-                    policy.log_trajectory_step(
-                        i, current_step, tool_call, tool_response, reward, done, obs
+                # Log OpenAI conversation format if requested
+                if openai_logger and hasattr(policy, "conversation_histories"):
+                    conversation = policy.conversation_histories.get(i, [])
+                    openai_logger(
+                        {
+                            "type": "conversation_state",
+                            "timestamp": time.time(),
+                            "step": step,
+                            "env_index": i,
+                            "session_id": envs.sessions[i].session_id,
+                            "conversation": conversation.copy(),
+                        }
                     )
 
         # Update trajectories
@@ -1240,6 +1411,22 @@ async def rollout(
                 if done:
                     trajectory.terminated = True
 
+                    # Log trajectory completion
+                    if trajectory_logger:
+                        trajectory_logger(
+                            {
+                                "type": "trajectory_complete",
+                                "timestamp": time.time(),
+                                "env_index": i,
+                                "session_id": envs.sessions[i].session_id,
+                                "total_steps": trajectory.steps,
+                                "total_reward": trajectory.total_reward,
+                                "success": reward > 0,
+                                "actions": trajectory.actions,
+                                "rewards": trajectory.rewards,
+                            }
+                        )
+
         # Update current observations for next step
         current_observations = observations
 
@@ -1253,6 +1440,35 @@ async def rollout(
     for trajectory in trajectories:
         trajectory.duration = total_duration
 
+    # Log rollout completion
+    if trajectory_logger:
+        successful = sum(1 for traj in trajectories if traj.total_reward > 0)
+        trajectory_logger(
+            {
+                "type": "rollout_complete",
+                "timestamp": time.time(),
+                "total_duration": total_duration,
+                "num_trajectories": len(trajectories),
+                "successful_trajectories": successful,
+                "success_rate": successful / len(trajectories) if trajectories else 0.0,
+                "avg_steps": (
+                    sum(traj.steps for traj in trajectories) / len(trajectories)
+                    if trajectories
+                    else 0
+                ),
+                "trajectories_summary": [
+                    {
+                        "session_id": traj.session.session_id,
+                        "seed": traj.session.seed,
+                        "steps": traj.steps,
+                        "total_reward": traj.total_reward,
+                        "terminated": traj.terminated,
+                    }
+                    for traj in trajectories
+                ],
+            }
+        )
+
     # Clean up
     await envs.close()
 
@@ -1260,7 +1476,25 @@ async def rollout(
     print(f"📊 Rollout complete: {successful}/{len(trajectories)} reached goal")
     print(f"⏱️  Total duration: {total_duration:.2f}s")
 
+    # Print log file locations if created
+    if trajectory_log_file:
+        print(f"📝 Detailed trajectory log: {trajectory_log_file}")
+    if openai_format_log_file:
+        print(f"💬 OpenAI format log: {openai_format_log_file}")
+
     return trajectories
+
+
+def _log_trajectory_entry(log_file: str, data: Dict[str, Any]):
+    """Helper function to log trajectory entries."""
+    with open(log_file, "a") as f:
+        f.write(json.dumps(data) + "\n")
+
+
+def _log_openai_entry(log_file: str, data: Dict[str, Any]):
+    """Helper function to log OpenAI format entries."""
+    with open(log_file, "a") as f:
+        f.write(json.dumps(data) + "\n")
 
 
 async def test_mcp(base_url: str, seeds: List[int]) -> Dict[str, Any]:

@@ -10,6 +10,7 @@ The Model Context Protocol (MCP) already gives us:
 * **tool calls** → perfect match for environment **step()**
 * **session header** (`Mcp-Session-Id`) for *stateful* episodes ([modelcontextprotocol.io][1])
 * **initializationOptions** to pass configuration such as **seed** and **model-id** at session start ([modelcontextprotocol.io][2])
+* **seed based initialization** so that every row of data will start with a different initialization condition, and then we can replay the scenario based on the seed if needed.
 
 Marry these pieces once and every RL or agent team in the company—Fireworks, Reward-kit, product pods—speaks the *same* language.
 

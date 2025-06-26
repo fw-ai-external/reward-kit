@@ -221,16 +221,17 @@ examples/frozen_lake/client/evaluation_logs/
 client/
 
 # Temporary debug and test files from MCP development
-examples/frozen_lake_mcp/test_*.py
 examples/frozen_lake_mcp/debug_*.py
 examples/frozen_lake_mcp/trace_*.py
 examples/frozen_lake_mcp/comprehensive_*.py
 examples/frozen_lake_mcp/final_*.py
 examples/frozen_lake_mcp/capture_*.py
 examples/frozen_lake_mcp/get_*.py
-examples/frozen_lake_mcp/*.jsonl
-examples/frozen_lake_mcp/*.json
 examples/frozen_lake_mcp/*_summary.txt
 north_star_interface_design.md
 proposed_north_star_interface.py
-test_*.py
+
+# Large data files
+examples/frozen_lake_mcp/trajectory.jsonl
+examples/frozen_lake_mcp/clean_openai_format.jsonl
+examples/frozen_lake_mcp/openai_format.jsonl

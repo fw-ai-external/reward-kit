@@ -23,6 +23,7 @@ from .cli_commands.common import (
     setup_logging,
 )
 from .cli_commands.deploy import deploy_command
+from .cli_commands.deploy_mcp import deploy_mcp_command
 from .cli_commands.preview import preview_command
 from .cli_commands.run_eval_cmd import hydra_cli_entry_point
 
@@ -217,6 +218,48 @@ def parse_args(args=None):
         "If not specified, defaults to value in rewardkit.yaml or 'api-key'. Optional.",
     )
 
+    # Deploy MCP command
+    deploy_mcp_parser = subparsers.add_parser(
+        "deploy-mcp", help="Deploy an MCP server to Google Cloud Run"
+    )
+    deploy_mcp_parser.add_argument(
+        "--id", required=True, help="Unique ID for the MCP server deployment"
+    )
+    deploy_mcp_parser.add_argument(
+        "--mcp-server-module",
+        required=True,
+        help="Python module containing the MCP server (e.g., 'examples.frozen_lake_mcp.frozen_lake_mcp_server')",
+    )
+    deploy_mcp_parser.add_argument(
+        "--gcp-project",
+        help="Google Cloud Project ID. Can also be set in rewardkit.yaml",
+    )
+    deploy_mcp_parser.add_argument(
+        "--gcp-region",
+        help="Google Cloud Region (e.g., 'us-central1'). Can also be set in rewardkit.yaml",
+    )
+    deploy_mcp_parser.add_argument(
+        "--gcp-ar-repo",
+        help="Google Artifact Registry repository name. Defaults to 'reward-kit-mcp-servers'",
+    )
+    deploy_mcp_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port for the MCP server to listen on (default: 8000)",
+    )
+    deploy_mcp_parser.add_argument(
+        "--python-version",
+        default="3.11",
+        help="Python version for the container (default: 3.11)",
+    )
+    deploy_mcp_parser.add_argument(
+        "--requirements", help="Additional pip requirements (newline separated)"
+    )
+    deploy_mcp_parser.add_argument(
+        "--env-vars", nargs="*", help="Environment variables in KEY=VALUE format"
+    )
+
     # Agent-eval command
     agent_eval_parser = subparsers.add_parser(
         "agent-eval", help="Run agent evaluation using the ForkableResource framework."
@@ -306,6 +349,8 @@ def main():
         return preview_command(args)
     elif args.command == "deploy":
         return deploy_command(args)
+    elif args.command == "deploy-mcp":
+        return deploy_mcp_command(args)
     elif args.command == "agent-eval":
         return agent_eval_command(args)
     elif args.command == "run":

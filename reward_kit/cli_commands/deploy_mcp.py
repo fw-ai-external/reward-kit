@@ -40,12 +40,28 @@ def _generate_mcp_dockerfile_content(
         Dockerfile content as string
     """
 
-    # Base requirements for MCP servers
+    # Base requirements for MCP servers - matching setup.py dependencies
     base_requirements = [
         "fastmcp>=0.1.0",
-        "gymnasium>=0.29.0",  # For frozen lake example
+        # Core reward-kit dependencies from setup.py
+        "requests>=2.25.0",
         "pydantic>=2.0.0",
-        "uvicorn>=0.24.0",
+        "dataclasses-json>=0.5.7",
+        "fastapi>=0.68.0",
+        "uvicorn>=0.15.0",
+        "python-dotenv>=0.19.0",
+        "openai==1.78.1",
+        "aiosqlite",
+        "aiohttp",
+        "mcp>=1.9.2",
+        "PyYAML>=5.0",
+        "datasets==3.6.0",
+        "fsspec==2025.3.0",
+        "hydra-core>=1.3.2",
+        "omegaconf>=2.3.0",
+        "gymnasium>=0.29.0",
+        "httpx>=0.24.0",
+        "fireworks-ai>=0.17.19",
     ]
 
     if additional_requirements:
@@ -105,8 +121,8 @@ ENV PYTHONUNBUFFERED=1
 # Expose the port
 EXPOSE {service_port}
 
-# Run the MCP server directly - FastMCP now properly configured for Cloud Run
-CMD ["python", "-m", "{mcp_server_module}", "--transport", "streamable-http"]
+# Run the MCP server with proper host and port for Cloud Run
+CMD ["python", "-m", "{mcp_server_module}", "--host", "0.0.0.0", "--port", "{service_port}"]
 """
 
     return dockerfile_content
@@ -116,9 +132,11 @@ def _deploy_mcp_to_gcp_cloud_run(args, current_config, gcp_config_from_yaml):
     """Deploy MCP server to GCP Cloud Run."""
     print(f"Starting MCP server deployment to GCP Cloud Run for '{args.id}'...")
 
-    # Validate required arguments
-    if not args.mcp_server_module:
-        print("Error: --mcp-server-module is required for MCP server deployment.")
+    # Validate required arguments - either dockerfile or mcp-server-module must be provided
+    if not args.dockerfile and not args.mcp_server_module:
+        print(
+            "Error: Either --dockerfile or --mcp-server-module is required for MCP server deployment."
+        )
         return None
 
     # Resolve GCP configuration
@@ -157,16 +175,33 @@ def _deploy_mcp_to_gcp_cloud_run(args, current_config, gcp_config_from_yaml):
         )
         return None
 
-    # Generate Dockerfile content
-    dockerfile_content = _generate_mcp_dockerfile_content(
-        mcp_server_module=args.mcp_server_module,
-        python_version=getattr(args, "python_version", "3.11"),
-        service_port=getattr(args, "port", 8000),
-        additional_requirements=getattr(args, "requirements", None),
-    )
+    # Determine Dockerfile content - use provided file or generate
+    dockerfile_content = None
+    if hasattr(args, "dockerfile") and args.dockerfile:
+        # Use provided Dockerfile
+        dockerfile_path = Path(args.dockerfile)
+        if not dockerfile_path.exists():
+            print(f"Error: Dockerfile not found at {dockerfile_path}")
+            return None
+        print(f"Using provided Dockerfile: {dockerfile_path}")
+        try:
+            with open(dockerfile_path, "r") as f:
+                dockerfile_content = f.read()
+        except Exception as e:
+            print(f"Error reading Dockerfile at {dockerfile_path}: {e}")
+            return None
+    else:
+        # Generate Dockerfile content (legacy approach)
+        print("Generating Dockerfile content from mcp-server-module...")
+        dockerfile_content = _generate_mcp_dockerfile_content(
+            mcp_server_module=args.mcp_server_module,
+            python_version=getattr(args, "python_version", "3.11"),
+            service_port=getattr(args, "port", 8000),
+            additional_requirements=getattr(args, "requirements", None),
+        )
 
     if not dockerfile_content:
-        print("Failed to generate Dockerfile content. Aborting.")
+        print("Failed to obtain Dockerfile content. Aborting.")
         return None
 
     # Build and push Docker image
@@ -214,6 +249,12 @@ def _deploy_mcp_to_gcp_cloud_run(args, current_config, gcp_config_from_yaml):
     print(f"📍 Service URL: {cloud_run_service_url}")
     print(f"🔗 MCP Connection URL: {cloud_run_service_url}")
     print(f"📋 Service Name: {args.id}")
+    deployment_method = (
+        "local Dockerfile"
+        if (hasattr(args, "dockerfile") and args.dockerfile)
+        else "auto-generated Dockerfile"
+    )
+    print(f"🐳 Deployment Method: {deployment_method}")
     print()
     print("🎯 Next steps:")
     print(f"   1. Test your MCP server: curl {cloud_run_service_url}/health")

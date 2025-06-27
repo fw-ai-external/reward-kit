@@ -227,8 +227,11 @@ def parse_args(args=None):
     )
     deploy_mcp_parser.add_argument(
         "--mcp-server-module",
-        required=True,
-        help="Python module containing the MCP server (e.g., 'examples.frozen_lake_mcp.frozen_lake_mcp_server')",
+        help="Python module containing the MCP server (e.g., 'examples.frozen_lake_mcp.frozen_lake_mcp_server'). Required if --dockerfile is not provided.",
+    )
+    deploy_mcp_parser.add_argument(
+        "--dockerfile",
+        help="Path to Dockerfile to use for deployment (recommended for tested local Dockerfiles). When provided, --mcp-server-module is not required.",
     )
     deploy_mcp_parser.add_argument(
         "--gcp-project",

@@ -10,17 +10,17 @@ This directory contains a **purely remote rollout setup** that tests the deploye
 
 ## 📁 Files
 
-- `test_remote_north_star.py` - Remote version of the north star interface test
-- `rollouts.jsonl` - Dataset with environment configuration and prompts
-- `README.md` - This file
+- `test_remote_north_star.py` - Remote version of the north star interface test (in `remote_testing/`)
+- `rollouts.jsonl` - Dataset with environment configuration and prompts (in `shared_data/`)
+- `remote_testing_readme.md` - This file (in `docs/`)
 
 ## 🚀 Running the Tests
 
 ### Basic Remote Connection Test
 Tests MCP protocol connectivity, tool discovery, and basic operations:
 ```bash
-cd remote_rollout_test
-python test_remote_north_star.py
+cd examples/frozen_lake_mcp_complete/remote_testing
+.venv/bin/python test_remote_north_star.py
 ```
 
 ### What the Test Does
@@ -88,7 +88,7 @@ This setup validates the exact north star interface from the MCP design:
 import reward_kit as rk
 
 # Load dataset with environment configuration and prompts
-dataset = load_jsonl("rollouts.jsonl")
+dataset = load_jsonl("../shared_data/rollouts.jsonl")
 
 # Create general policy (environment-agnostic via tool calling)
 policy = rk.FireworksPolicy(

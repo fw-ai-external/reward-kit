@@ -1,0 +1,38 @@
+{
+  "parallel_progression": [
+    {
+      "n_envs": 1,
+      "steps": 5,
+      "duration": 1.8991851806640625,
+      "error": "cannot unpack non-iterable CancelledError object",
+      "status": "FAILED",
+      "test_name": "Single Environment"
+    }
+  ],
+  "connection_recovery": {
+    "recovery_test": false,
+    "results": [
+      {
+        "n_envs": 3,
+        "steps": 3,
+        "duration": 1.2315189838409424,
+        "error": "cannot unpack non-iterable CancelledError object",
+        "status": "FAILED"
+      },
+      {
+        "n_envs": 3,
+        "steps": 3,
+        "duration": 2.121245861053467,
+        "error": "cannot unpack non-iterable CancelledError object",
+        "status": "FAILED"
+      },
+      {
+        "n_envs": 5,
+        "steps": 3,
+        "duration": 1.1487178802490234,
+        "error": "cannot unpack non-iterable CancelledError object",
+        "status": "FAILED"
+      }
+    ]
+  }
+}

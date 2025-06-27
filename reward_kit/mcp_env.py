@@ -41,7 +41,7 @@ import json
 import logging
 import os
 import time
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -116,7 +116,7 @@ class GeneralMCPVectorEnv:
     """
     General MCP vector environment that works with any MCP server.
 
-    Maintains persistent MCP sessions for the duration of rollouts.
+    Manages on-demand MCP sessions for rollouts.
     Driven by dataset prompts and MCP tool discovery, not hardcoded logic.
     """
 
@@ -145,186 +145,116 @@ class GeneralMCPVectorEnv:
                 f"Sessions ({len(sessions)}) and dataset rows ({len(dataset_rows)}) must have same length"
             )
 
-    async def _ensure_session_connected(self, session: MCPSession) -> ClientSession:
-        """Ensure the MCP session is connected and return the ClientSession."""
-        if session._mcp_session is not None:
-            return session._mcp_session
+    async def _create_mcp_session_context(self, session: MCPSession):
+        """Creates a temporary, managed MCP session context."""
+        client_info = None
+        if session.seed is not None or (
+            session.dataset_row and session.dataset_row.environment_context
+        ):
+            from mcp.types import Implementation
 
-        # Create persistent connection
-        session._exit_stack = AsyncExitStack()
+            client_info = Implementation(name="reward-kit", version="1.0.0", _extra={})
+            if session.seed is not None:
+                client_info._extra["seed"] = session.seed
+            if session.dataset_row and session.dataset_row.environment_context:
+                client_info._extra["config"] = session.dataset_row.environment_context
 
-        logger.debug(
-            f"Creating persistent MCP connection for session {session.session_id}"
-        )
+        # This context manager will handle the entire lifecycle of the connection
+        # for a single operation, avoiding any cross-task context issues.
+        @asynccontextmanager
+        async def managed_session():
+            async with streamablehttp_client(
+                session.base_url, terminate_on_close=False
+            ) as (read_stream, write_stream, _):
+                async with ClientSession(
+                    read_stream, write_stream, client_info=client_info
+                ) as mcp_session:
+                    await mcp_session.initialize()
+                    yield mcp_session
 
-        # Establish persistent streamable HTTP connection
-        read_stream, write_stream, _ = await session._exit_stack.enter_async_context(
-            streamablehttp_client(session.base_url)
-        )
-
-        # Prepare client info with seed from dataset
-        from mcp.types import Implementation
-
-        client_info = Implementation(name="reward-kit", version="1.0.0")
-
-        # Include seed in client info's extra data if available
-        if session.seed is not None:
-            client_info._extra = {"seed": session.seed}
-            logger.debug(
-                f"Including seed {session.seed} in client info for session {session.session_id}"
-            )
-
-        # Add any additional context from dataset
-        if session.dataset_row and session.dataset_row.environment_context:
-            if not hasattr(client_info, "_extra"):
-                client_info._extra = {}
-            client_info._extra["config"] = session.dataset_row.environment_context
-
-        # Create persistent MCP session with client info
-        session._mcp_session = await session._exit_stack.enter_async_context(
-            ClientSession(read_stream, write_stream, client_info=client_info)
-        )
-
-        # Initialize the MCP session
-        await session._mcp_session.initialize()
-
-        logger.debug(
-            f"Persistent MCP session established for {session.session_id} with seed: {session.seed}"
-        )
-        return session._mcp_session
+        return managed_session()
 
     async def reset(self) -> tuple[List[Any], List[List[Dict]], List[str]]:
         """
         Reset all environments and return observations, tools, and system prompts.
 
         Uses proper MCP pattern: get initial state from resources during session establishment,
-        not from tool calls. Maintains persistent sessions for rollout duration.
+        not from tool calls. Each reset establishes a new, temporary session.
 
         Returns:
             observations: Current state of each environment from MCP resources
             tool_schemas: Available MCP tools for each environment
             system_prompts: System prompts from dataset
         """
-        print(f"🔄 Resetting {self.n} MCP environments with persistent sessions...")
+        print(f"🔄 Resetting {self.n} MCP environments...")
 
         async def reset_session(session: MCPSession) -> tuple[Any, List[Dict]]:
-            # Get or create persistent MCP session
-            mcp_session = await self._ensure_session_connected(session)
+            # Create a new, managed session for each reset operation.
+            async with await self._create_mcp_session_context(session) as mcp_session:
+                # Get available tools from MCP server
+                tools_response = await mcp_session.list_tools()
+                tools = tools_response.tools if hasattr(tools_response, "tools") else []
 
-            # Get available tools from MCP server
-            tools_response = await mcp_session.list_tools()
-            tools = tools_response.tools if hasattr(tools_response, "tools") else []
+                # Convert tools to schema format - filter out internal tools
+                tool_schemas = []
+                for tool in tools:
+                    # Only expose action tools to the model, not internal state tools
+                    tool_schema = {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "input_schema": (
+                            tool.inputSchema if hasattr(tool, "inputSchema") else {}
+                        ),
+                    }
+                    tool_schemas.append(tool_schema)
 
-            # Convert tools to schema format - filter out internal tools
-            tool_schemas = []
-            for tool in tools:
-                # Only expose action tools to the model, not internal state tools
-                tool_schema = {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "input_schema": (
-                        tool.inputSchema if hasattr(tool, "inputSchema") else {}
-                    ),
-                }
-                tool_schemas.append(tool_schema)
+                # PROPER MCP PATTERN: Get initial state from resources during session establishment
+                initial_observation = None
 
-            # PROPER MCP PATTERN: Get initial state from resources during session establishment
-            initial_observation = None
-
-            try:
-                # List available resources - this is where initial state should come from
-                logger.debug(
-                    f"Session {session.session_id}: Discovering MCP resources for initial state..."
-                )
-                resources_response = await mcp_session.list_resources()
-                resources = (
-                    resources_response.resources
-                    if hasattr(resources_response, "resources")
-                    else []
-                )
-                logger.debug(
-                    f"Session {session.session_id}: Found {len(resources)} MCP resources"
-                )
-                for resource in resources:
+                try:
+                    # List available resources - this is where initial state should come from
                     logger.debug(
-                        f"Session {session.session_id}: Resource: {resource.name} | URI: {resource.uri}"
+                        f"Session {session.session_id}: Discovering MCP resources for initial state..."
                     )
-
-                # Try to identify initial state resource based on common patterns
-                initial_state_resource = None
-                for resource in resources:
-                    resource_name_lower = resource.name.lower()
-                    resource_uri_lower = str(
-                        resource.uri
-                    ).lower()  # Convert AnyUrl to string first
-                    if any(
-                        keyword in resource_name_lower or keyword in resource_uri_lower
-                        for keyword in ["initial", "state", "observation", "start"]
-                    ):
-                        initial_state_resource = resource
-                        logger.debug(
-                            f"Session {session.session_id}: ✅ Found initial state resource: {resource.name} | URI: {resource.uri}"
-                        )
-                        break
-
-                if initial_state_resource:
-                    # Read the initial state resource
+                    resources_response = await mcp_session.list_resources()
+                    resources = (
+                        resources_response.resources
+                        if hasattr(resources_response, "resources")
+                        else []
+                    )
                     logger.debug(
-                        f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
+                        f"Session {session.session_id}: Found {len(resources)} MCP resources"
                     )
-                    resource_content = await mcp_session.read_resource(
-                        initial_state_resource.uri
-                    )
-                    if (
-                        hasattr(resource_content, "contents")
-                        and resource_content.contents
-                        and len(resource_content.contents) > 0
-                    ):
-                        content = resource_content.contents[0]
-                        if hasattr(content, "text"):
-                            # Parse JSON from text content
-                            try:
-                                initial_observation = json.loads(content.text)
-                                logger.info(
-                                    f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
-                                )
-                            except json.JSONDecodeError:
-                                # If not JSON, use the text as is
-                                initial_observation = {"observation": content.text}
-                                logger.debug(
-                                    f"Session {session.session_id}: Using text initial state"
-                                )
-                        elif hasattr(content, "blob"):
-                            # Handle binary blob if needed
-                            initial_observation = {
-                                "observation": "binary_data",
-                                "size": len(content.blob),
-                            }
-                            logger.debug(
-                                f"Session {session.session_id}: Using binary blob initial state"
-                            )
-                        else:
-                            initial_observation = {"observation": str(content)}
-                            logger.debug(
-                                f"Session {session.session_id}: Using string initial state"
-                            )
-                    else:
-                        logger.warning(
-                            f"Session {session.session_id}: Resource content is empty"
-                        )
-                        initial_state_resource = None  # Fall back to other options
-                else:
-                    logger.warning(
-                        f"Session {session.session_id}: ❌ No initial state resource found among {len(resources)} resources"
-                    )
-                    # Fallback: if no initial state resource, try first available resource
-                    if resources:
-                        first_resource = resources[0]
+                    for resource in resources:
                         logger.debug(
-                            f"Session {session.session_id}: No initial state resource found, using first resource: {first_resource.name}"
+                            f"Session {session.session_id}: Resource: {resource.name} | URI: {resource.uri}"
+                        )
+
+                    # Try to identify initial state resource based on common patterns
+                    initial_state_resource = None
+                    for resource in resources:
+                        resource_name_lower = resource.name.lower()
+                        resource_uri_lower = str(
+                            resource.uri
+                        ).lower()  # Convert AnyUrl to string first
+                        if any(
+                            keyword in resource_name_lower
+                            or keyword in resource_uri_lower
+                            for keyword in ["initial", "state", "observation", "start"]
+                        ):
+                            initial_state_resource = resource
+                            logger.debug(
+                                f"Session {session.session_id}: ✅ Found initial state resource: {resource.name} | URI: {resource.uri}"
+                            )
+                            break
+
+                    if initial_state_resource:
+                        # Read the initial state resource
+                        logger.debug(
+                            f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
                         )
                         resource_content = await mcp_session.read_resource(
-                            first_resource.uri
+                            initial_state_resource.uri
                         )
                         if (
                             hasattr(resource_content, "contents")
@@ -333,44 +263,97 @@ class GeneralMCPVectorEnv:
                         ):
                             content = resource_content.contents[0]
                             if hasattr(content, "text"):
+                                # Parse JSON from text content
                                 try:
                                     initial_observation = json.loads(content.text)
+                                    logger.info(
+                                        f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
+                                    )
                                 except json.JSONDecodeError:
+                                    # If not JSON, use the text as is
                                     initial_observation = {"observation": content.text}
+                                    logger.debug(
+                                        f"Session {session.session_id}: Using text initial state"
+                                    )
+                            elif hasattr(content, "blob"):
+                                # Handle binary blob if needed
+                                initial_observation = {
+                                    "observation": "binary_data",
+                                    "size": len(content.blob),
+                                }
+                                logger.debug(
+                                    f"Session {session.session_id}: Using binary blob initial state"
+                                )
                             else:
                                 initial_observation = {"observation": str(content)}
+                                logger.debug(
+                                    f"Session {session.session_id}: Using string initial state"
+                                )
+                        else:
+                            logger.warning(
+                                f"Session {session.session_id}: Resource content is empty"
+                            )
+                            initial_state_resource = None  # Fall back to other options
                     else:
-                        logger.debug(
-                            f"Session {session.session_id}: No resources available from MCP server"
+                        logger.warning(
+                            f"Session {session.session_id}: ❌ No initial state resource found among {len(resources)} resources"
                         )
+                        # Fallback: if no initial state resource, try first available resource
+                        if resources:
+                            first_resource = resources[0]
+                            logger.debug(
+                                f"Session {session.session_id}: No initial state resource found, using first resource: {first_resource.name}"
+                            )
+                            resource_content = await mcp_session.read_resource(
+                                first_resource.uri
+                            )
+                            if (
+                                hasattr(resource_content, "contents")
+                                and resource_content.contents
+                                and len(resource_content.contents) > 0
+                            ):
+                                content = resource_content.contents[0]
+                                if hasattr(content, "text"):
+                                    try:
+                                        initial_observation = json.loads(content.text)
+                                    except json.JSONDecodeError:
+                                        initial_observation = {
+                                            "observation": content.text
+                                        }
+                                else:
+                                    initial_observation = {"observation": str(content)}
+                        else:
+                            logger.debug(
+                                f"Session {session.session_id}: No resources available from MCP server"
+                            )
 
-            except Exception as e:
-                # If resources are not available, fall back to a default observation
-                # This maintains backward compatibility with servers that don't expose resources
-                logger.warning(
-                    f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
-                )
-                initial_observation = {
-                    "observation": "initial_state",
-                    "message": "Session established",
-                }
+                except Exception as e:
+                    # If resources are not available, fall back to a default observation
+                    # This maintains backward compatibility with servers that don't expose resources
+                    logger.warning(
+                        f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
+                    )
+                    initial_observation = {
+                        "observation": "initial_state",
+                        "message": "Session established",
+                    }
 
-            # Ensure we have some observation
-            if initial_observation is None:
-                logger.debug(
-                    f"Session {session.session_id}: Using default initial state"
-                )
-                initial_observation = {
-                    "observation": "default_initial_state",
-                    "session_id": session.session_id,
-                }
+                # Ensure we have some observation
+                if initial_observation is None:
+                    logger.debug(
+                        f"Session {session.session_id}: Using default initial state"
+                    )
+                    initial_observation = {
+                        "observation": "default_initial_state",
+                        "session_id": session.session_id,
+                    }
 
-            # Update session state
-            session.terminated = False
-            session.last_observation = initial_observation
-            return initial_observation, tool_schemas
+                # Update session state
+                session.terminated = False
+                session.last_observation = initial_observation
+                return initial_observation, tool_schemas
 
-        # Execute resets in parallel
+        # Execute resets in parallel, each with its own isolated session.
         tasks = [reset_session(session) for session in self.sessions]
         results = await asyncio.gather(*tasks)
 
@@ -386,7 +369,7 @@ class GeneralMCPVectorEnv:
         self, tool_calls: List[ToolCall]
     ) -> tuple[List[Any], List[float], List[bool], List[Dict]]:
         """
-        Execute tool calls via MCP protocol using persistent sessions.
+        Execute tool calls via MCP protocol using on-demand sessions.
 
         Note: This uses MCP tools for actions/interactions during rollout.
         Initial state was obtained from MCP resources during reset() - different pattern.
@@ -404,81 +387,80 @@ class GeneralMCPVectorEnv:
             if session.terminated:
                 return session.last_observation, 0.0, True, {}
 
-            # Use persistent MCP session instead of creating new ones
-            mcp_session = await self._ensure_session_connected(session)
+            # Create a new, managed session for each step operation.
+            async with await self._create_mcp_session_context(session) as mcp_session:
+                # Execute the tool call via MCP protocol
+                tool_result = await mcp_session.call_tool(
+                    tool_call.tool_name, tool_call.arguments
+                )
 
-            # Execute the tool call via MCP protocol
-            tool_result = await mcp_session.call_tool(
-                tool_call.tool_name, tool_call.arguments
-            )
-
-            # Extract results using the working pattern
-            if tool_result.content and len(tool_result.content) > 0:
-                content = tool_result.content[0]
-                if hasattr(content, "text"):
-                    # Fix: Handle empty or invalid JSON responses gracefully
-                    if not content.text or content.text.strip() == "":
-                        logger.warning(
-                            f"Session {session.session_id}: Empty tool response from {tool_call.tool_name}"
-                        )
+                # Extract results using the working pattern
+                if tool_result.content and len(tool_result.content) > 0:
+                    content = tool_result.content[0]
+                    if hasattr(content, "text"):
+                        # Fix: Handle empty or invalid JSON responses gracefully
+                        if not content.text or content.text.strip() == "":
+                            logger.warning(
+                                f"Session {session.session_id}: Empty tool response from {tool_call.tool_name}"
+                            )
+                            result_data = {
+                                "observation": "empty_response",
+                                "reward": 0.0,
+                                "terminated": False,
+                            }
+                        else:
+                            try:
+                                result_data = json.loads(content.text)
+                            except json.JSONDecodeError as e:
+                                logger.warning(
+                                    f"Session {session.session_id}: Invalid JSON from {tool_call.tool_name}: {content.text}. Error: {e}"
+                                )
+                                # Create a structured response from the raw text
+                                result_data = {
+                                    "observation": content.text,
+                                    "reward": 0.0,
+                                    "terminated": False,
+                                    "error": "invalid_json_response",
+                                }
+                    else:
+                        # Handle non-text content
                         result_data = {
-                            "observation": "empty_response",
+                            "observation": str(content),
                             "reward": 0.0,
                             "terminated": False,
                         }
-                    else:
-                        try:
-                            result_data = json.loads(content.text)
-                        except json.JSONDecodeError as e:
-                            logger.warning(
-                                f"Session {session.session_id}: Invalid JSON from {tool_call.tool_name}: {content.text}. Error: {e}"
-                            )
-                            # Create a structured response from the raw text
-                            result_data = {
-                                "observation": content.text,
-                                "reward": 0.0,
-                                "terminated": False,
-                                "error": "invalid_json_response",
-                            }
                 else:
-                    # Handle non-text content
+                    # Handle completely empty tool result
+                    logger.warning(
+                        f"Session {session.session_id}: Tool {tool_call.tool_name} returned empty result"
+                    )
                     result_data = {
-                        "observation": str(content),
+                        "observation": "no_response",
                         "reward": 0.0,
                         "terminated": False,
                     }
-            else:
-                # Handle completely empty tool result
-                logger.warning(
-                    f"Session {session.session_id}: Tool {tool_call.tool_name} returned empty result"
-                )
-                result_data = {
-                    "observation": "no_response",
-                    "reward": 0.0,
-                    "terminated": False,
+
+                # Parse result into observation, reward, done, info
+                # Keep full result_data as observation for rich prompt templates
+                observation = result_data
+                reward = result_data.get("reward", 0.0)
+                terminated = result_data.get("terminated", False)
+                truncated = result_data.get("truncated", False)
+                done = terminated or truncated
+
+                # Update session state
+                session.last_observation = observation
+                session.terminated = done
+
+                info = {
+                    "steps": result_data.get("moves", result_data.get("steps", 0)),
+                    "tool_call": tool_call.tool_name,
+                    "arguments": tool_call.arguments,
                 }
 
-            # Parse result into observation, reward, done, info
-            # Keep full result_data as observation for rich prompt templates
-            observation = result_data
-            reward = result_data.get("reward", 0.0)
-            terminated = result_data.get("terminated", False)
-            truncated = result_data.get("truncated", False)
-            done = terminated or truncated
+                return observation, reward, done, info
 
-            # Update session state
-            session.last_observation = observation
-            session.terminated = done
-
-            info = {
-                "steps": result_data.get("moves", result_data.get("steps", 0)),
-                "tool_call": tool_call.tool_name,
-                "arguments": tool_call.arguments,
-            }
-
-            return observation, reward, done, info
-
-        # Execute steps in parallel using persistent sessions
+        # Execute steps in parallel using on-demand sessions
         tasks = [
             step_session(session, tool_call)
             for session, tool_call in zip(self.sessions, tool_calls)
@@ -536,34 +518,11 @@ class GeneralMCPVectorEnv:
         return template.format(observation=display_observation, **context)
 
     async def close(self):
-        """Close all persistent MCP sessions cleanly."""
-        print(f"🔄 Closing {self.n} persistent MCP sessions...")
-
-        close_tasks = []
-        for session in self.sessions:
-            if session._exit_stack is not None:
-                logger.debug(f"Closing persistent session {session.session_id}")
-
-                # Use asyncio.create_task to handle cleanup properly
-                async def cleanup_session(sess):
-                    try:
-                        await sess._exit_stack.aclose()
-                    except Exception as e:
-                        logger.warning(f"Error closing session {sess.session_id}: {e}")
-                    finally:
-                        sess._mcp_session = None
-                        sess._exit_stack = None
-
-                close_tasks.append(cleanup_session(session))
-
-        if close_tasks:
-            # Wait for all cleanup tasks with proper exception handling
-            results = await asyncio.gather(*close_tasks, return_exceptions=True)
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logger.warning(f"Session cleanup {i} failed: {result}")
-
-        print(f"✅ All {self.n} MCP sessions closed")
+        """Closes all MCP sessions. This is now a no-op as sessions are managed on-demand."""
+        print(
+            f"✅ MCP sessions are managed on-demand and do not require explicit closing."
+        )
+        pass
 
 
 # Keep the old MCPVectorEnv for backward compatibility
@@ -1123,9 +1082,9 @@ def make(
     if not base_url.startswith("http"):
         raise ValueError("Environment spec must be a valid HTTP URL")
 
-    # Ensure we don't have trailing slash to match working client pattern
-    if base_url.endswith("/"):
-        base_url = base_url.rstrip("/")
+    # Ensure we HAVE a trailing slash to avoid 307 redirects that break POST requests
+    if not base_url.endswith("/"):
+        base_url += "/"
 
     # Handle dataset-driven vs legacy approaches
     if dataset is not None:

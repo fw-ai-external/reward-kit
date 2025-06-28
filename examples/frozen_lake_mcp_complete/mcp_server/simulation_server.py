@@ -179,9 +179,10 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
 
     async def _get_initial_state_resource(self) -> str:
         """Get initial state resource."""
-        # Create a temporary session for resource calls
-        temp_session_id = "resource_call"
-        session_state = await self._get_or_create_session(temp_session_id)
+        # Use the current request's session context instead of a shared temporary session
+        ctx = self.app.request_context
+        session_id = f"resource_{id(ctx.session)}"
+        session_state = await self._get_or_create_session(session_id)
 
         env = session_state["env"]
         initial_observation = session_state["initial_observation"]
@@ -259,6 +260,23 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
             # Create environment with default config
             config = self.get_default_config()
             seed = 42  # Default seed for reproducibility
+
+            # Extract seed from client_info if available
+            ctx = self.app.request_context
+            if ctx.session.client_params and ctx.session.client_params.clientInfo:
+                client_info = ctx.session.client_params.clientInfo
+                if hasattr(client_info, "_extra") and client_info._extra:
+                    if "seed" in client_info._extra:
+                        seed = client_info._extra["seed"]
+                        logger.info(f"🎲 Using seed from client_info: {seed}")
+                    else:
+                        logger.debug(
+                            f"🎲 No seed in client_info._extra: {client_info._extra}"
+                        )
+                else:
+                    logger.debug(f"🎲 No _extra in client_info: {client_info}")
+            else:
+                logger.debug(f"🎲 No client_params or clientInfo available")
 
             # Create environment with seed
             if hasattr(self, "create_environment_with_seed"):

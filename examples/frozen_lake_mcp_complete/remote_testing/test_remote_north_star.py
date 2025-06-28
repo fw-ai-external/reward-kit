@@ -58,26 +58,26 @@ async def test_remote_north_star(remote_url: str = REMOTE_URL):
             },
         },
         # Temporarily commented out to test with single environment
-        # {
-        #     "id": "remote_run_002",
-        #     "system_prompt": system_prompt,
-        #     "user_prompt_template": user_prompt_template,
-        #     "environment_context": {
-        #         "game": "FrozenLake",
-        #         "grid_type": "4x4",
-        #         "seed": 123,
-        #     },
-        # },
-        # {
-        #     "id": "remote_run_003",
-        #     "system_prompt": system_prompt,
-        #     "user_prompt_template": user_prompt_template,
-        #     "environment_context": {
-        #         "game": "FrozenLake",
-        #         "grid_type": "4x4",
-        #         "seed": 999,
-        #     },
-        # },
+        {
+            "id": "remote_run_002",
+            "system_prompt": system_prompt,
+            "user_prompt_template": user_prompt_template,
+            "environment_context": {
+                "game": "FrozenLake",
+                "grid_type": "4x4",
+                "seed": 123,
+            },
+        },
+        {
+            "id": "remote_run_003",
+            "system_prompt": system_prompt,
+            "user_prompt_template": user_prompt_template,
+            "environment_context": {
+                "game": "FrozenLake",
+                "grid_type": "4x4",
+                "seed": 999,
+            },
+        },
     ]
     print(f"📊 Loaded dataset with {len(dataset)} rows")
 

@@ -253,45 +253,69 @@ class GeneralMCPVectorEnv:
                         logger.debug(
                             f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
                         )
+                        logger.debug(
+                            f"Session {session.session_id}: About to call mcp_session.read_resource with URI: {initial_state_resource.uri}"
+                        )
+                        logger.debug(
+                            f"Session {session.session_id}: mcp_session type: {type(mcp_session)}"
+                        )
+
                         resource_content = await mcp_session.read_resource(
                             initial_state_resource.uri
                         )
-                        if (
+
+                        logger.debug(
+                            f"Session {session.session_id}: read_resource returned type: {type(resource_content)}"
+                        )
+                        logger.debug(
+                            f"Session {session.session_id}: read_resource returned value: {resource_content}"
+                        )
+                        logger.debug(
+                            f"Session {session.session_id}: read_resource dir(): {dir(resource_content)}"
+                        )
+
+                        # Handle the new ResourceContents format
+                        if hasattr(resource_content, "text"):
+                            logger.debug(
+                                f"Session {session.session_id}: resource_content has 'text' attribute"
+                            )
+                            try:
+                                initial_observation = json.loads(resource_content.text)
+                                logger.info(
+                                    f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
+                                )
+                            except json.JSONDecodeError:
+                                initial_observation = {
+                                    "observation": resource_content.text
+                                }
+                                logger.debug(
+                                    f"Session {session.session_id}: Using text initial state"
+                                )
+                        elif (
                             hasattr(resource_content, "contents")
                             and resource_content.contents
                             and len(resource_content.contents) > 0
                         ):
+                            logger.debug(
+                                f"Session {session.session_id}: resource_content has 'contents' attribute (old format)"
+                            )
+                            # Fallback to old format for backward compatibility
                             content = resource_content.contents[0]
                             if hasattr(content, "text"):
-                                # Parse JSON from text content
                                 try:
                                     initial_observation = json.loads(content.text)
-                                    logger.info(
-                                        f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
-                                    )
                                 except json.JSONDecodeError:
-                                    # If not JSON, use the text as is
                                     initial_observation = {"observation": content.text}
-                                    logger.debug(
-                                        f"Session {session.session_id}: Using text initial state"
-                                    )
-                            elif hasattr(content, "blob"):
-                                # Handle binary blob if needed
-                                initial_observation = {
-                                    "observation": "binary_data",
-                                    "size": len(content.blob),
-                                }
-                                logger.debug(
-                                    f"Session {session.session_id}: Using binary blob initial state"
-                                )
                             else:
-                                initial_observation = {"observation": str(content)}
-                                logger.debug(
-                                    f"Session {session.session_id}: Using string initial state"
-                                )
+                                initial_observation = {
+                                    "observation": str(resource_content)
+                                }
                         else:
                             logger.warning(
-                                f"Session {session.session_id}: Resource content is empty"
+                                f"Session {session.session_id}: Resource content is empty or unrecognized format"
+                            )
+                            logger.warning(
+                                f"Session {session.session_id}: resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
                             )
                             initial_state_resource = None  # Fall back to other options
                     else:
@@ -304,14 +328,46 @@ class GeneralMCPVectorEnv:
                             logger.debug(
                                 f"Session {session.session_id}: No initial state resource found, using first resource: {first_resource.name}"
                             )
+                            logger.debug(
+                                f"Session {session.session_id}: About to call mcp_session.read_resource with fallback URI: {first_resource.uri}"
+                            )
+
                             resource_content = await mcp_session.read_resource(
                                 first_resource.uri
                             )
-                            if (
+
+                            logger.debug(
+                                f"Session {session.session_id}: fallback read_resource returned type: {type(resource_content)}"
+                            )
+                            logger.debug(
+                                f"Session {session.session_id}: fallback read_resource returned value: {resource_content}"
+                            )
+                            logger.debug(
+                                f"Session {session.session_id}: fallback read_resource dir(): {dir(resource_content)}"
+                            )
+
+                            # Handle the new ResourceContents format
+                            if hasattr(resource_content, "text"):
+                                logger.debug(
+                                    f"Session {session.session_id}: fallback resource_content has 'text' attribute"
+                                )
+                                try:
+                                    initial_observation = json.loads(
+                                        resource_content.text
+                                    )
+                                except json.JSONDecodeError:
+                                    initial_observation = {
+                                        "observation": resource_content.text
+                                    }
+                            elif (
                                 hasattr(resource_content, "contents")
                                 and resource_content.contents
                                 and len(resource_content.contents) > 0
                             ):
+                                logger.debug(
+                                    f"Session {session.session_id}: fallback resource_content has 'contents' attribute (old format)"
+                                )
+                                # Fallback to old format for backward compatibility
                                 content = resource_content.contents[0]
                                 if hasattr(content, "text"):
                                     try:
@@ -322,6 +378,13 @@ class GeneralMCPVectorEnv:
                                         }
                                 else:
                                     initial_observation = {"observation": str(content)}
+                            else:
+                                logger.warning(
+                                    f"Session {session.session_id}: fallback resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
+                                )
+                                initial_observation = {
+                                    "observation": str(resource_content)
+                                }
                         else:
                             logger.debug(
                                 f"Session {session.session_id}: No resources available from MCP server"
@@ -332,6 +395,17 @@ class GeneralMCPVectorEnv:
                     # This maintains backward compatibility with servers that don't expose resources
                     logger.warning(
                         f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
+                    )
+                    logger.warning(
+                        f"Session {session.session_id}: Exception type: {type(e)}"
+                    )
+                    logger.warning(
+                        f"Session {session.session_id}: Exception args: {e.args}"
+                    )
+                    import traceback
+
+                    logger.warning(
+                        f"Session {session.session_id}: Full traceback: {traceback.format_exc()}"
                     )
                     initial_observation = {
                         "observation": "initial_state",

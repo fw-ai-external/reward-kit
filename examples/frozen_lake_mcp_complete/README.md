@@ -78,7 +78,7 @@ export FIREWORKS_ACCOUNT_ID="your_account_id"
 **First, start the MCP server (in one terminal):**
 ```bash
 cd examples/frozen_lake_mcp_complete/mcp_server
-.venv/bin/python simulation_server.py
+../../../.venv/bin/python simulation_server.py
 # Server will start on http://localhost:8000/mcp
 # Keep this terminal running for tests
 ```
@@ -88,16 +88,16 @@ cd examples/frozen_lake_mcp_complete/mcp_server
 cd examples/frozen_lake_mcp_complete/local_testing
 
 # Test basic north star API (requires server running!)
-.venv/bin/python test_north_star.py
+../../../.venv/bin/python test_north_star.py
 
 # Test with MCP rollout client (requires server running!)
-.venv/bin/python mcp_rollout_client.py --test single --seed 42
+../../../.venv/bin/python mcp_rollout_client.py --test single --seed 42
 
 # Run comprehensive robustness tests
-.venv/bin/python run_all_robustness_tests.py
+../../../.venv/bin/python run_all_robustness_tests.py
 
 # Test adapter functionality (doesn't require server)
-.venv/bin/python test_adapter_seeding.py
+../../../.venv/bin/python test_adapter_seeding.py
 ```
 
 ### 2. Remote Testing
@@ -107,7 +107,7 @@ cd examples/frozen_lake_mcp_complete/local_testing
 **Test against deployed remote server:**
 ```bash
 cd examples/frozen_lake_mcp_complete/remote_testing
-.venv/bin/python test_remote_north_star.py
+../../../.venv/bin/python test_remote_north_star.py
 ```
 
 ## 🔧 Key Components
@@ -157,25 +157,25 @@ cd examples/frozen_lake_mcp_complete/remote_testing
 ### Development Testing
 ```bash
 # 1. Start local server (in background or separate terminal)
-cd mcp_server && .venv/bin/python frozen_lake_mcp_server.py &
+cd mcp_server && ../../../.venv/bin/python frozen_lake_mcp_server.py &
 
 # 2. Wait for server to start, then run validation
-sleep 2 && cd ../local_testing && .venv/bin/python test_north_star.py
+sleep 2 && cd ../local_testing && ../../../.venv/bin/python test_north_star.py
 
 # 3. Run comprehensive tests (requires server)
-.venv/bin/python run_all_robustness_tests.py
+../../../.venv/bin/python run_all_robustness_tests.py
 
 # 4. Test specific seeds (requires server)
-.venv/bin/python test_seed_verification.py
+../../../.venv/bin/python test_seed_verification.py
 
 # 5. Test adapter (no server needed)
-.venv/bin/python test_adapter_seeding.py
+../../../.venv/bin/python test_adapter_seeding.py
 ```
 
 ### Production Validation
 ```bash
 # Test remote deployment
-cd remote_testing && .venv/bin/python test_remote_north_star.py
+cd remote_testing && ../../../.venv/bin/python test_remote_north_star.py
 ```
 
 ## 📊 Expected Results
@@ -220,17 +220,17 @@ cd remote_testing && .venv/bin/python test_remote_north_star.py
 
 ```bash
 # Check server logs (start server in verbose mode)
-cd mcp_server && .venv/bin/python frozen_lake_mcp_server.py --verbose
+cd mcp_server && ../../../.venv/bin/python frozen_lake_mcp_server.py --verbose
 
 # Analyze trajectories (needs generated trajectory data)
-cd shared_data && .venv/bin/python analyze_seed_test.py
+cd shared_data && ../../../.venv/bin/python analyze_seed_test.py
 # Note: Requires trajectory data in expected format
 
 # Run single rollout for debugging (requires server running)
-cd local_testing && .venv/bin/python mcp_rollout_client.py --test single --seed 42
+cd local_testing && ../../../.venv/bin/python mcp_rollout_client.py --test single --seed 42
 
 # Test adapter without server
-cd local_testing && .venv/bin/python test_adapter_seeding.py
+cd local_testing && ../../../.venv/bin/python test_adapter_seeding.py
 ```
 
 ## 🌟 North Star API

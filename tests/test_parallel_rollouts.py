@@ -32,6 +32,12 @@ async def test_seed_handling_and_type_compatibility():
     )
     venv_python = Path(__file__).parent.parent / ".venv" / "bin" / "python"
 
+    # Check if the venv python exists, otherwise use system python
+    if not venv_python.exists():
+        import sys
+
+        venv_python = Path(sys.executable)
+
     # Start server in background
     server_process = subprocess.Popen(
         [str(venv_python), str(server_script), "--port", "8001", "--host", "127.0.0.1"],

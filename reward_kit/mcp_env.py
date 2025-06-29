@@ -152,6 +152,11 @@ class GeneralMCPVectorEnv:
             if session._exit_stack:
                 try:
                     await session._exit_stack.aclose()
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully (especially important for Python 3.12)
+                    logger.debug(
+                        f"Session {session.session_id} reinit close was cancelled"
+                    )
                 except Exception as e:
                     logger.warning(
                         f"Error closing existing session {session.session_id} during reinit: {e}"
@@ -607,6 +612,9 @@ class GeneralMCPVectorEnv:
             if session._exit_stack:
                 try:
                     await session._exit_stack.aclose()
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully (especially important for Python 3.12)
+                    logger.debug(f"Session {session.session_id} close was cancelled")
                 except Exception as e:
                     logger.warning(f"Error closing session {session.session_id}: {e}")
                 finally:
@@ -619,8 +627,14 @@ class GeneralMCPVectorEnv:
         ]
 
         if tasks:
-            # Wait for all close operations to complete
-            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                # Wait for all close operations to complete
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                # Handle cancellation gracefully (especially important for Python 3.12)
+                logger.debug(
+                    "Close operation was cancelled, but sessions are marked as closed"
+                )
 
         print(f"✅ All MCP sessions closed.")
 

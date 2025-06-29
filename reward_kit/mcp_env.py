@@ -41,7 +41,7 @@ import json
 import logging
 import os
 import time
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -116,7 +116,7 @@ class GeneralMCPVectorEnv:
     """
     General MCP vector environment that works with any MCP server.
 
-    Maintains persistent MCP sessions for the duration of rollouts.
+    Manages on-demand MCP sessions for rollouts.
     Driven by dataset prompts and MCP tool discovery, not hardcoded logic.
     """
 
@@ -145,71 +145,71 @@ class GeneralMCPVectorEnv:
                 f"Sessions ({len(sessions)}) and dataset rows ({len(dataset_rows)}) must have same length"
             )
 
-    async def _ensure_session_connected(self, session: MCPSession) -> ClientSession:
-        """Ensure the MCP session is connected and return the ClientSession."""
-        if session._mcp_session is not None:
-            return session._mcp_session
+    async def _initialize_mcp_session(self, session: MCPSession):
+        """Initializes a persistent MCP session."""
+        if session._mcp_session:
+            # If a session exists, close it before creating a new one.
+            if session._exit_stack:
+                try:
+                    await session._exit_stack.aclose()
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully (especially important for Python 3.12)
+                    logger.debug(
+                        f"Session {session.session_id} reinit close was cancelled"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Error closing existing session {session.session_id} during reinit: {e}"
+                    )
+                finally:
+                    session._exit_stack = None
+            session._mcp_session = None
 
-        # Create persistent connection
-        session._exit_stack = AsyncExitStack()
+        exit_stack = AsyncExitStack()
 
-        logger.debug(
-            f"Creating persistent MCP connection for session {session.session_id}"
+        client_info = None
+        if session.seed is not None or (
+            session.dataset_row and session.dataset_row.environment_context
+        ):
+            from mcp.types import Implementation
+
+            client_info = Implementation(name="reward-kit", version="1.0.0", _extra={})
+            if session.seed is not None:
+                client_info._extra["seed"] = session.seed
+            if session.dataset_row and session.dataset_row.environment_context:
+                client_info._extra["config"] = session.dataset_row.environment_context
+
+        read_stream, write_stream, _ = await exit_stack.enter_async_context(
+            streamablehttp_client(session.base_url, terminate_on_close=True)
         )
 
-        # Establish persistent streamable HTTP connection
-        read_stream, write_stream, _ = await session._exit_stack.enter_async_context(
-            streamablehttp_client(session.base_url)
-        )
-
-        # Prepare client info with seed from dataset
-        from mcp.types import Implementation
-
-        client_info = Implementation(name="reward-kit", version="1.0.0")
-
-        # Include seed in client info's extra data if available
-        if session.seed is not None:
-            client_info._extra = {"seed": session.seed}
-            logger.debug(
-                f"Including seed {session.seed} in client info for session {session.session_id}"
-            )
-
-        # Add any additional context from dataset
-        if session.dataset_row and session.dataset_row.environment_context:
-            if not hasattr(client_info, "_extra"):
-                client_info._extra = {}
-            client_info._extra["config"] = session.dataset_row.environment_context
-
-        # Create persistent MCP session with client info
-        session._mcp_session = await session._exit_stack.enter_async_context(
+        mcp_session = await exit_stack.enter_async_context(
             ClientSession(read_stream, write_stream, client_info=client_info)
         )
 
-        # Initialize the MCP session
-        await session._mcp_session.initialize()
+        await mcp_session.initialize()
 
-        logger.debug(
-            f"Persistent MCP session established for {session.session_id} with seed: {session.seed}"
-        )
-        return session._mcp_session
+        session._mcp_session = mcp_session
+        session._exit_stack = exit_stack
 
     async def reset(self) -> tuple[List[Any], List[List[Dict]], List[str]]:
         """
         Reset all environments and return observations, tools, and system prompts.
 
-        Uses proper MCP pattern: get initial state from resources during session establishment,
-        not from tool calls. Maintains persistent sessions for rollout duration.
+        Establishes persistent MCP sessions for each environment.
+        Uses proper MCP pattern: get initial state from resources during session establishment.
 
         Returns:
             observations: Current state of each environment from MCP resources
             tool_schemas: Available MCP tools for each environment
             system_prompts: System prompts from dataset
         """
-        print(f"🔄 Resetting {self.n} MCP environments with persistent sessions...")
+        print(f"🔄 Resetting {self.n} MCP environments...")
 
         async def reset_session(session: MCPSession) -> tuple[Any, List[Dict]]:
-            # Get or create persistent MCP session
-            mcp_session = await self._ensure_session_connected(session)
+            # Establish a persistent session for each environment.
+            await self._initialize_mcp_session(session)
+            mcp_session = session._mcp_session
 
             # Get available tools from MCP server
             tools_response = await mcp_session.list_tools()
@@ -272,45 +272,65 @@ class GeneralMCPVectorEnv:
                     logger.debug(
                         f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
                     )
+                    logger.debug(
+                        f"Session {session.session_id}: About to call mcp_session.read_resource with URI: {initial_state_resource.uri}"
+                    )
+                    logger.debug(
+                        f"Session {session.session_id}: mcp_session type: {type(mcp_session)}"
+                    )
+
                     resource_content = await mcp_session.read_resource(
                         initial_state_resource.uri
                     )
-                    if (
+
+                    logger.debug(
+                        f"Session {session.session_id}: read_resource returned type: {type(resource_content)}"
+                    )
+                    logger.debug(
+                        f"Session {session.session_id}: read_resource returned value: {resource_content}"
+                    )
+                    logger.debug(
+                        f"Session {session.session_id}: read_resource dir(): {dir(resource_content)}"
+                    )
+
+                    # Handle the new ResourceContents format
+                    if hasattr(resource_content, "text"):
+                        logger.debug(
+                            f"Session {session.session_id}: resource_content has 'text' attribute"
+                        )
+                        try:
+                            initial_observation = json.loads(resource_content.text)
+                            logger.info(
+                                f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
+                            )
+                        except json.JSONDecodeError:
+                            initial_observation = {"observation": resource_content.text}
+                            logger.debug(
+                                f"Session {session.session_id}: Using text initial state"
+                            )
+                    elif (
                         hasattr(resource_content, "contents")
                         and resource_content.contents
                         and len(resource_content.contents) > 0
                     ):
+                        logger.debug(
+                            f"Session {session.session_id}: resource_content has 'contents' attribute (old format)"
+                        )
+                        # Fallback to old format for backward compatibility
                         content = resource_content.contents[0]
                         if hasattr(content, "text"):
-                            # Parse JSON from text content
                             try:
                                 initial_observation = json.loads(content.text)
-                                logger.info(
-                                    f"Session {session.session_id}: ✅ Successfully parsed JSON initial state with grid_layout: {initial_observation.get('grid_layout', 'N/A')[:20]}..."
-                                )
                             except json.JSONDecodeError:
-                                # If not JSON, use the text as is
                                 initial_observation = {"observation": content.text}
-                                logger.debug(
-                                    f"Session {session.session_id}: Using text initial state"
-                                )
-                        elif hasattr(content, "blob"):
-                            # Handle binary blob if needed
-                            initial_observation = {
-                                "observation": "binary_data",
-                                "size": len(content.blob),
-                            }
-                            logger.debug(
-                                f"Session {session.session_id}: Using binary blob initial state"
-                            )
                         else:
-                            initial_observation = {"observation": str(content)}
-                            logger.debug(
-                                f"Session {session.session_id}: Using string initial state"
-                            )
+                            initial_observation = {"observation": str(resource_content)}
                     else:
                         logger.warning(
-                            f"Session {session.session_id}: Resource content is empty"
+                            f"Session {session.session_id}: Resource content is empty or unrecognized format"
+                        )
+                        logger.warning(
+                            f"Session {session.session_id}: resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
                         )
                         initial_state_resource = None  # Fall back to other options
                 else:
@@ -323,14 +343,44 @@ class GeneralMCPVectorEnv:
                         logger.debug(
                             f"Session {session.session_id}: No initial state resource found, using first resource: {first_resource.name}"
                         )
+                        logger.debug(
+                            f"Session {session.session_id}: About to call mcp_session.read_resource with fallback URI: {first_resource.uri}"
+                        )
+
                         resource_content = await mcp_session.read_resource(
                             first_resource.uri
                         )
-                        if (
+
+                        logger.debug(
+                            f"Session {session.session_id}: fallback read_resource returned type: {type(resource_content)}"
+                        )
+                        logger.debug(
+                            f"Session {session.session_id}: fallback read_resource returned value: {resource_content}"
+                        )
+                        logger.debug(
+                            f"Session {session.session_id}: fallback read_resource dir(): {dir(resource_content)}"
+                        )
+
+                        # Handle the new ResourceContents format
+                        if hasattr(resource_content, "text"):
+                            logger.debug(
+                                f"Session {session.session_id}: fallback resource_content has 'text' attribute"
+                            )
+                            try:
+                                initial_observation = json.loads(resource_content.text)
+                            except json.JSONDecodeError:
+                                initial_observation = {
+                                    "observation": resource_content.text
+                                }
+                        elif (
                             hasattr(resource_content, "contents")
                             and resource_content.contents
                             and len(resource_content.contents) > 0
                         ):
+                            logger.debug(
+                                f"Session {session.session_id}: fallback resource_content has 'contents' attribute (old format)"
+                            )
+                            # Fallback to old format for backward compatibility
                             content = resource_content.contents[0]
                             if hasattr(content, "text"):
                                 try:
@@ -339,6 +389,11 @@ class GeneralMCPVectorEnv:
                                     initial_observation = {"observation": content.text}
                             else:
                                 initial_observation = {"observation": str(content)}
+                        else:
+                            logger.warning(
+                                f"Session {session.session_id}: fallback resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
+                            )
+                            initial_observation = {"observation": str(resource_content)}
                     else:
                         logger.debug(
                             f"Session {session.session_id}: No resources available from MCP server"
@@ -349,6 +404,17 @@ class GeneralMCPVectorEnv:
                 # This maintains backward compatibility with servers that don't expose resources
                 logger.warning(
                     f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
+                )
+                logger.warning(
+                    f"Session {session.session_id}: Exception type: {type(e)}"
+                )
+                logger.warning(
+                    f"Session {session.session_id}: Exception args: {e.args}"
+                )
+                import traceback
+
+                logger.warning(
+                    f"Session {session.session_id}: Full traceback: {traceback.format_exc()}"
                 )
                 initial_observation = {
                     "observation": "initial_state",
@@ -370,7 +436,7 @@ class GeneralMCPVectorEnv:
             session.last_observation = initial_observation
             return initial_observation, tool_schemas
 
-        # Execute resets in parallel
+        # Execute resets in parallel, each with its own isolated session.
         tasks = [reset_session(session) for session in self.sessions]
         results = await asyncio.gather(*tasks)
 
@@ -404,8 +470,10 @@ class GeneralMCPVectorEnv:
             if session.terminated:
                 return session.last_observation, 0.0, True, {}
 
-            # Use persistent MCP session instead of creating new ones
-            mcp_session = await self._ensure_session_connected(session)
+            if not session._mcp_session:
+                raise RuntimeError("Session not initialized. Call reset() first.")
+
+            mcp_session = session._mcp_session
 
             # Execute the tool call via MCP protocol
             tool_result = await mcp_session.call_tool(
@@ -536,34 +604,39 @@ class GeneralMCPVectorEnv:
         return template.format(observation=display_observation, **context)
 
     async def close(self):
-        """Close all persistent MCP sessions cleanly."""
-        print(f"🔄 Closing {self.n} persistent MCP sessions...")
+        """Closes all MCP sessions."""
+        print(f"🧹 Closing {self.n} MCP sessions...")
 
-        close_tasks = []
-        for session in self.sessions:
-            if session._exit_stack is not None:
-                logger.debug(f"Closing persistent session {session.session_id}")
+        async def close_session(session: MCPSession):
+            """Close a single MCP session in its own task context."""
+            if session._exit_stack:
+                try:
+                    await session._exit_stack.aclose()
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully (especially important for Python 3.12)
+                    logger.debug(f"Session {session.session_id} close was cancelled")
+                except Exception as e:
+                    logger.warning(f"Error closing session {session.session_id}: {e}")
+                finally:
+                    session._exit_stack = None
+                    session._mcp_session = None
 
-                # Use asyncio.create_task to handle cleanup properly
-                async def cleanup_session(sess):
-                    try:
-                        await sess._exit_stack.aclose()
-                    except Exception as e:
-                        logger.warning(f"Error closing session {sess.session_id}: {e}")
-                    finally:
-                        sess._mcp_session = None
-                        sess._exit_stack = None
+        # Create individual tasks for each session close to match the creation pattern
+        tasks = [
+            asyncio.create_task(close_session(session)) for session in self.sessions
+        ]
 
-                close_tasks.append(cleanup_session(session))
+        if tasks:
+            try:
+                # Wait for all close operations to complete
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                # Handle cancellation gracefully (especially important for Python 3.12)
+                logger.debug(
+                    "Close operation was cancelled, but sessions are marked as closed"
+                )
 
-        if close_tasks:
-            # Wait for all cleanup tasks with proper exception handling
-            results = await asyncio.gather(*close_tasks, return_exceptions=True)
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logger.warning(f"Session cleanup {i} failed: {result}")
-
-        print(f"✅ All {self.n} MCP sessions closed")
+        print(f"✅ All MCP sessions closed.")
 
 
 # Keep the old MCPVectorEnv for backward compatibility
@@ -1123,9 +1196,9 @@ def make(
     if not base_url.startswith("http"):
         raise ValueError("Environment spec must be a valid HTTP URL")
 
-    # Ensure we don't have trailing slash to match working client pattern
-    if base_url.endswith("/"):
-        base_url = base_url.rstrip("/")
+    # Ensure we HAVE a trailing slash to avoid 307 redirects that break POST requests
+    if not base_url.endswith("/"):
+        base_url += "/"
 
     # Handle dataset-driven vs legacy approaches
     if dataset is not None:

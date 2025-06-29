@@ -26,7 +26,7 @@ async def test_seed_differences():
         import reward_kit as rk
 
         # Load dataset
-        dataset = load_jsonl("rollouts.jsonl")
+        dataset = load_jsonl("../shared_data/rollouts.jsonl")
         print(f"📊 Loaded dataset with {len(dataset)} rows")
 
         # Show what seeds we're testing

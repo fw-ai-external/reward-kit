@@ -24,7 +24,7 @@ async def test_north_star_interface():
         import reward_kit as rk
 
         # Load dataset with environment configuration and prompts
-        dataset = load_jsonl("rollouts.jsonl")
+        dataset = load_jsonl("../shared_data/rollouts.jsonl")
         print(f"📊 Loaded dataset with {len(dataset)} rows")
 
         # Create general policy (environment-agnostic via tool calling)
@@ -37,7 +37,7 @@ async def test_north_star_interface():
 
         # 1️⃣ create vector of MCP sessions
         envs = rk.make(
-            "http://localhost:8000/mcp", dataset=dataset, model_id=policy.model_id
+            "http://localhost:8000/mcp/", dataset=dataset, model_id=policy.model_id
         )
         print("✅ MCP environments created successfully")
 

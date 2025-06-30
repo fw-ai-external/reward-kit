@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -48,7 +49,7 @@ class TestRecordAndPlaybackE2E:
 
         print(f"🔧 Starting MCP server on port {port}...")
         process = subprocess.Popen(
-            ["python", str(server_path), "--port", str(port)],
+            [sys.executable, str(server_path), "--port", str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

@@ -270,13 +270,13 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
                         seed = client_info._extra["seed"]
                         logger.info(f"🎲 Using seed from client_info: {seed}")
                     else:
-                        logger.debug(
-                            f"🎲 No seed in client_info._extra: {client_info._extra}"
+                        seed = None
+                        logger.info(
+                            "🎲 No seed found in client_info, using random seed"
                         )
-                else:
-                    logger.debug(f"🎲 No _extra in client_info: {client_info}")
             else:
-                logger.debug(f"🎲 No client_params or clientInfo available")
+                seed = None
+                logger.info("🎲 No client_info available, using random seed")
 
             # Create environment with seed
             if hasattr(self, "create_environment_with_seed"):

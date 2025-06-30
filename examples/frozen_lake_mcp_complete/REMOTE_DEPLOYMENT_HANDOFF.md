@@ -258,81 +258,73 @@ rm -f /tmp/mcp_*
    - Add timeout handling for stale sessions
    - Implement proper session resource cleanup
 
-## 🧪 UPDATED Testing Methodology (Post-Bugfix)
+## 🔬 **Action Plan**
 
-Based on the recent critical bugs, our testing strategy must be updated to focus on preventing regressions and validating the true parallel performance of the system. The following testing plan is now recommended.
+This action plan outlines the next steps for finalizing the remote deployment and testing strategy.
 
-### **🔥 Priority 1: URL Handling & Redirect Robustness (URGENT)**
-**Priority**: 🔥 **URGENT** - This is to prevent a regression of the last critical bug.
+### **🔥 Priority 1: Fix Critical Playback Bug (URGENT)**
+**Priority**: 🔥 **URGENT** - The core playback functionality is not behaving as expected.
 
-**Context**: The last blocking issue was caused by the `httpx` client changing a `POST` request to a `GET` request when following a server redirect. This redirect was triggered by a missing trailing slash in the URL. Our testing must ensure this never happens again.
+**Context**: It has been observed that the current playback implementation **does not hit the MCP server**. This is incorrect. Playback should only replace the expensive LLM call that *generates* an action. The recorded action must then be sent to the MCP environment to drive the simulation and get a new, updated observation.
+
+**Root Cause Analysis**:
+The investigation has revealed that the recording file generated during the test's recording phase is **empty**. This causes the subsequent playback phase to fail silently and fall back to live mode, which masks the underlying issue and makes it appear as though playback is working.
+
+**Action Item**:
+- **Debug `rollout()` function**: The primary task is to debug the `rollout` function in `reward_kit/mcp_env.py` and the `log_conversation_state_for_playback` method in the `FireworksPolicy` class.
+- **Hypothesis**: The issue may be related to asynchronous file I/O within the `asyncio` event loop or incorrect file handle management within the test suite. The `with open(...)` calls inside async functions are a potential source of problems.
+- **Goal**: Ensure that the recording file is correctly written to with the full trajectory data during the recording phase. Once this is fixed, the playback phase should naturally start hitting the MCP server with the recorded actions, as the code structure already supports this.
+
+### **⚠️ Priority 2: Finalize CI/CD Testing Strategy (HIGH)**
+**Priority**: ⚠️ **HIGH** - This is critical for stable, fast, and reliable testing.
+
+**Context**: Once the playback bug is fixed, we need a robust offline testing strategy for CI. The current end-to-end tests rely on recording live trajectories from the Fireworks API, which is too slow and non-deterministic for a CI environment.
+
+**Action Items**:
+1.  **Standardize Dataset**: All tests should use the `examples/frozen_lake_mcp_complete/shared_data/rollouts.jsonl` dataset for consistency.
+2.  **Create a Pre-Recorded Trajectory**:
+    -   Run a local test to generate a clean, canonical recording file (after the playback bug is fixed).
+    -   Save this file as `examples/frozen_lake_mcp_complete/shared_data/recorded_trajectory.jsonl`.
+    -   Check this file into the repository.
+3.  **Update CI Test Configuration**:
+    -   Modify the CI scripts to set the `REWARD_KIT_PLAYBACK_FILE` environment variable to point to the newly checked-in `recorded_trajectory.jsonl`.
+    -   This ensures that CI tests run exclusively in playback mode, making them fast, offline, and deterministic.
+4.  **Update Local Test Configuration**:
+    -   Ensure that local tests (like `tests/test_record_and_playback_e2e.py`) can still be run to generate *new* recordings if the `recorded_trajectory.jsonl` file needs to be updated.
+
+### **🟡 Priority 3: Add Regression and Robustness Tests (MEDIUM)**
+**Priority**: 🟡 **MEDIUM** - These tests will ensure long-term stability.
 
 **Test File to Create**: `tests/test_url_handling.py`
 
 **Test Scenarios**:
-1.  **URL with Trailing Slash**:
-    -   Connect to the server using a URL that correctly includes the trailing slash (e.g., `.../mcp/`).
+1.  **URL with Trailing Slash**: Connect to the server using a URL that correctly includes the trailing slash (e.g., `.../mcp/`).
     -   **Expected Result**: The connection succeeds immediately with no redirects.
-2.  **URL without Trailing Slash**:
-    -   Connect using a URL *without* the trailing slash (e.g., `.../mcp`).
-    -   **Expected Result**: The connection succeeds. The `reward-kit` client-side fix should automatically append the slash, preventing any server redirect.
-3.  **Cross-Path Redirect (Advanced)**:
-    -   (If possible) Configure a temporary server endpoint that issues a `307` redirect from a different path (e.g., from `/mcp-old/` to `/mcp/`).
-    -   Send a `POST` request to the old endpoint.
-    -   **Expected Result**: Verify that the `POST` method is preserved after the redirect. This validates the behavior of the underlying HTTP client and our assumptions about it.
-
-### **⚠️ Priority 2: Parallel Rollout Validation (HIGH)**
-**Priority**: ⚠️ **HIGH** - This validates the core feature of the system for production.
-
-**Context**: The original async race conditions were fixed, but the fix was never validated under true parallel load because the URL bug was blocking all tests. We must now confirm that the on-demand session management works correctly for multiple concurrent rollouts.
-
-**Action Items**:
-1.  **Update `test_remote_north_star.py`**:
-    -   In `examples/frozen_lake_mcp_complete/remote_testing/test_remote_north_star.py`, uncomment the additional dataset entries to run with 3 concurrent environments.
-    -   **Expected Result**: The test should pass with all three rollouts completing successfully and generating valid trajectories. Check logs for any `asyncio` or `anyio` warnings.
-2.  **Create `tests/test_parallel_rollouts.py`**:
-    -   **Scenario**: Run rollouts with a larger number of concurrent sessions (e.g., 5, 10, 20).
-    -   **Verification**:
-        -   Programmatically verify that the number of returned trajectories matches the number of environments.
-        -   Check for session data integrity: ensure that the `seed`, `actions`, and `observations` in the resulting trajectories are not mixed or duplicated across sessions.
-        -   Monitor server logs for any cleanup errors or warnings after the test completes.
-
-### **🟡 Priority 3: Session Lifecycle & Resource Testing (MEDIUM)**
-**Priority**: 🟡 **MEDIUM** - These are general robustness and stability tests.
-
-**Context**: Beyond basic connections, we need to ensure sessions are managed gracefully throughout their lifecycle and that the server's resources are exposed correctly.
-
-**Test Files to Create**: `tests/test_session_lifecycle.py`, `tests/test_resource_handlers.py`
-
-**Test Scenarios**:
-1.  **`test_session_lifecycle.py`**:
-    -   **Abnormal Termination**: Simulate a client disconnecting abruptly during a rollout.
-    -   **Expected Result**: The server should not crash. It should eventually time out the orphaned session and clean up its resources.
-    -   **Long-Running Sessions**: Run a single session for an extended number of steps (e.g., 200+) to check for potential memory leaks on the server.
-2.  **`test_resource_handlers.py`**:
-    -   **List and Read**: Verify that all expected resources (`initial_state`, `config`) can be listed and read successfully.
-    -   **Invalid Resource**: Attempt to read a resource that does not exist.
-    -   **Expected Result**: The server should return a graceful error (e.g., a standard MCP error message) instead of crashing.
+2.  **URL without Trailing Slash**: Connect using a URL *without* the trailing slash (e.g., `.../mcp`).
+    -   **Expected Result**: The `reward-kit` client-side fix should automatically append the slash, preventing any server redirect.
 
 ### **🟢 Priority 4: Code Cleanup and Finalization**
 1.  **Remove Debug Logging**:
-   - Remove any remaining `print()` statements or excessive debug logging from `simulation_server.py` and `mcp_env.py` that were added during debugging.
+   - Remove any remaining `print()` statements or excessive debug logging from `simulation_server.py` and `mcp_env.py`.
 2.  **Resource Handler Optimization**:
-   - The current resource handler in `simulation_server.py` uses a simplified string return. For long-term maintainability, consider updating it to return proper MCP types (e.g., `TextResourceContents`). This will improve compatibility with other MCP tools.
+   - The current resource handler in `simulation_server.py` uses a simplified string return. For long-term maintainability, consider updating it to return proper MCP types (e.g., `TextResourceContents`).
+3.  **Session Management Review**:
+   - Review session creation/cleanup logic in `simulation_server.py`.
+   - Add timeout handling for stale sessions to prevent resource leaks.
 
 ## 📋 **Success Criteria Checklist**
 
 ### **Deployment Success**
-- [ ] Docker validation passes locally (`./validate_docker.sh`)
-- [ ] Cloud Run service deploys without errors
-- [ ] Service URL responds to health checks
-- [ ] MCP endpoint `/mcp/` returns proper headers
+- [✅] Docker validation passes locally (`./validate_docker.sh`)
+- [✅] Cloud Run service deploys without errors
+- [✅] Service URL responds to health checks
+- [✅] MCP endpoint `/mcp/` returns proper headers
 
 ### **Basic Functionality**
-- [ ] Remote MCP connection works
-- [ ] Tool calls execute properly
-- [ ] Resource access functions
-- [ ] Basic north star test passes
+- [✅] Remote MCP connection works
+- [✅] Tool calls execute properly
+- [✅] Resource access functions
+- [✅] Basic north star test passes
 
 ### **Advanced Validation (Next Steps)**
 - [ ] Multi-seed deterministic behavior
@@ -340,6 +332,57 @@ Based on the recent critical bugs, our testing strategy must be updated to focus
 - [ ] Multiple grid size support
 - [ ] Load testing passes
 - [ ] Error handling robustness
+
+## 🔬 **Next Steps & Testing Strategy**
+
+Based on recent development and bug fixes, our testing strategy must be updated to focus on preventing regressions and validating the true parallel performance of the system.
+
+### **🔥 Priority 1: Finalize CI/CD Testing Strategy (URGENT)**
+**Priority**: 🔥 **URGENT** - This is critical for stable, fast, and reliable testing.
+
+**Context**: The current end-to-end tests rely on recording live trajectories from the Fireworks API, which is too slow and non-deterministic for a CI environment. We need a robust offline testing strategy.
+
+**Action Items**:
+1.  **Standardize Dataset**: All tests should use the `examples/frozen_lake_mcp_complete/shared_data/rollouts.jsonl` dataset for consistency.
+2.  **Create a Pre-Recorded Trajectory**:
+    -   Run a local test to generate a clean, canonical recording file.
+    -   Save this file as `examples/frozen_lake_mcp_complete/shared_data/recorded_trajectory.jsonl`.
+    -   Check this file into the repository.
+3.  **Update CI Test Configuration**:
+    -   Modify the CI scripts to set the `REWARD_KIT_PLAYBACK_FILE` environment variable to point to the newly checked-in `recorded_trajectory.jsonl`.
+    -   This ensures that CI tests run exclusively in playback mode, making them fast, offline, and deterministic.
+4.  **Update Local Test Configuration**:
+    -   Ensure that local tests (like `tests/test_record_and_playback_e2e.py`) can still be run to generate *new* recordings if the `recorded_trajectory.jsonl` file needs to be updated. This can be done by temporarily deleting the file before running the test.
+
+### **⚠️ Priority 2: Investigate Playback Environment Interaction (CRITICAL BUG)**
+**Priority**: ⚠️ **CRITICAL** - The core playback functionality is not behaving as expected.
+
+**Context**: It has been observed that the current playback implementation **does not hit the MCP server**. This is incorrect. Playback should only replace the expensive LLM call that *generates* an action. The recorded action must then be sent to the MCP environment to drive the simulation and get a new, updated observation.
+
+**Root Cause Analysis**:
+The investigation has revealed that the recording file generated during the test's recording phase is **empty**. This causes the subsequent playback phase to fail silently and fall back to live mode, which masks the underlying issue and makes it appear as though playback is working.
+
+**Action Item**:
+- **Debug `rollout()` function**: The primary task is to debug the `rollout` function in `reward_kit/mcp_env.py` and the `log_conversation_state_for_playback` method in the `FireworksPolicy` class.
+- **Hypothesis**: The issue may be related to asynchronous file I/O within the `asyncio` event loop or incorrect file handle management within the test suite. The `with open(...)` calls inside async functions are a potential source of problems.
+- **Goal**: Ensure that the recording file is correctly written to with the full trajectory data during the recording phase. Once this is fixed, the playback phase should naturally start hitting the MCP server with the recorded actions, as the code structure already supports this.
+
+### **🟡 Priority 3: URL Handling & Redirect Robustness (MEDIUM)**
+**Priority**: 🟡 **MEDIUM** - This is to prevent a regression of the previous critical bug.
+
+**Test File to Create**: `tests/test_url_handling.py`
+
+**Test Scenarios**:
+1.  **URL with Trailing Slash**: Connect to the server using a URL that correctly includes the trailing slash (e.g., `.../mcp/`).
+    -   **Expected Result**: The connection succeeds immediately with no redirects.
+2.  **URL without Trailing Slash**: Connect using a URL *without* the trailing slash (e.g., `.../mcp`).
+    -   **Expected Result**: The `reward-kit` client-side fix should automatically append the slash, preventing any server redirect.
+
+### **🟢 Priority 4: Code Cleanup and Finalization**
+1.  **Remove Debug Logging**:
+   - Remove any remaining `print()` statements or excessive debug logging from `simulation_server.py` and `mcp_env.py`.
+2.  **Resource Handler Optimization**:
+   - The current resource handler in `simulation_server.py` uses a simplified string return. For long-term maintainability, consider updating it to return proper MCP types (e.g., `TextResourceContents`).
 
 ## 📁 **Key Files Reference**
 

@@ -58,44 +58,10 @@ except ImportError:
     FIREWORKS_AVAILABLE = False
 
 from .auth import get_fireworks_api_key
+from .mcp.types import DatasetRow, MCPSession, MCPToolCall
+from .playback_policy import PlaybackPolicyBase
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ToolCall:
-    """Represents a tool call to be executed via MCP."""
-
-    tool_name: str
-    arguments: Dict[str, Any]
-
-
-@dataclass
-class DatasetRow:
-    """Represents a row from the dataset JSONL."""
-
-    id: str
-    seed: int
-    system_prompt: str
-    user_prompt_template: str
-    environment_context: Dict[str, Any]
-
-
-@dataclass
-class MCPSession:
-    """Represents a single MCP session with an environment."""
-
-    session_id: str
-    base_url: str
-    seed: Optional[int]
-    model_id: str
-    dataset_row: Optional[DatasetRow] = None
-    terminated: bool = False
-    last_observation: Any = None
-
-    # Persistent MCP connection components
-    _exit_stack: Optional[Any] = None
-    _mcp_session: Optional[ClientSession] = None
 
 
 @dataclass
@@ -272,32 +238,13 @@ class GeneralMCPVectorEnv:
                     logger.debug(
                         f"Session {session.session_id}: Reading initial state from resource: {initial_state_resource.uri}"
                     )
-                    logger.debug(
-                        f"Session {session.session_id}: About to call mcp_session.read_resource with URI: {initial_state_resource.uri}"
-                    )
-                    logger.debug(
-                        f"Session {session.session_id}: mcp_session type: {type(mcp_session)}"
-                    )
 
                     resource_content = await mcp_session.read_resource(
                         initial_state_resource.uri
                     )
 
-                    logger.debug(
-                        f"Session {session.session_id}: read_resource returned type: {type(resource_content)}"
-                    )
-                    logger.debug(
-                        f"Session {session.session_id}: read_resource returned value: {resource_content}"
-                    )
-                    logger.debug(
-                        f"Session {session.session_id}: read_resource dir(): {dir(resource_content)}"
-                    )
-
                     # Handle the new ResourceContents format
                     if hasattr(resource_content, "text"):
-                        logger.debug(
-                            f"Session {session.session_id}: resource_content has 'text' attribute"
-                        )
                         try:
                             initial_observation = json.loads(resource_content.text)
                             logger.info(
@@ -305,17 +252,11 @@ class GeneralMCPVectorEnv:
                             )
                         except json.JSONDecodeError:
                             initial_observation = {"observation": resource_content.text}
-                            logger.debug(
-                                f"Session {session.session_id}: Using text initial state"
-                            )
                     elif (
                         hasattr(resource_content, "contents")
                         and resource_content.contents
                         and len(resource_content.contents) > 0
                     ):
-                        logger.debug(
-                            f"Session {session.session_id}: resource_content has 'contents' attribute (old format)"
-                        )
                         # Fallback to old format for backward compatibility
                         content = resource_content.contents[0]
                         if hasattr(content, "text"):
@@ -330,7 +271,7 @@ class GeneralMCPVectorEnv:
                             f"Session {session.session_id}: Resource content is empty or unrecognized format"
                         )
                         logger.warning(
-                            f"Session {session.session_id}: resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
+                            f"Session {session.session_id}: Unexpected resource format"
                         )
                         initial_state_resource = None  # Fall back to other options
                 else:
@@ -363,9 +304,6 @@ class GeneralMCPVectorEnv:
 
                         # Handle the new ResourceContents format
                         if hasattr(resource_content, "text"):
-                            logger.debug(
-                                f"Session {session.session_id}: fallback resource_content has 'text' attribute"
-                            )
                             try:
                                 initial_observation = json.loads(resource_content.text)
                             except json.JSONDecodeError:
@@ -377,9 +315,6 @@ class GeneralMCPVectorEnv:
                             and resource_content.contents
                             and len(resource_content.contents) > 0
                         ):
-                            logger.debug(
-                                f"Session {session.session_id}: fallback resource_content has 'contents' attribute (old format)"
-                            )
                             # Fallback to old format for backward compatibility
                             content = resource_content.contents[0]
                             if hasattr(content, "text"):
@@ -391,7 +326,7 @@ class GeneralMCPVectorEnv:
                                 initial_observation = {"observation": str(content)}
                         else:
                             logger.warning(
-                                f"Session {session.session_id}: fallback resource_content attributes: {[attr for attr in dir(resource_content) if not attr.startswith('_')]}"
+                                f"Session {session.session_id}: Fallback resource has unexpected format"
                             )
                             initial_observation = {"observation": str(resource_content)}
                     else:
@@ -449,7 +384,7 @@ class GeneralMCPVectorEnv:
         return list(observations), self.tool_schemas, system_prompts
 
     async def step(
-        self, tool_calls: List[ToolCall]
+        self, tool_calls: List[MCPToolCall]
     ) -> tuple[List[Any], List[float], List[bool], List[Dict]]:
         """
         Execute tool calls via MCP protocol using persistent sessions.
@@ -466,9 +401,22 @@ class GeneralMCPVectorEnv:
         if len(tool_calls) != self.n:
             raise ValueError(f"Expected {self.n} tool calls, got {len(tool_calls)}")
 
-        async def step_session(session: MCPSession, tool_call: ToolCall):
+        async def step_session(session: MCPSession, tool_call: MCPToolCall):
             if session.terminated:
                 return session.last_observation, 0.0, True, {}
+
+            # Handle special playback termination signal
+            if tool_call.tool_name == "_playback_terminate":
+                logger.info(
+                    f"🎬 Session {session.session_id}: Received playback termination signal"
+                )
+                session.terminated = True
+                return (
+                    session.last_observation,
+                    0.0,
+                    True,
+                    {"playback_terminated": True},
+                )
 
             if not session._mcp_session:
                 raise RuntimeError("Session not initialized. Call reset() first.")
@@ -643,12 +591,14 @@ class GeneralMCPVectorEnv:
 MCPVectorEnv = GeneralMCPVectorEnv
 
 
-class FireworksPolicy:
+class FireworksPolicy(PlaybackPolicyBase):
     """
     General Fireworks AI policy that works with ANY MCP environment via tool calling.
 
     Maintains conversation history per environment for proper OpenAI-style trajectories.
     NO environment-specific logic - everything comes from MCP tools and dataset prompts.
+
+    Supports both live mode (using Fireworks LLM) and playback mode (replaying recorded trajectories).
     """
 
     def __init__(
@@ -657,60 +607,90 @@ class FireworksPolicy:
         temperature: float = 0.2,
         deployment_type: str = "serverless",
         max_tokens: int = 4096,
-        trajectory_file: str = None,
-        openai_format_file: str = None,
+        **kwargs,
     ):
         """
-        Initialize general policy with no environment knowledge.
+        Initialize general policy with automatic record/playback detection.
 
         Args:
             model_id: Fireworks model identifier (e.g., "accounts/fireworks/models/qwen3-235b-a22b")
             temperature: Sampling temperature (0.0 to 2.0)
             deployment_type: "serverless", "on-demand", or "auto"
             max_tokens: Maximum tokens to generate per request
+
+        Automatic Mode Detection:
+            - If REWARD_KIT_PLAYBACK_FILE is set and file exists: Playback mode
+            - Otherwise: Recording mode
         """
-        if not FIREWORKS_AVAILABLE:
-            raise ImportError(
-                "The 'fireworks-ai' package is required for FireworksPolicy. "
-                "Please install it with 'pip install fireworks-ai'"
+        # Check for automatic playback mode
+        playback_file = os.environ.get("REWARD_KIT_PLAYBACK_FILE")
+        _playback_actions = None
+
+        if playback_file and os.path.exists(playback_file):
+            logger.info(f"🎬 Auto-detected playback mode: {playback_file}")
+            _playback_actions = self._load_trajectory_file(playback_file)
+            if not _playback_actions:
+                logger.warning(
+                    f"⚠️  Failed to load playback file, switching to recording mode"
+                )
+                _playback_actions = None
+        elif playback_file:
+            logger.info(
+                f"📝 Auto-detected recording mode: {playback_file} (file will be created)"
             )
 
+        # Initialize playback functionality
+        super().__init__(_playback_actions=_playback_actions, **kwargs)
+
+        # Store policy configuration
         self.model_id = model_id
         self.temperature = temperature
         self.deployment_type = deployment_type
         self.max_tokens = max_tokens
-        self.trajectory_file = trajectory_file
-        self.openai_format_file = openai_format_file
 
-        # Verify authentication
-        api_key = get_fireworks_api_key()
-        if not api_key:
-            raise ValueError(
-                "FIREWORKS_API_KEY environment variable or ~/.fireworks/auth.ini file is required "
-                "to use FireworksPolicy. See the reward-kit documentation for setup instructions."
-            )
-
-        # Set the API key for the Fireworks SDK
-        os.environ["FIREWORKS_API_KEY"] = api_key
-
-        # Initialize the LLM instance using Build SDK
-        try:
-            self.llm = LLM(
-                model=self.model_id,
-                deployment_type=self.deployment_type,
-                temperature=self.temperature,
-            )
-            logger.info(
-                f"✅ Initialized Fireworks LLM: {self.model_id} ({self.deployment_type})"
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to initialize Fireworks LLM '{self.model_id}': {e}"
-            )
-
-        # Conversation state tracking for proper OpenAI trajectories
+        # Initialize conversation state tracking for proper OpenAI trajectories
         self.conversation_histories = {}  # {env_index: [messages]}
         self.initialized = False
+
+        # Only initialize Fireworks LLM in live mode (not in playback mode)
+        if not self._is_playback:
+            if not FIREWORKS_AVAILABLE:
+                raise ImportError(
+                    "The 'fireworks-ai' package is required for FireworksPolicy. "
+                    "Please install it with 'pip install fireworks-ai'"
+                )
+
+            # Verify authentication
+            api_key = get_fireworks_api_key()
+            if not api_key:
+                raise ValueError(
+                    "FIREWORKS_API_KEY environment variable or ~/.fireworks/auth.ini file is required "
+                    "to use FireworksPolicy. See the reward-kit documentation for setup instructions."
+                )
+
+            # Set the API key for the Fireworks SDK
+            os.environ["FIREWORKS_API_KEY"] = api_key
+
+            # Initialize the LLM instance using Build SDK
+            try:
+                self.llm = LLM(
+                    model=self.model_id,
+                    deployment_type=self.deployment_type,
+                    temperature=self.temperature,
+                )
+                logger.info(
+                    f"✅ Initialized Fireworks LLM: {self.model_id} ({self.deployment_type})"
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to initialize Fireworks LLM '{self.model_id}': {e}"
+                )
+        else:
+            # In playback mode, skip expensive LLM initialization
+            self.llm = None
+            logger.info(
+                f"🎬 Playback mode: Skipping Fireworks LLM initialization for performance"
+            )
 
     def initialize_conversations(
         self, n_envs: int, system_prompts: List[str], initial_user_prompts: List[str]
@@ -724,38 +704,8 @@ class FireworksPolicy:
             ]
         self.initialized = True
 
-    def log_trajectory_step(
-        self,
-        env_index: int,
-        step: int,
-        tool_call: ToolCall,
-        tool_response: str,
-        reward: float,
-        terminated: bool,
-        observation: Any,
-    ):
-        """Log a complete trajectory step with all relevant information."""
-        if self.trajectory_file:
-            step_entry = {
-                "env_index": env_index,
-                "step": step,
-                "timestamp": time.time(),
-                "step_type": "trajectory_step",
-                "action": {
-                    "tool_name": tool_call.tool_name,
-                    "arguments": tool_call.arguments,
-                },
-                "observation": observation,
-                "reward": reward,
-                "terminated": terminated,
-                "tool_response_raw": tool_response,
-            }
-
-            with open(self.trajectory_file, "a") as f:
-                f.write(json.dumps(step_entry) + "\n")
-
     def add_tool_response(
-        self, env_index: int, tool_call: ToolCall, tool_response: str
+        self, env_index: int, tool_call: MCPToolCall, tool_response: str
     ):
         """Add tool call and response to conversation history."""
         if env_index not in self.conversation_histories:
@@ -790,37 +740,43 @@ class FireworksPolicy:
         }
         conversation.append(tool_message)
 
-        # Add user message for next step (using the tool response as the new observation)
-        # This creates the proper conversation flow: assistant -> tool -> user -> assistant -> tool -> user ...
-        user_message = {
-            "role": "user",
-            "content": f"Tool response received: {tool_response}. What's your next move?",
+    def log_conversation_state_for_playback(self, env_index: int, step: int):
+        """
+        Log the current conversation state in the format required for playback.
+
+        Expected format: {"env_index": 0, "step": 0, "messages": [{..}, {..}]}
+
+        Args:
+            env_index: Environment index
+            step: Current step number
+        """
+        # Use REWARD_KIT_PLAYBACK_FILE environment variable for recording
+        playback_file = os.environ.get("REWARD_KIT_PLAYBACK_FILE")
+        if not playback_file:
+            return  # No recording file specified
+
+        conversation = self.conversation_histories.get(env_index, [])
+        if not conversation:
+            return
+
+        playback_entry = {
+            "env_index": env_index,
+            "step": step,
+            "messages": conversation.copy(),
         }
-        conversation.append(user_message)
 
-        # Trajectory logging is now handled in rollout function via log_trajectory_step
+        with open(playback_file, "a") as f:
+            f.write(json.dumps(playback_entry) + "\n")
 
-        # Log the updated conversation to OpenAI format file
-        if self.openai_format_file:
-            conversation_entry = {
-                "env_index": env_index,
-                "timestamp": time.time(),
-                "step_type": "conversation_after_tool_response",
-                "conversation": conversation.copy(),
-            }
-
-            with open(self.openai_format_file, "a") as f:
-                f.write(json.dumps(conversation_entry) + "\n")
-
-    async def __call__(
+    async def _generate_live_tool_calls(
         self,
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
         user_prompts: List[str],
-    ) -> List[ToolCall]:
+    ) -> List[MCPToolCall]:
         """
-        Generate tool calls based on conversation history and current state.
+        Generate tool calls for all environments using Fireworks LLM in live mode.
 
         For first call: Initialize conversations with system + user prompts
         For subsequent calls: Use existing conversation history for continuity
@@ -866,13 +822,13 @@ class FireworksPolicy:
                 # Use first available tool as fallback
                 if tool_schemas[i]:
                     fallback_tool = tool_schemas[i][0]
-                    fallback_call = ToolCall(
+                    fallback_call = MCPToolCall(
                         tool_name=fallback_tool["name"], arguments={}
                     )
                     result_calls.append(fallback_call)
                 else:
                     logger.error(f"No tools available for environment {i}")
-                    result_calls.append(ToolCall("unknown", {}))
+                    result_calls.append(MCPToolCall("unknown", {}))
             else:
                 result_calls.append(tool_call)
 
@@ -881,7 +837,7 @@ class FireworksPolicy:
 
     async def _generate_tool_call_with_history(
         self, tools: List[Dict], env_index: int
-    ) -> ToolCall:
+    ) -> MCPToolCall:
         """
         Generate a tool call using conversation history for proper OpenAI trajectories.
 
@@ -890,7 +846,7 @@ class FireworksPolicy:
             env_index: Environment index
 
         Returns:
-            ToolCall object
+            MCPToolCall object
         """
         try:
             # Get conversation history for this environment
@@ -923,83 +879,6 @@ class FireworksPolicy:
             response = await loop.run_in_executor(
                 None, lambda: self.llm.chat.completions.create(**current_request)
             )
-
-            # Log request-response pair for trajectory analysis
-            if self.trajectory_file:
-                # Convert response to dict for JSON serialization
-                response_dict = {
-                    "choices": [
-                        {
-                            "message": {
-                                "role": response.choices[0].message.role,
-                                "content": response.choices[0].message.content,
-                                "tool_calls": [
-                                    {
-                                        "id": tc.id,
-                                        "type": tc.type,
-                                        "function": {
-                                            "name": tc.function.name,
-                                            "arguments": tc.function.arguments,
-                                        },
-                                    }
-                                    for tc in (
-                                        response.choices[0].message.tool_calls or []
-                                    )
-                                ],
-                            }
-                        }
-                    ]
-                }
-
-                trajectory_entry = {
-                    "env_index": env_index,
-                    "timestamp": time.time(),
-                    "step_type": "llm_request_response",
-                    "request": current_request,
-                    "response": response_dict,
-                }
-
-                with open(self.trajectory_file, "a") as f:
-                    f.write(json.dumps(trajectory_entry) + "\n")
-
-            # Log the current conversation state to OpenAI format file
-            if self.openai_format_file:
-                # Add the assistant's response to the conversation copy
-                conversation_with_response = messages.copy()
-                assistant_message = {
-                    "role": "assistant",
-                    "content": response.choices[0].message.content,
-                    "tool_calls": (
-                        [
-                            {
-                                "id": tc.id,
-                                "type": tc.type,
-                                "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments,
-                                },
-                            }
-                            for tc in (response.choices[0].message.tool_calls or [])
-                        ]
-                        if response.choices[0].message.tool_calls
-                        else None
-                    ),
-                }
-                # Remove None tool_calls if there are none
-                if assistant_message["tool_calls"] is None:
-                    del assistant_message["tool_calls"]
-                conversation_with_response.append(assistant_message)
-
-                openai_entry = {
-                    "env_index": env_index,
-                    "timestamp": time.time(),
-                    "step_type": "conversation_after_llm_response",
-                    "conversation": conversation_with_response,
-                    "tools": openai_tools,  # Add the available tools to the log
-                }
-
-                with open(self.openai_format_file, "a") as f:
-                    f.write(json.dumps(openai_entry) + "\n")
 
             # ADD ASSISTANT MESSAGE TO ACTUAL CONVERSATION HISTORY
             # This is crucial for proper tool call ID management in add_tool_response
@@ -1035,7 +914,7 @@ class FireworksPolicy:
                     f"Environment {env_index} - Using tool call: {tool_call.function.name}({tool_call.function.arguments})"
                 )
 
-                return ToolCall(
+                return MCPToolCall(
                     tool_name=tool_call.function.name,
                     arguments=json.loads(tool_call.function.arguments),
                 )
@@ -1045,7 +924,9 @@ class FireworksPolicy:
                     f"No tool calls in response for env {env_index}, message content: {message.content}"
                 )
                 return (
-                    ToolCall(tools[0]["name"], {}) if tools else ToolCall("unknown", {})
+                    MCPToolCall(tools[0]["name"], {})
+                    if tools
+                    else MCPToolCall("unknown", {})
                 )
 
         except Exception as e:
@@ -1054,7 +935,7 @@ class FireworksPolicy:
 
     async def _generate_tool_call(
         self, system_prompt: str, user_prompt: str, tools: List[Dict], env_index: int
-    ) -> ToolCall:
+    ) -> MCPToolCall:
         """
         Generate a single tool call using Fireworks API with proper tool calling.
 
@@ -1065,7 +946,7 @@ class FireworksPolicy:
             env_index: Environment index for logging
 
         Returns:
-            ToolCall object
+            MCPToolCall object
         """
         messages = [
             {"role": "system", "content": system_prompt},
@@ -1113,7 +994,7 @@ class FireworksPolicy:
                 logger.debug(
                     f"Environment {env_index} - Using tool call: {tool_call.function.name}({tool_call.function.arguments})"
                 )
-                return ToolCall(
+                return MCPToolCall(
                     tool_name=tool_call.function.name,
                     arguments=json.loads(tool_call.function.arguments),
                 )
@@ -1123,7 +1004,9 @@ class FireworksPolicy:
                     f"No tool calls in response for env {env_index}, message content: {message.content}"
                 )
                 return (
-                    ToolCall(tools[0]["name"], {}) if tools else ToolCall("unknown", {})
+                    MCPToolCall(tools[0]["name"], {})
+                    if tools
+                    else MCPToolCall("unknown", {})
                 )
 
         except Exception as e:
@@ -1284,11 +1167,10 @@ async def rollout(
     envs: Union[GeneralMCPVectorEnv, "MCPVectorEnv"],
     policy: Union[FireworksPolicy, Callable],
     steps: int = 512,
-    trajectory_log_file: Optional[str] = None,
     openai_format_log_file: Optional[str] = None,
 ) -> List[Trajectory]:
     """
-    Execute general rollouts using tool calling interface.
+    Execute general rollouts using tool calling interface with automatic record/playback.
 
     This works with ANY MCP environment because:
     1. Policy receives tool schemas and makes tool calls
@@ -1299,30 +1181,44 @@ async def rollout(
         envs: GeneralMCPVectorEnv instance
         policy: Policy that takes tool schemas, observations, prompts and returns tool calls
         steps: Maximum steps per rollout
-        trajectory_log_file: Optional file to log detailed trajectory data
-        openai_format_log_file: Optional file to log OpenAI-compatible conversation format
+        openai_format_log_file: Optional file to log clean OpenAI format for terminated trajectories only
+
+    Environment Variable Control:
+        REWARD_KIT_PLAYBACK_FILE: Controls record/playback mode
+        - Not set: Normal live mode
+        - Set but file doesn't exist: Record mode (file will be created)
+        - Set and file exists: Playback mode (uses recorded data)
 
     Returns:
         List of Trajectory objects with complete rollout data
 
     Example:
-        trajectories = await rk.rollout(envs, policy=policy, steps=512,
-                                      trajectory_log_file="trajectories.jsonl")
+        # Live mode
+        trajectories = await rk.rollout(envs, policy)
+
+        # Recording mode
+        os.environ["REWARD_KIT_PLAYBACK_FILE"] = "record.jsonl"
+        trajectories = await rk.rollout(envs, policy, openai_format_log_file="sft_data.jsonl")
+
+        # Playback mode (after recording file exists)
+        trajectories = await rk.rollout(envs, policy)
     """
     start_time = time.time()
 
-    # Initialize clean logging (separate from policy-level logging)
-    trajectory_logger = None
+    # Check for record/playback mode
+    playback_file = os.environ.get("REWARD_KIT_PLAYBACK_FILE")
+    recording_mode = playback_file and not os.path.exists(playback_file)
+    playback_mode = playback_file and os.path.exists(playback_file)
+
+    if recording_mode:
+        logger.info(f"📝 Recording mode: Will record to {playback_file}")
+    elif playback_mode:
+        logger.info(f"🎬 Playback mode: Using recorded data from {playback_file}")
+    else:
+        logger.info(f"🚀 Live mode: No recording/playback")
+
+    # Initialize OpenAI format logging for terminated trajectories only
     openai_logger = None
-
-    if trajectory_log_file:
-        # Clear the file at start
-        with open(trajectory_log_file, "w") as f:
-            pass
-        trajectory_logger = lambda data: _log_trajectory_entry(
-            trajectory_log_file, data
-        )
-
     if openai_format_log_file:
         # Clear the file at start
         with open(openai_format_log_file, "w") as f:
@@ -1345,21 +1241,6 @@ async def rollout(
             )
         )
 
-    # Log rollout initialization
-    if trajectory_logger:
-        trajectory_logger(
-            {
-                "type": "rollout_start",
-                "timestamp": start_time,
-                "num_environments": envs.n,
-                "max_steps": steps,
-                "sessions": [
-                    {"session_id": session.session_id, "seed": session.seed}
-                    for session in envs.sessions
-                ],
-            }
-        )
-
     # Reset environments and get initial state with tool discovery
     print(f"🔄 Resetting {envs.n} MCP environments...")
     current_observations, tool_schemas, system_prompts = await envs.reset()
@@ -1367,20 +1248,6 @@ async def rollout(
     # Record initial observations
     for trajectory, obs in zip(trajectories, current_observations):
         trajectory.observations.append(obs)
-
-    # Log initial states
-    if trajectory_logger:
-        for i, (session, obs) in enumerate(zip(envs.sessions, current_observations)):
-            trajectory_logger(
-                {
-                    "type": "initial_state",
-                    "timestamp": time.time(),
-                    "env_index": i,
-                    "session_id": session.session_id,
-                    "seed": session.seed,
-                    "initial_observation": obs,
-                }
-            )
 
     print(f"✅ Starting rollouts with {envs.n} environments for {steps} steps...")
 
@@ -1391,59 +1258,13 @@ async def rollout(
         # Format user prompts based on current observations (callback pattern)
         user_prompts = envs.format_user_prompts(current_observations)
 
-        # Log step start
-        if trajectory_logger:
-            trajectory_logger(
-                {
-                    "type": "step_start",
-                    "timestamp": step_start_time,
-                    "step": step,
-                    "observations": current_observations,
-                }
-            )
-
         # Generate tool calls using general policy
         tool_calls = await policy(
             tool_schemas, current_observations, system_prompts, user_prompts
         )
 
-        # Log tool calls
-        if trajectory_logger:
-            for i, tool_call in enumerate(tool_calls):
-                trajectory_logger(
-                    {
-                        "type": "tool_call",
-                        "timestamp": time.time(),
-                        "step": step,
-                        "env_index": i,
-                        "session_id": envs.sessions[i].session_id,
-                        "tool_name": tool_call.tool_name,
-                        "arguments": tool_call.arguments,
-                    }
-                )
-
         # Execute tool calls via MCP protocol
         observations, rewards, dones, infos = await envs.step(tool_calls)
-
-        # Log step results
-        if trajectory_logger:
-            for i, (obs, reward, done, info) in enumerate(
-                zip(observations, rewards, dones, infos)
-            ):
-                trajectory_logger(
-                    {
-                        "type": "step_result",
-                        "timestamp": time.time(),
-                        "step": step,
-                        "env_index": i,
-                        "session_id": envs.sessions[i].session_id,
-                        "observation": obs,
-                        "reward": reward,
-                        "terminated": done,
-                        "info": info,
-                        "step_duration": time.time() - step_start_time,
-                    }
-                )
 
         # Update conversation histories with tool responses (for proper OpenAI trajectories)
         if hasattr(policy, "add_tool_response"):
@@ -1454,19 +1275,11 @@ async def rollout(
                 tool_response = json.dumps(obs) if isinstance(obs, dict) else str(obs)
                 policy.add_tool_response(i, tool_call, tool_response)
 
-                # Log OpenAI conversation format if requested
-                if openai_logger and hasattr(policy, "conversation_histories"):
-                    conversation = policy.conversation_histories.get(i, [])
-                    openai_logger(
-                        {
-                            "type": "conversation_state",
-                            "timestamp": time.time(),
-                            "step": step,
-                            "env_index": i,
-                            "session_id": envs.sessions[i].session_id,
-                            "conversation": conversation.copy(),
-                        }
-                    )
+                # Log conversation state for playback if in recording mode
+                if recording_mode and hasattr(
+                    policy, "log_conversation_state_for_playback"
+                ):
+                    policy.log_conversation_state_for_playback(i, step)
 
         # Update trajectories
         for i, (trajectory, obs, reward, done, info) in enumerate(
@@ -1484,21 +1297,23 @@ async def rollout(
                 if done:
                     trajectory.terminated = True
 
-                    # Log trajectory completion
-                    if trajectory_logger:
-                        trajectory_logger(
-                            {
-                                "type": "trajectory_complete",
-                                "timestamp": time.time(),
-                                "env_index": i,
-                                "session_id": envs.sessions[i].session_id,
-                                "total_steps": trajectory.steps,
-                                "total_reward": trajectory.total_reward,
-                                "success": reward > 0,
-                                "actions": trajectory.actions,
-                                "rewards": trajectory.rewards,
-                            }
-                        )
+                    # Log final OpenAI conversation for terminated trajectories only
+                    if openai_logger and hasattr(policy, "conversation_histories"):
+                        conversation = policy.conversation_histories.get(i, [])
+                        if conversation:  # Only log if we have a conversation
+                            openai_logger(
+                                {
+                                    "messages": conversation,
+                                    "metadata": {
+                                        "session_id": envs.sessions[i].session_id,
+                                        "seed": envs.sessions[i].seed,
+                                        "total_steps": trajectory.steps,
+                                        "total_reward": trajectory.total_reward,
+                                        "terminated": True,
+                                        "success": reward > 0,
+                                    },
+                                }
+                            )
 
         # Update current observations for next step
         current_observations = observations
@@ -1513,35 +1328,6 @@ async def rollout(
     for trajectory in trajectories:
         trajectory.duration = total_duration
 
-    # Log rollout completion
-    if trajectory_logger:
-        successful = sum(1 for traj in trajectories if traj.total_reward > 0)
-        trajectory_logger(
-            {
-                "type": "rollout_complete",
-                "timestamp": time.time(),
-                "total_duration": total_duration,
-                "num_trajectories": len(trajectories),
-                "successful_trajectories": successful,
-                "success_rate": successful / len(trajectories) if trajectories else 0.0,
-                "avg_steps": (
-                    sum(traj.steps for traj in trajectories) / len(trajectories)
-                    if trajectories
-                    else 0
-                ),
-                "trajectories_summary": [
-                    {
-                        "session_id": traj.session.session_id,
-                        "seed": traj.session.seed,
-                        "steps": traj.steps,
-                        "total_reward": traj.total_reward,
-                        "terminated": traj.terminated,
-                    }
-                    for traj in trajectories
-                ],
-            }
-        )
-
     # Clean up
     await envs.close()
 
@@ -1550,10 +1336,10 @@ async def rollout(
     print(f"⏱️  Total duration: {total_duration:.2f}s")
 
     # Print log file locations if created
-    if trajectory_log_file:
-        print(f"📝 Detailed trajectory log: {trajectory_log_file}")
     if openai_format_log_file:
         print(f"💬 OpenAI format log: {openai_format_log_file}")
+    if recording_mode:
+        print(f"📝 Recorded trajectory: {playback_file}")
 
     return trajectories
 
@@ -1633,7 +1419,7 @@ __all__ = [
     "FireworksPolicy",
     "MCPVectorEnv",
     "GeneralMCPVectorEnv",
-    "ToolCall",
+    "MCPToolCall",
     "DatasetRow",
     "test_mcp",
 ]

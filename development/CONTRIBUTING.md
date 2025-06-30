@@ -19,11 +19,8 @@ source .venv/bin/activate
 # Run tests
 .venv/bin/pytest
 
-# Type check
-.venv/bin/mypy reward_kit
-
-# Lint code
-.venv/bin/flake8 reward_kit
+# Type check and lint
+make pre-commit
 ```
 
 ## Development Environment

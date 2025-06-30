@@ -14,6 +14,7 @@ from .adapters.braintrust import reward_fn_to_scorer, scorer_to_reward_fn
 from .common_utils import load_jsonl
 from .mcp_env import FireworksPolicy, MCPVectorEnv, make, rollout, test_mcp
 from .models import EvaluateResult, Message, MetricResult
+from .playback_policy import PlaybackPolicyBase
 from .reward_function import RewardFunction
 from .typed_interface import reward_function
 
@@ -36,6 +37,8 @@ __all__ = [
     "FireworksPolicy",
     "MCPVectorEnv",
     "test_mcp",
+    # Playback functionality
+    "PlaybackPolicyBase",
 ]
 
 from . import _version

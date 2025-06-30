@@ -479,30 +479,38 @@ class TestRecordAndPlaybackE2E:
             ) as openai_file:
                 openai_log_path = openai_file.name
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".jsonl", delete=False
-            ) as record_file:
-                record_path = record_file.name
+            # Use canonical recording to avoid hitting production APIs
+            canonical_recording = "examples/frozen_lake_mcp_complete/shared_data/recorded_trajectory.jsonl"
+            
+            if not os.path.exists(canonical_recording):
+                pytest.skip(f"Canonical recording not found: {canonical_recording}")
 
-            # Set up recording mode
-            os.environ["REWARD_KIT_PLAYBACK_FILE"] = record_path
+            # Set up playback mode using canonical recording
+            os.environ["REWARD_KIT_PLAYBACK_FILE"] = canonical_recording
 
+            # Use dataset that matches the canonical recording
             dataset = [
                 {
-                    "id": "openai_test",
-                    "seed": 999,
-                    "system_prompt": "Test system prompt",
-                    "user_prompt_template": "Test: {observation}",
-                    "environment_context": {},
+                    "id": "test_env_0", 
+                    "seed": 42,
+                    "system_prompt": "You are playing FrozenLake. Move to the goal (G) avoiding holes (H). Actions: up, down, left, right",
+                    "user_prompt_template": "Game state:\n{observation}\n\nChoose your move:",
+                    "environment_context": {"timeout_seconds": 30},
                 }
             ]
 
+            # Create policy - will auto-detect playback mode since canonical file exists
             policy = rk.FireworksPolicy(
                 model_id="accounts/fireworks/models/qwen3-235b-a22b"
             )
+            
+            # Verify we're in playback mode to ensure no live API calls
+            assert policy.is_playback_mode(), "Policy should be in playback mode"
+            print("✅ Using playback mode - no live API calls will be made")
+
             envs = rk.make("http://localhost:8001/mcp", dataset=dataset)
 
-            # This should create OpenAI format log entries only for terminated trajectories
+            # Run rollout in playback mode - will use recorded data
             trajectories = await rk.rollout(
                 envs, policy, steps=20, openai_format_log_file=openai_log_path
             )
@@ -531,9 +539,8 @@ class TestRecordAndPlaybackE2E:
         finally:
             if "REWARD_KIT_PLAYBACK_FILE" in os.environ:
                 del os.environ["REWARD_KIT_PLAYBACK_FILE"]
-            for path in [openai_log_path, record_path]:
-                if os.path.exists(path):
-                    os.unlink(path)
+            if os.path.exists(openai_log_path):
+                os.unlink(openai_log_path)
             # Stop the MCP server
             self.stop_mcp_server(server_process)
 

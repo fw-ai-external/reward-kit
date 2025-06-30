@@ -1043,6 +1043,57 @@ class FireworksPolicy(PlaybackPolicyBase):
 
         return openai_tools
 
+    async def __call__(
+        self,
+        tool_schemas: List[List[Dict]],
+        observations: List[Any],
+        system_prompts: List[str],
+        user_prompts: List[str],
+    ) -> List["MCPToolCall"]:
+        """
+        Override to ensure conversation histories are maintained in both live and playback modes.
+        
+        This is crucial for OpenAI format logging which requires conversation_histories.
+        """
+        # Initialize conversations if not already done (important for both modes)
+        if not hasattr(self, 'initialized') or not self.initialized:
+            self.initialize_conversations(len(observations), system_prompts, user_prompts)
+        
+        if self._is_playback:
+            # In playback mode, populate conversation histories with recorded messages
+            tool_calls = []
+            n_envs = len(tool_schemas)
+
+            for env_index in range(n_envs):
+                # Get recorded messages for this environment and step
+                messages = self._get_playback_messages(env_index)
+
+                if messages is None:
+                    # No more recorded actions - signal early termination
+                    tool_calls.append(
+                        MCPToolCall(
+                            "_playback_terminate", {"reason": "no_more_recorded_actions"}
+                        )
+                    )
+                    logger.info(
+                        f"🎬 Environment {env_index}: No more recorded actions, signaling termination"
+                    )
+                    continue
+
+                # Store the recorded messages in conversation history for OpenAI logging
+                self.conversation_histories[env_index] = messages.copy()
+
+                # Extract tool call from the last assistant message with tool_calls
+                tool_call = self._extract_tool_call_from_messages(messages, env_index)
+                tool_calls.append(tool_call)
+
+            return tool_calls
+        else:
+            # Live mode - use the inherited behavior
+            return await self._generate_live_tool_calls(
+                tool_schemas, observations, system_prompts, user_prompts
+            )
+
 
 def make(
     env_spec: str,

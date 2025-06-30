@@ -136,10 +136,18 @@ class PlaybackPolicyBase(ABC):
             for env_key in playback_actions:
                 playback_actions[env_key].sort(key=lambda x: x["step"])
 
-            logger.info(
-                f"✅ Loaded {valid_entries} trajectory entries for {len(playback_actions)} environments"
-            )
-            return playback_actions if playback_actions else None
+            if playback_actions:
+                logger.info(
+                    f"✅ Loaded {valid_entries} trajectory entries for {len(playback_actions)} environments"
+                )
+                return playback_actions
+            else:
+                logger.warning(
+                    f"⚠️  Trajectory file {filepath} exists but contains no valid entries. "
+                    f"Falling back to recording mode. Please check file format - expected JSONL with "
+                    f"'env_index', 'step', and 'messages' fields."
+                )
+                return None
 
         except Exception as e:
             logger.error(f"Error loading trajectory file {filepath}: {e}")

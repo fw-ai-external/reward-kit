@@ -15,7 +15,7 @@ def load_jsonl(filepath: str) -> List[Dict[str, Any]]:
 
 
 async def test_north_star_interface():
-    """Test the new simplified north star interface with automatic record-and-playbook."""
+    """Test the new simplified north star interface with automatic record-and-playback."""
     print("🌟 Testing Simplified North Star Interface")
     print("=" * 55)
 

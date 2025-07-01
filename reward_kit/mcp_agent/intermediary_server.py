@@ -1,18 +1,13 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 import anyio  # Added for debugging cancel scopes and tasks
 from mcp import types as mcp_types  # Added for type hinting
 from pydantic import BaseModel, Field
 
-from reward_kit.mcp_agent.backends.base import (
-    AbstractBackendHandler,
-    BackendInitRequest,
-    BackendInitResult,
-)
-from reward_kit.mcp_agent.backends.generic import GenericBackendHandler
+
 from reward_kit.mcp_agent.config import AppConfig, BackendServerConfig
 from reward_kit.mcp_agent.orchestration.base_client import (
     AbstractOrchestrationClient,
@@ -33,6 +28,31 @@ from mcp.server.fastmcp.server import Context as FastMCPContext
 from mcp.server.fastmcp.server import FastMCP
 
 # RequestContext is not directly used by handlers anymore, mcp_ctx is.
+
+
+# Backend initialization models (moved here to avoid separate backends module)
+class BackendInitRequest(BaseModel):
+    backend_name_ref: str = Field(
+        ...,
+        description="The unique reference name of the backend configuration to use (must match one in AppConfig.backends).",
+    )
+    num_instances: int = Field(
+        1,
+        ge=1,
+        description="Number of instances of this backend to provision for the session.",
+    )
+    template_details: Optional[Any] = Field(
+        None,
+        description="Backend-specific details for initializing stateful instances from a template.",
+    )
+
+    class Config:
+        extra = "forbid"
+
+
+class BackendInitResult(BaseModel):
+    backend_name_ref: str
+    instances: List[ManagedInstanceInfo]
 
 
 # Pydantic models for tool arguments
@@ -92,7 +112,6 @@ class RewardKitIntermediaryServer(FastMCP):
         self.app_config = app_config
         self._local_docker_orchestrator: Optional[LocalDockerOrchestrationClient] = None
         self._remote_http_orchestrators: Dict[str, RemoteHttpOrchestrationClient] = {}
-        self._backend_handlers: Dict[str, AbstractBackendHandler] = {}
         self._shared_global_instances: Dict[str, ManagedInstanceInfo] = {}
         self._shared_instance_locks: Dict[str, asyncio.Lock] = {}
         self.intermediary_session_data: Dict[str, IntermediarySessionData] = {}
@@ -219,22 +238,11 @@ class RewardKitIntermediaryServer(FastMCP):
                 f"Unsupported orchestration mode: {backend_cfg.orchestration_mode}"
             )
 
-    async def _initialize_backend_handlers(self):
-        logger.info("Initializing backend handlers...")
-        for backend_cfg in self.app_config.backends:
-            handler_class: Type[AbstractBackendHandler] = GenericBackendHandler
-            self._backend_handlers[backend_cfg.backend_name_ref] = handler_class(
-                backend_cfg
-            )
-            self._shared_instance_locks[backend_cfg.backend_name_ref] = asyncio.Lock()
-            logger.info(
-                f"Initialized {handler_class.__name__} for '{backend_cfg.backend_name_ref}'."
-            )
-        logger.info("Backend handlers initialization complete.")
-
     async def _get_or_provision_shared_global_instance(
         self, backend_name_ref: str
     ) -> ManagedInstanceInfo:
+        if backend_name_ref not in self._shared_instance_locks:
+            self._shared_instance_locks[backend_name_ref] = asyncio.Lock()
         async with self._shared_instance_locks[backend_name_ref]:
             if backend_name_ref in self._shared_global_instances:
                 logger.info(
@@ -365,14 +373,12 @@ class RewardKitIntermediaryServer(FastMCP):
                         shared_instance_info
                     ] * backend_req.num_instances
                 else:
-                    handler = self._backend_handlers[backend_req.backend_name_ref]
                     orchestration_client = self._get_orchestration_client(backend_cfg)
-                    instances_for_this_backend = (
-                        await handler.initialize_session_instances(
-                            session_data=session_data,
-                            init_request=backend_req,
-                            orchestration_client=orchestration_client,
-                        )
+                    instances_for_this_backend = await orchestration_client.provision_instances(
+                        backend_config=backend_cfg,
+                        num_instances=backend_req.num_instances,
+                        session_id=session_data.session_id,
+                        template_details=backend_req.template_details,
                     )
                 session_data.add_managed_instances(
                     backend_req.backend_name_ref, instances_for_this_backend
@@ -632,7 +638,6 @@ class RewardKitIntermediaryServer(FastMCP):
         logger.info("RewardKitIntermediaryServer performing custom startup tasks...")
         try:
             await self._initialize_orchestrators()
-            await self._initialize_backend_handlers()
             await self._provision_shared_global_instances()
             logger.info("RewardKitIntermediaryServer custom startup tasks complete.")
         except Exception as e:

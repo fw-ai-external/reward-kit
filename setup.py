@@ -34,6 +34,7 @@ setup(
             "pytest>=6.0.0",
             "pytest-asyncio",
             "pytest-httpserver",
+            "werkzeug>=2.0.0",  # needed for test_url_handling.py
             "black>=21.5b2",
             "mypy>=0.812",
             "flake8>=3.9.2",

@@ -29,16 +29,13 @@ try:
 
     print("\n3️⃣ Testing simulation server import...")
     from examples.frozen_lake_mcp_complete.mcp_server.simulation_server import (
-        FrozenLakeSimulation,
+        FrozenLakeSimulationServer,
     )
 
     print("✅ Simulation server import successful")
 
     print("\n4️⃣ Testing server creation...")
-    server = FrozenLakeSimulation(
-        "FrozenLake-Simulation-Test",
-        production_server_app=frozen_lake_mcp_server.app,
-    )
+    server = FrozenLakeSimulationServer()
     print("✅ Server instance created successfully")
 
     print("\n5️⃣ Testing server startup...")

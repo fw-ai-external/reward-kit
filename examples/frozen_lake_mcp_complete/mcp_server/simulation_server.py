@@ -187,6 +187,13 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
         env = session_state["env"]
         initial_observation = session_state["initial_observation"]
 
+        # Determine grid size from the environment
+        grid_size = "4x4"  # default
+        if hasattr(env, "desc") and env.desc is not None:
+            desc = env.desc
+            rows, cols = desc.shape
+            grid_size = f"{rows}x{cols}"
+
         initial_state = {
             "position": int(initial_observation),
             "grid_layout": self._get_grid_layout(int(initial_observation), env),
@@ -195,7 +202,7 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
             "truncated": False,
             "reward": 0.0,
             "info": {
-                "grid_size": "4x4",
+                "grid_size": grid_size,
                 "initial_position": int(initial_observation),
                 "seed": session_state.get("seed", 42),
             },
@@ -204,10 +211,23 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
 
     async def _get_game_config_resource(self) -> str:
         """Get game configuration resource."""
+        # Get session to extract actual config
+        ctx = self.app.request_context
+        session_id = f"config_{id(ctx.session)}"
+        session_state = await self._get_or_create_session(session_id)
+
+        # Determine grid size from the environment
+        env = session_state["env"]
+        grid_size = "4x4"  # default
+        if hasattr(env, "desc") and env.desc is not None:
+            desc = env.desc
+            rows, cols = desc.shape
+            grid_size = f"{rows}x{cols}"
+
         config = {
             "game_type": "FrozenLake",
             "version": "simulation-v1",
-            "grid_size": "4x4",
+            "grid_size": grid_size,
             "deterministic": True,
             "actions": ["LEFT", "DOWN", "RIGHT", "UP"],
         }
@@ -261,7 +281,7 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
             config = self.get_default_config()
             seed = 42  # Default seed for reproducibility
 
-            # Extract seed from client_info if available
+            # Extract seed and grid_type from client_info if available
             ctx = self.app.request_context
             if ctx.session.client_params and ctx.session.client_params.clientInfo:
                 client_info = ctx.session.client_params.clientInfo
@@ -274,6 +294,20 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
                         logger.info(
                             "🎲 No seed found in client_info, using random seed"
                         )
+
+                    # Extract grid_type from client_info
+                    if "grid_type" in client_info._extra:
+                        config["grid_type"] = client_info._extra["grid_type"]
+                        logger.info(
+                            f"🎯 Using grid_type from client_info: {config['grid_type']}"
+                        )
+                    else:
+                        logger.info(
+                            "🎯 No grid_type found in client_info, using default 4x4"
+                        )
+                else:
+                    seed = None
+                    logger.info("🎲 No extra info in client_info, using random seed")
             else:
                 seed = None
                 logger.info("🎲 No client_info available, using random seed")
@@ -297,7 +331,7 @@ class FrozenLakeSimulationServer(FrozenLakeAdapter):
                 "last_used": time.time(),
             }
             logger.info(
-                f"🆕 Simulation session created: {session_id[:16]}... (seed={seed})"
+                f"🆕 Simulation session created: {session_id[:16]}... (seed={seed}, grid_type={config.get('grid_type', '4x4')})"
             )
 
         self.sessions[session_id]["last_used"] = time.time()
@@ -376,4 +410,17 @@ def main(port: int, host: str, log_level: str) -> int:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if len(sys.argv) == 1:
+        # No arguments provided, use defaults for direct execution
+        try:
+            main.callback(port=8000, host="0.0.0.0", log_level="INFO")
+        except SystemExit:
+            pass  # Handle Click's normal exit
+    else:
+        # Arguments provided, let Click handle parsing
+        try:
+            main()
+        except SystemExit:
+            pass  # Handle Click's normal exit

@@ -1052,13 +1052,15 @@ class FireworksPolicy(PlaybackPolicyBase):
     ) -> List["MCPToolCall"]:
         """
         Override to ensure conversation histories are maintained in both live and playback modes.
-        
+
         This is crucial for OpenAI format logging which requires conversation_histories.
         """
         # Initialize conversations if not already done (important for both modes)
-        if not hasattr(self, 'initialized') or not self.initialized:
-            self.initialize_conversations(len(observations), system_prompts, user_prompts)
-        
+        if not hasattr(self, "initialized") or not self.initialized:
+            self.initialize_conversations(
+                len(observations), system_prompts, user_prompts
+            )
+
         if self._is_playback:
             # In playback mode, populate conversation histories with recorded messages
             tool_calls = []
@@ -1072,7 +1074,8 @@ class FireworksPolicy(PlaybackPolicyBase):
                     # No more recorded actions - signal early termination
                     tool_calls.append(
                         MCPToolCall(
-                            "_playback_terminate", {"reason": "no_more_recorded_actions"}
+                            "_playback_terminate",
+                            {"reason": "no_more_recorded_actions"},
                         )
                     )
                     logger.info(

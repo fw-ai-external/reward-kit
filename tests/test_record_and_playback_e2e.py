@@ -481,7 +481,7 @@ class TestRecordAndPlaybackE2E:
 
             # Use canonical recording to avoid hitting production APIs
             canonical_recording = "examples/frozen_lake_mcp_complete/shared_data/recorded_trajectory.jsonl"
-            
+
             if not os.path.exists(canonical_recording):
                 pytest.skip(f"Canonical recording not found: {canonical_recording}")
 
@@ -491,7 +491,7 @@ class TestRecordAndPlaybackE2E:
             # Use dataset that matches the canonical recording
             dataset = [
                 {
-                    "id": "test_env_0", 
+                    "id": "test_env_0",
                     "seed": 42,
                     "system_prompt": "You are playing FrozenLake. Move to the goal (G) avoiding holes (H). Actions: up, down, left, right",
                     "user_prompt_template": "Game state:\n{observation}\n\nChoose your move:",
@@ -503,7 +503,7 @@ class TestRecordAndPlaybackE2E:
             policy = rk.FireworksPolicy(
                 model_id="accounts/fireworks/models/qwen3-235b-a22b"
             )
-            
+
             # Verify we're in playback mode to ensure no live API calls
             assert policy.is_playback_mode(), "Policy should be in playback mode"
             print("✅ Using playback mode - no live API calls will be made")

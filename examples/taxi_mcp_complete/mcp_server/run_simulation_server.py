@@ -13,9 +13,7 @@ sys.path.insert(0, project_root)
 
 # Import required modules
 from examples.taxi_mcp_complete.mcp_server import taxi_mcp_server
-from examples.taxi_mcp_complete.mcp_server.simulation_server import (
-    TaxiSimulation,
-)
+from examples.taxi_mcp_complete.mcp_server.simulation_server import TaxiSimulation
 
 
 def main():

@@ -47,7 +47,7 @@ async def test_north_star_interface():
 
         # Create policy - will auto-detect mode based on environment variable
         policy = rk.FireworksPolicy(
-            model_id="accounts/fireworks/models/qwen3-235b-a22b", 
+            model_id="accounts/fireworks/models/qwen3-235b-a22b",
             temperature=0.2,
             max_tokens=16384,  # Increased from default 4096 for more thinking space
         )
@@ -106,7 +106,9 @@ async def test_north_star_interface():
             fickle_passenger = env_context.get("fickle_passenger", False)
             status = "SUCCESS" if traj.total_reward > 0 else "FAILED"
 
-            print(f"  Taxi Environment {i} (seed: {seed}, rain: {is_raining}, fickle: {fickle_passenger}): {status}")
+            print(
+                f"  Taxi Environment {i} (seed: {seed}, rain: {is_raining}, fickle: {fickle_passenger}): {status}"
+            )
             print(f"    Steps: {traj.steps}, Reward: {traj.total_reward}")
 
         if recording_mode:
@@ -150,4 +152,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

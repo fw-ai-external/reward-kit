@@ -28,9 +28,7 @@ from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 
 # Import production server components
-from examples.taxi_mcp_complete.mcp_server.taxi_adapter import (
-    TaxiAdapter,
-)
+from examples.taxi_mcp_complete.mcp_server.taxi_adapter import TaxiAdapter
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -78,7 +76,14 @@ class TaxiSimulationServer(TaxiAdapter):
                             "action": {
                                 "type": "string",
                                 "description": "Direction to move or action to take",
-                                "enum": ["SOUTH", "NORTH", "EAST", "WEST", "PICKUP", "DROPOFF"],
+                                "enum": [
+                                    "SOUTH",
+                                    "NORTH",
+                                    "EAST",
+                                    "WEST",
+                                    "PICKUP",
+                                    "DROPOFF",
+                                ],
                             }
                         },
                     },
@@ -149,7 +154,9 @@ class TaxiSimulationServer(TaxiAdapter):
         for r, desc_row in enumerate(desc):
             line = ""
             for c, cell in enumerate(desc_row):
-                cell_char = cell.decode("utf-8") if isinstance(cell, bytes) else str(cell)
+                cell_char = (
+                    cell.decode("utf-8") if isinstance(cell, bytes) else str(cell)
+                )
 
                 # Show taxi position
                 if r == taxi_visual_row and c == taxi_visual_col:
@@ -160,11 +167,16 @@ class TaxiSimulationServer(TaxiAdapter):
                 else:
                     # Check if this position is the destination
                     if destination < 4:  # Valid destination (0-3)
-                        dest_locs = [(0, 0), (0, 4), (4, 0), (4, 3)]  # R, G, Y, B locations
+                        dest_locs = [
+                            (0, 0),
+                            (0, 4),
+                            (4, 0),
+                            (4, 3),
+                        ]  # R, G, Y, B locations
                         dest_logical_row, dest_logical_col = dest_locs[destination]
                         dest_visual_row = dest_logical_row + 1
                         dest_visual_col = dest_logical_col * 2 + 1
-                        
+
                         if r == dest_visual_row and c == dest_visual_col:
                             # Highlight destination
                             if cell_char in "RGYB":
@@ -179,7 +191,6 @@ class TaxiSimulationServer(TaxiAdapter):
             grid_lines.append(line)
 
         return "\n".join(grid_lines)
-        
 
     async def _handle_taxi_move(self, arguments: dict) -> Dict[str, Any]:
         """Handle taxi_move tool call."""
@@ -216,7 +227,7 @@ class TaxiSimulationServer(TaxiAdapter):
         clean_info = {}
         if info:
             for key, value in info.items():
-                if hasattr(value, 'tolist'):  # numpy array
+                if hasattr(value, "tolist"):  # numpy array
                     clean_info[key] = value.tolist()
                 else:
                     clean_info[key] = value
@@ -330,7 +341,9 @@ class TaxiSimulationServer(TaxiAdapter):
                         )
 
                     if "fickle_passenger" in client_info._extra:
-                        config["fickle_passenger"] = client_info._extra["fickle_passenger"]
+                        config["fickle_passenger"] = client_info._extra[
+                            "fickle_passenger"
+                        ]
                         logger.info(
                             f"🎭 Using fickle_passenger from client_info: {config['fickle_passenger']}"
                         )

@@ -181,23 +181,3 @@ class TaxiAdapter(EnvironmentAdapter):
             "is_raining": False,  # Deterministic movement
             "fickle_passenger": False,  # Passenger doesn't change destinations
         }
-
-    # def get_game_info(self) -> Dict[str, Any]:
-    #     """Get general information about the Taxi game."""
-    #     return {
-    #         "name": "Taxi-v3",
-    #         "description": "Navigate to passengers, pick them up, and drop them off at designated locations",
-    #         "grid_size": "5x5",
-    #         "locations": {
-    #             "Red": "Top-left area",
-    #             "Green": "Top-right area",
-    #             "Yellow": "Bottom-left area",
-    #             "Blue": "Bottom-right area"
-    #         },
-    #         "rewards": {
-    #             "step": -1,
-    #             "successful_dropoff": +20,
-    #             "illegal_pickup_dropoff": -10
-    #         },
-    #         "episode_length": "Max 200 steps (with time limit wrapper)"
-    #     }

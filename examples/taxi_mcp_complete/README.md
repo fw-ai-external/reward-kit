@@ -20,7 +20,6 @@ taxi_mcp_complete/
 ├── mcp_server/                         # MCP Server Implementation
 │   ├── taxi_adapter.py                 # Taxi environment adapter
 │   ├── simulation_server.py            # 🚀 Multi-session simulation server
-│   ├── run_simulation_server.py        # Server startup script
 │   └── requirements.txt                # Server dependencies
 ├── local_testing/                      # Local Development & Testing
 │   ├── test_north_star.py              # North star API tests

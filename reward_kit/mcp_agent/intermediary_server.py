@@ -7,7 +7,6 @@ import anyio  # Added for debugging cancel scopes and tasks
 from mcp import types as mcp_types  # Added for type hinting
 from pydantic import BaseModel, Field
 
-
 from reward_kit.mcp_agent.config import AppConfig, BackendServerConfig
 from reward_kit.mcp_agent.orchestration.base_client import (
     AbstractOrchestrationClient,
@@ -374,11 +373,13 @@ class RewardKitIntermediaryServer(FastMCP):
                     ] * backend_req.num_instances
                 else:
                     orchestration_client = self._get_orchestration_client(backend_cfg)
-                    instances_for_this_backend = await orchestration_client.provision_instances(
-                        backend_config=backend_cfg,
-                        num_instances=backend_req.num_instances,
-                        session_id=session_data.session_id,
-                        template_details=backend_req.template_details,
+                    instances_for_this_backend = (
+                        await orchestration_client.provision_instances(
+                            backend_config=backend_cfg,
+                            num_instances=backend_req.num_instances,
+                            session_id=session_data.session_id,
+                            template_details=backend_req.template_details,
+                        )
                     )
                 session_data.add_managed_instances(
                     backend_req.backend_name_ref, instances_for_this_backend

@@ -89,21 +89,12 @@ class TaxiAdapter(EnvironmentAdapter):
         Create Taxi environment.
 
         Args:
-            config: Optional configuration dict. Can include:
-                - is_raining: If True, movement has 80% success rate (default: False)
-                - fickle_passenger: If True, passenger may change destinations (default: False)
+            config: Optional configuration dict. Note: TaxiEnv doesn't support
+                configuration parameters in the current gymnasium version.
         """
-        is_raining = False
-        fickle_passenger = False
-
-        # Extract config options
-        if config:
-            is_raining = config["is_raining"]
-            fickle_passenger = config["fickle_passenger"]
-
-        # Create environment (TaxiEnv doesn't accept these parameters directly)
-        # TODO: The parameters would need to be handled differently in gymnasium
-        env = TaxiEnv(is_rainy=is_raining, fickle_passenger=fickle_passenger)
+        # Create environment with default parameters
+        # Note: TaxiEnv in gymnasium doesn't support is_slippery or other config options
+        env = TaxiEnv(render_mode=None)
 
         return env
 
@@ -178,6 +169,71 @@ class TaxiAdapter(EnvironmentAdapter):
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration for Taxi."""
         return {
-            "is_raining": False,  # Deterministic movement
-            "fickle_passenger": False,  # Passenger doesn't change destinations
+            # Note: TaxiEnv doesn't support configuration in current gymnasium
+            "render_mode": None,
         }
+
+    def _get_visual_grid(self, position: int, env=None) -> str:
+        """Get the visual grid layout showing current taxi and passenger positions."""
+        if env is None:
+            return f"Position: {position}"
+
+        if not hasattr(env, "desc") or env.desc is None:
+            return f"Position: {position} (no map available)"
+
+        # Get the actual map from the environment
+        desc = env.desc
+
+        decoded = self.decode_state(position)
+        taxi_row = decoded["taxi_row"]
+        taxi_col = decoded["taxi_col"]
+        passenger_location = decoded["passenger_location"]
+        destination = decoded["destination"]
+
+        # Convert logical 5x5 coordinates to visual 7x11 coordinates
+        # Mapping: visual_row = logical_row + 1, visual_col = logical_col * 2 + 1
+        taxi_visual_row = taxi_row + 1
+        taxi_visual_col = taxi_col * 2 + 1
+
+        # Create grid representation
+        grid_lines = []
+        for r, desc_row in enumerate(desc):
+            line = ""
+            for c, cell in enumerate(desc_row):
+                cell_char = (
+                    cell.decode("utf-8") if isinstance(cell, bytes) else str(cell)
+                )
+
+                # Show taxi position
+                if r == taxi_visual_row and c == taxi_visual_col:
+                    if passenger_location == 4:  # Passenger in taxi
+                        line += "T"  # Taxi with passenger
+                    else:
+                        line += "t"  # Empty taxi
+                else:
+                    # Check if this position is the destination
+                    if destination < 4:  # Valid destination (0-3)
+                        dest_locs = [
+                            (0, 0),
+                            (0, 4),
+                            (4, 0),
+                            (4, 3),
+                        ]  # R, G, Y, B locations
+                        dest_logical_row, dest_logical_col = dest_locs[destination]
+                        dest_visual_row = dest_logical_row + 1
+                        dest_visual_col = dest_logical_col * 2 + 1
+
+                        if r == dest_visual_row and c == dest_visual_col:
+                            # Highlight destination
+                            if cell_char in "RGYB":
+                                line += cell_char.lower()  # Lowercase for destination
+                            else:
+                                line += "D"  # Destination marker
+                        else:
+                            line += cell_char
+                    else:
+                        line += cell_char
+
+            grid_lines.append(line)
+
+        return "\n".join(grid_lines)

@@ -235,3 +235,6 @@ proposed_north_star_interface.py
 examples/frozen_lake_mcp/trajectory.jsonl
 examples/frozen_lake_mcp/clean_openai_format.jsonl
 examples/frozen_lake_mcp/openai_format.jsonl
+node_modules/
+package-lock.json
+package.json

@@ -6,7 +6,13 @@ with reward-kit environments and evaluation workflows.
 """
 
 from .adapter import EnvironmentAdapter
+from .gym_production_server import GymProductionServer
 from .server import MCPEnvironmentServer
 from .simulation_server import SimulationServerBase
 
-__all__ = ["MCPEnvironmentServer", "EnvironmentAdapter", "SimulationServerBase"]
+__all__ = [
+    "MCPEnvironmentServer",
+    "EnvironmentAdapter",
+    "SimulationServerBase",
+    "GymProductionServer",
+]

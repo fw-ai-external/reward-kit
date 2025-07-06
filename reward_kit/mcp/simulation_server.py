@@ -4,9 +4,9 @@ MCP Simulation Server Framework
 This framework enforces the correct separation between production and simulation servers.
 It ensures that:
 1. No session management tools are exposed to models
-2. Session initialization happens via initializationOptions (MCP spec)
+2. Session initialization happens via client_info (MCP spec)
 3. Only domain game tools are exposed
-4. Simulation logic is handled internally
+4. Simulation logic is handled internally using proper MCP session management
 
 Usage:
     class MyGameSimulation(SimulationServerBase):
@@ -18,16 +18,29 @@ Usage:
     server.run()
 """
 
+import asyncio
+import contextlib
 import functools
 import inspect
+import json
+import logging
 import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from mcp.server.fastmcp import Context, FastMCP
+import uvicorn
+from mcp.server.lowlevel import Server
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.applications import Starlette
+from starlette.routing import Mount
+from starlette.types import Receive, Scope, Send
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class ToolMismatchError(Exception):
@@ -69,110 +82,115 @@ def simulation_resource(uri_pattern: str) -> Callable:
 
 class SimulationServerBase(ABC):
     """
-    Base class for simulation MCP servers.
+    Base class for simulation MCP servers using proper StreamableHTTPSessionManager.
 
     This framework enforces correct separation by:
-    - Managing sessions internally (no exposed tools)
-    - Using initializationOptions for configuration
+    - Using StreamableHTTPSessionManager for proper session management
+    - Extracting seeds from client_info during session initialization
     - Only exposing domain-specific game tools
     - Preventing session management tool pollution
-    - Automatically validating simulation tools against a production server
     - Supporting MCP resources for initial state following proper MCP patterns
     """
 
     def __init__(
         self,
         server_name: str,
-        production_server_app: Optional[FastMCP] = None,
+        production_server_app=None,
     ):
         """
         Initialize simulation server framework.
 
         Args:
             server_name: Name for the MCP server.
-            production_server_app: The production FastMCP app instance for validation.
+            production_server_app: The production server app instance for validation (optional).
         """
         self.server_name = server_name
         self.production_server_app = production_server_app
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.session_lock = threading.Lock()
         self._domain_tools: Dict[str, Callable] = {}
         self._domain_resources: Dict[str, Callable] = {}
 
-        # Create FastMCP server with proper lifespan
-        self.mcp = FastMCP(server_name, lifespan=self._lifespan)
+        # Create low-level MCP server
+        self.app = Server(server_name)
 
-        # Discover, validate, and register domain tools and resources
-        self._validate_and_register_tools()
+        # Session state storage for simulation environments
+        self.session_environments: Dict[str, Dict[str, Any]] = {}
+        self.session_lock = threading.Lock()
+
+        # Discover and register domain tools and resources
+        self._discover_and_register_tools()
         self._discover_and_register_resources()
+        self._register_session_handlers()
 
-    @asynccontextmanager
-    async def _lifespan(self, app: FastMCP):
-        """Server lifespan management."""
-        print(f"🚀 {self.server_name} Simulation Server")
-        print("🎯 Framework: Enforces no session tool pollution")
-        print(f"🔧 Domain tools: {list(self._domain_tools.keys())}")
-        print(f"📦 Domain resources: {list(self._domain_resources.keys())}")
-        print("📡 Session management: Internal (MCP spec compliant)")
-        print()
+    def _get_session_id_from_context(self, ctx) -> str:
+        """Extract session ID from MCP request context."""
+        # Use a stable session ID based on the client info
+        # Since we know the client_info is consistent for a given session,
+        # we can use a hash of the client_info to create a stable session ID
+        if hasattr(ctx, "session") and hasattr(ctx.session, "client_params"):
+            client_params = ctx.session.client_params
+            if hasattr(client_params, "clientInfo"):
+                client_info = client_params.clientInfo
+                if client_info and hasattr(client_info, "_extra"):
+                    extra_data = client_info._extra
+                    if extra_data and isinstance(extra_data, dict):
+                        # Create a stable session ID based on seed and other config
+                        import hashlib
+                        import json
 
-        yield
-
-        # Cleanup sessions
-        print("🧹 Cleaning up simulation sessions...")
-        with self.session_lock:
-            for session_id, session_data in self.sessions.items():
-                env = session_data.get("env")
-                if env:
-                    try:
-                        self.close_environment(env)
-                    except Exception as e:
-                        print(
-                            f"⚠️ Error closing environment in session {session_id}: {e}"
+                        stable_data = {
+                            "seed": extra_data.get("seed"),
+                            "config": extra_data.get("config", {}),
+                            "name": client_info.name,
+                            "version": client_info.version,
+                        }
+                        stable_str = json.dumps(stable_data, sort_keys=True)
+                        session_id = hashlib.md5(stable_str.encode()).hexdigest()
+                        logger.debug(
+                            f"Generated stable session_id from client_info: {session_id}"
                         )
-            self.sessions.clear()
-        print("✅ Simulation server shutdown complete")
+                        return session_id
 
-    def _get_session_id(self, ctx: Context) -> str:
-        """Extract session ID from FastMCP Context."""
-        session_obj = ctx.session
-        return f"sim_{id(session_obj)}"
+        # Fallback for testing or other scenarios
+        session_id = f"sim_{id(ctx)}"
+        logger.debug(f"Generated fallback session_id: {session_id}")
+        return session_id
 
-    def _get_or_create_session(self, ctx: Context) -> Dict[str, Any]:
+    def _get_or_create_session_env(self, ctx) -> Dict[str, Any]:
         """
-        Get or create session and return its state.
+        Get or create session environment.
 
-        This handles session initialization using MCP spec:
-        - Configuration from client info
-        - Automatic environment creation
-        - Internal session management (no tools exposed)
-
-        Returns:
-            Session state dictionary instead of injecting into context
+        This extracts the seed from client_info and creates a session-specific environment.
         """
-        session_id = self._get_session_id(ctx)
+        session_id = self._get_session_id_from_context(ctx)
 
         with self.session_lock:
-            if session_id not in self.sessions:
-                # Extract seed from MCP client info if available
+            if session_id not in self.session_environments:
+                # Extract seed from client info if available
                 config = self.get_default_config()
                 seed = None
 
-                # Get seed from client info if available
-                if hasattr(ctx, "session") and hasattr(ctx.session, "client_info"):
-                    client_info = ctx.session.client_info
-                    if client_info and hasattr(client_info, "_extra"):
-                        extra_data = client_info._extra
-                        if extra_data:
-                            # Extract seed from client info
-                            seed = extra_data.get("seed")
-                            # Update config with any additional options
-                            if "config" in extra_data:
-                                config.update(extra_data["config"])
+                # Extract client info and seed
+                if hasattr(ctx, "session") and hasattr(ctx.session, "client_params"):
+                    client_params = ctx.session.client_params
+                    if hasattr(client_params, "clientInfo"):
+                        client_info = client_params.clientInfo
+                        if client_info and hasattr(client_info, "_extra"):
+                            extra_data = client_info._extra
+                            if extra_data and isinstance(extra_data, dict):
+                                # Extract seed from client info
+                                seed = extra_data.get("seed")
+                                logger.info(
+                                    f"🎯 Extracted seed from client_info: {seed}"
+                                )
+                                # Update config with any additional options
+                                if "config" in extra_data:
+                                    config.update(extra_data["config"])
 
-                # Use create_environment_with_seed if available (for proper seeding)
-                # Otherwise fall back to separate create and reset
-                if hasattr(self, "create_environment_with_seed"):
+                # Create environment with seed - use create_environment_with_seed if available
+                # This is important for environments like FrozenLake that need the seed during creation
+                if hasattr(self, "create_environment_with_seed") and callable(
+                    getattr(self, "create_environment_with_seed")
+                ):
                     env, obs, info = self.create_environment_with_seed(
                         config, seed=seed
                     )
@@ -180,7 +198,7 @@ class SimulationServerBase(ABC):
                     env = self.create_environment(config)
                     obs, info = self.reset_environment(env, seed=seed)
 
-                self.sessions[session_id] = {
+                self.session_environments[session_id] = {
                     "env": env,
                     "config": config,
                     "seed": seed,
@@ -191,16 +209,16 @@ class SimulationServerBase(ABC):
                     "total_reward": 0.0,
                     "last_used": time.time(),
                 }
-                print(
+                logger.info(
                     f"🆕 Simulation session created: {session_id[:16]}... (seed={seed})"
                 )
 
-            self.sessions[session_id]["last_used"] = time.time()
-            return self.sessions[session_id]
+            self.session_environments[session_id]["last_used"] = time.time()
+            return self.session_environments[session_id]
 
-    def _validate_and_register_tools(self):
+    def _discover_and_register_tools(self):
         """
-        Discover, validate, and register tools marked with @simulation_tool.
+        Discover and register tools marked with @simulation_tool.
         """
         # 1. Discover tools on the subclass instance
         discovered_tools = {}
@@ -209,96 +227,64 @@ class SimulationServerBase(ABC):
                 discovered_tools[method.__name__] = method
         self._domain_tools = discovered_tools
 
-        # 2. Validate against production server if provided
-        if self.production_server_app:
-            prod_tools = self.production_server_app._tool_manager._tools
-            prod_tool_names = set(prod_tools.keys())
-            sim_tool_names = set(self._domain_tools.keys())
+        # 2. Register the discovered tools with the MCP server
+        if discovered_tools:
 
-            if prod_tool_names != sim_tool_names:
-                raise ToolMismatchError(
-                    f"Tool mismatch!\n"
-                    f"  - In Production but not Simulation: {prod_tool_names - sim_tool_names}\n"
-                    f"  - In Simulation but not Production: {sim_tool_names - prod_tool_names}"
-                )
+            @self.app.call_tool()
+            async def call_tool(name: str, arguments: dict):
+                # Get the current request context
+                ctx = self.app.request_context
+                session_state = self._get_or_create_session_env(ctx)
 
-            for name, sim_tool in self._domain_tools.items():
-                prod_tool = prod_tools[name]
-                prod_sig = inspect.signature(prod_tool.fn)
-                sim_sig = inspect.signature(sim_tool)
+                # Find the matching tool function
+                if name in self._domain_tools:
+                    tool_func = self._domain_tools[name]
 
-                # Exclude 'self', 'ctx', and 'session_state' from simulation signature for comparison
-                sim_params = [
-                    p
-                    for p in sim_sig.parameters.values()
-                    if p.name not in ("self", "ctx", "session_state")
-                ]
-                prod_params = [
-                    p
-                    for p in prod_sig.parameters.values()
-                    if p.name not in ("self", "ctx")
-                ]
+                    # Check if the tool function is async or sync
+                    if inspect.iscoroutinefunction(tool_func):
+                        result = await tool_func(
+                            ctx=ctx, session_state=session_state, **arguments
+                        )
+                    else:
+                        # For sync functions, call them directly
+                        result = tool_func(
+                            ctx=ctx, session_state=session_state, **arguments
+                        )
 
-                if len(sim_params) != len(prod_params) or any(
-                    s.name != p.name or s.annotation != p.annotation
-                    for s, p in zip(sim_params, prod_params)
-                ):
-                    raise SignatureMismatchError(
-                        f"Signature mismatch for tool '{name}':\n"
-                        f"  - Production: {prod_sig}\n"
-                        f"  - Simulation: {sim_sig}"
+                    # Return list of ContentBlock for low-level server
+                    from mcp.types import TextContent
+
+                    result_str = (
+                        json.dumps(result) if not isinstance(result, str) else result
+                    )
+                    return [TextContent(type="text", text=result_str)]
+                else:
+                    raise ValueError(f"Unknown tool: {name}")
+
+            @self.app.list_tools()
+            async def list_tools():
+                """List all available tools."""
+                from mcp.types import Tool
+
+                tools = []
+                for tool_name, tool_func in self._domain_tools.items():
+                    # Extract docstring as description
+                    description = tool_func.__doc__ or f"Execute {tool_name} action"
+
+                    # Create a basic input schema - could be enhanced by inspecting function signature
+                    input_schema = {"type": "object", "properties": {}, "required": []}
+
+                    tools.append(
+                        Tool(
+                            name=tool_name,
+                            description=description,
+                            inputSchema=input_schema,
+                        )
                     )
 
-        # 3. Register the validated tools
-        for tool_name, tool_func in self._domain_tools.items():
-            # Get the production tool signature to create a properly wrapped function
-            if self.production_server_app:
-                prod_tool = self.production_server_app._tool_manager._tools[tool_name]
-                prod_sig = inspect.signature(prod_tool.fn)
+                return tools
 
-                # Create a wrapper function with the exact production signature
-                # Use default parameters to capture variables from loop
-                def create_wrapper(
-                    original_func=tool_func, prod_signature=prod_sig, self_ref=self
-                ):
-                    def wrapper(*args, **kwargs):
-                        # Get context from kwargs (FastMCP injects this)
-                        ctx = kwargs.pop("ctx", None)
-                        if ctx is None:
-                            raise ValueError("Context not available in tool call")
-
-                        # Get session state
-                        session_state = self_ref._get_or_create_session(ctx)
-
-                        # Call original function with session_state
-                        return original_func(
-                            *args, ctx=ctx, session_state=session_state, **kwargs
-                        )
-
-                    # Copy the production signature to the wrapper
-                    wrapper.__signature__ = prod_signature
-                    wrapper.__name__ = original_func.__name__
-                    wrapper.__doc__ = original_func.__doc__
-                    return wrapper
-
-                wrapped_tool = create_wrapper()
-            else:
-                # Fallback for when no production server is provided
-                # Use default parameter to capture tool_func from loop
-                def create_fallback_wrapper(original_func=tool_func, self_ref=self):
-                    @functools.wraps(original_func)
-                    def wrapped_tool(*args, ctx: Context, **kwargs):
-                        session_state = self_ref._get_or_create_session(ctx)
-                        # Pass session state as a special argument instead of injecting into context
-                        return original_func(
-                            *args, ctx=ctx, session_state=session_state, **kwargs
-                        )
-
-                    return wrapped_tool
-
-                wrapped_tool = create_fallback_wrapper()
-
-            self.mcp.tool(name=tool_name)(wrapped_tool)
+            logger.info(f"✅ Registered {len(discovered_tools)} domain tools")
 
     def _discover_and_register_resources(self):
         """
@@ -311,84 +297,78 @@ class SimulationServerBase(ABC):
                 discovered_resources[method.__name__] = method
         self._domain_resources = discovered_resources
 
-        # 2. Register the discovered resources with their URI patterns
-        for resource_name, resource_func in self._domain_resources.items():
-            resource_uri = resource_func._resource_uri
-
-            # Create a wrapper that completely hides the original signature from FastMCP
-            # This wrapper has no parameters, which FastMCP can accept
-            def create_clean_resource_wrapper(
-                original_func=resource_func, self_ref=self
-            ):
-                def clean_resource_wrapper() -> str:
-                    """Clean resource wrapper with no parameters for FastMCP compatibility."""
-                    # Create a default session state for resource calls
-                    default_session_state = {
-                        "session_id": "resource_call",
-                        "env": None,
-                        "initial_observation": 0,
-                        "steps": 0,
-                        "total_reward": 0.0,
-                        "seed": 42,  # Default seed for resource calls
-                        "last_used": time.time(),
-                    }
-
-                    try:
-                        # For initial state resources, create a temporary environment
-                        if "initial_state" in original_func.__name__:
-                            # Create a temporary environment for the resource
-                            config = self_ref.get_default_config()
-                            env = self_ref.create_environment(config)
-                            obs, info = self_ref.reset_environment(env, seed=42)
-                            default_session_state.update(
-                                {
-                                    "env": env,
-                                    "initial_observation": obs,
-                                    "seed": 42,
-                                }
-                            )
-
-                        result = original_func(
-                            ctx=None, session_state=default_session_state
-                        )
-
-                        # Clean up temporary environment
-                        if (
-                            "env" in default_session_state
-                            and default_session_state["env"]
-                        ):
-                            try:
-                                self_ref.close_environment(default_session_state["env"])
-                            except Exception:
-                                pass  # Ignore cleanup errors
-
-                        return result
-                    except Exception as e:
-                        # Return a default resource response on error
-                        import json
-
-                        return json.dumps(
-                            {
-                                "error": f"Resource unavailable: {str(e)}",
-                                "resource": original_func.__name__,
-                                "uri": resource_uri,
-                            }
-                        )
-
-                # Set the correct name and docstring for the wrapper
-                clean_resource_wrapper.__name__ = f"{resource_name}_wrapper"
-                clean_resource_wrapper.__doc__ = f"Resource wrapper for {resource_uri}"
-
-                return clean_resource_wrapper
-
-            wrapped_resource = create_clean_resource_wrapper()
-
-            # Register the resource with FastMCP using the URI pattern
-            self.mcp.resource(resource_uri)(wrapped_resource)
-            print(f"📦 Registered resource: {resource_uri} -> {resource_name}")
-
+        # 2. Register the discovered resources with the MCP server
         if discovered_resources:
-            print(f"✅ Registered {len(discovered_resources)} domain resources")
+
+            @self.app.read_resource()
+            async def read_resource(uri: str):
+                # Get the current request context
+                ctx = self.app.request_context
+
+                # Find the matching resource function by URI pattern
+                for resource_name, resource_func in self._domain_resources.items():
+                    resource_uri_pattern = resource_func._resource_uri
+                    # Convert URI to string for pattern matching
+                    uri_str = str(uri)
+                    # Simple pattern matching - could be enhanced for complex patterns
+                    if uri_str == resource_uri_pattern or uri_str.endswith(
+                        resource_uri_pattern
+                    ):
+                        # Create session state for this resource call
+                        session_state = self._get_or_create_session_env(ctx)
+
+                        # Check if the resource function is async or sync
+                        if inspect.iscoroutinefunction(resource_func):
+                            result = await resource_func(
+                                ctx=ctx, session_state=session_state
+                            )
+                        else:
+                            # For sync functions, call them directly
+                            result = resource_func(ctx=ctx, session_state=session_state)
+
+                        # Ensure we return the proper format for the low-level server
+                        if isinstance(result, str):
+                            return result
+                        else:
+                            return json.dumps(result)
+
+                raise ValueError(f"Unknown resource: {uri}")
+
+            @self.app.list_resources()
+            async def list_resources():
+                """List all available resources."""
+                from mcp.types import Resource
+
+                resources = []
+                for resource_name, resource_func in self._domain_resources.items():
+                    # Extract docstring as description
+                    description = resource_func.__doc__ or f"Resource {resource_name}"
+
+                    resources.append(
+                        Resource(
+                            uri=resource_func._resource_uri,
+                            name=resource_name,
+                            description=description,
+                            mimeType="application/json",
+                        )
+                    )
+
+                return resources
+
+            logger.info(f"✅ Registered {len(discovered_resources)} domain resources")
+
+    def _register_session_handlers(self):
+        """Register session initialization and cleanup handlers."""
+
+        @self.app.set_logging_level()
+        async def set_logging_level(level):
+            """Handle logging level requests."""
+            logger.setLevel(getattr(logging, level.upper()))
+            return {}
+
+        # NOTE: The low-level Server doesn't have built-in session lifecycle hooks
+        # We'll need to capture client_info during the first request in each session
+        # This is a limitation of using the low-level server directly
 
     # Abstract methods that subclasses MUST implement
 
@@ -431,15 +411,16 @@ class SimulationServerBase(ABC):
         """Get default environment configuration."""
         pass
 
-    def run(self, transport: str = "streamable-http", **kwargs):
+    def run(self, port: int = 8000, host: str = "127.0.0.1", **kwargs):
         """
-        Run the simulation server.
+        Run the simulation server using StreamableHTTPSessionManager.
 
         Args:
-            transport: Transport protocol
-            **kwargs: Additional arguments for FastMCP.run()
+            port: Port to listen on
+            host: Host to bind to
+            **kwargs: Additional arguments for uvicorn
         """
-        print(f"📡 Starting simulation server with {transport} transport")
+        print(f"📡 Starting simulation server with StreamableHTTPSessionManager")
         print(f"🎮 Domain tools: {list(self._domain_tools.keys())}")
         print(f"📦 Domain resources: {list(self._domain_resources.keys())}")
         if self.production_server_app:
@@ -447,5 +428,59 @@ class SimulationServerBase(ABC):
         print("🚫 No session management tools exposed (framework enforced)")
         print()
 
-        # Pass all arguments directly to FastMCP.run()
-        self.mcp.run(transport=transport, **kwargs)
+        # Create the session manager with our app
+        session_manager = StreamableHTTPSessionManager(
+            app=self.app,
+        )
+
+        # ASGI handler for streamable HTTP connections
+        async def handle_streamable_http(
+            scope: Scope, receive: Receive, send: Send
+        ) -> None:
+            await session_manager.handle_request(scope, receive, send)
+
+        @contextlib.asynccontextmanager
+        async def lifespan(app: Starlette) -> AsyncIterator[None]:
+            """Context manager for managing session manager lifecycle."""
+            async with session_manager.run():
+                logger.info(
+                    f"🚀 {self.server_name} started with StreamableHTTP session manager!"
+                )
+                try:
+                    yield
+                finally:
+                    logger.info("🧹 Simulation server shutting down...")
+                    # Clean up session environments
+                    with self.session_lock:
+                        for (
+                            session_id,
+                            session_data,
+                        ) in self.session_environments.items():
+                            env = session_data.get("env")
+                            if env:
+                                try:
+                                    self.close_environment(env)
+                                except Exception as e:
+                                    logger.warning(
+                                        f"⚠️ Error closing environment in session {session_id}: {e}"
+                                    )
+                        self.session_environments.clear()
+                    logger.info("✅ Simulation server shutdown complete")
+
+        # Create an ASGI application using the transport
+        starlette_app = Starlette(
+            debug=kwargs.get("debug", False),
+            routes=[
+                Mount("/mcp", app=handle_streamable_http),
+            ],
+            lifespan=lifespan,
+        )
+
+        # Run the server
+        uvicorn.run(
+            starlette_app,
+            host=host,
+            port=port,
+            log_level=kwargs.get("log_level", "info"),
+            **{k: v for k, v in kwargs.items() if k not in ["debug", "log_level"]},
+        )

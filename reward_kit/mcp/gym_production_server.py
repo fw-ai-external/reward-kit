@@ -90,7 +90,13 @@ class GymProductionServer(ABC):
             return json.dumps(self._render(self.obs))
 
     def extract_seed_from_context(self, ctx: Context) -> Optional[int]:
-        """Extract seed from MCP client info if available."""
+        """
+        Extract seed from MCP client info if available.
+
+        NOTE: Production servers are typically single-session and don't need
+        seed extraction. This method is mainly for compatibility with simulation
+        servers that handle multiple sessions with different seeds.
+        """
         if hasattr(ctx, "session") and hasattr(ctx.session, "client_info"):
             client_info = ctx.session.client_info
             if client_info and hasattr(client_info, "_extra"):
@@ -100,6 +106,7 @@ class GymProductionServer(ABC):
                     print(f"🌱 Reinitializing with seed from client: {seed}")
                     self.env, self.obs, _info = self._new_env(seed=seed)
                     return seed
+
         return None
 
     # Abstract methods that subclasses must implement

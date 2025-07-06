@@ -130,14 +130,16 @@ def simulation_server():
 
 @pytest.fixture
 def recording_file():
-    """Provide temporary recording file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+    """Provide temporary recording file path without creating it."""
+    # Create a temporary file, get its name, then delete it.
+    # This ensures we have a unique, non-existent path.
+    with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=True) as f:
         recording_path = f.name
 
     try:
         yield recording_path
     finally:
-        # Clean up
+        # Clean up any file that might have been created at the path
         if os.path.exists(recording_path):
             os.unlink(recording_path)
 
@@ -328,35 +330,37 @@ def test_server_health_checks(production_server, simulation_server):
 
 
 @pytest.mark.asyncio
-async def test_production_only_recorded_policy():
+async def test_production_only_recorded_policy(taxi_dataset):
     """Test that production environments work with pre-recorded policies only."""
 
     # Create a pre-recorded trajectory file for this test
-    test_recording_file = "/tmp/test_taxi_recording.jsonl"
-
-    # Generate proper trajectory data format for taxi
-    recording_data = [
-        {
-            "env_index": 0,
-            "step": 0,
-            "messages": [{"role": "assistant", "content": "I'll move SOUTH"}],
-            "tool_calls": [
-                {"function": {"name": "taxi_move", "arguments": '{"action": "SOUTH"}'}}
-            ],
-            "response": {"state": 25},
-        },
-        {
-            "env_index": 0,
-            "step": 1,
-            "messages": [{"role": "assistant", "content": "I'll try to PICKUP"}],
-            "tool_calls": [
-                {"function": {"name": "taxi_move", "arguments": '{"action": "PICKUP"}'}}
-            ],
-            "response": {"state": 85},
-        },
-    ]
-
-    with open(test_recording_file, "w") as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        test_recording_file = f.name
+        # Create a dummy trajectory file
+        recording_data = [
+            {
+                "env_index": 0,
+                "step": 0,
+                "messages": [
+                    {"role": "system", "content": taxi_dataset[0]["system_prompt"]},
+                    {"role": "user", "content": "Initial state"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "type": "function",
+                                "function": {
+                                    "name": "taxi_move",
+                                    "arguments": '{"action": "SOUTH"}',
+                                },
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
         for entry in recording_data:
             f.write(json.dumps(entry) + "\n")
 

@@ -43,17 +43,21 @@ frozen_lake_mcp_complete/
 
 ### `frozen_lake_mcp_server.py` - Production Server
 - **Purpose**: Single-session production deployment
-- **Use Case**: Individual client connections, demos
+- **Use Case**: Individual client connections, demos, simple integrations
 - **Concurrency**: ❌ NOT suitable for multiple concurrent rollouts
 - **Session Management**: Global state (one game per server instance)
+- **Seed Handling**: ❌ No seed handling - uses default environment
+- **Architecture**: Vanilla MCP server built on `GymProductionServer`
 
 ### `simulation_server.py` - Simulation Server
-- **Purpose**: Multi-session simulation environment
+- **Purpose**: Multi-session simulation environment for evaluation
 - **Use Case**: ✅ **PREFERRED for concurrent rollouts and testing**
 - **Concurrency**: ✅ Handles multiple parallel sessions properly
 - **Session Management**: Per-client isolated sessions with proper seeding
+- **Seed Handling**: ✅ Supports different seeds per session for reproducible evaluation
+- **Architecture**: Built on `SimulationServerBase` framework
 
-**For Remote Deployment**: Use `simulation_server.py` for best rollout performance!
+**Key Point**: Production servers are intentionally simple and don't handle seeds. For evaluation with different seeds, always use the simulation server.
 
 ## 🚀 Quick Start
 
@@ -154,22 +158,22 @@ cd examples/frozen_lake_mcp_complete/remote_testing
 
 ## 🧪 Testing Workflow
 
+### Proper Testing (Recommended)
+```bash
+# Run the proper e2e test (tests simulation server with seeds)
+python -m pytest tests/test_record_and_replay_e2e.py -v
+```
+
 ### Development Testing
 ```bash
-# 1. Start local server (in background or separate terminal)
-cd mcp_server && ../../../.venv/bin/python frozen_lake_mcp_server.py &
+# 1. Start simulation server for multi-session testing
+cd mcp_server && ../../../.venv/bin/python simulation_server.py --port 8001 &
 
-# 2. Wait for server to start, then run validation
-sleep 2 && cd ../local_testing && ../../../.venv/bin/python test_north_star.py
+# 2. Test with simulation server (handles seeds properly)
+# Note: Most local testing scripts are deprecated - use e2e test instead
 
-# 3. Run comprehensive tests (requires server)
-../../../.venv/bin/python run_all_robustness_tests.py
-
-# 4. Test specific seeds (requires server)
-../../../.venv/bin/python test_seed_verification.py
-
-# 5. Test adapter (no server needed)
-../../../.venv/bin/python test_adapter_seeding.py
+# 3. Test adapter (no server needed)
+cd local_testing && ../../../.venv/bin/python test_adapter_seeding.py
 ```
 
 ### Production Validation

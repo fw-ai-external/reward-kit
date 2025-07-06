@@ -65,6 +65,7 @@ class FrozenLakeSimServer(FrozenLakeAdapter, SimulationServerBase):
         # Update session state
         session_state["steps"] += 1
         session_state["total_reward"] = session_state.get("total_reward", 0.0) + reward
+        session_state["env"] = env
 
         # Format response to match production server
         result = {
@@ -84,7 +85,7 @@ class FrozenLakeSimServer(FrozenLakeAdapter, SimulationServerBase):
         return result
 
     @simulation_resource("game://initial_state")
-    def initial_state(self, *, ctx, session_state) -> str:
+    async def initial_state(self, *, ctx, session_state):
         """Get initial state resource for simulation."""
         env = session_state["env"]
         initial_observation = session_state["initial_observation"]
@@ -102,6 +103,8 @@ class FrozenLakeSimServer(FrozenLakeAdapter, SimulationServerBase):
                 "seed": session_state.get("seed", 42),
             },
         }
+
+        # Return the JSON string directly for the low-level server
         return json.dumps(initial_state)
 
 
@@ -120,11 +123,11 @@ def main():
     print()
 
     # Set port environment variable
-    os.environ["PORT"] = str(args.port)
+    os.environ["FASTMCP_PORT"] = str(args.port)
 
     # Create and run server
     server = FrozenLakeSimServer()
-    server.run()
+    server.run(port=args.port, host=args.host)
 
 
 if __name__ == "__main__":

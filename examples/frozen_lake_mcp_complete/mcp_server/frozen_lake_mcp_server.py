@@ -52,8 +52,8 @@ class FrozenLakeProdServer(GymProductionServer):
             Returns:
                 Game state with position, reward, and completion status
             """
-            # Extract seed from client info and reinitialize if needed
-            self.extract_seed_from_context(ctx)
+            # Production server: single-session, no seed handling
+            # For multi-session with seeds, use simulation_server.py
 
             # Validate action
             if not action or not isinstance(action, str):

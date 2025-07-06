@@ -18,14 +18,36 @@ The **Taxi** environment is a classic reinforcement learning problem where:
 taxi_mcp_complete/
 ├── README.md                           # This comprehensive guide
 ├── mcp_server/                         # MCP Server Implementation
+│   ├── taxi_mcp_server.py              # 🏭 Production server (vanilla, no seeds)
+│   ├── simulation_server.py            # 🚀 Simulation server (multi-session, seeds)
 │   ├── taxi_adapter.py                 # Taxi environment adapter
-│   ├── simulation_server.py            # 🚀 Multi-session simulation server
 │   └── requirements.txt                # Server dependencies
-├── local_testing/                      # Local Development & Testing
-│   ├── test_north_star.py              # North star API tests
+├── tests/                              # Testing
+│   ├── test_record_and_replay_e2e.py   # Main test (use this!)
+│   └── conftest.py                     # Test configuration
 └── shared_data/                        # Shared Data & Configurations
-    ├── taxi_rollouts.jsonl             # Environment configurations and prompts
+    └── taxi_rollouts.jsonl             # Environment configurations and prompts
 ```
+
+## 🏭 Server Types Explained
+
+### `taxi_mcp_server.py` - Production Server
+- **Purpose**: Single-session production deployment
+- **Use Case**: Individual client connections, demos, simple integrations
+- **Concurrency**: ❌ NOT suitable for multiple concurrent rollouts
+- **Session Management**: Global state (one game per server instance)
+- **Seed Handling**: ❌ No seed handling - uses default environment
+- **Architecture**: Vanilla MCP server built on `GymProductionServer`
+
+### `simulation_server.py` - Simulation Server
+- **Purpose**: Multi-session simulation environment for evaluation
+- **Use Case**: ✅ **PREFERRED for concurrent rollouts and testing**
+- **Concurrency**: ✅ Handles multiple parallel sessions properly
+- **Session Management**: Per-client isolated sessions with proper seeding
+- **Seed Handling**: ✅ Supports different seeds per session for reproducible evaluation
+- **Architecture**: Built on `SimulationServerBase` framework
+
+**Key Point**: Production servers are intentionally simple and don't handle seeds. For evaluation with different seeds, always use the simulation server.
 
 ## 🎮 Game Environment
 
@@ -75,20 +97,18 @@ export FIREWORKS_API_KEY="your_dev_fireworks_api_key"
 export FIREWORKS_ACCOUNT_ID="your_account_id"
 ```
 
-### North Star API Testing
-
-Test the complete reward-kit north star interface with record-and-playback:
+### Proper Testing (Recommended)
 
 ```bash
-# Terminal 1: Start the MCP server
-cd examples/taxi_mcp_complete/mcp_server
-../../../.venv/bin/python simulation_server.py
-# Server starts on http://localhost:8000/mcp/
-
-# Terminal 2: Run north star tests
-cd examples/taxi_mcp_complete/local_testing
-../../../.venv/bin/python test_north_star.py
+# Run the proper e2e test (tests simulation server with seeds)
+python -m pytest tests/test_record_and_replay_e2e.py -v
 ```
+
+This test validates:
+- Multi-session handling with different seeds
+- Record/replay functionality
+- Environment adapter integration
+- MCP protocol compliance
 
 ## 🔧 Configuration Options
 

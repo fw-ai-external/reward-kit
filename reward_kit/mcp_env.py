@@ -874,6 +874,7 @@ class FireworksPolicy(PlaybackPolicyBase):
                 # "tool_choice": "required" if openai_tools else None,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
+                # "reasoning_effort": "none",
             }
 
             response = await loop.run_in_executor(
@@ -1148,9 +1149,7 @@ def make(
             if isinstance(row, dict):
                 # Handle seed from both old location (backward compatibility) and new location
                 environment_context = row.get("environment_context", {})
-                seed = row.get("seed")  # Check old location first
-                if seed is None and "seed" in environment_context:
-                    seed = environment_context["seed"]  # Check new location
+                seed = environment_context.get("seed")
 
                 dataset_row = DatasetRow(
                     id=row["id"],

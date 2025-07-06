@@ -40,8 +40,11 @@ def render_grid(desc, position: int) -> str:
                 )
 
                 if r == row and c == col:
-                    # Show player position with 'P'
-                    line += "P"
+                    # Show player position with 'P', unless it's the goal
+                    if cell_char == "G":
+                        line += "W"  # Won - player reached goal
+                    else:
+                        line += "P"
                 else:
                     # Show original cell
                     line += cell_char

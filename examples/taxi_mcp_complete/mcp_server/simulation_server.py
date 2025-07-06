@@ -146,7 +146,7 @@ def main():
     # Set port environment variable
     import os
 
-    os.environ["PORT"] = str(args.port)
+    os.environ["FASTMCP_PORT"] = str(args.port)
 
     # Create and run server
     server = TaxiSimServer()

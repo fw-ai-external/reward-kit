@@ -8,20 +8,17 @@ from omegaconf import DictConfig
 
 from reward_kit.generation.cache import ResponseCache
 
-# Define a temporary cache directory for tests
-TEST_CACHE_DIR = ".test_cache_dir_temp"
-
 
 @pytest.fixture(scope="function")
-def cache_manager():
+def cache_manager(tmp_path):
     """Fixture to set up and tear down the cache directory for each test."""
-    if os.path.exists(TEST_CACHE_DIR):
-        shutil.rmtree(TEST_CACHE_DIR)  # Clean up before test
-    os.makedirs(TEST_CACHE_DIR, exist_ok=True)
+    # Use pytest's tmp_path for unique temporary directories per test
+    test_cache_dir = tmp_path / "test_cache"
+    test_cache_dir.mkdir(exist_ok=True)
 
     cache_config_enabled = DictConfig(
         {
-            "cache_dir": TEST_CACHE_DIR,
+            "cache_dir": str(test_cache_dir),
             # enabled is not a direct param of ResponseCache, but used by pipeline.
             # ResponseCache itself is always "enabled" if cache_dir is valid.
         }
@@ -29,9 +26,7 @@ def cache_manager():
     cache = ResponseCache(cache_config_enabled)
     yield cache  # Provide the ResponseCache instance
 
-    # Teardown: remove the cache directory after the test
-    if os.path.exists(TEST_CACHE_DIR):
-        shutil.rmtree(TEST_CACHE_DIR)
+    # Cleanup is handled automatically by pytest's tmp_path
 
 
 def test_generate_key_includes_all_params(cache_manager: ResponseCache):
@@ -190,19 +185,22 @@ def test_cache_non_zero_temperature(cache_manager: ResponseCache):
     ), "Should not cache or retrieve for non-zero temperature by default"
 
 
-def test_cache_disabled_if_dir_creation_fails():
+def test_cache_disabled_if_dir_creation_fails(tmp_path):
     # This test needs to mock os.makedirs to raise an OSError
+    unique_dir_1 = tmp_path / "some_uncreatable_dir"
+    unique_dir_2 = tmp_path / "another_uncreatable_dir"
+
     with patch("os.makedirs", side_effect=OSError("Test OS Error")):
         with patch(
             "logging.Logger.error"
         ) as mock_log_error:  # Check that error is logged
-            cache_config_fail = DictConfig({"cache_dir": ".some_uncreatable_dir"})
+            cache_config_fail = DictConfig({"cache_dir": str(unique_dir_1)})
             cache = ResponseCache(cache_config_fail)
             assert cache.cache_dir is None  # Caching should be disabled
             mock_log_error.assert_called_once()  # Ensure the error was logged
 
     # Double check that put/get do nothing if cache_dir is None
-    cache_config_fail = DictConfig({"cache_dir": ".another_uncreatable_dir"})
+    cache_config_fail = DictConfig({"cache_dir": str(unique_dir_2)})
     with patch("os.makedirs", side_effect=OSError("Test OS Error")):
         cache = ResponseCache(cache_config_fail)  # cache.cache_dir will be None
 

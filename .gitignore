@@ -218,7 +218,6 @@ gitleaks-report*.json
 .deepeval/
 examples/frozen_lake/evaluation_logs/
 examples/frozen_lake/client/evaluation_logs/
-client/
 
 # Temporary debug and test files from MCP development
 examples/frozen_lake_mcp/debug_*.py

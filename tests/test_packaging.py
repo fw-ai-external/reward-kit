@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -16,32 +17,39 @@ from reward_kit.packaging import (
 if Path.cwd().as_posix() not in sys.path:
     sys.path.insert(0, Path.cwd().as_posix())
 
-# Create a dummy reward function file for testing
-DUMMY_REWARD_MODULE_NAME = "dummy_test_reward_module_for_packaging"
-DUMMY_REWARD_MODULE_FILENAME = f"{DUMMY_REWARD_MODULE_NAME}.py"
-DUMMY_REWARD_FUNCTION_NAME = "my_dummy_reward_func"
-DUMMY_FUNCTION_REF = f"{DUMMY_REWARD_MODULE_NAME}.{DUMMY_REWARD_FUNCTION_NAME}"
-
-DUMMY_REWARD_MODULE_CONTENT = f"""
-from reward_kit.typed_interface import reward_function
-
-@reward_function(id="test-dummy-packaging", requirements="requests==2.25.1\\nnumpy>=1.20.0")
-def {DUMMY_REWARD_FUNCTION_NAME}(messages, ground_truth=None):
-    return {{"score": 1.0, "reason": "Dummy success"}}
-"""
-
 
 class TestPackaging(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with open(DUMMY_REWARD_MODULE_FILENAME, "w") as f:
-            f.write(DUMMY_REWARD_MODULE_CONTENT)
+        # Create a unique dummy reward function file for testing to avoid race conditions
+        import uuid
+
+        unique_id = str(uuid.uuid4()).replace("-", "")[:8]
+        cls.DUMMY_REWARD_MODULE_NAME = (
+            f"dummy_test_reward_module_for_packaging_{unique_id}"
+        )
+        cls.DUMMY_REWARD_MODULE_FILENAME = f"{cls.DUMMY_REWARD_MODULE_NAME}.py"
+        cls.DUMMY_REWARD_FUNCTION_NAME = "my_dummy_reward_func"
+        cls.DUMMY_FUNCTION_REF = (
+            f"{cls.DUMMY_REWARD_MODULE_NAME}.{cls.DUMMY_REWARD_FUNCTION_NAME}"
+        )
+
+        cls.DUMMY_REWARD_MODULE_CONTENT = f"""
+from reward_kit.typed_interface import reward_function
+
+@reward_function(id="test-dummy-packaging", requirements="requests==2.25.1\\nnumpy>=1.20.0")
+def {cls.DUMMY_REWARD_FUNCTION_NAME}(messages, ground_truth=None):
+    return {{"score": 1.0, "reason": "Dummy success"}}
+"""
+
+        with open(cls.DUMMY_REWARD_MODULE_FILENAME, "w") as f:
+            f.write(cls.DUMMY_REWARD_MODULE_CONTENT)
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(DUMMY_REWARD_MODULE_FILENAME):
-            os.remove(DUMMY_REWARD_MODULE_FILENAME)
+        if os.path.exists(cls.DUMMY_REWARD_MODULE_FILENAME):
+            os.remove(cls.DUMMY_REWARD_MODULE_FILENAME)
 
     def test_resolve_module_path_and_name_simple_module(self):
         """Test resolving a simple .py module in CWD."""
@@ -65,7 +73,7 @@ class TestPackaging(unittest.TestCase):
     def test_generate_dockerfile_with_inline_requirements(self):
         requirements_content = "flask==2.0.1\npydantic<2.0"
         dockerfile = generate_dockerfile_content(
-            function_ref=DUMMY_FUNCTION_REF,
+            function_ref=self.DUMMY_FUNCTION_REF,
             inline_requirements_content=requirements_content,
         )
         self.assertIsNotNone(dockerfile)
@@ -90,13 +98,14 @@ class TestPackaging(unittest.TestCase):
         )
 
         self.assertIn(
-            f"CMD python -m reward_kit.generic_server {DUMMY_FUNCTION_REF}", dockerfile
+            f"CMD python -m reward_kit.generic_server {self.DUMMY_FUNCTION_REF}",
+            dockerfile,
         )
 
     def test_generate_dockerfile_with_user_requirements_path(self):
         user_req_path = "my_custom_requirements.txt"
         dockerfile = generate_dockerfile_content(
-            function_ref=DUMMY_FUNCTION_REF, user_requirements_path=user_req_path
+            function_ref=self.DUMMY_FUNCTION_REF, user_requirements_path=user_req_path
         )
         self.assertIsNotNone(dockerfile)
         self.assertIn(
@@ -105,7 +114,7 @@ class TestPackaging(unittest.TestCase):
         )
 
     def test_generate_dockerfile_no_extra_requirements(self):
-        dockerfile = generate_dockerfile_content(function_ref=DUMMY_FUNCTION_REF)
+        dockerfile = generate_dockerfile_content(function_ref=self.DUMMY_FUNCTION_REF)
         self.assertIsNotNone(dockerfile)
         self.assertNotIn("generated_requirements.txt", dockerfile)
         self.assertNotIn(

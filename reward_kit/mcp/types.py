@@ -36,3 +36,17 @@ class MCPSession:
     # Persistent MCP connection components
     _exit_stack: Optional[Any] = None
     _mcp_session: Optional[Any] = None
+
+
+@dataclass
+class Trajectory:
+    """Represents a complete rollout trajectory."""
+
+    session: MCPSession
+    observations: List[Any]
+    actions: List[str]
+    rewards: List[float]
+    terminated: bool
+    total_reward: float
+    steps: int
+    duration: float

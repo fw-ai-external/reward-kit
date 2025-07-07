@@ -32,8 +32,11 @@ from reward_kit.mcp.grid_renderer import render_grid
 class FrozenLakeProdServer(GymProductionServer):
     """FrozenLake production server using unified framework."""
 
-    def __init__(self):
+    def __init__(self, seed: int = None):
         super().__init__("FrozenLake-v1", FrozenLakeAdapter())
+        if seed is not None:
+            # The key change to make the environment reproducible
+            self.env.reset(seed=seed)
 
     def _register_tools(self):
         """Register domain-specific tools."""
@@ -121,6 +124,9 @@ def main():
     parser.add_argument(
         "--port", type=int, default=8000, help="Port for HTTP transport"
     )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Seed for the environment"
+    )
 
     args = parser.parse_args()
 
@@ -129,7 +135,7 @@ def main():
         os.environ["PORT"] = str(args.port)
 
     # Create and run server
-    server = FrozenLakeProdServer()
+    server = FrozenLakeProdServer(seed=args.seed)
     server.run(transport=args.transport)
 
 

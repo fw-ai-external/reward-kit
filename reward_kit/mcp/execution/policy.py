@@ -234,6 +234,14 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
                 else:
                     logger.error(f"No tools available for environment {i}")
                     result_calls.append(MCPToolCall("unknown", {}))
+            elif tool_call is None:
+                # No tool call generated (e.g., success message with no tools) - use special termination signal
+                logger.info(
+                    f"Environment {i}: No tool call generated, using termination signal"
+                )
+                result_calls.append(
+                    MCPToolCall("_no_tool_call", {"reason": "no_tool_call_generated"})
+                )
             else:
                 result_calls.append(tool_call)
 
@@ -305,15 +313,11 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
                     arguments=json.loads(tool_call["function"]["arguments"]),
                 )
             else:
-                # Fallback if no tool calls
-                logger.warning(
+                # No tool calls in response - this is normal when episode ends or LLM provides only text
+                logger.info(
                     f"No tool calls in response for env {env_index}, message content: {message.get('content')}"
                 )
-                return (
-                    MCPToolCall(tools[0]["name"], {})
-                    if tools
-                    else MCPToolCall("unknown", {})
-                )
+                return None
 
         except Exception as e:
             logger.error(f"LLM API call failed for env {env_index}: {e}")

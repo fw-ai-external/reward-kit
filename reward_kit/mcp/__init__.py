@@ -13,6 +13,9 @@ from .adapter import EnvironmentAdapter
 from .client import MCPConnectionManager
 from .execution import FireworksPolicy, LLMBasePolicy, RolloutManager
 from .gym_production_server import GymProductionServer
+
+# North Star MCP-Gym Framework
+from .mcpgym import McpGym
 from .server import MCPEnvironmentServer
 from .session import GeneralMCPVectorEnv, SessionManager
 from .simulation_server import SimulationServerBase
@@ -35,4 +38,6 @@ __all__ = [
     "MCPToolCall",
     "DatasetRow",
     "Trajectory",
+    # North Star MCP-Gym Framework
+    "McpGym",
 ]

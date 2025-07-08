@@ -117,6 +117,13 @@ class RolloutManager:
         for step in range(steps):
             step_start_time = time.time()
 
+            # Early termination check - prevent tool call generation for already terminated environments
+            if all(traj.terminated for traj in trajectories):
+                print(
+                    f"🏁 All environments already terminated before step {step} (control plane signals)"
+                )
+                break
+
             # Format user prompts based on current observations (callback pattern)
             user_prompts = envs.format_user_prompts(current_observations)
 
@@ -125,7 +132,7 @@ class RolloutManager:
                 tool_schemas, current_observations, system_prompts, user_prompts
             )
 
-            # Execute tool calls via MCP protocol
+            # Execute tool calls via MCP protocol (now with control plane separation)
             observations, rewards, dones, infos = await envs.step(tool_calls)
 
             # Update conversation histories with tool responses (for proper OpenAI trajectories)
@@ -145,21 +152,52 @@ class RolloutManager:
                     ):
                         policy.log_conversation_state_for_playback(i, step)
 
-            # Update trajectories
+            # Update trajectories with both data and control plane information
             for i, (trajectory, obs, reward, done, info) in enumerate(
                 zip(trajectories, observations, rewards, dones, infos)
             ):
                 if not trajectory.terminated:
+                    # Record data plane (observation)
                     trajectory.observations.append(obs)
-                    # Record the tool call as the action
+
+                    # Record action (tool call)
                     action_str = f"{tool_calls[i].tool_name}({tool_calls[i].arguments})"
                     trajectory.actions.append(action_str)
+
+                    # Record control plane (reward/termination)
                     trajectory.rewards.append(reward)
                     trajectory.total_reward += reward
                     trajectory.steps += 1
 
+                    # Enhanced trajectory recording with control plane info
+                    if not hasattr(trajectory, "control_plane_steps"):
+                        trajectory.control_plane_steps = []
+
+                    control_plane_step = {
+                        "step": step,
+                        "reward": reward,
+                        "terminated": done,
+                        "info": info.get("control_plane", {}),
+                        "tool_call": action_str,
+                    }
+                    trajectory.control_plane_steps.append(control_plane_step)
+
+                    # Use control plane information for termination decision
                     if done:
                         trajectory.terminated = True
+
+                        # Add final control plane summary
+                        if not hasattr(trajectory, "control_plane_summary"):
+                            trajectory.control_plane_summary = {}
+
+                        trajectory.control_plane_summary.update(
+                            {
+                                "total_reward": trajectory.total_reward,
+                                "termination_reason": "control_plane_signal",
+                                "final_step": step,
+                                "control_plane_source": info.get("control_plane", {}),
+                            }
+                        )
 
                         # Log final OpenAI conversation for terminated trajectories only
                         if openai_logger and hasattr(policy, "conversation_histories"):
@@ -175,6 +213,7 @@ class RolloutManager:
                                             "total_reward": trajectory.total_reward,
                                             "terminated": True,
                                             "success": reward > 0,
+                                            "control_plane_summary": trajectory.control_plane_summary,
                                         },
                                     }
                                 )
@@ -182,10 +221,22 @@ class RolloutManager:
             # Update current observations for next step
             current_observations = observations
 
-            # Check if all environments are done
+            # Check if all environments are done (using control plane termination)
             if all(traj.terminated for traj in trajectories):
-                print(f"🏁 All environments terminated at step {step + 1}")
+                print(
+                    f"🏁 All environments terminated at step {step + 1} (control plane signals)"
+                )
                 break
+
+            # Progress logging with control plane info
+            active_envs = sum(1 for traj in trajectories if not traj.terminated)
+            if step % 10 == 0 and active_envs > 0:
+                avg_reward = sum(traj.total_reward for traj in trajectories) / len(
+                    trajectories
+                )
+                print(
+                    f"📊 Step {step}: {active_envs}/{len(trajectories)} active, avg reward: {avg_reward:.2f}"
+                )
 
         # Calculate durations
         total_duration = time.time() - start_time
@@ -195,8 +246,20 @@ class RolloutManager:
         # Clean up
         await envs.close()
 
+        # Enhanced reporting with control plane info
         successful = sum(1 for traj in trajectories if traj.total_reward > 0)
+        terminated_by_control_plane = sum(
+            1
+            for traj in trajectories
+            if hasattr(traj, "control_plane_summary")
+            and traj.control_plane_summary.get("termination_reason")
+            == "control_plane_signal"
+        )
+
         print(f"📊 Rollout complete: {successful}/{len(trajectories)} reached goal")
+        print(
+            f"🎛️  Control plane terminations: {terminated_by_control_plane}/{len(trajectories)}"
+        )
         print(f"⏱️  Total duration: {total_duration:.2f}s")
 
         # Print log file locations if created
@@ -204,6 +267,8 @@ class RolloutManager:
             print(f"💬 OpenAI format log: {openai_format_log_file}")
         if recording_mode:
             print(f"📝 Recorded trajectory: {playback_file}")
+            # Add note about control plane separation
+            print(f"🎛️  Trajectories include control plane separation")
 
         return trajectories
 

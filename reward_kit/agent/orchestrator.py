@@ -842,6 +842,7 @@ class Orchestrator:
                             if tool_adapter:
                                 try:
                                     function_args = json.loads(function_args_str)
+                                    print("show function args: ", function_args)
                                     function_response = await tool_adapter(
                                         function_args
                                     )

@@ -292,7 +292,12 @@ class MCPConnectionManager:
         self, session: MCPSession, tool_name: str, arguments: Dict
     ) -> Tuple[Any, float, bool, Dict]:
         """
-        Execute a tool call via MCP protocol.
+        Execute a tool call via MCP protocol with control plane separation.
+
+        This method implements the control plane separation architecture:
+        1. Execute tool call (data plane) - contains only observations
+        2. Query control plane resources for reward/termination info
+        3. Return combined result maintaining strict plane separation
 
         Args:
             session: The MCPSession to execute the tool call on
@@ -300,17 +305,17 @@ class MCPConnectionManager:
             arguments: Arguments for the tool call
 
         Returns:
-            Tuple of (observation, reward, done, info)
+            Tuple of (observation, reward, done, info) with control plane data
         """
         if not session._mcp_session:
             raise RuntimeError("Session not initialized")
 
         mcp_session = session._mcp_session
 
-        # Execute the tool call via MCP protocol
+        # 1. Execute the tool call via MCP protocol (DATA PLANE)
         tool_result = await mcp_session.call_tool(tool_name, arguments)
 
-        # Extract results using the working pattern
+        # Extract data plane results (observation only)
         if tool_result.content and len(tool_result.content) > 0:
             content = tool_result.content[0]
             if hasattr(content, "text"):
@@ -319,56 +324,110 @@ class MCPConnectionManager:
                     logger.warning(
                         f"Session {session.session_id}: Empty tool response from {tool_name}"
                     )
-                    result_data = {
+                    observation = {
                         "observation": "empty_response",
-                        "reward": 0.0,
-                        "terminated": False,
+                        "session_id": session.session_id,
                     }
                 else:
                     try:
-                        result_data = json.loads(content.text)
+                        observation = json.loads(content.text)
                     except json.JSONDecodeError as e:
                         logger.warning(
                             f"Session {session.session_id}: Invalid JSON from {tool_name}: {content.text}. Error: {e}"
                         )
                         # Create a structured response from the raw text
-                        result_data = {
+                        observation = {
                             "observation": content.text,
-                            "reward": 0.0,
-                            "terminated": False,
+                            "session_id": session.session_id,
                             "error": "invalid_json_response",
                         }
             else:
                 # Handle non-text content
-                result_data = {
+                observation = {
                     "observation": str(content),
-                    "reward": 0.0,
-                    "terminated": False,
+                    "session_id": session.session_id,
                 }
         else:
             # Handle completely empty tool result
             logger.warning(
                 f"Session {session.session_id}: Tool {tool_name} returned empty result"
             )
-            result_data = {
+            observation = {
                 "observation": "no_response",
-                "reward": 0.0,
-                "terminated": False,
+                "session_id": session.session_id,
             }
 
-        # Parse result into observation, reward, done, info
-        # Keep full result_data as observation for rich prompt templates
-        observation = result_data
-        reward = result_data.get("reward", 0.0)
-        terminated = result_data.get("terminated", False)
-        truncated = result_data.get("truncated", False)
+        # 2. Query CONTROL PLANE resources for reward/termination info
+        reward = 0.0
+        terminated = False
+        truncated = False
+        control_plane_info = {}
+
+        try:
+            # Query control plane resources following the new architecture
+            resources_response = await mcp_session.list_resources()
+            resources = (
+                resources_response.resources
+                if hasattr(resources_response, "resources")
+                else []
+            )
+
+            for resource in resources:
+                if resource.uri == "control://reward":
+                    try:
+                        reward_resource = await mcp_session.read_resource(resource.uri)
+                        # Handle new resource format (check .text first)
+                        if hasattr(reward_resource, "text"):
+                            reward_data = json.loads(reward_resource.text)
+                            reward = reward_data.get("reward", 0.0)
+                            control_plane_info["reward_source"] = "control_plane"
+                        # Fallback to old format for backward compatibility
+                        elif reward_resource.contents:
+                            reward_content = reward_resource.contents[0]
+                            if hasattr(reward_content, "text"):
+                                reward_data = json.loads(reward_content.text)
+                                reward = reward_data.get("reward", 0.0)
+                                control_plane_info["reward_source"] = "control_plane"
+                    except Exception as e:
+                        logger.warning(f"Failed to read reward resource: {e}")
+
+                elif resource.uri == "control://status":
+                    try:
+                        status_resource = await mcp_session.read_resource(resource.uri)
+                        # Handle new resource format (check .text first)
+                        if hasattr(status_resource, "text"):
+                            status_data = json.loads(status_resource.text)
+                            terminated = status_data.get("terminated", False)
+                            truncated = status_data.get("truncated", False)
+                            control_plane_info["status_source"] = "control_plane"
+                        # Fallback to old format for backward compatibility
+                        elif status_resource.contents:
+                            status_content = status_resource.contents[0]
+                            if hasattr(status_content, "text"):
+                                status_data = json.loads(status_content.text)
+                                terminated = status_data.get("terminated", False)
+                                truncated = status_data.get("truncated", False)
+                                control_plane_info["status_source"] = "control_plane"
+                    except Exception as e:
+                        logger.warning(f"Failed to read status resource: {e}")
+
+        except Exception as e:
+            logger.warning(f"Failed to query control plane resources: {e}")
+
+        # 3. Combine results maintaining strict separation
         done = terminated or truncated
 
         info = {
-            "steps": result_data.get("moves", result_data.get("steps", 0)),
+            "steps": observation.get("moves", observation.get("steps", 0)),
             "tool_call": tool_name,
             "arguments": arguments,
+            "control_plane": control_plane_info,  # Mark control plane data
         }
+
+        # Log control plane separation
+        logger.debug(
+            f"Session {session.session_id}: Data plane: {list(observation.keys())}, Control plane: reward={reward}, terminated={terminated}"
+        )
 
         return observation, reward, done, info
 

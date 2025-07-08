@@ -172,6 +172,22 @@ class GeneralMCPVectorEnv:
                     {"playback_terminated": True},
                 )
 
+            # Handle special no-tool-call signal (episode ended, no action needed)
+            if tool_call.tool_name == "_no_tool_call":
+                logger.info(
+                    f"🏁 Session {session.session_id}: No tool call generated, episode likely ended"
+                )
+                session.terminated = True
+                return (
+                    session.last_observation,
+                    0.0,
+                    True,
+                    {
+                        "no_tool_call": True,
+                        "reason": tool_call.arguments.get("reason", "unknown"),
+                    },
+                )
+
             # Execute the tool call via MCP protocol
             observation, reward, done, info = (
                 await self.session_manager.connection_manager.call_tool(

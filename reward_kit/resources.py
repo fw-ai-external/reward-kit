@@ -10,12 +10,17 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, TypeVar
 
+from fireworks.llm.llm import LLM
+
 logger = logging.getLogger(__name__)
 
 # Type definitions
 T = TypeVar("T")
 ResourceDict = Dict[str, List["ResourceWrapper"]]
 
+
+class ResourceType(Enum):
+    LLM = "llm"
 
 class ResourceWrapper(ABC):
     """Abstract base class for all resource wrappers."""
@@ -31,6 +36,11 @@ class ResourceWrapper(ABC):
         pass
 
     @abstractmethod
+    def get_resource_type(self) -> ResourceType:
+        """Get the type of resource."""
+        pass
+
+    @abstractmethod
     def get_client(self) -> Any:
         """Get the client object for using this resource."""
         pass
@@ -39,7 +49,7 @@ class ResourceWrapper(ABC):
 class LLMResourceWrapper(ResourceWrapper):
     """Resource wrapper for Fireworks LLM deployments."""
 
-    def __init__(self, llm_instance: Any):
+    def __init__(self, llm_instance: LLM):
         """
         Initialize LLM resource wrapper.
 
@@ -49,6 +59,10 @@ class LLMResourceWrapper(ResourceWrapper):
         self.llm_instance = llm_instance
         self._client = None
         self._is_setup = False
+
+    def get_resource_type(self) -> ResourceType:
+        """Get the type of resource."""
+        return ResourceType.LLM
 
     def setup(self) -> None:
         """Setup the LLM deployment."""

@@ -30,7 +30,7 @@ _single_res_adapter = TypeAdapter(EvaluateResult)
 _list_res_adapter = TypeAdapter(List[EvaluateResult])
 
 # Define a type for the mode parameter
-EvaluationMode = Literal["pointwise", "batch"]
+EvaluationMode = Literal["pointwise", "listwise"]
 
 # TypeVar for the function being decorated, to preserve its signature as much as possible.
 F = TypeVar("F", bound=Callable[..., Any])
@@ -58,7 +58,7 @@ def reward_function(
         _func: The user's reward/evaluation function. Optional for decorator usage with args.
         mode: Specifies the operational mode. Defaults to "pointwise".
               - "pointwise": Function processes one rollout. Expected output: `EvaluateResult`.
-              - "batch": Function processes a batch of rollouts. Expected output: `List[EvaluateResult]`.
+              - "listwise": Function processes a batch of rollouts. Expected output: `List[EvaluateResult]`.
         id: Optional identifier for the reward function, used for deployment
         requirements: Optional string content for requirements.txt for deployment
         resources: Optional dictionary of resource types to resource instances.
@@ -115,7 +115,7 @@ def reward_function(
             # For now, sticking to the structure of the reverted file which explicitly handles 'messages'.
 
             current_messages_arg_name = "messages"  # Default for pointwise
-            if mode == "batch":
+            if mode == "batch" or mode == "listwise":
                 # A common pattern for batch mode is 'rollouts_messages'
                 # We'd need to find this in *args or **kwargs if not hardcoded.
                 # For now, let's assume it's still passed as 'messages' for simplicity of this step,
@@ -176,7 +176,7 @@ def reward_function(
                         ) from None
 
             elif (
-                mode == "batch"
+                (mode == "batch" or mode == "listwise")
                 and "rollouts_messages" in params
                 and "rollouts_messages" in final_func_args
             ):
@@ -284,7 +284,7 @@ def reward_function(
                     if isinstance(result, EvaluateResult):  # Already correct type
                         return result
                     return _single_res_adapter.validate_python(result)
-                elif mode == "batch":
+                elif mode == "batch" or mode == "listwise":
                     if isinstance(result, list) and all(
                         isinstance(item, EvaluateResult) for item in result
                     ):

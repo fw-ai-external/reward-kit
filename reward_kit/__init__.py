@@ -15,6 +15,7 @@ from .common_utils import load_jsonl
 from .mcp_env import FireworksPolicy, MCPVectorEnv, make, rollout, test_mcp
 from .models import EvaluateResult, Message, MetricResult
 from .playback_policy import PlaybackPolicyBase
+from .resources import create_llm_resource
 from .reward_function import RewardFunction
 from .typed_interface import reward_function
 
@@ -39,6 +40,8 @@ __all__ = [
     "test_mcp",
     # Playback functionality
     "PlaybackPolicyBase",
+    # Resource management
+    "create_llm_resource",
 ]
 
 from . import _version

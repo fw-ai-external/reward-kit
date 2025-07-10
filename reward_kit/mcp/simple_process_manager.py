@@ -118,6 +118,21 @@ class SimpleServerProcessManager:
             str(seed),
         ]
 
+        # Determine working directory for subprocess
+        # If script_path is absolute, use its directory as working directory
+        # If script_path is relative, use current directory
+        if os.path.isabs(self.script_path):
+            # Use the directory containing the script as the working directory
+            script_dir = os.path.dirname(self.script_path)
+            working_dir = script_dir
+        else:
+            # Use current working directory
+            working_dir = os.getcwd()
+
+        print(f"Working directory: {working_dir}")
+        print(f"Script path: {self.script_path}")
+        print(f"Command: {' '.join(cmd)}")
+
         # Start the process with visible output for debugging
         process = subprocess.Popen(
             cmd,
@@ -125,12 +140,13 @@ class SimpleServerProcessManager:
             stderr=subprocess.PIPE,  # Keep stderr separate to see error output
             text=True,
             env=env,
+            cwd=working_dir,  # Set working directory
         )
 
         self.processes[port] = (process, instance_id)
 
         # Wait for server to be ready with health check polling
-        if not self._wait_for_server_ready(port, instance_id, process):
+        if not asyncio.run(self._check_mcp_health(port, instance_id)):
             # Clean up failed process
             if port in self.processes:
                 del self.processes[port]

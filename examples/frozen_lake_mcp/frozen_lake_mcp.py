@@ -38,8 +38,34 @@ class FrozenLakeMcp(McpGym):
 
     def __init__(self, seed: Optional[int] = None):
         """Initialize FrozenLake MCP-Gym environment."""
+        print(f"🌱 BACKEND INIT: ===== FrozenLakeMcp.__init__ CALLED =====")
+        print(f"🌱 BACKEND INIT: Received seed parameter: {seed}")
+        print(f"🌱 BACKEND INIT: Seed type: {type(seed)}")
+
         adapter = FrozenLakeAdapter()
+        print(f"🔧 BACKEND INIT: Created FrozenLakeAdapter: {adapter}")
+
+        print(
+            f"🚀 BACKEND INIT: Calling super().__init__('FrozenLake-v1', adapter, seed={seed})"
+        )
         super().__init__("FrozenLake-v1", adapter, seed)
+
+        print(f"✅ BACKEND INIT: super().__init__ completed")
+        print(f"🎮 BACKEND INIT: Final environment state:")
+        print(f"  - Environment object: {self.env}")
+        print(f"  - Environment type: {type(self.env)}")
+        print(f"  - Initial observation: {self.obs}")
+        print(f"  - Environment desc: {getattr(self.env, 'desc', 'N/A')}")
+
+        # Render the initial grid to see what map was actually generated
+        if hasattr(self.env, "render"):
+            try:
+                grid = self.env.render()
+                print(f"🗺️  BACKEND INIT: Generated map:\n{grid}")
+            except Exception as e:
+                print(f"❌ BACKEND INIT: Could not render map: {e}")
+
+        print(f"🌱 BACKEND INIT: ===== FrozenLakeMcp.__init__ COMPLETED =====")
 
     def _register_tools(self):
         """Register domain-specific MCP tools."""
@@ -61,6 +87,14 @@ class FrozenLakeMcp(McpGym):
                 Dictionary with observation data ONLY (data plane).
                 Rewards and termination info available via control plane resources.
             """
+            print(f"🔧 BACKEND: ===== lake_move CALLED =====")
+            print(f"🔧 BACKEND: Received lake_move(action='{action}')")
+            print(f"🎮 BACKEND: Current state BEFORE move:")
+            print(f"  - Position: {self.obs}")
+            print(f"  - Step count: {self.control_plane_state['step_count']}")
+            print(f"  - Total reward: {self.control_plane_state['total_reward']}")
+            print(f"  - Terminated: {self.control_plane_state['terminated']}")
+
             # Validate action
             if not action or not isinstance(action, str):
                 raise ValueError(
@@ -69,21 +103,29 @@ class FrozenLakeMcp(McpGym):
                 )
 
             action = action.strip().upper()
+            print(f"🎯 BACKEND: Parsed action: '{action}'")
 
             # Parse action
             try:
                 action_int = self.adapter.parse_action(action)
+                print(f"🔢 BACKEND: Action integer: {action_int}")
             except ValueError as e:
+                print(f"❌ BACKEND: Action parse error: {e}")
                 raise ValueError(str(e))
 
-            # Execute environment step using control plane separation
+            # Use base class method to execute step and update control plane
+            print(f"🚀 BACKEND: Executing environment step with action {action_int}")
             observation_data = self._execute_environment_step(action_int)
 
             # Add the action to the response for context
             observation_data["action"] = action
 
-            # Log basic move information (no control plane data)
-            print(f"🎮 {action} → position {self.obs}")
+            # Log detailed move information including state progression
+            print(
+                f"🎮 BACKEND RESULT: {action} → position {self.obs} (step {self.control_plane_state['step_count']})"
+            )
+            print(f"📤 BACKEND: Returning observation data: {observation_data}")
+            print(f"🔧 BACKEND: ===== lake_move COMPLETED =====")
 
             # Return ONLY data plane information (no rewards/termination)
             return observation_data

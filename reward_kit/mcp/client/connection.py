@@ -313,7 +313,16 @@ class MCPConnectionManager:
         mcp_session = session._mcp_session
 
         # 1. Execute the tool call via MCP protocol (DATA PLANE)
+        logger.info(
+            f"🔧 CALL_TOOL: Session {session.session_id}: About to call mcp_session.call_tool({tool_name}, {arguments})"
+        )
         tool_result = await mcp_session.call_tool(tool_name, arguments)
+        logger.info(
+            f"🔧 CALL_TOOL: Session {session.session_id}: mcp_session.call_tool completed, result type: {type(tool_result)}"
+        )
+        logger.info(
+            f"🔧 CALL_TOOL: Session {session.session_id}: Tool result: {tool_result}"
+        )
 
         # Extract data plane results (observation only)
         if tool_result.content and len(tool_result.content) > 0:
@@ -365,51 +374,114 @@ class MCPConnectionManager:
 
         try:
             # Query control plane resources following the new architecture
+            logger.info(
+                f"🎛️  CALL_TOOL: Session {session.session_id}: About to call mcp_session.list_resources()..."
+            )
             resources_response = await mcp_session.list_resources()
+            logger.info(
+                f"🎛️  CALL_TOOL: Session {session.session_id}: mcp_session.list_resources() completed"
+            )
             resources = (
                 resources_response.resources
                 if hasattr(resources_response, "resources")
                 else []
             )
+            logger.info(
+                f"🎛️  CALL_TOOL: Session {session.session_id}: Found {len(resources)} resources: {[r.uri for r in resources]}"
+            )
 
             for resource in resources:
-                if resource.uri == "control://reward":
+                if str(resource.uri) == "control://reward":
                     try:
+                        logger.info(
+                            f"Session {session.session_id}: Reading reward resource..."
+                        )
                         reward_resource = await mcp_session.read_resource(resource.uri)
+                        logger.info(
+                            f"Session {session.session_id}: Reward resource response: {reward_resource}"
+                        )
                         # Handle new resource format (check .text first)
                         if hasattr(reward_resource, "text"):
+                            logger.info(
+                                f"Session {session.session_id}: Reward resource has .text attribute: {reward_resource.text}"
+                            )
                             reward_data = json.loads(reward_resource.text)
                             reward = reward_data.get("reward", 0.0)
                             control_plane_info["reward_source"] = "control_plane"
+                            logger.info(
+                                f"Session {session.session_id}: Reward resource data: {reward_data}, reward={reward}"
+                            )
                         # Fallback to old format for backward compatibility
                         elif reward_resource.contents:
+                            logger.info(
+                                f"Session {session.session_id}: Reward resource has .contents: {len(reward_resource.contents)} items"
+                            )
                             reward_content = reward_resource.contents[0]
                             if hasattr(reward_content, "text"):
+                                logger.info(
+                                    f"Session {session.session_id}: Reward content has .text: {reward_content.text}"
+                                )
                                 reward_data = json.loads(reward_content.text)
                                 reward = reward_data.get("reward", 0.0)
                                 control_plane_info["reward_source"] = "control_plane"
+                                logger.info(
+                                    f"Session {session.session_id}: Reward content data: {reward_data}, reward={reward}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Session {session.session_id}: Reward resource has no .text or .contents attributes"
+                            )
                     except Exception as e:
-                        logger.warning(f"Failed to read reward resource: {e}")
+                        logger.warning(
+                            f"Session {session.session_id}: Failed to read reward resource: {e}"
+                        )
 
-                elif resource.uri == "control://status":
+                elif str(resource.uri) == "control://status":
                     try:
+                        logger.info(
+                            f"Session {session.session_id}: Reading status resource..."
+                        )
                         status_resource = await mcp_session.read_resource(resource.uri)
+                        logger.info(
+                            f"Session {session.session_id}: Status resource response: {status_resource}"
+                        )
                         # Handle new resource format (check .text first)
                         if hasattr(status_resource, "text"):
+                            logger.info(
+                                f"Session {session.session_id}: Status resource has .text attribute: {status_resource.text}"
+                            )
                             status_data = json.loads(status_resource.text)
                             terminated = status_data.get("terminated", False)
                             truncated = status_data.get("truncated", False)
                             control_plane_info["status_source"] = "control_plane"
+                            logger.info(
+                                f"Session {session.session_id}: Status resource data: {status_data}, terminated={terminated}, truncated={truncated}"
+                            )
                         # Fallback to old format for backward compatibility
                         elif status_resource.contents:
+                            logger.info(
+                                f"Session {session.session_id}: Status resource has .contents: {len(status_resource.contents)} items"
+                            )
                             status_content = status_resource.contents[0]
                             if hasattr(status_content, "text"):
+                                logger.info(
+                                    f"Session {session.session_id}: Status content has .text: {status_content.text}"
+                                )
                                 status_data = json.loads(status_content.text)
                                 terminated = status_data.get("terminated", False)
                                 truncated = status_data.get("truncated", False)
                                 control_plane_info["status_source"] = "control_plane"
+                                logger.info(
+                                    f"Session {session.session_id}: Status content data: {status_data}, terminated={terminated}, truncated={truncated}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Session {session.session_id}: Status resource has no .text or .contents attributes"
+                            )
                     except Exception as e:
-                        logger.warning(f"Failed to read status resource: {e}")
+                        logger.warning(
+                            f"Session {session.session_id}: Failed to read status resource: {e}"
+                        )
 
         except Exception as e:
             logger.warning(f"Failed to query control plane resources: {e}")
@@ -425,7 +497,7 @@ class MCPConnectionManager:
         }
 
         # Log control plane separation
-        logger.debug(
+        logger.info(
             f"Session {session.session_id}: Data plane: {list(observation.keys())}, Control plane: reward={reward}, terminated={terminated}"
         )
 

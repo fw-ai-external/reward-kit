@@ -152,17 +152,38 @@ class GeneralMCPVectorEnv:
         Returns:
             observations, rewards, dones, infos
         """
+        logger.info(
+            f"🌐 STEP: ===== STARTING STEP WITH {len(tool_calls)} TOOL CALLS ====="
+        )
+        logger.info(
+            f"🌐 STEP: Tool calls: {[(tc.tool_name, tc.arguments) if tc else None for tc in tool_calls]}"
+        )
+
         if len(tool_calls) != self.n:
             raise ValueError(f"Expected {self.n} tool calls, got {len(tool_calls)}")
 
         async def step_session(session: MCPSession, tool_call: MCPToolCall):
+            session_id = session.session_id
+            logger.info(f"🔧 STEP: Processing session {session_id}")
+
             if session.terminated:
+                logger.info(
+                    f"🔧 STEP: Session {session_id} already terminated, returning last observation"
+                )
                 return session.last_observation, 0.0, True, {}
+
+            # Handle None tool calls for terminated environments
+            if tool_call is None:
+                logger.info(
+                    f"🔧 STEP: Session {session_id}: Received None tool call, marking as terminated"
+                )
+                session.terminated = True
+                return session.last_observation, 0.0, True, {"none_tool_call": True}
 
             # Handle special playback termination signal
             if tool_call.tool_name == "_playback_terminate":
                 logger.info(
-                    f"🎬 Session {session.session_id}: Received playback termination signal"
+                    f"🎬 STEP: Session {session_id}: Received playback termination signal"
                 )
                 session.terminated = True
                 return (
@@ -175,7 +196,7 @@ class GeneralMCPVectorEnv:
             # Handle special no-tool-call signal (episode ended, no action needed)
             if tool_call.tool_name == "_no_tool_call":
                 logger.info(
-                    f"🏁 Session {session.session_id}: No tool call generated, episode likely ended"
+                    f"🏁 STEP: Session {session_id}: No tool call generated, episode likely ended"
                 )
                 session.terminated = True
                 return (
@@ -188,27 +209,55 @@ class GeneralMCPVectorEnv:
                     },
                 )
 
+            # ARCHITECTURAL FIX: Removed _terminate handling
+            # Policies should NOT decide termination - this violates separation of concerns
+            # Server/environment should handle hole/goal detection and termination
+
             # Execute the tool call via MCP protocol
+            logger.info(
+                f"🔧 STEP: Session {session_id}: Calling tool {tool_call.tool_name}({tool_call.arguments})"
+            )
+            logger.info(
+                f"🔧 STEP: Session {session_id}: About to call connection_manager.call_tool"
+            )
             observation, reward, done, info = (
                 await self.session_manager.connection_manager.call_tool(
                     session, tool_call.tool_name, tool_call.arguments
                 )
+            )
+            logger.info(f"🔧 STEP: Session {session_id}: Tool call completed")
+            logger.info(
+                f"🔧 STEP: Session {session_id}: Results - obs={observation}, reward={reward}, done={done}, info={info}"
             )
 
             # Update session state
             session.last_observation = observation
             session.terminated = done
 
+            logger.info(
+                f"🔧 STEP: Session {session_id}: Updated session state - terminated={session.terminated}"
+            )
             return observation, reward, done, info
 
         # Execute steps in parallel using persistent sessions
+        logger.info(
+            f"🌐 STEP: Creating {len(self.sessions)} tasks for parallel execution"
+        )
         tasks = [
             step_session(session, tool_call)
             for session, tool_call in zip(self.sessions, tool_calls)
         ]
+        logger.info(f"🌐 STEP: About to execute {len(tasks)} tasks with asyncio.gather")
         results = await asyncio.gather(*tasks)
+        logger.info(f"🌐 STEP: asyncio.gather completed, got {len(results)} results")
 
         observations, rewards, dones, infos = zip(*results)
+        logger.info(f"🌐 STEP: Final results:")
+        logger.info(f"  - Observations: {observations}")
+        logger.info(f"  - Rewards: {rewards}")
+        logger.info(f"  - Dones: {dones}")
+        logger.info(f"  - Infos: {infos}")
+        logger.info(f"🌐 STEP: ===== STEP COMPLETED =====")
         return list(observations), list(rewards), list(dones), list(infos)
 
     def format_user_prompts(self, observations: List[Any]) -> List[str]:

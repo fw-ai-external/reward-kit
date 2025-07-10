@@ -30,6 +30,9 @@ class FrozenLakeAdapter(EnvironmentAdapter):
         Returns:
             FrozenLake environment instance
         """
+        print(f"🏗️  ADAPTER: ===== create_environment CALLED =====")
+        print(f"🏗️  ADAPTER: Received config: {config}")
+
         config = config or {}
 
         # Determine grid size from config
@@ -37,15 +40,34 @@ class FrozenLakeAdapter(EnvironmentAdapter):
         if "map_name" in config:
             if "8x8" in config["map_name"]:
                 grid_size = 8
+        print(f"🏗️  ADAPTER: Grid size: {grid_size}")
 
         # Generate random map if seed is provided
         seed = config.get("seed")
-        if seed is not None:
-            desc = generate_random_map(size=grid_size, p=0.8, seed=seed)
-        else:
-            desc = generate_random_map(size=grid_size, p=0.8)
+        print(f"🌱 ADAPTER: Extracted seed from config: {seed}")
+        print(f"🌱 ADAPTER: Seed type: {type(seed)}")
 
-        return FrozenLakeEnv(desc=desc, is_slippery=False, render_mode="ansi")
+        if seed is not None:
+            print(f"🎯 ADAPTER: Generating map with seed {seed}")
+            desc = generate_random_map(size=grid_size, p=0.8, seed=seed)
+            print(f"🗺️  ADAPTER: Generated map desc with seed {seed}:")
+            map_str = "\n".join(["".join(row) for row in desc])
+            print(f"{map_str}")
+        else:
+            print(f"⚠️  ADAPTER: No seed provided, generating random map")
+            desc = generate_random_map(size=grid_size, p=0.8)
+            print(f"🗺️  ADAPTER: Generated map desc without seed:")
+            map_str = "\n".join(["".join(row) for row in desc])
+            print(f"{map_str}")
+
+        print(
+            f"🏗️  ADAPTER: Creating FrozenLakeEnv with desc={len(desc)}x{len(desc[0])}"
+        )
+        env = FrozenLakeEnv(desc=desc, is_slippery=False, render_mode="ansi")
+        print(f"🏗️  ADAPTER: FrozenLakeEnv created: {env}")
+        print(f"🏗️  ADAPTER: ===== create_environment COMPLETED =====")
+
+        return env
 
     def create_environment_with_seed(
         self, config: Optional[Dict[str, Any]] = None, seed: Optional[int] = None
@@ -60,14 +82,26 @@ class FrozenLakeAdapter(EnvironmentAdapter):
         Returns:
             Tuple of (environment, initial_observation, initial_info)
         """
+        print(f"🌱 ADAPTER: ===== create_environment_with_seed CALLED =====")
+        print(f"🌱 ADAPTER: Received config: {config}")
+        print(f"🌱 ADAPTER: Received seed: {seed}")
+        print(f"🌱 ADAPTER: Seed type: {type(seed)}")
+
         config = config or {}
 
         # Add seed to config for environment creation
         env_config = {**config, "seed": seed}
+        print(f"🔧 ADAPTER: Enhanced config with seed: {env_config}")
 
+        print(f"🚀 ADAPTER: Calling create_environment with config: {env_config}")
         env = self.create_environment(env_config)
-        obs, info = env.reset(seed=seed)
+        print(f"✅ ADAPTER: create_environment returned: {env}")
 
+        print(f"🔄 ADAPTER: Resetting environment with seed: {seed}")
+        obs, info = env.reset(seed=seed)
+        print(f"🔄 ADAPTER: Reset returned obs={obs}, info={info}")
+
+        print(f"🌱 ADAPTER: ===== create_environment_with_seed COMPLETED =====")
         return env, obs, info
 
     def reset_environment(
@@ -83,7 +117,15 @@ class FrozenLakeAdapter(EnvironmentAdapter):
         Returns:
             Tuple of (observation, info)
         """
-        return env.reset(seed=seed)
+        print(f"🔄 ADAPTER: ===== reset_environment CALLED =====")
+        print(f"🔄 ADAPTER: Environment: {env}")
+        print(f"🔄 ADAPTER: Seed: {seed}")
+
+        result = env.reset(seed=seed)
+        print(f"🔄 ADAPTER: Reset result: {result}")
+        print(f"🔄 ADAPTER: ===== reset_environment COMPLETED =====")
+
+        return result
 
     def step_environment(
         self, env: FrozenLakeEnv, action: int
@@ -98,7 +140,37 @@ class FrozenLakeAdapter(EnvironmentAdapter):
         Returns:
             Tuple of (observation, reward, terminated, truncated, info)
         """
-        return env.step(action)
+        print(f"🏃 ADAPTER: ===== step_environment CALLED =====")
+        print(f"🏃 ADAPTER: Environment ID: {id(env)}")
+        print(f"🏃 ADAPTER: Environment type: {type(env)}")
+        print(f"🏃 ADAPTER: Action: {action}")
+        print(f"🏃 ADAPTER: Environment state before step:")
+        print(f"  - Current position (env.s): {getattr(env, 's', 'N/A')}")
+        print(f"  - Last action (env.lastaction): {getattr(env, 'lastaction', 'N/A')}")
+        print(f"  - Environment desc: {getattr(env, 'desc', 'N/A')}")
+        print(f"  - Environment nrow: {getattr(env, 'nrow', 'N/A')}")
+        print(f"  - Environment ncol: {getattr(env, 'ncol', 'N/A')}")
+
+        # Execute the actual step
+        print(f"🚀 ADAPTER: Calling env.step({action})")
+        step_result = env.step(action)
+        print(f"🚀 ADAPTER: env.step returned: {step_result}")
+
+        # Unpack and log the result
+        obs, reward, terminated, truncated, info = step_result
+        print(f"🎯 ADAPTER: Step result details:")
+        print(f"  - Observation: {obs}")
+        print(f"  - Reward: {reward}")
+        print(f"  - Terminated: {terminated}")
+        print(f"  - Truncated: {truncated}")
+        print(f"  - Info: {info}")
+
+        print(f"🏃 ADAPTER: Environment state after step:")
+        print(f"  - New position (env.s): {getattr(env, 's', 'N/A')}")
+        print(f"  - Last action (env.lastaction): {getattr(env, 'lastaction', 'N/A')}")
+        print(f"🏃 ADAPTER: ===== step_environment COMPLETED =====")
+
+        return step_result
 
     def close_environment(self, env: FrozenLakeEnv) -> None:
         """

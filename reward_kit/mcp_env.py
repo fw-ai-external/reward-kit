@@ -52,6 +52,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 # Import all functionality from the new modular components
 from .mcp.execution.policy import FireworksPolicy, LLMBasePolicy
 from .mcp.execution.rollout import RolloutManager
+from .mcp.execution.simple_deterministic_policy import SimpleDeterministicPolicy
 from .mcp.session.manager import GeneralMCPVectorEnv, SessionManager
 from .mcp.types import DatasetRow, MCPSession, MCPToolCall, Trajectory
 
@@ -287,6 +288,7 @@ __all__ = [
     "rollout",
     "FireworksPolicy",
     "LLMBasePolicy",  # New base class for OpenAI integration
+    "SimpleDeterministicPolicy",  # Simple deterministic policy for testing
     "MCPVectorEnv",
     "GeneralMCPVectorEnv",
     "MCPToolCall",

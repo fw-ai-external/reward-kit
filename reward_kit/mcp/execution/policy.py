@@ -69,6 +69,9 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         # Initialize conversation state tracking for proper OpenAI trajectories
         self.conversation_histories = {}  # {env_index: [messages]}
         self.initialized = False
+        self.step_counter = (
+            0  # Track which step we're on to prevent duplicate user prompts
+        )
 
     @abstractmethod
     async def _make_llm_call(self, messages: List[Dict], tools: List[Dict]) -> Dict:
@@ -198,11 +201,8 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         if not observations:
             return []
 
-        # Initialize conversations on first call
-        if not self.initialized:
-            self.initialize_conversations(
-                len(observations), system_prompts, user_prompts
-            )
+        # Note: Conversation initialization and user prompt addition is now handled in __call__
+        # This method just generates tool calls using the existing conversation history
 
         logger.debug(
             f"🤖 Generating tool calls for {len(observations)} environments using {self.model_id}"
@@ -337,9 +337,22 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         """
         # Initialize conversations if not already done (important for both modes)
         if not hasattr(self, "initialized") or not self.initialized:
+            # First call: initialize conversation with system + initial user prompt
             self.initialize_conversations(
                 len(observations), system_prompts, user_prompts
             )
+            # Mark this as step 0 (initialization step)
+            self.step_counter = 0
+        else:
+            # Subsequent calls: add new user prompts to conversation history (for both live and playback modes)
+            # Only add user prompts for steps 1 and beyond
+            for i, user_prompt in enumerate(user_prompts):
+                if i in self.conversation_histories:
+                    self.conversation_histories[i].append(
+                        {"role": "user", "content": user_prompt}
+                    )
+            # Increment step counter
+            self.step_counter += 1
 
         if self._is_playback:
             # In playback mode, populate conversation histories with recorded messages
@@ -465,6 +478,7 @@ class FireworksPolicy(LLMBasePolicy):
         Returns:
             API response in OpenAI format
         """
+        print("------ show tools", tools)
         current_request = {
             "messages": messages,
             "tools": tools,

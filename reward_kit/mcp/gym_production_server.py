@@ -1,28 +1,11 @@
 """
-GymProductionServer Framework
+MCP Production Server for Gymnasium Environments
 
-This framework provides a simplified base class for creating production MCP servers
-that wrap gymnasium environments using adapters. It handles:
-
-1. Single-session production server lifecycle
-2. Automatic tool and resource registration
-3. Environment management via adapters
-4. MCP resource patterns for initial state
-5. Standardized tool signatures
-
-Usage:
-    class MyGameProdServer(GymProductionServer):
-        def __init__(self):
-            super().__init__("MyGame-v1", MyAdapter())
-
-        def _register_tools(self):
-            # Register domain-specific tools
-
-        @staticmethod
-        def format_observation(obs, env):
-            # Format observations for MCP responses
+This module provides the base production server for Gymnasium-based MCP environments.
+Handles basic gym environment management and tool routing.
 """
 
+import json
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Tuple
@@ -85,8 +68,6 @@ class GymProductionServer(ABC):
         @self.mcp.resource("game://initial_state")
         def initial_state() -> str:
             """Provide initial game state as MCP resource."""
-            import json
-
             return json.dumps(self._render(self.obs))
 
     def extract_seed_from_context(self, ctx: Context) -> Optional[int]:

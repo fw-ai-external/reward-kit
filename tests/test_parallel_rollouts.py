@@ -38,11 +38,7 @@ async def _test_seed_handling_and_type_compatibility_impl():
     import time
 
     server_script = (
-        Path(__file__).parent.parent
-        / "examples"
-        / "frozen_lake_mcp_complete"
-        / "mcp_server"
-        / "simulation_server.py"
+        Path(__file__).parent.parent / "examples" / "frozen_lake_mcp" / "server.py"
     )
     venv_python = Path(__file__).parent.parent / ".venv" / "bin" / "python"
 
@@ -54,7 +50,7 @@ async def _test_seed_handling_and_type_compatibility_impl():
 
     # Start server in background
     server_process = subprocess.Popen(
-        [str(venv_python), str(server_script), "--port", "8001", "--host", "127.0.0.1"],
+        [str(venv_python), str(server_script), "--port", "8001"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -299,9 +295,7 @@ async def _run_simplified_compatibility_test():
     try:
         from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-        from examples.frozen_lake_mcp_complete.mcp_server.frozen_lake_adapter import (
-            FrozenLakeAdapter,
-        )
+        from examples.frozen_lake_mcp.frozen_lake_adapter import FrozenLakeAdapter
 
         adapter = FrozenLakeAdapter()
 
@@ -356,9 +350,7 @@ async def test_mcp_resource_type_compatibility():
     # Test the core functionality that was causing issues
     from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-    from examples.frozen_lake_mcp_complete.mcp_server.frozen_lake_adapter import (
-        FrozenLakeAdapter,
-    )
+    from examples.frozen_lake_mcp.frozen_lake_adapter import FrozenLakeAdapter
 
     # Test the map generation with different seeds (this was the core bug)
     adapter = FrozenLakeAdapter()

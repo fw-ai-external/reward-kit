@@ -52,11 +52,11 @@ To force regeneration of recordings (e.g., after changes to the environment):
 # Remove existing recordings
 rm examples/frozen_lake_mcp/tests/recordings/*.jsonl
 
-# Run tests to generate new recordings
+# Run tests to generate new recordings (auto-records when not in CI)
 pytest examples/frozen_lake_mcp/tests/test_record_and_replay_e2e.py -v
 
-# Or force recording even if files exist
-REWARD_KIT_FORCE_RECORD=1 pytest examples/frozen_lake_mcp/tests/test_record_and_replay_e2e.py -v
+# CI mode - only runs playback with existing recordings
+CI=true pytest examples/frozen_lake_mcp/tests/test_record_and_replay_e2e.py -v
 ```
 
 ## North Star Compliance

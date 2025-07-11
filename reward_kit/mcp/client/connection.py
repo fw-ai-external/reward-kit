@@ -6,6 +6,7 @@ Extracted from mcp_env.py to improve modularity.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 from contextlib import AsyncExitStack
@@ -74,6 +75,28 @@ class MCPConnectionManager:
         session._mcp_session = mcp_session
         session._exit_stack = exit_stack
 
+        # Update session ID to match server's calculation (for control plane sync)
+        if client_info and hasattr(client_info, "_extra"):
+            extra_data = client_info._extra
+            if extra_data and isinstance(extra_data, dict):
+
+                seed_value = extra_data.get("seed")
+                config_value = extra_data.get("config", {})
+
+                stable_data = {
+                    "seed": seed_value,
+                    "config": config_value,
+                    "name": client_info.name,
+                    "version": client_info.version,
+                }
+
+                stable_str = json.dumps(stable_data, sort_keys=True)
+                server_session_id = hashlib.md5(stable_str.encode()).hexdigest()
+
+                # Update the session ID to match what the server generated
+                session.session_id = server_session_id
+                logger.debug(f"Updated session ID to match server: {server_session_id}")
+
     async def discover_tools(self, session: MCPSession) -> List[Dict]:
         """
         Discover available tools from an MCP session.
@@ -110,8 +133,8 @@ class MCPConnectionManager:
 
     async def get_initial_state(self, session: MCPSession) -> Any:
         """
-        Get initial state from MCP resources during session establishment.
-        Uses proper MCP pattern: initial state comes from resources, not tools.
+        Get initial state from session-aware control plane endpoint.
+        Uses HTTP endpoint instead of MCP resources for proper session awareness.
 
         Args:
             session: The MCPSession to get initial state from
@@ -122,6 +145,77 @@ class MCPConnectionManager:
         if not session._mcp_session:
             raise RuntimeError("Session not initialized")
 
+        # Try to get initial state from control plane endpoint first
+        initial_observation = None
+
+        try:
+            import httpx
+
+            # Extract base URL and session ID from the MCP session
+            base_url = session.base_url.rstrip("/mcp").rstrip("/")
+            session_id = session.session_id
+
+            if session_id:
+                headers = {"mcp-session-id": session_id}
+
+                # Query initial state endpoint
+                try:
+                    # Use shorter timeout for playback mode
+                    timeout = (
+                        3.0
+                        if hasattr(session, "_is_playback_mode")
+                        and session._is_playback_mode
+                        else 5.0
+                    )
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        initial_state_response = await client.get(
+                            f"{base_url}/control/initial_state",
+                            headers=headers,
+                            timeout=timeout,
+                        )
+                        if initial_state_response.status_code == 200:
+                            initial_observation = initial_state_response.json()
+                            logger.info(
+                                f"Session {session.session_id}: ✅ Successfully fetched session-aware initial state from control plane endpoint"
+                            )
+                        else:
+                            logger.warning(
+                                f"Control plane initial state endpoint returned {initial_state_response.status_code}"
+                            )
+                except httpx.TimeoutException:
+                    logger.warning(
+                        f"Control plane initial state endpoint timed out after {timeout}s"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to query initial state endpoint: {e}")
+
+        except Exception as e:
+            logger.warning(f"Failed to query control plane initial state endpoint: {e}")
+
+        # Fallback to MCP resource if control plane endpoint fails (backward compatibility)
+        if initial_observation is None:
+            logger.debug(
+                f"Session {session.session_id}: Falling back to MCP resource for initial state"
+            )
+            initial_observation = await self._get_initial_state_from_mcp_resource(
+                session
+            )
+
+        # Ensure we have some observation
+        if initial_observation is None:
+            logger.debug(f"Session {session.session_id}: Using default initial state")
+            initial_observation = {
+                "observation": "default_initial_state",
+                "session_id": session.session_id,
+            }
+
+        return initial_observation
+
+    async def _get_initial_state_from_mcp_resource(self, session: MCPSession) -> Any:
+        """
+        Fallback method to get initial state from MCP resources.
+        This is kept for backward compatibility but should be replaced by control plane endpoints.
+        """
         mcp_session = session._mcp_session
         initial_observation = None
 
@@ -264,7 +358,7 @@ class MCPConnectionManager:
             # If resources are not available, fall back to a default observation
             # This maintains backward compatibility with servers that don't expose resources
             logger.warning(
-                f"Session {session.session_id}: Could not get initial state from MCP resources: {e}"
+                f"Session {session.session_id}: Failed to read initial state from MCP resources: {e}"
             )
             logger.warning(f"Session {session.session_id}: Exception type: {type(e)}")
             logger.warning(f"Session {session.session_id}: Exception args: {e.args}")
@@ -276,14 +370,6 @@ class MCPConnectionManager:
             initial_observation = {
                 "observation": "initial_state",
                 "message": "Session established",
-            }
-
-        # Ensure we have some observation
-        if initial_observation is None:
-            logger.debug(f"Session {session.session_id}: Using default initial state")
-            initial_observation = {
-                "observation": "default_initial_state",
-                "session_id": session.session_id,
             }
 
         return initial_observation
@@ -357,62 +443,80 @@ class MCPConnectionManager:
                 "session_id": session.session_id,
             }
 
-        # 2. Query CONTROL PLANE resources for reward/termination info
+        # 2. Query CONTROL PLANE endpoints for reward/termination info
         reward = 0.0
         terminated = False
         truncated = False
         control_plane_info = {}
 
         try:
-            # Query control plane resources following the new architecture
-            resources_response = await mcp_session.list_resources()
-            resources = (
-                resources_response.resources
-                if hasattr(resources_response, "resources")
-                else []
-            )
+            # Query control plane endpoints following the new architecture
+            import httpx
 
-            for resource in resources:
-                if resource.uri == "control://reward":
-                    try:
-                        reward_resource = await mcp_session.read_resource(resource.uri)
-                        # Handle new resource format (check .text first)
-                        if hasattr(reward_resource, "text"):
-                            reward_data = json.loads(reward_resource.text)
+            # Extract base URL and session ID from the MCP session
+            base_url = session.base_url.rstrip("/mcp").rstrip("/")
+            # Use the session ID from the established MCP session
+            session_id = session.session_id
+
+            if session_id:
+                headers = {"mcp-session-id": session_id}
+
+                # Query reward endpoint
+                try:
+                    # Use shorter timeout for better responsiveness
+                    timeout = 3.0
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        reward_response = await client.get(
+                            f"{base_url}/control/reward",
+                            headers=headers,
+                            timeout=timeout,
+                        )
+                        if reward_response.status_code == 200:
+                            reward_data = reward_response.json()
                             reward = reward_data.get("reward", 0.0)
-                            control_plane_info["reward_source"] = "control_plane"
-                        # Fallback to old format for backward compatibility
-                        elif reward_resource.contents:
-                            reward_content = reward_resource.contents[0]
-                            if hasattr(reward_content, "text"):
-                                reward_data = json.loads(reward_content.text)
-                                reward = reward_data.get("reward", 0.0)
-                                control_plane_info["reward_source"] = "control_plane"
-                    except Exception as e:
-                        logger.warning(f"Failed to read reward resource: {e}")
+                            control_plane_info["reward_source"] = (
+                                "control_plane_endpoint"
+                            )
+                        else:
+                            logger.warning(
+                                f"Control plane reward endpoint returned {reward_response.status_code}"
+                            )
+                except httpx.TimeoutException:
+                    logger.warning(
+                        f"Control plane reward endpoint timed out after {timeout}s"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to query reward endpoint: {e}")
 
-                elif resource.uri == "control://status":
-                    try:
-                        status_resource = await mcp_session.read_resource(resource.uri)
-                        # Handle new resource format (check .text first)
-                        if hasattr(status_resource, "text"):
-                            status_data = json.loads(status_resource.text)
+                # Query status endpoint
+                try:
+                    timeout = 3.0
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        status_response = await client.get(
+                            f"{base_url}/control/status",
+                            headers=headers,
+                            timeout=timeout,
+                        )
+                        if status_response.status_code == 200:
+                            status_data = status_response.json()
                             terminated = status_data.get("terminated", False)
                             truncated = status_data.get("truncated", False)
-                            control_plane_info["status_source"] = "control_plane"
-                        # Fallback to old format for backward compatibility
-                        elif status_resource.contents:
-                            status_content = status_resource.contents[0]
-                            if hasattr(status_content, "text"):
-                                status_data = json.loads(status_content.text)
-                                terminated = status_data.get("terminated", False)
-                                truncated = status_data.get("truncated", False)
-                                control_plane_info["status_source"] = "control_plane"
-                    except Exception as e:
-                        logger.warning(f"Failed to read status resource: {e}")
+                            control_plane_info["status_source"] = (
+                                "control_plane_endpoint"
+                            )
+                        else:
+                            logger.warning(
+                                f"Control plane status endpoint returned {status_response.status_code}"
+                            )
+                except httpx.TimeoutException:
+                    logger.warning(
+                        f"Control plane status endpoint timed out after {timeout}s"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to query status endpoint: {e}")
 
         except Exception as e:
-            logger.warning(f"Failed to query control plane resources: {e}")
+            logger.warning(f"Failed to query control plane endpoints: {e}")
 
         # 3. Combine results maintaining strict separation
         done = terminated or truncated

@@ -5,9 +5,10 @@ This module implements the north star vision for MCP-Gym environments,
 providing a clean, simple implementation of FrozenLake using the McpGym base class.
 
 Key Features:
-- Strict data/control plane separation
+- Multi-session support with session-based control plane state
 - Data plane: Tool responses contain only observations
-- Control plane: Rewards/termination available via MCP resources (control://reward, control://status)
+- Control plane: Server-side state management keyed by session ID
+- Rollout system can query control plane state for termination logic
 
 Example usage:
     from frozen_lake_mcp import FrozenLakeMcp
@@ -22,6 +23,7 @@ from frozen_lake_adapter import FrozenLakeAdapter
 from mcp.server.fastmcp import Context
 
 from reward_kit.mcp import McpGym
+from reward_kit.mcp.mcpgym import control_plane_endpoint
 
 
 class FrozenLakeMcp(McpGym):
@@ -33,7 +35,7 @@ class FrozenLakeMcp(McpGym):
     - Use proper EnvironmentAdapter pattern
     - Register tools with @self.mcp.tool() decorator
     - Compatible with CondaServerProcessManager
-    - Strict data/control plane separation via MCP resources
+    - Multi-session support with session-based control plane state
     """
 
     def __init__(self, seed: Optional[int] = None):
@@ -41,13 +43,17 @@ class FrozenLakeMcp(McpGym):
         adapter = FrozenLakeAdapter()
         super().__init__("FrozenLake-v1", adapter, seed)
 
+        # Multi-session support is now handled by the base class
+
+    # Session management methods are now handled by the base class
+
     def _register_tools(self):
         """Register domain-specific MCP tools."""
 
         @self.mcp.tool(
             name="lake_move",
             description="Move on the frozen lake. Actions: LEFT, DOWN, RIGHT, UP. "
-            "Check control://reward and control://status resources for rewards and termination.",
+            "Returns only observation data; control plane state managed server-side.",
         )
         def lake_move(action: str, ctx: Context) -> Dict[str, Any]:
             """
@@ -59,7 +65,7 @@ class FrozenLakeMcp(McpGym):
 
             Returns:
                 Dictionary with observation data ONLY (data plane).
-                Rewards and termination info available via control plane resources.
+                Control plane state managed server-side per session.
             """
             # Validate action
             if not action or not isinstance(action, str):
@@ -76,17 +82,46 @@ class FrozenLakeMcp(McpGym):
             except ValueError as e:
                 raise ValueError(str(e))
 
-            # Execute environment step using control plane separation
-            observation_data = self._execute_environment_step(action_int)
+            # Get session ID and session data
+            session_id = self._get_session_id(ctx)
+            session_data = self._get_or_create_session(ctx)
 
-            # Add the action to the response for context
+            # Execute environment step using base class method
+            observation_data = self._execute_session_environment_step(
+                session_id, action_int
+            )
             observation_data["action"] = action
 
-            # Log basic move information (no control plane data)
-            print(f"🎮 {action} → position {self.obs}")
+            # Log move (no control plane data in logs)
+            print(
+                f"🎮 Session {session_id[:16]}...: {action} → position {session_data['obs']}"
+            )
 
-            # Return ONLY data plane information (no rewards/termination)
             return observation_data
+
+        @self.mcp.tool(
+            name="get_control_plane_state",
+            description="Get current control plane state for this session (for rollout system).",
+        )
+        def get_control_plane_state(ctx: Context) -> Dict[str, Any]:
+            """
+            Get control plane state for current session.
+
+            Args:
+                ctx: MCP context
+
+            Returns:
+                Control plane state dictionary
+            """
+            session_id = self._get_session_id(ctx)
+            control_state = self.get_control_plane_state(session_id)
+
+            if control_state is None:
+                # Initialize session if it doesn't exist
+                session_data = self._get_or_create_session(ctx)
+                control_state = self._get_or_create_session_control_plane(session_id)
+
+            return control_state
 
     @staticmethod
     def format_observation(obs: int, env: Any) -> Dict[str, Any]:
@@ -98,19 +133,19 @@ class FrozenLakeMcp(McpGym):
 
 
 # Example usage and testing
-if __name__ == "__main__":
-    # Test the FrozenLake MCP-Gym environment
-    print("Creating FrozenLake MCP-Gym server...")
-    server = FrozenLakeMcp(seed=42)
-
-    print("Server created successfully!")
-    print(f"Initial observation: {server.obs}")
-    print(f"Environment adapter: {server.adapter.__class__.__name__}")
-    print("\n🎛️  Control plane resources available:")
-    print("  - control://reward (current reward and step count)")
-    print("  - control://status (termination status and total reward)")
-    print("  - control://info (environment info)")
-
-    # Run the server
-    print("\nStarting MCP server...")
-    server.run()
+# if __name__ == "__main__":
+#     # Test the FrozenLake MCP-Gym environment
+#     print("Creating FrozenLake MCP-Gym server...")
+#     server = FrozenLakeMcp(seed=42)
+#
+#     print("Server created successfully!")
+#     print(f"Environment adapter: {server.adapter.__class__.__name__}")
+#     print("\n🎛️  Multi-session control plane features:")
+#     print("  - Session-based environment isolation")
+#     print("  - Server-side control plane state management")
+#     print("  - get_control_plane_state tool for rollout system")
+#     print("  - Data plane tools return observations only")
+#
+#     # Run the server
+#     print("\nStarting MCP server...")
+#     server.run()

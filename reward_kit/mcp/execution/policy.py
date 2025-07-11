@@ -110,9 +110,15 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         self.initialized = True
 
     def add_tool_response(
-        self, env_index: int, tool_call: MCPToolCall, tool_response: str
+        self,
+        env_index: int,
+        tool_call: MCPToolCall,
+        tool_response: str,
+        reward: float = 0.0,
+        terminated: bool = False,
+        info: Dict[str, Any] = None,
     ):
-        """Add tool call and response to conversation history."""
+        """Add tool call and response to conversation history with control plane metadata."""
         if env_index not in self.conversation_histories:
             return
 
@@ -137,12 +143,21 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         if not call_id:
             call_id = f"call_{env_index}_{len(conversation)}"
 
-        # Add tool response (the assistant message was already added by _generate_tool_call_with_history)
+        # Add tool response with control plane metadata
         tool_message = {
             "role": "tool",
             "tool_call_id": call_id,
             "content": tool_response,
         }
+
+        # Add control plane metadata if provided
+        if reward != 0.0 or terminated or info:
+            tool_message["metadata"] = {
+                "reward": reward,
+                "terminated": terminated,
+                "info": info or {},
+            }
+
         conversation.append(tool_message)
 
     def log_conversation_state_for_playback(self, env_index: int, step: int):
@@ -454,19 +469,41 @@ class FireworksPolicy(LLMBasePolicy):
                 f"🎬 Playback mode: Skipping Fireworks LLM initialization for performance"
             )
 
+    def _clean_messages_for_api(self, messages: List[Dict]) -> List[Dict]:
+        """
+        Clean messages by removing metadata fields that Fireworks API doesn't accept.
+
+        Args:
+            messages: Conversation messages with potential metadata
+
+        Returns:
+            Clean messages without metadata fields
+        """
+        clean_messages = []
+        for msg in messages:
+            clean_msg = msg.copy()
+            # Remove metadata field if present
+            if "metadata" in clean_msg:
+                del clean_msg["metadata"]
+            clean_messages.append(clean_msg)
+        return clean_messages
+
     async def _make_llm_call(self, messages: List[Dict], tools: List[Dict]) -> Dict:
         """
         Make a Fireworks API call.
 
         Args:
-            messages: Conversation messages
+            messages: Conversation messages (may contain metadata)
             tools: Available tools in OpenAI format
 
         Returns:
             API response in OpenAI format
         """
+        # Clean messages by removing metadata before sending to API
+        clean_messages = self._clean_messages_for_api(messages)
+
         current_request = {
-            "messages": messages,
+            "messages": clean_messages,
             "tools": tools,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,

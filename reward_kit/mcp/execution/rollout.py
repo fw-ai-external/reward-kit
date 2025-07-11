@@ -17,6 +17,7 @@ from ..types import MCPToolCall, Trajectory
 if TYPE_CHECKING:
     from ..session.manager import GeneralMCPVectorEnv
     from .policy import LLMBasePolicy
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -124,27 +125,94 @@ class RolloutManager:
                 )
                 break
 
+            # Check control plane termination status for each environment BEFORE generating tool calls
+            # This ensures we don't generate tool calls for environments that are already terminated
+            for i, session in enumerate(envs.sessions):
+                if not trajectories[i].terminated:
+                    # Query control plane status directly from the session
+                    control_plane_state = await self._get_control_plane_status(session)
+                    if control_plane_state and control_plane_state.get(
+                        "terminated", False
+                    ):
+                        # Environment is terminated according to control plane
+                        trajectories[i].terminated = True
+                        session.terminated = True
+                        logger.debug(
+                            f"Environment {i} terminated by control plane before step {step}"
+                        )
+
             # Format user prompts based on current observations (callback pattern)
             user_prompts = envs.format_user_prompts(current_observations)
 
-            # Generate tool calls using general policy
-            tool_calls = await policy(
-                tool_schemas, current_observations, system_prompts, user_prompts
-            )
+            # Filter out terminated environments when generating tool calls
+            active_indices = [
+                i for i, traj in enumerate(trajectories) if not traj.terminated
+            ]
+            active_tool_schemas = [tool_schemas[i] for i in active_indices]
+            active_observations = [current_observations[i] for i in active_indices]
+            active_system_prompts = [system_prompts[i] for i in active_indices]
+            active_user_prompts = [user_prompts[i] for i in active_indices]
+
+            # Generate tool calls only for active environments
+            if active_indices:
+                active_tool_calls = await policy(
+                    active_tool_schemas,
+                    active_observations,
+                    active_system_prompts,
+                    active_user_prompts,
+                )
+            else:
+                active_tool_calls = []
+
+            # Create full tool_calls list with no-op calls for terminated environments
+            tool_calls = []
+            active_call_idx = 0
+            for i, traj in enumerate(trajectories):
+                if traj.terminated:
+                    # Use a no-op tool call for terminated environments
+                    no_op_call = MCPToolCall(
+                        tool_name="_no_tool_call",
+                        arguments={"reason": "environment_already_terminated"},
+                    )
+                    tool_calls.append(no_op_call)
+                else:
+                    tool_calls.append(active_tool_calls[active_call_idx])
+                    active_call_idx += 1
 
             # Execute tool calls via MCP protocol (now with control plane separation)
             observations, rewards, dones, infos = await envs.step(tool_calls)
 
             # Update conversation histories with tool responses (for proper OpenAI trajectories)
             if hasattr(policy, "add_tool_response"):
-                for i, (tool_call, obs, reward, done) in enumerate(
-                    zip(tool_calls, observations, rewards, dones)
+                for i, (tool_call, obs, reward, done, info) in enumerate(
+                    zip(tool_calls, observations, rewards, dones, infos)
                 ):
+                    # Skip adding tool response for no-op calls (terminated environments)
+                    if tool_call.tool_name == "_no_tool_call":
+                        logger.debug(
+                            f"Env {i}: Skipping tool response recording for no-op call"
+                        )
+                        continue
+
                     # Convert observation to tool response format
                     tool_response = (
                         json.dumps(obs) if isinstance(obs, dict) else str(obs)
                     )
-                    policy.add_tool_response(i, tool_call, tool_response)
+
+                    # Check if policy supports control plane metadata
+                    import inspect
+
+                    sig = inspect.signature(policy.add_tool_response)
+                    if (
+                        len(sig.parameters) > 3
+                    ):  # More than (env_index, tool_call, tool_response)
+                        # Pass control plane information for policies that support it
+                        policy.add_tool_response(
+                            i, tool_call, tool_response, reward, done, info
+                        )
+                    else:
+                        # Fallback for older policies
+                        policy.add_tool_response(i, tool_call, tool_response)
 
                     # Log conversation state for playback if in recording mode
                     if recording_mode and hasattr(
@@ -185,6 +253,8 @@ class RolloutManager:
                     # Use control plane information for termination decision
                     if done:
                         trajectory.terminated = True
+                        # Also update session termination status to ensure synchronization
+                        envs.sessions[i].terminated = True
 
                         # Add final control plane summary
                         if not hasattr(trajectory, "control_plane_summary"):
@@ -271,6 +341,57 @@ class RolloutManager:
             print(f"🎛️  Trajectories include control plane separation")
 
         return trajectories
+
+    async def _get_control_plane_status(self, session) -> Optional[Dict[str, Any]]:
+        """
+        Query the control plane status endpoint directly for a session.
+
+        Args:
+            session: MCP session object
+
+        Returns:
+            Control plane status dictionary or None if query fails
+        """
+        try:
+            import httpx
+
+            # Extract base URL and session ID
+            base_url = session.base_url.rstrip("/mcp").rstrip("/")
+            session_id = session.session_id
+
+            if not session_id:
+                logger.debug("Control plane query failed: No session ID")
+                return None
+
+            headers = {"mcp-session-id": session_id}
+
+            # Query status endpoint
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                status_response = await client.get(
+                    f"{base_url}/control/status",
+                    headers=headers,
+                    timeout=2.0,  # Short timeout for performance
+                )
+
+                if status_response.status_code == 200:
+                    status_data = status_response.json()
+                    return status_data
+                else:
+                    logger.debug(
+                        f"Control plane endpoint returned {status_response.status_code} for session {session_id[:16]}"
+                    )
+                    return None
+
+        except asyncio.TimeoutError:
+            logger.debug(
+                f"Control plane query timed out for session {session.session_id[:16]}"
+            )
+            return None
+        except Exception as e:
+            logger.debug(
+                f"Control plane query failed for session {session.session_id[:16]}: {e}"
+            )
+            return None
 
     def _log_openai_entry(self, log_file: str, data: Dict[str, Any]):
         """Helper function to log OpenAI format entries."""

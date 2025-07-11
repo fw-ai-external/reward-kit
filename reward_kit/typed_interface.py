@@ -138,9 +138,14 @@ def reward_function(
                 if get_origin(messages_param_annotation) in (list, List) and get_args(
                     messages_param_annotation
                 ) and get_args(messages_param_annotation)[0] == Message:
-                    final_func_args["messages"] = _coerce_to_list_message(
-                        final_func_args["messages"], "messages"
-                    )
+                    try:
+                        final_func_args["messages"] = _coerce_to_list_message(
+                            final_func_args["messages"], "messages"
+                        )
+                    except Exception as err:
+                        raise ValueError(
+                            f"Input 'messages' failed Pydantic validation: {err}"
+                        ) from None
 
             elif (
                 mode == "batch"
@@ -151,21 +156,33 @@ def reward_function(
                 inner = get_args(param_annotation)[0] if get_args(param_annotation) else None
                 if get_origin(param_annotation) == list and inner and get_origin(inner) == list:
                     if get_args(inner) and get_args(inner)[0] == Message:
-                        coerced_rollouts = []
-                        for i, rollout_data in enumerate(final_func_args["rollouts_messages"]):
-                            coerced_rollouts.append(
-                                _coerce_to_list_message(rollout_data, f"rollouts_messages[{i}]")
-                            )
-                        final_func_args["rollouts_messages"] = coerced_rollouts
+                        try:
+                            coerced_rollouts = []
+                            for i, rollout_data in enumerate(final_func_args["rollouts_messages"]):
+                                coerced_rollouts.append(
+                                    _coerce_to_list_message(
+                                        rollout_data, f"rollouts_messages[{i}]"
+                                    )
+                                )
+                            final_func_args["rollouts_messages"] = coerced_rollouts
+                        except Exception as err:
+                            raise ValueError(
+                                f"Input 'rollouts_messages' failed Pydantic validation: {err}"
+                            ) from None
 
             # Ground truth coercion (if needed)
             if "ground_truth" in params and "ground_truth" in final_func_args:
                 gt_ann = params["ground_truth"].annotation
                 if get_origin(gt_ann) in (list, List) and get_args(gt_ann) and get_args(gt_ann)[0] == Message:
                     if final_func_args["ground_truth"] is not None:
-                        final_func_args["ground_truth"] = _coerce_to_list_message(
-                            final_func_args["ground_truth"], "ground_truth"
-                        )
+                        try:
+                            final_func_args["ground_truth"] = _coerce_to_list_message(
+                                final_func_args["ground_truth"], "ground_truth"
+                            )
+                        except Exception as err:
+                            raise ValueError(
+                                f"Input 'ground_truth' failed Pydantic validation for List[Message]: {err}"
+                            ) from None
 
             # Inject resource clients, if any
             if resource_managers:

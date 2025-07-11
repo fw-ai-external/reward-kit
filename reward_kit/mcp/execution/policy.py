@@ -152,6 +152,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
 
         # Add control plane metadata if provided
         if reward != 0.0 or terminated or info:
+
             tool_message["metadata"] = {
                 "reward": reward,
                 "terminated": terminated,

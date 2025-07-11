@@ -13,7 +13,7 @@ Usage:
     pytest test_record_and_replay_e2e.py -v
 
 Environment Variables:
-    REWARD_KIT_FORCE_RECORD=1  # Force recording mode even if replay file exists
+    CI=true                    # CI mode - only playback existing recordings
     REWARD_KIT_PLAYBACK_FILE   # Path to replay file (auto-detected if not set)
 """
 
@@ -29,6 +29,49 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import reward_kit as rk
+
+
+def _is_ci_mode():
+    """Check if we're running in CI mode."""
+    return os.environ.get("CI", "").lower() in ["true", "1", "yes"]
+
+
+def _setup_recording_file(filename: str) -> str:
+    """Set up a recording file with proper CI/recording logic."""
+    recording_dir = Path(__file__).parent / "recordings"
+    recording_dir.mkdir(exist_ok=True)
+    recording_path = recording_dir / filename
+
+    is_ci = _is_ci_mode()
+
+    # In CI, preserve existing recording files for replay mode
+    # Only remove if not in CI to enable re-recording
+    if os.path.exists(recording_path) and not is_ci:
+        os.unlink(recording_path)
+    elif is_ci and not os.path.exists(recording_path):
+        pytest.skip("CI mode requires existing recording file for replay")
+
+    return str(recording_path)
+
+
+def _cleanup_playback_env():
+    """Clean up playback environment variables."""
+    if "REWARD_KIT_PLAYBACK_FILE" in os.environ:
+        del os.environ["REWARD_KIT_PLAYBACK_FILE"]
+
+
+def _create_test_server(port: int) -> "MCPServerManager":
+    """Create and start a test server."""
+    server = MCPServerManager("server.py", port=port)
+    server.start()
+    print(f"✅ Started test server on port {port}")
+    return server
+
+
+def _stop_test_server(server: "MCPServerManager"):
+    """Stop and clean up a test server."""
+    server.stop()
+    print("🧹 Test server stopped and cleaned up")
 
 
 class MCPServerManager:
@@ -119,49 +162,13 @@ def production_server():
 @pytest.fixture
 def production_recording_file():
     """Provide a recording file path for the production server test."""
-    recording_dir = Path(__file__).parent / "recordings"
-    recording_dir.mkdir(exist_ok=True)
-    recording_path = recording_dir / "production_trajectory.jsonl"
-
-    # In CI, preserve existing recording files for replay mode
-    # Only remove if not in CI or if forced to record
-    is_ci = os.environ.get("CI", "").lower() in ["true", "1", "yes"]
-    force_record = os.environ.get("REWARD_KIT_FORCE_RECORD", "").lower() in [
-        "true",
-        "1",
-        "yes",
-    ]
-
-    if os.path.exists(recording_path) and not is_ci and not force_record:
-        os.unlink(recording_path)
-    elif is_ci and not os.path.exists(recording_path):
-        pytest.skip("CI mode requires existing recording file for replay")
-
-    yield str(recording_path)
+    yield _setup_recording_file("production_trajectory.jsonl")
 
 
 @pytest.fixture
 def conda_isolation_recording_file():
     """Provide a recording file path for the conda isolation test."""
-    recording_dir = Path(__file__).parent / "recordings"
-    recording_dir.mkdir(exist_ok=True)
-    recording_path = recording_dir / "conda_isolation_trajectory.jsonl"
-
-    # In CI, preserve existing recording files for replay mode
-    # Only remove if not in CI or if forced to record
-    is_ci = os.environ.get("CI", "").lower() in ["true", "1", "yes"]
-    force_record = os.environ.get("REWARD_KIT_FORCE_RECORD", "").lower() in [
-        "true",
-        "1",
-        "yes",
-    ]
-
-    if os.path.exists(recording_path) and not is_ci and not force_record:
-        os.unlink(recording_path)
-    elif is_ci and not os.path.exists(recording_path):
-        pytest.skip("CI mode requires existing recording file for replay")
-
-    yield str(recording_path)
+    yield _setup_recording_file("conda_isolation_trajectory.jsonl")
 
 
 @pytest.mark.asyncio
@@ -561,11 +568,8 @@ async def test_multi_environment_sessions(multi_env_dataset, multi_env_recording
         pytest.skip("CI mode skips resource-intensive multi-environment tests")
 
     # Start server for this test
-    server = MCPServerManager("server.py", port=9600)
-
+    server = _create_test_server(9600)
     try:
-        server.start()
-        print(f"✅ Started test server on port {server.port}")
 
         # Set up recording
         os.environ["REWARD_KIT_PLAYBACK_FILE"] = multi_env_recording_file
@@ -625,8 +629,7 @@ async def test_multi_environment_sessions(multi_env_dataset, multi_env_recording
 
     finally:
         # Always stop the server
-        server.stop()
-        print("🧹 Test server stopped and cleaned up")
+        _stop_test_server(server)
 
 
 async def _validate_recording_integrity(recording_file: str, dataset: List[Dict]):
@@ -1133,11 +1136,8 @@ async def test_fireworks_multi_environment_sessions(
         )
 
     # Start server for this test
-    server = MCPServerManager("server.py", port=9700)
-
+    server = _create_test_server(9700)
     try:
-        server.start()
-        print(f"✅ Started test server on port {server.port}")
 
         # Set up recording
         os.environ["REWARD_KIT_PLAYBACK_FILE"] = fireworks_multi_env_recording_file
@@ -1222,8 +1222,7 @@ async def test_fireworks_multi_environment_sessions(
 
     finally:
         # Always stop the server
-        server.stop()
-        print("🧹 Test server stopped and cleaned up")
+        _stop_test_server(server)
 
 
 @pytest.mark.asyncio
@@ -1250,26 +1249,27 @@ async def test_static_policy_functionality():
 
     # Test action generation
     for step in range(6):
-        actions = await policy.act(
-            observations=[None, None], tools_list=[[], []], env_indices=[0, 1]
+        actions = await policy(
+            tool_schemas=[[], []],
+            observations=[None, None],
+            system_prompts=["Test system prompt 1", "Test system prompt 2"],
+            user_prompts=["Test user prompt 1", "Test user prompt 2"],
         )
 
         assert len(actions) == 2, "Should generate action for each environment"
 
         for i, action in enumerate(actions):
-            assert action["type"] == "function", "Should be function call"
-            assert action["function"]["name"] == "lake_move", "Should call lake_move"
-
-            args = json.loads(action["function"]["arguments"])
-            assert "action" in args, "Should have action argument"
-            assert args["action"] in [
+            # Actions are MCPToolCall objects
+            assert action.tool_name == "lake_move", "Should call lake_move"
+            assert "action" in action.arguments, "Should have action argument"
+            assert action.arguments["action"] in [
                 "RIGHT",
                 "DOWN",
                 "LEFT",
                 "UP",
             ], "Should be valid action"
 
-            print(f"  Step {step}, Env {i}: {args['action']}")
+            print(f"  Step {step}, Env {i}: {action.arguments['action']}")
 
     print("✅ Static policy test completed successfully")
 
@@ -1287,11 +1287,8 @@ async def test_control_plane_state_querying(multi_env_dataset):
     from static_policy import StaticPolicy
 
     # Start server for this test
-    server = MCPServerManager("server.py", port=9700)
-
+    server = _create_test_server(9700)
     try:
-        server.start()
-        print(f"✅ Started test server on port {server.port}")
 
         # Create policy with shorter sequence for testing
         policy = StaticPolicy(action_sequence=["RIGHT", "DOWN"])
@@ -1329,8 +1326,46 @@ async def test_control_plane_state_querying(multi_env_dataset):
 
     finally:
         # Always stop the server
-        server.stop()
-        print("🧹 Test server stopped and cleaned up")
+        _stop_test_server(server)
+
+
+async def _run_playback_only(
+    recording_file: str, dataset: List[Dict], server_url: str, steps: int = 8
+):
+    """Run playback-only mode for CI testing."""
+    print("\n🎬 === CI MODE: PLAYBACK ONLY ===")
+
+    # Set up playback environment
+    os.environ["REWARD_KIT_PLAYBACK_FILE"] = recording_file
+
+    # Create playback policy
+    playback_policy = rk.FireworksPolicy(
+        model_id="accounts/fireworks/models/qwen3-235b-a22b",
+        temperature=0.2,
+        max_tokens=4096,
+    )
+
+    assert playback_policy.is_playback_mode(), "Should be in playback mode in CI"
+
+    # Create environments for playback
+    playback_envs = rk.make(
+        server_url,
+        dataset=dataset,
+        model_id=playback_policy.model_id,
+    )
+
+    # Run playback
+    start_time = time.time()
+    playback_trajectories = await rk.rollout(
+        playback_envs, policy=playback_policy, steps=steps
+    )
+    playback_duration = time.time() - start_time
+
+    print(
+        f"✅ CI playback completed: {len(playback_trajectories)} trajectories in {playback_duration:.2f}s"
+    )
+
+    _cleanup_playback_env()
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ Extracted from mcp_env.py to improve modularity.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 from contextlib import AsyncExitStack
@@ -78,8 +79,6 @@ class MCPConnectionManager:
         if client_info and hasattr(client_info, "_extra"):
             extra_data = client_info._extra
             if extra_data and isinstance(extra_data, dict):
-                import hashlib
-                import json
 
                 seed_value = extra_data.get("seed")
                 config_value = extra_data.get("config", {})

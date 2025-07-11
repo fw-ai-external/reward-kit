@@ -14,6 +14,7 @@ Key Features:
 
 import inspect
 import json
+import logging
 from abc import abstractmethod
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -23,6 +24,8 @@ from starlette.responses import JSONResponse
 
 from .adapter import EnvironmentAdapter
 from .gym_production_server import GymProductionServer
+
+logger = logging.getLogger(__name__)
 
 
 def control_plane_endpoint(path: str) -> Callable:
@@ -166,13 +169,13 @@ class McpGym(GymProductionServer):
             self.mcp.custom_route(path, methods=["GET"])(handler)
 
         if discovered_endpoints:
-            print(
+            logger.info(
                 f"✅ Registered {len(discovered_endpoints)} session-aware control plane endpoints"
             )
             for name, endpoint in discovered_endpoints.items():
-                print(f"  - {name}: {endpoint._control_plane_path}")
+                logger.info(f"  - {name}: {endpoint._control_plane_path}")
         else:
-            print("⚠️  No session-aware control plane endpoints discovered")
+            logger.info("⚠️  No session-aware control plane endpoints discovered")
 
     def _create_session_from_id(self, session_id: str) -> Dict[str, Any]:
         """

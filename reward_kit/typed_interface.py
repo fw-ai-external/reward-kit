@@ -184,25 +184,32 @@ def reward_function(
                                 f"Input 'ground_truth' failed Pydantic validation for List[Message]: {err}"
                             ) from None
 
-            # Inject resource clients, if any
+            # Inject resource clients into kwargs (resources are already setup)
             if resource_managers:
                 final_func_args["resources"] = {
-                    r_type: [mgr.get_client() for mgr in mgrs]
-                    for r_type, mgrs in resource_managers.items()
+                    resource_type: [manager.get_client() for manager in managers]
+                    for resource_type, managers in resource_managers.items()
                 }
 
-            # Reconstruct args / kwargs for the user function
+            # Call the author's function using the (potentially modified) arguments dictionary.
+            # final_func_args should contain all parameters expected by func, correctly mapped.
+            # Reconstruct args and kwargs for the call to func
             call_args: List[Any] = []
             call_kwargs: Dict[str, Any] = {}
-            for p_name, p_obj in params.items():
+            for (
+                p_name,
+                p_obj,
+            ) in params.items():  # params from inspect.signature(func).parameters
                 if p_obj.kind == inspect.Parameter.VAR_POSITIONAL:
+                    # If original func had *pos_args, final_func_args might contain it as a tuple
                     call_args.extend(final_func_args.get(p_name, ()))
-                elif p_obj.kind == inspect.Parameter.VAR_KEYWORD:
+                elif p_obj.kind == inspect.Parameter.VAR_KEYWORD:  # **kwargs
+                    # If original func had **kw_args, final_func_args contains the dict of these
                     call_kwargs.update(final_func_args.get(p_name, {}))
-                elif p_name in final_func_args:
+                elif p_name in final_func_args:  # Named parameters
                     if p_obj.kind == inspect.Parameter.POSITIONAL_ONLY:
                         call_args.append(final_func_args[p_name])
-                    else:
+                    else:  # POSITIONAL_OR_KEYWORD, KEYWORD_ONLY
                         call_kwargs[p_name] = final_func_args[p_name]
 
             return call_args, call_kwargs

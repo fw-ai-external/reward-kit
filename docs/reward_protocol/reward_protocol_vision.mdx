@@ -1,0 +1,34 @@
+# The Vision: A Universal Standard for Reinforcement Learning Environments
+
+### The Reinforcement Learning Bottleneck
+
+The field of Reinforcement Learning (RL) is filled with innovation, with high-quality environments being developed for a vast array of tasks. However, progress is significantly hampered by a persistent bottleneck: **environmental fragmentation**.
+
+Unlike the open-sourcing of models and datasets which has accelerated development in other areas of AI, RL environments largely exist in disconnected silos. This fragmentation creates a significant "integration tax" on the community:
+
+-   **High Integration Burden:** A disproportionate amount of effort is spent adapting existing environments to different training pipelines and frameworks, rather than on novel research.
+-   **Inconsistent Benchmarking:** Without a standardized interface, comparing the performance of different agents across different environments is difficult and often unreliable.
+-   **Gap Between Training and Production:** Environments used for training often diverge significantly from the live, production systems where agents are ultimately deployed, leading to a mismatch in performance and behavior.
+-   **Wasted Effort:** Researchers and developers are forced to repeatedly build foundational "plumbing" instead of focusing on advancing agent intelligence.
+
+### Our Solution: The Reward Protocol and MCP-Gym
+
+To solve this, we are introducing the **Reward Protocol**, an open standard designed to create a universal adapter for Reinforcement Learning. **MCP-Gym** is our flagship implementation of this protocol.
+
+Our mission is to converge the three pillars of the RL ecosystem:
+
+1.  **High-Quality Environments:** From classic Gymnasium tasks to complex, custom-built simulators.
+2.  **Production Systems:** The existing MCP toolchains that developers already use.
+3.  **RL Training Stacks:** Frameworks for training and fine-tuning models.
+
+Just as PyTorch created a standard abstraction layer for GPU programming that unleashed a wave of innovation, the Reward Protocol provides a universal layer of compatibility for RL environments.
+
+### The Founders' Mandate: Democratization Through Standardization
+
+We believe that progress is unlocked through open standards and shared foundations. Our principles are simple:
+
+-   **No Walled Gardens:** The Reward Protocol is open-source (Apache 2.0 licensed).
+-   **No Captive Audiences:** MCP-Gym environments can be hosted anywhere.
+-   **Zero Reinvention:** We enable sharable environments and reproducible benchmarks, allowing the community to build upon a common foundation.
+
+The era of rebuilding RL plumbing is over. By providing a true abstraction layer for agent-environment interaction, we can collectively focus on what truly matters: building more capable and intelligent agents.

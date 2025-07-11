@@ -1,0 +1,268 @@
+---
+title: "Tutorial: Building an MCP-Gym Environment"
+---
+
+# Part 3: Tutorial: Building Your Own MCP-Gym Environment
+
+This tutorial will guide you through the process of wrapping a standard Gymnasium environment with the Reward Protocol, turning it into a production-ready, multi-session MCP-Gym server. We will use the `FrozenLake-v1` environment as our example.
+
+## 3.1 Overview
+
+To integrate a new environment, you need to create two main components:
+
+1.  **An Environment Adapter:** A Python class that acts as a bridge between the generic MCP-Gym server and your specific environment's API. It translates actions, formats observations, and manages the environment's lifecycle.
+2.  **An MCP-Gym Server:** A simple server class that inherits from `reward_kit.mcp.McpGym`. It defines the specific tool(s) that an agent can call to interact with the environment.
+
+Let's start by building the adapter.
+
+## 3.2 Step 1: Implement the `EnvironmentAdapter`
+
+The `EnvironmentAdapter` is an abstract base class that defines a standard interface for any environment you want to connect to the framework. Your custom adapter will inherit from `reward_kit.mcp.adapter.EnvironmentAdapter` and implement its methods.
+
+Here is a breakdown of the `FrozenLakeAdapter`, which you can use as a template.
+
+### The Complete `FrozenLakeAdapter`
+
+```python
+# examples/frozen_lake_mcp/frozen_lake_adapter.py
+from typing import Any, Dict, Optional, Tuple
+from gymnasium.envs.toy_text import FrozenLakeEnv
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
+from reward_kit.mcp.adapter import EnvironmentAdapter
+
+class FrozenLakeAdapter(EnvironmentAdapter):
+    """Adapter for the FrozenLake Gymnasium environment."""
+
+    ACTION_NAMES = ["LEFT", "DOWN", "RIGHT", "UP"]
+
+    def create_environment(self, config: Optional[Dict[str, Any]] = None) -> FrozenLakeEnv:
+        """Creates a new FrozenLake environment instance."""
+        config = config or {}
+        desc = generate_random_map(
+            size=config.get("size", 4),
+            p=config.get("p", 0.8),
+            seed=config.get("map_seed")
+        )
+        return FrozenLakeEnv(desc=desc, is_slippery=False, render_mode="ansi")
+
+    def reset_environment(self, env: FrozenLakeEnv, seed: Optional[int] = None) -> Tuple[Any, Dict[str, Any]]:
+        """Resets the environment to its initial state."""
+        obs, info = env.reset(seed=seed)
+        return obs, info
+
+    def step_environment(self, env: FrozenLakeEnv, action: int) -> Tuple[Any, float, bool, bool, Dict[str, Any]]:
+        """Executes one step in the environment."""
+        return env.step(action)
+
+    def close_environment(self, env: FrozenLakeEnv) -> None:
+        """Cleans up the environment's resources."""
+        env.close()
+
+    def parse_action(self, action_str: str) -> int:
+        """Parses the string action from the LLM into an integer for the environment."""
+        if action_str.upper() not in self.ACTION_NAMES:
+            raise ValueError(f"Invalid action '{action_str}'. Valid actions are: {self.ACTION_NAMES}")
+        return self.ACTION_NAMES.index(action_str.upper())
+
+    def format_observation(self, observation: int, env: FrozenLakeEnv) -> Dict[str, Any]:
+        """Formats the raw observation into a JSON-serializable dictionary."""
+        return {
+            "position": observation,
+            "grid": env.render()
+        }
+
+    def get_action_space_description(self) -> Dict[str, Any]:
+        """Returns a description of the valid actions."""
+        return {"type": "string", "enum": self.ACTION_NAMES}
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Returns a default configuration dictionary."""
+        return {"size": 4, "p": 0.8}
+```
+
+### Method Breakdown
+
+-   **`create_environment(config)`**: This method is responsible for instantiating your environment. It takes an optional `config` dictionary, allowing you to parameterize the environment's creation (e.g., setting the map size for Frozen Lake).
+-   **`reset_environment(env, seed)`**: This resets the provided environment instance to a starting state. Crucially, it accepts a `seed` to ensure that rollouts can be made reproducible. It returns the initial observation and an info dictionary, just like a standard `gym.reset()`.
+-   **`step_environment(env, action)`**: This method executes a single action in the environment. It returns the standard `(observation, reward, terminated, truncated, info)` tuple. The MCP-Gym framework will automatically handle separating this tuple into the Data Plane (observation) and Control Plane (reward, status).
+-   **`close_environment(env)`**: This is for cleanup, allowing the environment to release any resources it holds when a session ends.
+-   **`parse_action(action_str)`**: A vital translation layer. LLM agents send actions as strings (e.g., "UP"). This method converts that string into the format the actual environment expects (e.g., the integer `3`).
+-   **`format_observation(observation, env)`**: This method takes the raw observation from the environment (in this case, an integer representing the player's position) and formats it into a more descriptive, JSON-serializable dictionary that is sent to the agent. Including the rendered grid provides helpful context.
+-   **`get_action_space_description()`**: This provides a schema for the valid actions, which can be used to automatically generate the tool definition for the LLM.
+-   **`get_default_config()`**: Returns a base configuration, which can be overridden by the client at connection time.
+
+## 3.3 Step 2: Create the `McpGym` Server
+
+With the adapter in place, creating the server is straightforward. The server class is responsible for defining the specific tools the agent can use.
+
+Your server will inherit from `reward_kit.mcp.McpGym` and will need to implement the `_register_tools` and `format_observation` methods.
+
+### The Complete `FrozenLakeMcp` Server
+
+```python
+# examples/frozen_lake_mcp/frozen_lake_mcp.py
+from typing import Any, Dict, Optional
+from reward_kit.mcp import McpGym
+from .frozen_lake_adapter import FrozenLakeAdapter
+from mcp.server.fastmcp import Context
+
+class FrozenLakeMcp(McpGym):
+    """FrozenLake MCP-Gym environment."""
+
+    def __init__(self, seed: Optional[int] = None):
+        """Initialize the server with our custom adapter."""
+        adapter = FrozenLakeAdapter()
+        super().__init__("FrozenLake-v1", adapter, seed)
+
+    def _register_tools(self):
+        """Register the domain-specific 'lake_move' tool."""
+        @self.mcp.tool(
+            name="lake_move",
+            description="Move on the frozen lake. Actions: LEFT, DOWN, RIGHT, UP."
+        )
+        def lake_move(action: str, ctx: Context) -> Dict[str, Any]:
+            # 1. Parse the string action using the adapter
+            action_int = self.adapter.parse_action(action)
+
+            # 2. Get the session ID from the context
+            session_id = self._get_session_id(ctx)
+
+            # 3. Get or create the session environment
+            self._get_or_create_session(ctx)
+
+            # 4. Execute the step
+            observation_data = self._execute_session_environment_step(
+                session_id, action_int
+            )
+            observation_data["action"] = action
+            return observation_data
+
+    @staticmethod
+    def format_observation(obs: Any, env: Any) -> Dict[str, Any]:
+        """Format the observation for the MCP response."""
+        return {
+            "position": int(obs),
+            "grid": env.render(),
+        }
+```
+
+### Method Breakdown
+
+-   **`__init__(self, seed)`**: The constructor is simple. It instantiates your `FrozenLakeAdapter` and passes it to the `super().__init__()` method, along with a server name.
+-   **`_register_tools(self)`**: This is where you define the agent's capabilities.
+    -   The `@self.mcp.tool()` decorator registers a new tool that the LLM can call.
+    -   The `lake_move` function defines the logic for the tool. Notice the clean flow: it uses the adapter to parse the action, gets the session context, and then calls `self._execute_session_environment_step()`.
+    -   This `_execute_session_environment_step()` method is provided by the `McpGym` base class. It performs the environment step and **critically, it handles updating the control plane state internally.**
+    -   The tool's return value is the observation data, keeping the data plane clean.
+-   **`format_observation(obs, env)`**: This static method is required by the base class. It provides a consistent way to format observations. While our adapter also has a `format_observation` method, this static one on the server class ensures the server itself can format observations if needed, maintaining a clear separation of concerns.
+
+## 3.4 Step 3: The "Automatic" Control Plane
+
+You may have noticed that we haven't written any code to handle rewards or termination status. This is one of the most powerful features of the MCP-Gym framework.
+
+The `McpGym` base class that your server inherits from automatically provides the HTTP endpoints for the Control Plane. By default, it exposes:
+
+-   `GET /control/reward`
+-   `GET /control/status`
+-   `GET /control/info`
+
+When `_execute_session_environment_step()` is called inside your tool, the base class takes the full `(observation, reward, terminated, truncated, info)` tuple from your adapter's `step_environment` method. It saves the reward, status, and info to the internal state for that specific session and returns only the observation to the agent.
+
+The client-side rollout manager can then make a separate, out-of-band HTTP call to `/control/status` (with the correct `mcp-session-id` header) to check if the episode has ended, perfectly decoupling the agent's logic from the training loop's logic.
+
+# Part 4: Running and Using the Environment
+
+## 4.1 Running the Server
+
+Once you have your adapter and server classes, you need a simple script to run the server.
+
+```python
+# examples/frozen_lake_mcp/server.py
+import asyncio
+from frozen_lake_mcp import FrozenLakeMcp
+
+async def main():
+    server = FrozenLakeMcp()
+    await server.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+You can then run this script from your terminal to start the MCP-Gym server:
+```bash
+python examples/frozen_lake_mcp/server.py
+```
+
+## 4.2 Client-Side Interaction
+
+The `reward-kit` library provides a high-level API for interacting with MCP-Gym environments and running rollouts.
+
+Here's how you can connect to the server, run a few episodes with different seeds, and record the trajectories.
+
+```python
+import reward_kit as rk
+from reward_kit.mcp.execution.policy import FireworksPolicy
+
+# 1. Initialize a policy (e.g., a Fireworks LLM)
+policy = FireworksPolicy(
+    model_id="accounts/fireworks/models/firefunction-v1",
+    temperature=0.2,
+)
+
+# 2. Connect to the MCP-Gym server
+# This will create 3 independent sessions with different seeds.
+envs = rk.connect_mcp_environments([
+    {"url": "http://localhost:8000", "count": 3, "seeds": [42, 123, 456]}
+])
+
+# 3. Execute the rollouts
+# The `rollout` function handles the entire loop:
+# - Calling the 'lake_move' tool (Data Plane)
+# - Querying the '/control/status' endpoint to check for termination (Control Plane)
+# - Recording all interactions to a file
+rollouts = await rk.rollout(
+    envs,
+    policy,
+    steps=10,
+    recording_file="trajectory.jsonl"
+)
+
+print("Rollouts complete. Trajectories saved to trajectory.jsonl")
+```
+
+The resulting `trajectory.jsonl` file will contain a complete record of the interactions, including the observations returned to the agent and the reward/status information retrieved from the control plane, ready for analysis or training.
+
+# Part 5: API Reference
+
+This section provides a brief overview of the key classes a developer will interact with when creating a new environment.
+
+### `reward_kit.mcp.adapter.EnvironmentAdapter`
+
+The abstract base class for all environment adapters.
+
+**Methods to Implement:**
+
+-   `create_environment(config)`
+-   `reset_environment(env, seed)`
+-   `step_environment(env, action)`
+-   `close_environment(env)`
+-   `parse_action(action_str)`
+-   `format_observation(observation, env)`
+-   `get_action_space_description()`
+-   `get_default_config()`
+
+### `reward_kit.mcp.McpGym`
+
+The main server base class.
+
+**Key Methods for Subclassing:**
+
+-   `__init__(server_name, adapter, seed)`: The constructor you call from your server's `__init__`.
+-   `_register_tools()`: The abstract method you must implement to define your agent's tools.
+
+**Key Methods for Use within Tools:**
+
+-   `_get_session_id(ctx)`: Retrieves the unique ID for the current session.
+-   `_get_or_create_session(ctx)`: Ensures the environment for the session is instantiated.
+-   `_execute_session_environment_step(session_id, action_int)`: Executes the action and handles the data/control plane separation.

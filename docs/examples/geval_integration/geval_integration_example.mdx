@@ -1,0 +1,34 @@
+# Deepeval GEval Integration Example
+
+This guide demonstrates how to use a [deepeval](https://github.com/confident-ai/deepeval) `GEval` metric with Reward Kit. GEval metrics employ an LLM as a judge to score model outputs based on custom criteria. The example configures the judge to be the Fireworks model `accounts/fireworks/models/qwen3-235b-a22b`.
+
+## Overview
+
+The script [`geval_integration_example.py`](../../examples/geval_integration_example.py) shows how to:
+
+1. Construct a `GEval` metric defining the evaluation criteria.
+2. Adapt that metric into a Reward Kit reward function using `adapt_metric`.
+3. Evaluate a short conversation (in this case a simple translation) and print the resulting score and reason.
+
+## Running the Example
+
+## Setup
+
+1. Install Reward Kit with the deepeval extras:
+
+```bash
+pip install "reward-kit[deepeval]"
+```
+
+2. Ensure your Fireworks API key is available as the `FIREWORKS_API_KEY` environment variable. The example script sets up the OpenAI-compatible base URL automatically.
+3. Execute the script from the repository root:
+
+```bash
+python examples/geval_integration_example.py
+```
+
+You should see a numeric score along with an optional reason returned by the GEval metric.
+
+## When to Use GEval
+
+GEval metrics are useful whenever you need an automated judge to assess qualities such as correctness, helpfulness or relevance. By combining `adapt_metric` with GEval you can seamlessly incorporate these evaluations into Reward Kit workflows.

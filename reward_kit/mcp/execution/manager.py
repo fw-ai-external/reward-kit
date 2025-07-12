@@ -1,38 +1,72 @@
 """
-Rollout Coordination
+MCP Execution Management
 
-Handles the orchestration of complete rollouts using tool calling interface.
-Extracted from mcp_env.py to improve modularity.
+Unified class that handles both session management and rollout execution.
+Combines the functionality of SessionManager and RolloutManager.
 """
 
+import asyncio
 import json
 import logging
 import os
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
-from ..session.manager import SessionManager
-from ..types import MCPToolCall, Trajectory
+from ..client.connection import MCPConnectionManager
+from ..types import MCPSession, MCPToolCall, Trajectory
 
 if TYPE_CHECKING:
     from ..session.manager import GeneralMCPVectorEnv
     from .policy import LLMBasePolicy
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 
-class RolloutManager:
-    """Manages the execution of complete rollouts using tool calling interface."""
+class ExecutionManager:
+    """
+    Unified manager that handles both MCP session lifecycle and rollout execution.
+    
+    Combines the functionality of SessionManager and RolloutManager for better
+    organization and reduced complexity.
+    """
 
-    def __init__(self, session_manager: SessionManager):
+    def __init__(self):
+        """Initialize the execution manager."""
+        self.connection_manager = MCPConnectionManager()
+
+    async def initialize_sessions(self, sessions: List[MCPSession]) -> None:
         """
-        Initialize the rollout manager.
+        Initialize multiple MCP sessions in parallel.
 
         Args:
-            session_manager: The session manager to use for environment interactions
+            sessions: List of MCPSessions to initialize
         """
-        self.session_manager = session_manager
+        tasks = [
+            self.connection_manager.initialize_session(session) for session in sessions
+        ]
+        await asyncio.gather(*tasks)
+
+    async def close_sessions(self, sessions: List[MCPSession]) -> None:
+        """
+        Close multiple MCP sessions in parallel.
+
+        Args:
+            sessions: List of MCPSessions to close
+        """
+        tasks = [
+            asyncio.create_task(self.connection_manager.close_session(session))
+            for session in sessions
+        ]
+
+        if tasks:
+            try:
+                # Wait for all close operations to complete
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                # Handle cancellation gracefully (especially important for Python 3.12)
+                logger.debug(
+                    "Close operation was cancelled, but sessions are marked as closed"
+                )
 
     async def execute_rollout(
         self,
@@ -396,4 +430,4 @@ class RolloutManager:
     def _log_openai_entry(self, log_file: str, data: Dict[str, Any]):
         """Helper function to log OpenAI format entries."""
         with open(log_file, "a") as f:
-            f.write(json.dumps(data) + "\n")
+            f.write(json.dumps(data) + "\n") 

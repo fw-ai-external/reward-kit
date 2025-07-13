@@ -5,27 +5,27 @@ This module provides the core McpGym base class that implements the north star v
 for universal RL environment integration via MCP protocol.
 
 Key Features:
-- Inherits from GymProductionServer for proper MCP integration
+- Unified MCP server with FastMCP integration
 - Simple tool registration with @self.mcp.tool() decorator
 - Clean separation between data plane (MCP tool calls) and control plane (custom endpoints)
 - Compatible with CondaServerProcessManager
 - Session-aware control plane endpoints via @control_plane_endpoint decorator
 """
 
+import os
 import hashlib
 import threading
 import inspect
 import json
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from mcp.server.fastmcp import Context
+from mcp.server.fastmcp import Context, FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .adapter import EnvironmentAdapter
-from .gym_production_server import GymProductionServer
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def control_plane_endpoint(path: str) -> Callable:
     return decorator
 
 
-class McpGym(GymProductionServer):
+class McpGym(ABC):
     """
     Base class for MCP-Gym environments implementing the north star vision.
 
@@ -70,21 +70,27 @@ class McpGym(GymProductionServer):
     - Data Plane: JSON tool calls/responses via MCP (state transitions/actions)
     - Control Plane: Rewards/termination signals via MCP resources
     - Environment Implementation: Single-process MCP server per environment
-    - Inherits from GymProductionServer for proper MCP protocol handling
     """
 
     def __init__(
         self, server_name: str, adapter: EnvironmentAdapter, seed: Optional[int] = None
     ):
         """
-        Initialize MCP-Gym environment.
+        Initialize the MCP-Gym environment.
 
         Args:
             server_name: Name for the MCP server
             adapter: Environment adapter instance
             seed: Optional seed for reproducible environments
         """
-        super().__init__(server_name, adapter)
+        self.adapter = adapter
+
+        # Create FastMCP server
+        self.mcp = FastMCP(
+            server_name,
+            host="0.0.0.0",
+            port=int(os.environ.get("PORT", 8000)),
+        )
 
         # Multi-session support
         self.sessions = (
@@ -108,8 +114,36 @@ class McpGym(GymProductionServer):
         # Reset with seed if provided
         self.env, self.obs, _info = self._new_env(seed=seed)
 
-        # Discover and register control plane endpoints
+        # Register resources, tools, and control plane endpoints
+        self._register_resources()
+        self._register_tools()
         self._discover_and_register_control_plane_endpoints()
+
+    def _register_resources(self):
+        """
+        Register standard MCP resources.
+        
+        NOTE: Resources have been removed in favor of session-aware HTTP endpoints.
+        This method is kept for backward compatibility but does nothing.
+        """
+        # REMOVED: game://initial_state MCP resource
+        # This was not session-aware and caused all sessions to return identical initial state.
+        #
+        # Initial state is now provided by session-aware HTTP endpoint:
+        # - GET /control/initial_state (with mcp-session-id header)
+        #
+        # The connection manager has been updated to query this HTTP endpoint instead.
+
+        # REMOVED: Control plane MCP resources (control://reward, control://status, control://info)
+        # These were not session-aware and caused all sessions to return identical control plane state.
+        #
+        # Control plane data is now provided by session-aware HTTP endpoints:
+        # - GET /control/reward (with mcp-session-id header)
+        # - GET /control/status (with mcp-session-id header)  
+        # - GET /control/info (with mcp-session-id header)
+        #
+        # The rollout system has been updated to query these HTTP endpoints instead.
+        pass
 
     def _get_session_id(self, ctx: Context) -> str:
         """
@@ -571,3 +605,28 @@ class McpGym(GymProductionServer):
             Formatted observation dictionary (DATA PLANE ONLY)
         """
         pass
+
+    def run(self, transport: str = "streamable-http", **kwargs):
+        """
+        Run the unified MCP-Gym server.
+        
+        Args:
+            transport: MCP transport protocol ("stdio", "sse", "streamable-http")
+            **kwargs: Additional arguments passed to FastMCP.run()
+        """
+        print(f"🚀 {self.mcp.name} MCP-Gym Server Starting...")
+        print(f"📡 Transport: {transport}")
+        print("🎯 MCP Pattern: HTTP endpoints for control plane, tools for data plane")
+        print("🔗 Session-aware control plane endpoints:")
+        
+        # List registered control plane endpoints
+        for endpoint_name, endpoint_func in self._control_plane_endpoints.items():
+            print(f"  - {endpoint_name}: {endpoint_func._control_plane_path}")
+        
+        if not self._control_plane_endpoints:
+            print("  - No control plane endpoints registered")
+        
+        print()
+
+        # Run the unified server
+        self.mcp.run(transport=transport, **kwargs)

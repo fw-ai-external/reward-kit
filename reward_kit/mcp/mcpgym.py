@@ -450,6 +450,36 @@ class McpGym(GymProductionServer):
         # Return ONLY data plane information (no rewards/termination)
         return self.format_observation(obs, env)
 
+
+    def _new_env(self, seed: Optional[int] = None) -> Tuple[Any, Any, Dict]:
+        """Create new environment and return initial state."""
+        config = self.adapter.get_default_config()
+        
+        try:
+            env, obs, info = self.adapter.create_environment_with_seed(config, seed=seed)
+        except AttributeError:
+            env = self.adapter.create_environment(config)
+            obs, info = self.adapter.reset_environment(env, seed=seed)
+        
+        return env, obs, info
+
+    def _render(self, obs) -> Dict[str, Any]:
+        """Format observation using subclass implementation."""
+        return self.format_observation(obs, self.env)
+
+    
+    def _get_default_config(self) -> Dict[str, Any]:
+        """
+        Get default configuration from adapter.
+        
+        Wrapper method to handle potential adapter interface issues.
+        """
+        try:
+            return self.adapter.get_default_config()
+        except AttributeError:
+            # Fallback for adapters that don't implement get_default_config
+            return {}
+
     # ===== SESSION-AWARE CONTROL PLANE ENDPOINTS =====
     # These provide session-specific control plane data via HTTP endpoints
     # instead of global MCP resources, enabling proper multi-session support.
@@ -541,32 +571,3 @@ class McpGym(GymProductionServer):
             Formatted observation dictionary (DATA PLANE ONLY)
         """
         pass
-
-    def _new_env(self, seed: Optional[int] = None) -> Tuple[Any, Any, Dict]:
-        """Create new environment and return initial state."""
-        config = self.adapter.get_default_config()
-        
-        try:
-            env, obs, info = self.adapter.create_environment_with_seed(config, seed=seed)
-        except AttributeError:
-            env = self.adapter.create_environment(config)
-            obs, info = self.adapter.reset_environment(env, seed=seed)
-        
-        return env, obs, info
-
-    def _render(self, obs) -> Dict[str, Any]:
-        """Format observation using subclass implementation."""
-        return self.format_observation(obs, self.env)
-
-    
-    def _get_default_config(self) -> Dict[str, Any]:
-        """
-        Get default configuration from adapter.
-        
-        Wrapper method to handle potential adapter interface issues.
-        """
-        try:
-            return self.adapter.get_default_config()
-        except AttributeError:
-            # Fallback for adapters that don't implement get_default_config
-            return {}

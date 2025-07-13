@@ -42,6 +42,8 @@ def main():
     if args.transport == "streamable-http":
         os.environ["PORT"] = str(args.port)
 
+    print("hola", flush=True)  # Force flush to ensure output is captured
+
     # Create and run server
     server = FrozenLakeMcp(seed=args.seed)
 

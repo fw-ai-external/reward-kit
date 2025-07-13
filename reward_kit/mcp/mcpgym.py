@@ -15,15 +15,21 @@ Key Features:
 import inspect
 import json
 import logging
+import os
 from abc import abstractmethod
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from mcp.server.fastmcp import Context
+from mcp.server.fastmcp import Context, FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .adapter import EnvironmentAdapter
-from .gym_production_server import GymProductionServer
+from .utils import (
+    ControlPlaneState,
+    SessionManager,
+    EnvironmentUtils,
+    SessionIDGenerator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +62,7 @@ def control_plane_endpoint(path: str) -> Callable:
     return decorator
 
 
-class McpGym(GymProductionServer):
+class McpGym():
     """
     Base class for MCP-Gym environments implementing the north star vision.
 
@@ -68,7 +74,6 @@ class McpGym(GymProductionServer):
     - Data Plane: JSON tool calls/responses via MCP (state transitions/actions)
     - Control Plane: Rewards/termination signals via MCP resources
     - Environment Implementation: Single-process MCP server per environment
-    - Inherits from GymProductionServer for proper MCP protocol handling
     """
 
     def __init__(
@@ -82,27 +87,120 @@ class McpGym(GymProductionServer):
             adapter: Environment adapter instance
             seed: Optional seed for reproducible environments
         """
-        super().__init__(server_name, adapter)
+        # Store adapter
+        self.adapter = adapter
+
+        # Create initial environment
+        self.env, self.obs, _info = self._new_env(seed=seed)
+
+        # Set up session management
+        self.session_manager = SessionManager()
+        # Keep compatibility properties for existing code
+        self.sessions = self.session_manager.sessions
+        self.session_lock = self.session_manager.session_lock
+
+        # Create FastMCP server
+        self.mcp = FastMCP(
+            server_name,
+            host="0.0.0.0",
+            port=int(os.environ.get("PORT", 8000)),
+        )
 
         # Control plane endpoints dictionary
         self._control_plane_endpoints: Dict[str, Callable] = {}
 
         # Initialize control plane state (for backward compatibility - single session)
-        self.control_plane_state = {
-            "reward": 0.0,
-            "terminated": False,
-            "truncated": False,
-            "info": {},
-            "step_count": 0,
-            "total_reward": 0.0,
-        }
+        self.control_plane_state = ControlPlaneState.create_initial_state()
 
-        # Reset with seed if provided
-        if seed is not None:
-            self.env, self.obs, _info = self._new_env(seed=seed)
+        # Register resources and tools
+        self._register_resources()
+        self._register_tools()
 
         # Discover and register control plane endpoints
         self._discover_and_register_control_plane_endpoints()
+
+    def _new_env(self, seed: Optional[int] = None) -> Tuple[Any, Any, Dict]:
+        """Create new environment and return initial state."""
+        config = self.adapter.get_default_config()
+        return EnvironmentUtils.create_environment_with_seed(self.adapter, config, seed)
+
+    def _render(self, obs) -> Dict[str, Any]:
+        """Format observation using subclass implementation."""
+        return self.format_observation(obs, self.env)
+
+    def _register_resources(self):
+        """Register standard MCP resources."""
+        # REMOVED: game://initial_state MCP resource
+        # This was not session-aware and caused all sessions to return identical initial state.
+        #
+        # Initial state is now provided by session-aware HTTP endpoint in McpGym:
+        # - GET /control/initial_state (with mcp-session-id header)
+        #
+        # The connection manager has been updated to query this HTTP endpoint instead.
+
+        # REMOVED: Control plane MCP resources (control://reward, control://status, control://info)
+        # These were not session-aware and caused all sessions to return identical control plane state.
+        #
+        # Control plane data is now provided by session-aware HTTP endpoints in McpGym:
+        # - GET /control/reward (with mcp-session-id header)
+        # - GET /control/status (with mcp-session-id header)
+        # - GET /control/info (with mcp-session-id header)
+        #
+        # The rollout system has been updated to query these HTTP endpoints instead.
+        pass
+
+    def run(self, transport: str = "streamable-http", **kwargs):
+        """Run the MCP-Gym server."""
+        print(f"🚀 {self.mcp.name} MCP-Gym Server Starting...")
+        print(f"📡 Transport: {transport}")
+        print("🎯 MCP-Gym Pattern: Session-aware control plane + data plane separation")
+        print("🔗 Control plane endpoints: /control/* (session-aware)")
+
+        # Run the server
+        self.mcp.run(transport=transport, **kwargs)
+
+    def _get_session_id(self, ctx: Context) -> str:
+        """Extract session ID from MCP context using shared utility."""
+        return SessionIDGenerator.generate_session_id(ctx)
+
+    def _get_or_create_session(self, ctx: Context) -> Dict[str, Any]:
+        """Get or create session data for the given context using shared utilities."""
+        session_id = self._get_session_id(ctx)
+        
+        # Check if session already exists
+        existing_session = self.session_manager.get_session(session_id)
+        if existing_session:
+            return existing_session
+        
+        # Create new session using shared utilities
+        seed = SessionIDGenerator.extract_seed_from_context(ctx)
+        config = SessionIDGenerator.extract_config_from_context(
+            ctx, self.adapter.get_default_config()
+        )
+        
+        # Create environment with extracted seed and config
+        env, obs, info = EnvironmentUtils.create_environment_with_seed(
+            self.adapter, config, seed
+        )
+        
+        # Log environment creation
+        EnvironmentUtils.log_environment_creation(session_id, seed, obs)
+        
+        # Create session using SessionManager
+        return self.session_manager.create_session(session_id, env, obs)
+
+    def extract_seed_from_context(self, ctx: Context) -> Optional[int]:
+        """
+        Extract seed from MCP client info if available.
+
+        NOTE: This method is kept for backward compatibility. New code should use
+        _get_or_create_session() which handles seed extraction automatically.
+        """
+        seed = SessionIDGenerator.extract_seed_from_context(ctx)
+        if seed is not None:
+            # For backward compatibility, reinitialize the global environment
+            self.env, self.obs, _info = self._new_env(seed=seed)
+        return seed
 
     def _discover_and_register_control_plane_endpoints(self):
         """
@@ -226,36 +324,20 @@ class McpGym(GymProductionServer):
             truncated: Whether episode truncated
             info: Info dictionary from environment
         """
-        self.control_plane_state["reward"] = reward
-        self.control_plane_state["terminated"] = terminated
-        self.control_plane_state["truncated"] = truncated
-        self.control_plane_state["info"] = info
-        self.control_plane_state["step_count"] += 1
-        self.control_plane_state["total_reward"] += reward
-
-        # Log control plane update (for debugging)
-        print(
-            f"🎛️  Control plane updated: reward={reward}, terminated={terminated}, step={self.control_plane_state['step_count']}"
+        ControlPlaneState.update_state(
+            self.control_plane_state, reward, terminated, truncated, info
+        )
+        
+        # Log control plane update using shared utility
+        ControlPlaneState.log_update(
+            "single_session", reward, terminated, self.control_plane_state["step_count"]
         )
 
     def _get_or_create_session_control_plane(self, session_id: str) -> Dict[str, Any]:
         """Get or create control plane state for a specific session."""
-        with self.session_lock:
-            if session_id not in self.sessions:
-                return {}
-
-            session_data = self.sessions[session_id]
-            if "control_plane" not in session_data["session_data"]:
-                session_data["session_data"]["control_plane"] = {
-                    "reward": 0.0,
-                    "terminated": False,
-                    "truncated": False,
-                    "info": {},
-                    "step_count": 0,
-                    "total_reward": 0.0,
-                }
-
-            return session_data["session_data"]["control_plane"]
+        return self.session_manager.get_or_create_session_data(
+            session_id, "control_plane", ControlPlaneState.create_initial_state
+        ) or {}
 
     def _update_session_control_plane(
         self,
@@ -267,17 +349,12 @@ class McpGym(GymProductionServer):
     ):
         """Update control plane state for a specific session."""
         control_plane = self._get_or_create_session_control_plane(session_id)
-
-        control_plane["reward"] = reward
-        control_plane["terminated"] = terminated
-        control_plane["truncated"] = truncated
-        control_plane["info"] = info
-        control_plane["step_count"] += 1
-        control_plane["total_reward"] += reward
-
-        # Log control plane update
-        print(
-            f"🎛️  Session {session_id[:16]}... control plane: reward={reward}, terminated={terminated}, step={control_plane['step_count']}"
+        
+        ControlPlaneState.update_state(control_plane, reward, terminated, truncated, info)
+        
+        # Log control plane update using shared utility
+        ControlPlaneState.log_update(
+            session_id, reward, terminated, control_plane["step_count"]
         )
 
     def get_control_plane_state(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -396,15 +473,7 @@ class McpGym(GymProductionServer):
     ) -> Dict[str, Any]:
         """Extract control plane state from session data."""
         return session_data.get("session_data", {}).get(
-            "control_plane",
-            {
-                "reward": 0.0,
-                "terminated": False,
-                "truncated": False,
-                "info": {},
-                "step_count": 0,
-                "total_reward": 0.0,
-            },
+            "control_plane", ControlPlaneState.create_initial_state()
         )
 
     @abstractmethod

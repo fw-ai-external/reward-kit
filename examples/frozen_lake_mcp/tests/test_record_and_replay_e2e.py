@@ -93,7 +93,7 @@ class MCPServerManager:
         env["PORT"] = str(self.port)
 
         # Start server process
-        cmd = ["python", self.server_script, "--port", str(self.port)]
+        cmd = ["python", "-u", self.server_script, "--port", str(self.port)]
         self.process = subprocess.Popen(
             cmd,
             cwd=self.base_dir,
@@ -340,6 +340,70 @@ async def test_production_server_record_and_replay(
 def test_server_health_checks(production_server):
     """Test that the server is running and healthy."""
     assert production_server.is_running(), "Production server should be running"
+
+
+# def test_server_startup():
+#     """Test that MCPServerManager properly starts server.py and shows 'hola' output."""
+#     print("\n=== Testing MCPServerManager startup ===")
+    
+#     # Create server manager (but don't start it yet)
+#     server = MCPServerManager('server.py', port=9600)
+    
+#     try:
+#         # Start the server
+#         print("Starting server...")
+#         server.start()
+        
+#         # Verify the server is running
+#         assert server.is_running(), "Server should be running after start()"
+        
+#         # Give the server a moment to produce output
+#         time.sleep(2)
+        
+#         # Check if the process is still running (not crashed)
+#         assert server.is_running(), "Server should still be running after 2 seconds"
+        
+#         # Try to get output from the process
+#         if server.process and server.process.stdout:
+#             try:
+#                 # Read available output
+#                 output = ""
+                
+#                 # Try to read from stdout without blocking
+#                 import select
+#                 ready, _, _ = select.select([server.process.stdout], [], [], 0.1)
+                
+#                 if ready:
+#                     # Read available data
+#                     data = server.process.stdout.read(1000)
+#                     output = data if data else ""
+                    
+#                 print(f"Server output: {repr(output)}")
+                
+#                 # Check if 'hola' is in the output
+#                 if 'hola' in output:
+#                     print("✅ SUCCESS: Found 'hola' in server output!")
+#                 else:
+#                     print("❌ 'hola' not found in output")
+#                     # Don't fail the test yet - the output might be buffered
+                    
+#             except Exception as e:
+#                 print(f"Error reading output: {e}")
+        
+#         # Verify server responds to basic connectivity (port is open)
+#         import socket
+        
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#             result = s.connect_ex(('localhost', 9600))
+#             assert result == 0, f"Server should be listening on port 9600"
+        
+#         print("✅ Server startup test completed")
+
+#         assert 1 == 0
+        
+#     finally:
+#         # Clean up
+#         server.stop()
 
 
 @pytest.mark.asyncio

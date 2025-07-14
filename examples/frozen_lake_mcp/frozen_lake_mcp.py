@@ -31,7 +31,7 @@ class FrozenLakeMcp(McpGym):
     FrozenLake MCP-Gym environment implementing the north star vision.
 
     This demonstrates the clean, simple API for MCP-Gym environments:
-    - Inherit from McpGym (which inherits from GymProductionServer)
+    - Inherit from McpGym
     - Use proper EnvironmentAdapter pattern
     - Register tools with @self.mcp.tool() decorator
     - Compatible with CondaServerProcessManager

@@ -163,7 +163,7 @@ async def main():
     if all_passed:
         print("🎉 ALL TESTS PASSED!")
         print("\nNorth Star Vision Successfully Implemented:")
-        print("✅ MCP-Gym inherits from GymProductionServer")
+        print("✅ MCP Gym implemented")
         print("✅ Proper EnvironmentAdapter pattern")
         print("✅ FastMCP Context integration")
         print("✅ CondaServerProcessManager compatibility")

@@ -168,7 +168,7 @@ class FrozenLakeAdapter(EnvironmentAdapter):
     def get_default_config(self): ...
 
 # Complex server setup
-server = GymProductionServer("FrozenLake-v1", FrozenLakeAdapter())
+server = McpGym("FrozenLake-v1", FrozenLakeAdapter())
 # Multiple configuration files, complex inheritance...
 ```
 

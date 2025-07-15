@@ -43,6 +43,8 @@ def reward_function(
     id: Optional[str] = None,
     requirements: Optional[List[str]] = None,  # Changed to List[str]
     resources: Optional[ResourceDict] = None,  # Resource management
+    concurrency: Optional[int] = None,
+    timeout: Optional[int] = None,
 ) -> Union[F, Callable[[F], F]]:
     """
     Decorator for user-defined reward and evaluation functions with resource management.
@@ -64,6 +66,8 @@ def reward_function(
         resources: Optional dictionary of resource types to resource instances.
                   Example: {"llms": [llm_resource]}
                   Resources are automatically setup before evaluation and cleaned up after.
+        concurrency: Optional number of concurrent requests to the reward function. This will only take effect if the function is async or there are async resources binded to the reward function (e.g. LLM resource).
+        timeout: Optional timeout for the reward function. This will only take effect if the function is async or there are async resources binded to the reward function (e.g. LLM resource).
 
     Returns:
         A decorator if `_func` is None, or the decorated function.
@@ -269,6 +273,8 @@ def reward_function(
         wrapper_fn._reward_function_requirements = requirements  # type: ignore[attr-defined]
         wrapper_fn._reward_function_mode = mode  # type: ignore[attr-defined]
         wrapper_fn._reward_function_resources = resources  # type: ignore[attr-defined]
+        wrapper_fn._reward_function_timeout = timeout  # type: ignore[attr-defined]
+        wrapper_fn._reward_function_concurrency = concurrency  # type: ignore[attr-defined]
 
         return cast(F, wrapper_fn)
 

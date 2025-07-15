@@ -255,3 +255,20 @@ def test_async_reward_function():
         assert result.reason == "Overall test reason"
     
     asyncio.run(_test_async_reward_function())
+
+def test_reward_function_decorator_attributes():
+    """Test that the reward_function decorator sets attributes correctly."""
+
+    @reward_function(mode="batch", requirements=["requests", "numpy"], concurrency=10, timeout=10)
+    def sample_evaluator(messages: List[Message], **kwargs) -> EvaluateResult:
+        """Sample evaluator that returns a hardcoded result."""
+        return EvaluateResult(
+            score=0.8,
+            reason="Overall test reason",
+            metrics={}
+        )
+
+    assert sample_evaluator._reward_function_mode == "batch"
+    assert sample_evaluator._reward_function_requirements == ["requests", "numpy"]
+    assert sample_evaluator._reward_function_concurrency == 10
+    assert sample_evaluator._reward_function_timeout == 10

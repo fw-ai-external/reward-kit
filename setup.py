@@ -74,7 +74,7 @@ setup(
     author_email="info@fireworks.ai",
     description="A Python library for defining, testing, and using reward functions",
     long_description="A library for defining, testing, and deploying reward functions",
-    url="https://github.com/fireworks-ai/reward-kit",
+    url="https://github.com/fw-ai-external/reward-kit",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",

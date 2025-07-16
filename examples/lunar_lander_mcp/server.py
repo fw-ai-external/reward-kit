@@ -40,6 +40,7 @@ def main():
 
     # Set environment variable for HTTP port (required by FastMCP)
     if args.transport == "streamable-http":
+        # TODO: Benny to fix this later
         os.environ["PORT"] = str(args.port)
 
     # Create and run server

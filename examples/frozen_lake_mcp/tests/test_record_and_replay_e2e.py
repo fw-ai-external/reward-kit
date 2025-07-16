@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import reward_kit as rk
-
+from reward_kit.utils.static_policy import create_frozen_lake_static_policy
 
 def _is_ci_mode():
     """Check if we're running in CI mode."""
@@ -555,12 +555,6 @@ async def test_multi_environment_sessions(multi_env_dataset, multi_env_recording
         os.unlink(multi_env_recording_file)
         print(f"🧹 Removed existing trajectory file: {multi_env_recording_file}")
 
-    # Import static policy for faster testing
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from static_policy import StaticPolicy
-
     # Check if we're in CI mode
     is_ci = os.environ.get("CI", "").lower() in ["true", "1", "yes"]
     if is_ci:
@@ -575,7 +569,7 @@ async def test_multi_environment_sessions(multi_env_dataset, multi_env_recording
         os.environ["REWARD_KIT_PLAYBACK_FILE"] = multi_env_recording_file
 
         # Create static policy for fast testing
-        policy = StaticPolicy(
+        policy = create_frozen_lake_static_policy(
             action_sequence=["RIGHT", "RIGHT", "RIGHT", "DOWN", "DOWN", "DOWN"]
         )
 
@@ -1231,20 +1225,13 @@ async def test_static_policy_functionality():
 
     print("\n🧪 === STATIC POLICY TEST ===")
 
-    # Import static policy
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from static_policy import StaticPolicy
-
     # Create policy
-    policy = StaticPolicy(action_sequence=["RIGHT", "DOWN", "LEFT", "UP"])
+    policy = create_frozen_lake_static_policy(action_sequence=["RIGHT", "DOWN", "LEFT", "UP"])
 
     # Initialize
     policy.initialize_conversations(
         n_envs=2,
         system_prompts=["Test system prompt 1", "Test system prompt 2"],
-        initial_user_prompts=["Test user prompt 1", "Test user prompt 2"],
     )
 
     # Test action generation
@@ -1280,18 +1267,12 @@ async def test_control_plane_state_querying(multi_env_dataset):
 
     print("\n🧪 === CONTROL PLANE STATE QUERYING TEST ===")
 
-    # Import static policy
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from static_policy import StaticPolicy
-
     # Start server for this test
     server = _create_test_server(9700)
     try:
 
         # Create policy with shorter sequence for testing
-        policy = StaticPolicy(action_sequence=["RIGHT", "DOWN"])
+        policy = create_frozen_lake_static_policy(action_sequence=["RIGHT", "DOWN"])
 
         # Create environments
         envs = rk.make(

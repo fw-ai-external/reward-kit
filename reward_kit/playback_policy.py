@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .mcp.types import MCPToolCall
 
@@ -220,7 +220,7 @@ class PlaybackPolicyBase(ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[str],
+        user_prompts: List[Union[str, Dict[str, Any]]],
     ) -> List["MCPToolCall"]:
         """
         Generate tool calls in live mode. Concrete classes must implement this.
@@ -241,7 +241,7 @@ class PlaybackPolicyBase(ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[str],
+        user_prompts: List[Union[str, Dict[str, Any]]],
     ) -> List["MCPToolCall"]:
         """
         Main policy call method. Delegates to playback or live mode.
@@ -269,7 +269,7 @@ class PlaybackPolicyBase(ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[str],
+        user_prompts: List[Union[str, Dict[str, Any]]],
     ) -> List["MCPToolCall"]:
         """
         Handle policy calls in playback mode by extracting tool calls from recorded messages.

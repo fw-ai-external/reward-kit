@@ -453,7 +453,7 @@ class McpGym(ABC):
         return self._render(obs)
 
     def _execute_session_environment_step(
-        self, session_id: str, action_int: int
+        self, session_id: str, action: Any
     ) -> Dict[str, Any]:
         """
         Execute environment step for a specific session and update control plane.
@@ -470,7 +470,7 @@ class McpGym(ABC):
 
         # Execute environment step
         obs, reward, terminated, truncated, info = self.adapter.step_environment(
-            env, action_int
+            env, action
         )
 
         # Update session observation state

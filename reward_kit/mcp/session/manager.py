@@ -192,7 +192,35 @@ class GeneralMCPVectorEnv:
 
         return user_prompts
 
-    def _default_formatter(self, template: str, observation: Any, context: Dict) -> Union[str, Dict[str, Any]]:
+    def format_tool_response(self, obs: Any) -> Union[str, List[Dict[str, Any]]]:
+        """
+        Format observation to tool response. If there's an image_url, it will be returned as a multimodal content. If not, it will be returned as a string.
+        This is what gets filled in for the tool responses content.
+        """
+
+        if isinstance(obs, dict) and obs.get("image_url"):
+            image_url = obs["image_url"]["url"]
+            obs.pop("image_url")
+
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(obs) if isinstance(obs, dict) else str(obs)
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_url,
+                    }
+                }
+            ]
+
+        else:
+            return json.dumps(obs) if isinstance(obs, dict) else str(obs)
+
+        
+
+    def _default_formatter(self, template: str, obs: Any, context: Dict) -> Union[str, Dict[str, Any]]:
         """
         Default user prompt formatter.
 
@@ -204,32 +232,29 @@ class GeneralMCPVectorEnv:
             Either a string (text-only) or a dict (multimodal content)
         """
         # Extract formatted display from observation if available
-        display_observation = observation
+        display_obs = obs
         image_url = None
 
-        debug_observation = observation.copy()
-        debug_observation.pop("image_url", None)
-
-        if isinstance(observation, dict):
+        if isinstance(obs, dict):
             # For visual environments like LunarLander, we have image_url
-            if "image_url" in observation:
-                image_url = observation["image_url"]
-                display_observation.pop("image_url")
+            if "image_url" in obs:
+                image_url = obs["image_url"]
+                display_obs.pop("image_url")
             # For other structured observations, try to extract meaningful display
             elif (
-                "observation" in observation
-                and observation["observation"] != "default_initial_state"
+                "observation" in obs
+                and obs["observation"] != "default_initial_state"
             ):
-                display_observation = observation["observation"]
+                display_obs = obs["observation"]
             # If we still have default_initial_state, try to use position info
             elif (
-                observation.get("observation") == "default_initial_state"
-                and "session_id" in observation
+                obs.get("observation") == "default_initial_state"
+                and "session_id" in obs
             ):
                 # This is the fallback case - we should have gotten the proper initial state from MCP resources
-                display_observation = f"Initial game state (Session: {observation['session_id']})\nWaiting for grid data from server..."
+                display_obs = f"Initial game state (Session: {obs['session_id']})\nWaiting for grid data from server..."
 
-        formatted_prompt = template.format(observation=display_observation, **context)
+        formatted_prompt = template.format(observation=display_obs, **context)
         
         # If we have image data, return multimodal content
         if image_url:

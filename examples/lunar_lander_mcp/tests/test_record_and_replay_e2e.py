@@ -207,7 +207,7 @@ async def test_production_server_record_and_replay(
 
         # Create playback policy
         playback_policy = rk.OpenAIPolicy(
-            model_id="gpt-4o",
+            model_id="gpt-4.1",
             # temperature=0.2,
             max_tokens=4096,
         )
@@ -246,7 +246,7 @@ async def test_production_server_record_and_replay(
 
     # Create policy for recording
     policy = rk.OpenAIPolicy(
-        model_id="gpt-4o",
+        model_id="gpt-4.1",
         # temperature=0.2,
         max_tokens=4096,
     )
@@ -312,7 +312,7 @@ async def test_production_server_record_and_replay(
 
     # Create new policy for playback (same environment variable)
     playback_policy = rk.OpenAIPolicy(
-        model_id="gpt-4o",
+        model_id="gpt-4.1",
         # temperature=0.2,
         max_tokens=4096,
     )
@@ -410,7 +410,7 @@ async def test_production_only_recorded_policy(lunar_lander_dataset):
 
         # Create policy in playback mode
         policy = rk.OpenAIPolicy(
-            model_id="gpt-4o",
+            model_id="gpt-4.1",
             # temperature=0.2,
             max_tokens=4096,
         )
@@ -463,7 +463,7 @@ async def test_lunar_lander_step_by_step(conda_isolation_recording_file):
 
         # Create policy
         policy = rk.OpenAIPolicy(
-            model_id="gpt-4o",
+            model_id="gpt-4.1",
             # temperature=0.2,
             max_tokens=4096,
         )
@@ -536,7 +536,7 @@ def multi_env_dataset():
         {
             "id": "multi_env_test_001",
             "system_prompt": "You are controlling a lunar lander spacecraft. Use the lander_action tool with actions: NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT. Your goal is to land safely on the moon between the two flags without crashing.",
-            "user_prompt_template": "1 Current state: {observation}. First, describe what is in the image attached and analyze the current state. Think through the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
+            "user_prompt_template": "Current state: {observation}. First, describe what is in the image attached and analyze the current state. You MUST explain your reasoning in picking the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
             "environment_context": {
                 "game": "LunarLander",
                 "continuous": False,
@@ -548,7 +548,7 @@ def multi_env_dataset():
         {
             "id": "multi_env_test_002",
             "system_prompt": "You are controlling a lunar lander spacecraft. Use the lander_action tool with actions: NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT. Your goal is to land safely on the moon between the two flags without crashing.",
-            "user_prompt_template": "2 Current state: {observation}. First, describe what is in the image attached and analyze the current state. Think through the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
+            "user_prompt_template": "Current state: {observation}. First, describe what is in the image attached and analyze the current state. You MUST explain your reasoning in picking the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
             "environment_context": {
                 "game": "LunarLander",
                 "continuous": False,
@@ -560,7 +560,7 @@ def multi_env_dataset():
         {
             "id": "multi_env_test_003",
             "system_prompt": "You are controlling a lunar lander spacecraft. Use the lander_action tool with actions: NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT. Your goal is to land safely on the moon between the two flags without crashing.",
-            "user_prompt_template": "3 Current state: {observation}. First, describe what is in the image attached and analyze the current state. Think through the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
+            "user_prompt_template": "Current state: {observation}. First, describe what is in the image attached and analyze the current state. You MUST explain your reasoning in picking the next best action (NOTHING, FIRE_LEFT, FIRE_MAIN, FIRE_RIGHT) and call lander_action tool with it to land the spacecraft.",
             "environment_context": {
                 "game": "LunarLander",
                 "continuous": False,
@@ -784,7 +784,22 @@ async def _validate_recording_integrity(recording_file: str, dataset: List[Dict]
         states = []
         for i, response in enumerate(tool_responses[:2]):
             try:
-                response_data = json.loads(response)
+                # Handle both string (JSON) and list (multimodal) content
+                if isinstance(response, list):
+                    # Multimodal content - extract text part
+                    text_content = None
+                    for item in response:
+                        if item.get("type") == "text":
+                            text_content = item.get("text")
+                            break
+                    if text_content:
+                        response_data = json.loads(text_content)
+                    else:
+                        response_data = {}
+                else:
+                    # String content - parse as JSON
+                    response_data = json.loads(response)
+                
                 # For lunar lander, we might have different state representation
                 state_info = {
                     "position": response_data.get("position", "unknown"),
@@ -794,9 +809,9 @@ async def _validate_recording_integrity(recording_file: str, dataset: List[Dict]
                 }
                 states.append(state_info)
                 print(f"    Step {i+1}: {state_info}")
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, TypeError) as e:
                 pytest.fail(
-                    f"❌ Invalid JSON in tool response {i+1} for env {env_idx}: {response}"
+                    f"❌ Invalid JSON in tool response {i+1} for env {env_idx}: {response}. Error: {e}"
                 )
 
         # For lunar lander, we expect state to change between steps
@@ -841,12 +856,28 @@ def _validate_no_repeated_states(env_recordings: Dict, dataset: List[Dict]):
             for msg in messages:
                 if msg["role"] == "tool":
                     try:
-                        tool_response = json.loads(msg["content"])
+                        # Handle both string (JSON) and list (multimodal) content
+                        content = msg["content"]
+                        if isinstance(content, list):
+                            # Multimodal content - extract text part
+                            text_content = None
+                            for item in content:
+                                if item.get("type") == "text":
+                                    text_content = item.get("text")
+                                    break
+                            if text_content:
+                                tool_response = json.loads(text_content)
+                            else:
+                                tool_response = {}
+                        else:
+                            # String content - parse as JSON
+                            tool_response = json.loads(content)
+                        
                         # For lunar lander, we might track position or a state hash
-                        state_id = tool_response.get("position", str(hash(msg["content"])))
+                        state_id = tool_response.get("position", str(hash(str(content))))
                         if state_id is not None:
                             positions.append((entry_num, state_id))
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, TypeError):
                         continue
 
         if len(positions) < 2:
@@ -1081,7 +1112,7 @@ async def test_fireworks_multi_environment_sessions(
 
         # Create playback policy
         playback_policy = rk.OpenAIPolicy(
-            model_id="gpt-4o-mini",
+            model_id="gpt-4.1",
             temperature=0.2,
             max_tokens=8192,
         )
@@ -1128,7 +1159,7 @@ async def test_fireworks_multi_environment_sessions(
 
         # Create OpenAIPolicy for multi-environment testing
         policy = rk.OpenAIPolicy(
-            model_id="gpt-4o",
+            model_id="gpt-4.1",
             # temperature=0.2,
             max_tokens=4096,
         )

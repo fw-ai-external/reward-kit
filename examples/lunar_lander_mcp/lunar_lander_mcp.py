@@ -86,30 +86,6 @@ class LunarLanderMcp(McpGym):
 
             return observation_data
 
-        @self.mcp.tool(
-            name="get_control_plane_state",
-            description="Get current control plane state for this session (for rollout system).",
-        )
-        def get_control_plane_state(ctx: Context) -> Dict[str, Any]:
-            """
-            Get control plane state for current session.
-
-            Args:
-                ctx: MCP context
-
-            Returns:
-                Control plane state dictionary
-            """
-            session_id = self._get_session_id(ctx)
-            control_state = self.get_control_plane_state(session_id)
-
-            if control_state is None:
-                # Initialize session if it doesn't exist
-                session_data = self._get_or_create_session(ctx)
-                # TODO: do we need the above?
-                control_state = self._get_or_create_session_control_plane(session_id)
-
-            return control_state
 
     def format_observation(self, obs: Any, env: Any) -> Dict[str, Any]:
         """Format observation for MCP response (data plane only)."""

@@ -112,7 +112,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         self,
         env_index: int,
         tool_call: MCPToolCall,
-        tool_response: str,
+        tool_response: Union[str, List[Dict[str, Any]]],
         reward: float = 0.0,
         terminated: bool = False,
         info: Optional[Dict[str, Any]] = None,
@@ -229,10 +229,12 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
 
         # Process responses and handle exceptions
         result_calls = []
+
         for i, tool_call in enumerate(tool_calls):
             if isinstance(tool_call, Exception):
-                return
-            elif tool_call is None:
+                logger.error(f"tool_call failed with exception: {tool_call}")
+                raise tool_call
+            if tool_call is None:
                 # No tool call generated (e.g., success message with no tools) - use special termination signal
                 logger.info(
                     f"Environment {i}: No tool call generated, using termination signal"
@@ -269,14 +271,16 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
                 )
 
             # Add current user prompt with observation to conversation history
-            if isinstance(user_prompt, str):
-                current_user_message = {"role": "user", "content": user_prompt}
-            elif isinstance(user_prompt, dict):
-                current_user_message = {"role": "user", "content": user_prompt["content"]}
-            else:
-                current_user_message = {"role": "user", "content": str(user_prompt)}
             
-            messages.append(current_user_message)
+            # TODO: make this an option the users can trigger
+            # if isinstance(user_prompt, str):
+            #     current_user_message = {"role": "user", "content": user_prompt}
+            # elif isinstance(user_prompt, dict):
+            #     current_user_message = {"role": "user", "content": user_prompt["content"]}
+            # else:
+            #     current_user_message = {"role": "user", "content": str(user_prompt)}
+            
+            # messages.append(current_user_message)
 
             # Convert MCP tools to LLM format
             llm_tools = self._convert_mcp_tools_to_llm_format(tools)

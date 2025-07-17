@@ -57,7 +57,7 @@ class LunarLanderAdapter(EnvironmentAdapter):
         return env.reset()
 
     def step_environment(
-        self, env: LunarLander, action: np.ndarray
+        self, env: LunarLander, action: int
     ) -> Tuple[Any, float, bool, bool, Dict[str, Any]]:
         """Execute one step in the environment."""
         return env.step(action)

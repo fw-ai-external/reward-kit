@@ -1243,6 +1243,7 @@ async def test_static_policy_functionality():
     policy.initialize_conversations(
         n_envs=2,
         system_prompts=["Test system prompt 1", "Test system prompt 2"],
+        user_prompts=["Test user prompt 1", "Test user prompt 2"],
     )
 
     # Test action generation

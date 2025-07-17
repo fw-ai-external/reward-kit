@@ -220,7 +220,7 @@ class GeneralMCPVectorEnv:
 
         
 
-    def _default_formatter(self, template: str, obs: Any, context: Dict) -> Union[str, Dict[str, Any]]:
+    def _default_formatter(self, template: str, obs: Any, context: Dict) -> Union[str, List[Dict[str, Any]]]:
         """
         Default user prompt formatter.
 
@@ -258,15 +258,13 @@ class GeneralMCPVectorEnv:
         
         # If we have image data, return multimodal content
         if image_url:
-            return {
-                "content": [
-                    {"type": "text", "text": formatted_prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": image_url,
-                    }
-                ]
-            }
+            return [
+                {"type": "text", "text": formatted_prompt},
+                {
+                    "type": "image_url",
+                    "image_url": image_url,
+                }
+            ]
         
         return formatted_prompt
 

@@ -42,7 +42,7 @@ class PlaybackPolicyBase(ABC):
         # Playback state management
         self._playback_actions = _playback_actions
         self._is_playback = _playback_actions is not None
-        print("show is playback: ", self._is_playback, _playback_actions)
+        # print("show is playback: ", self._is_playback, _playback_actions)
         self._playback_step_counters = {}  # {env_index: current_step}
 
         # Environment variable override

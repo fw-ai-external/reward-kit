@@ -71,7 +71,7 @@ class StaticPolicy(PlaybackPolicyBase):
         self.initialized = False
 
     def initialize_conversations(
-        self, n_envs: int, system_prompts: List[str]
+        self, n_envs: int, system_prompts: List[str], user_prompts: List[Union[str, List[Dict[str, Any]]]]
     ):
         """Initialize conversation histories for each environment."""
         self.step_counts = {i: 0 for i in range(n_envs)}
@@ -79,6 +79,7 @@ class StaticPolicy(PlaybackPolicyBase):
         for i in range(n_envs):
             self.conversation_histories[i] = [
                 {"role": "system", "content": system_prompts[i]},
+                {"role": "user", "content": user_prompts[i]},
             ]
         self.initialized = True
         logger.info(f"🎯 Static policy initialized for {n_envs} environments")
@@ -90,7 +91,7 @@ class StaticPolicy(PlaybackPolicyBase):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List[MCPToolCall]:
         """
         Generate tool calls in live mode using the static action sequence.
@@ -109,7 +110,7 @@ class StaticPolicy(PlaybackPolicyBase):
         # Initialize conversations on first call
         if not self.initialized:
             self.initialize_conversations(
-                len(observations), system_prompts
+                len(observations), system_prompts, user_prompts
             )
 
         # Generate actions using the same logic as before, but now create conversation entries
@@ -277,13 +278,14 @@ class RandomPolicy(PlaybackPolicyBase):
         self.initialized = False
 
     def initialize_conversations(
-        self, n_envs: int, system_prompts: List[str]
+        self, n_envs: int, system_prompts: List[str], user_prompts: List[Union[str, List[Dict[str, Any]]]]
     ):
         """Initialize conversation histories for each environment."""
         self.conversation_histories = {}
         for i in range(n_envs):
             self.conversation_histories[i] = [
                 {"role": "system", "content": system_prompts[i]},
+                {"role": "user", "content": user_prompts[i]},
             ]
         self.initialized = True
         logger.info(f"🎲 Random policy initialized for {n_envs} environments")
@@ -295,7 +297,7 @@ class RandomPolicy(PlaybackPolicyBase):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List[MCPToolCall]:
         """
         Generate random tool calls in live mode.
@@ -312,7 +314,7 @@ class RandomPolicy(PlaybackPolicyBase):
         # Initialize conversations on first call
         if not self.initialized:
             self.initialize_conversations(
-                len(observations), system_prompts
+                len(observations), system_prompts, user_prompts
             )
 
         results = []
@@ -476,6 +478,7 @@ if __name__ == "__main__":
         policy.initialize_conversations(
             n_envs=2,
             system_prompts=["System prompt 1", "System prompt 2"],
+            user_prompts=["User prompt 1", "User prompt 2"],
         )
 
         # Generate actions for several steps
@@ -501,6 +504,7 @@ if __name__ == "__main__":
         policy.initialize_conversations(
             n_envs=2,
             system_prompts=["System prompt 1", "System prompt 2"],
+            user_prompts=["User prompt 1", "User prompt 2"],
         )
 
         # Generate actions for several steps

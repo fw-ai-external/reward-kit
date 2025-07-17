@@ -98,13 +98,14 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         pass
 
     def initialize_conversations(
-        self, n_envs: int, system_prompts: List[str]
+        self, n_envs: int, system_prompts: List[str], user_prompts: List[Union[str, List[Dict[str, Any]]]]
     ):
         """Initialize conversation histories for each environment."""
         self.conversation_histories = {}
         for i in range(n_envs):
             self.conversation_histories[i] = [
                 {"role": "system", "content": system_prompts[i]},
+                {"role": "user", "content": user_prompts[i]},
             ]
         self.initialized = True
 
@@ -188,7 +189,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List[MCPToolCall]:
         """
         Generate tool calls for all environments using LLM in live mode.
@@ -211,7 +212,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         # Initialize conversations on first call
         if not self.initialized:
             self.initialize_conversations(
-                len(observations), system_prompts
+                len(observations), system_prompts, user_prompts
             )
 
         logger.debug(
@@ -221,7 +222,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         # Make parallel API calls using conversation history
         tasks = []
         for i, tools in enumerate(tool_schemas):
-            task = asyncio.create_task(self._generate_tool_call_with_history(tools, i, user_prompts[i]))
+            task = asyncio.create_task(self._generate_tool_call_with_history(tools, i))
             tasks.append(task)
 
         # Wait for all API calls to complete
@@ -249,7 +250,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         return result_calls
 
     async def _generate_tool_call_with_history(
-        self, tools: List[Dict], env_index: int, user_prompt: Union[str, Dict[str, Any]]
+        self, tools: List[Dict], env_index: int
     ) -> MCPToolCall:
         """
         Generate a tool call using conversation history for proper OpenAI trajectories.
@@ -342,7 +343,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List[MCPToolCall]:
         """
         Override to ensure conversation histories are maintained in both live and playback modes.
@@ -352,7 +353,7 @@ class LLMBasePolicy(PlaybackPolicyBase, ABC):
         # Initialize conversations if not already done (important for both modes)
         if not hasattr(self, "initialized") or not self.initialized:
             self.initialize_conversations(
-                len(observations), system_prompts
+                len(observations), system_prompts, user_prompts
             )
 
         if self._is_playback:

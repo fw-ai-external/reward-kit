@@ -169,7 +169,7 @@ class GeneralMCPVectorEnv:
         observations, rewards, dones, infos = zip(*results)
         return list(observations), list(rewards), list(dones), list(infos)
 
-    def format_user_prompts(self, observations: List[Any]) -> List[Union[str, Dict[str, Any]]]:
+    def format_user_prompts(self, observations: List[Any]) -> List[Union[str, List[Dict[str, Any]]]]:
         """
         Format user prompts dynamically based on current observations.
 

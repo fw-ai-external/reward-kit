@@ -220,7 +220,7 @@ class PlaybackPolicyBase(ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List["MCPToolCall"]:
         """
         Generate tool calls in live mode. Concrete classes must implement this.
@@ -241,7 +241,7 @@ class PlaybackPolicyBase(ABC):
         tool_schemas: List[List[Dict]],
         observations: List[Any],
         system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
+        user_prompts: List[Union[str, List[Dict[str, Any]]]],
     ) -> List["MCPToolCall"]:
         """
         Main policy call method. Delegates to playback or live mode.
@@ -257,7 +257,7 @@ class PlaybackPolicyBase(ABC):
         """
         if self._is_playback:
             return await self._handle_playback_mode(
-                tool_schemas, observations, system_prompts, user_prompts
+                tool_schemas
             )
         else:
             return await self._generate_live_tool_calls(
@@ -267,9 +267,6 @@ class PlaybackPolicyBase(ABC):
     async def _handle_playback_mode(
         self,
         tool_schemas: List[List[Dict]],
-        observations: List[Any],
-        system_prompts: List[str],
-        user_prompts: List[Union[str, Dict[str, Any]]],
     ) -> List["MCPToolCall"]:
         """
         Handle policy calls in playback mode by extracting tool calls from recorded messages.

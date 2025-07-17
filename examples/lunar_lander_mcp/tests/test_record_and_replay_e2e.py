@@ -29,7 +29,28 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import reward_kit as rk
-from reward_kit.utils.static_policy import create_lunar_lander_static_policy
+from reward_kit.utils.static_policy import StaticPolicy, RandomPolicy
+
+
+# Helper functions for creating environment-specific policies
+def create_lunar_lander_static_policy(action_sequence: Optional[List[str]] = None, **kwargs) -> StaticPolicy:
+    """Create a static policy configured for LunarLander environment."""
+    return StaticPolicy(
+        tool_name="lander_action",
+        action_sequence=action_sequence or ["NOTHING"],
+        available_actions=["NOTHING", "FIRE_LEFT", "FIRE_MAIN", "FIRE_RIGHT"],
+        **kwargs
+    )
+
+
+def create_lunar_lander_random_policy(seed: Optional[int] = None, **kwargs) -> RandomPolicy:
+    """Create a random policy configured for LunarLander environment."""
+    return RandomPolicy(
+        tool_name="lander_action",
+        available_actions=["NOTHING", "FIRE_LEFT", "FIRE_MAIN", "FIRE_RIGHT"],
+        seed=seed,
+        **kwargs
+    )
 
 
 def _is_ci_mode():

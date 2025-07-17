@@ -29,7 +29,29 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import reward_kit as rk
-from reward_kit.utils.static_policy import create_frozen_lake_static_policy
+from reward_kit.utils.static_policy import StaticPolicy, RandomPolicy
+
+
+# Helper functions for creating environment-specific policies
+def create_frozen_lake_static_policy(action_sequence: Optional[List[str]] = None, **kwargs) -> StaticPolicy:
+    """Create a static policy configured for FrozenLake environment."""
+    return StaticPolicy(
+        tool_name="lake_move",
+        action_sequence=action_sequence or ["RIGHT", "RIGHT", "RIGHT", "DOWN", "DOWN", "DOWN"],
+        available_actions=["LEFT", "DOWN", "RIGHT", "UP"],
+        **kwargs
+    )
+
+
+def create_frozen_lake_random_policy(seed: Optional[int] = None, **kwargs) -> RandomPolicy:
+    """Create a random policy configured for FrozenLake environment."""
+    return RandomPolicy(
+        tool_name="lake_move",
+        available_actions=["LEFT", "DOWN", "RIGHT", "UP"],
+        seed=seed,
+        **kwargs
+    )
+
 
 def _is_ci_mode():
     """Check if we're running in CI mode."""

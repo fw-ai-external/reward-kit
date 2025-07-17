@@ -99,30 +99,6 @@ class FrozenLakeMcp(McpGym):
 
             return observation_data
 
-        @self.mcp.tool(
-            name="get_control_plane_state",
-            description="Get current control plane state for this session (for rollout system).",
-        )
-        def get_control_plane_state(ctx: Context) -> Dict[str, Any]:
-            """
-            Get control plane state for current session.
-
-            Args:
-                ctx: MCP context
-
-            Returns:
-                Control plane state dictionary
-            """
-            session_id = self._get_session_id(ctx)
-            control_state = self.get_control_plane_state(session_id)
-
-            if control_state is None:
-                # Initialize session if it doesn't exist
-                session_data = self._get_or_create_session(ctx)
-                control_state = self._get_or_create_session_control_plane(session_id)
-
-            return control_state
-
     @staticmethod
     def format_observation(obs: int, env: Any) -> Dict[str, Any]:
         """Format observation for MCP response (data plane only)."""
@@ -130,22 +106,3 @@ class FrozenLakeMcp(McpGym):
             "position": int(obs),
             "grid": env.render(),
         }
-
-
-# Example usage and testing
-# if __name__ == "__main__":
-#     # Test the FrozenLake MCP-Gym environment
-#     print("Creating FrozenLake MCP-Gym server...")
-#     server = FrozenLakeMcp(seed=42)
-#
-#     print("Server created successfully!")
-#     print(f"Environment adapter: {server.adapter.__class__.__name__}")
-#     print("\n🎛️  Multi-session control plane features:")
-#     print("  - Session-based environment isolation")
-#     print("  - Server-side control plane state management")
-#     print("  - get_control_plane_state tool for rollout system")
-#     print("  - Data plane tools return observations only")
-#
-#     # Run the server
-#     print("\nStarting MCP server...")
-#     server.run()

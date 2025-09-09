@@ -1,10 +1,18 @@
 import json
 from typing import Any, Dict, List, Optional, Union
 
-from openai.types.chat.chat_completion_message import (
-    ChatCompletionMessageToolCall,
-    FunctionCall,
-)
+# OpenAI types (support multiple SDK layouts). Fallback to typing.Any if unavailable.
+try:
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+    )
+    try:
+        from openai.types.chat.chat_completion_message import FunctionCall
+    except Exception:
+        from typing import Any as FunctionCall  # type: ignore
+except Exception:
+    from typing import Any as ChatCompletionMessageToolCall  # type: ignore
+    from typing import Any as FunctionCall  # type: ignore
 from pydantic import BaseModel, Field
 
 

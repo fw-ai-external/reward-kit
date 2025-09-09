@@ -790,7 +790,12 @@ def execute_code_with_e2b(
                 "error": "API key is required for E2B execution. Set it using the api_key parameter or E2B_API_KEY environment variable.",
             }
 
-        with Sandbox(api_key=api_key) as sandbox:
+        # Newer E2B SDKs require Sandbox.create() and use env var for API key
+        if api_key:
+            os.environ["E2B_API_KEY"] = api_key
+        sandbox = None
+        try:
+            sandbox = Sandbox.create(timeout=timeout)
             stdout = []
             stderr = []
 
@@ -806,7 +811,11 @@ def execute_code_with_e2b(
                 else:
                     stderr.append(str(output))
 
-            sandbox.on_exit = lambda *args: None  # type: ignore[method-assign, assignment]
+            # Some SDK versions expose on_exit; ignore if missing
+            try:
+                sandbox.on_exit = lambda *args: None  # type: ignore[method-assign, assignment]
+            except Exception:
+                pass
 
             if language.lower() in ["python", "py"]:
                 file_path = "/code/script.py"
@@ -823,14 +832,13 @@ def execute_code_with_e2b(
 
             try:
                 fs_handler = None
-                if _E2B_SOURCE == "e2b_code_interpreter":
-                    if hasattr(sandbox, "filesystem"):
-                        fs_handler = sandbox.filesystem
-                elif _E2B_SOURCE == "e2b":
-                    if hasattr(sandbox, "_filesystem"):
-                        fs_handler = sandbox._filesystem
-                    elif hasattr(sandbox, "filesystem"):
-                        fs_handler = sandbox.filesystem
+                # Prefer modern 'files' API; fallback to legacy attributes
+                if hasattr(sandbox, "files"):
+                    fs_handler = sandbox.files
+                elif hasattr(sandbox, "filesystem"):
+                    fs_handler = sandbox.filesystem
+                elif hasattr(sandbox, "_filesystem"):
+                    fs_handler = sandbox._filesystem
 
                 if not fs_handler:
                     return {
@@ -878,6 +886,12 @@ def execute_code_with_e2b(
                     "output": None,
                     "error": f"Execution error: {str(e)}",
                 }
+        finally:
+            try:
+                if sandbox is not None:
+                    sandbox.kill()
+            except Exception:
+                pass
 
     except Exception as e:
         error_traceback = traceback.format_exc()

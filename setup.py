@@ -14,7 +14,7 @@ setup(
         "fastapi>=0.68.0",
         "uvicorn>=0.15.0",
         "python-dotenv>=0.19.0",
-        "openai==1.78.1",
+        "openai>=1.78.1,<2",
         "aiosqlite",
         "aiohttp",
         "mcp>=1.9.2",
@@ -45,7 +45,7 @@ setup(
             "types-PyYAML",
             "types-docker",
             "versioneer>=0.20",
-            "openai==1.78.1",  # needed for tests using OpenAI types
+            "openai>=1.78.1,<2",  # needed for tests using OpenAI types
             # datasets, hydra-core, omegaconf moved to core dependencies
             "pre-commit",
             "e2b>=0.15.0",  # Added e2b for E2B environment tests

@@ -269,21 +269,30 @@ def json_schema_reward_with_llm_judge(
     Returns:
         EvaluateResult with score and metrics
     """
-    # Import OpenAI at call time to make this optional
+    # Import OpenAI at call time to make this optional, support both 1.x and legacy 0.x
+    OpenAIClientCls = None
+    legacy_openai = None
     try:
-        from openai import OpenAI
+        from openai import OpenAI as OpenAIClient  # type: ignore
+
+        OpenAIClientCls = OpenAIClient
     except ImportError:
-        return EvaluateResult(
-            score=0.0,
-            reason="OpenAI package not installed.",
-            metrics={
-                "error": MetricResult(
-                    score=0.0,
-                    reason="OpenAI package not installed. Install it with: pip install openai",
-                    is_score_valid=False,
-                )
-            },
-        )
+        try:
+            import openai as openai_legacy  # type: ignore
+
+            legacy_openai = openai_legacy
+        except Exception:
+            return EvaluateResult(
+                score=0.0,
+                reason="OpenAI package not installed.",
+                metrics={
+                    "error": MetricResult(
+                        score=0.0,
+                        reason="OpenAI package not installed. Install it with: pip install openai",
+                        is_score_valid=False,
+                    )
+                },
+            )
 
     if weights is None:
         weights = {"schema": 0.7, "llm": 0.3}
@@ -378,13 +387,27 @@ EXPLANATION: [your detailed explanation]
             api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OpenAI API key not provided")
-            client = OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model=model,
-                temperature=temperature,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            llm_response = response.choices[0].message.content or ""
+
+            if OpenAIClientCls is not None:
+                client = OpenAIClientCls(api_key=api_key)
+                response = client.chat.completions.create(
+                    model=model,
+                    temperature=temperature,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                llm_response = response.choices[0].message.content or ""
+            elif legacy_openai is not None:
+                legacy_openai.api_key = api_key  # type: ignore[attr-defined]
+                request_kwargs = {
+                    "model": model,
+                    "temperature": temperature,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+                response = legacy_openai.ChatCompletion.create(**request_kwargs)  # type: ignore[attr-defined]
+                # Legacy returns dict-like; extract content
+                choices = response.get("choices", [])
+                message = choices[0]["message"] if choices else {"content": ""}
+                llm_response = message.get("content", "") or ""
             score_match = re.search(r"SCORE:\s*([\d.]+)", llm_response)
             explanation_match = re.search(
                 r"EXPLANATION:\s*(.*)", llm_response, re.DOTALL

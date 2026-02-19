@@ -20,11 +20,12 @@ async def test_control_plane_separation():
     """Test that control plane separation works correctly."""
 
     # Start the server in a separate process or assume it's already running
-    server_url = "http://localhost:8000"
+    server_url = "http://localhost:8000/mcp"
 
     # Create MCP client
     exit_stack = AsyncExitStack()
 
+    print("🔗 Connecting to MCP server at", server_url)
     try:
         # Connect to server
         read_stream, write_stream, _ = await exit_stack.enter_async_context(
@@ -37,10 +38,11 @@ async def test_control_plane_separation():
 
         await session.initialize()
 
+        print("✅ MCP session initialized")
         # Test 1: Check that control plane resources are available
         print("🔍 Testing control plane resources availability...")
         resources = await session.list_resources()
-        resource_uris = [r.uri for r in resources.resources]
+        resource_uris = [str(r.uri) for r in resources.resources]
 
         assert (
             "control://reward" in resource_uris
@@ -53,7 +55,7 @@ async def test_control_plane_separation():
 
         # Test 2: Execute a successful path to goal
         print("\n🎯 Testing successful path to goal...")
-        successful_path = ["DOWN", "RIGHT", "RIGHT", "RIGHT", "DOWN", "DOWN"]
+        successful_path = ["DOWN", "DOWN", "RIGHT", "RIGHT", "DOWN", "RIGHT"]
 
         for i, action in enumerate(successful_path):
             print(f"\n--- Step {i+1}: {action} ---")
@@ -84,11 +86,11 @@ async def test_control_plane_separation():
 
             # Query control plane resources
             reward_resource = await session.read_resource("control://reward")
-            reward_data = json.loads(reward_resource.text)
+            reward_data = json.loads(reward_resource.contents[0].text)
             print(f"Control plane reward: {reward_data}")
 
             status_resource = await session.read_resource("control://status")
-            status_data = json.loads(status_resource.text)
+            status_data = json.loads(status_resource.contents[0].text)
             print(f"Control plane status: {status_data}")
 
             # Check if episode terminated
